@@ -1,0 +1,67 @@
+---
+title: "Embassy: async sin sistema operativo"
+description: "async/await en un microcontrolador: un ejecutor que duerme la CPU hasta que una interrupción la despierta. Cómo funciona un ejecutor mínimo y qué añade Embassy."
+sidebar:
+  order: 5
+duracion: 13
+requiere: ["23-embebido-y-tu-so/04-interrupciones", "18-async"]
+tarjetas:
+  - p: "¿Por qué encaja tan bien async en un microcontrolador?"
+    r: "Porque cada tarea es una máquina de estados de tamaño conocido al compilar: se pueden tener muchas tareas concurrentes sin hilos, sin pila por tarea y sin heap."
+  - p: "¿Qué hace un ejecutor?"
+    r: "Sondea (`poll`) las tareas que están listas. Cuando ninguna lo está, espera. Embassy, en vez de girar, pone la CPU a dormir hasta la siguiente interrupción."
+  - p: "¿Qué es Embassy?"
+    r: "Un framework async para embebido: ejecutor, temporizadores, HAL async para muchos chips, red, USB y Bluetooth. Funciona en Rust estable."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+En el mundo 18 viste que una función `async` es una **máquina de estados**. En un microcontrolador eso es oro: muchas tareas a la vez sin hilos, sin un sistema operativo y, a menudo, sin heap.
+
+## La idea
+
+Un programa embebido típico espera mucho: a que pase un tiempo, a que llegue un byte, a que se pulse un botón. Con `async`:
+
+```rust
+#[embassy_executor::task]
+async fn parpadear(mut led: Output<'static>) {
+    loop {
+        led.set_high();
+        Timer::after_millis(500).await;   // no bloquea: cede la CPU
+        led.set_low();
+        Timer::after_millis(500).await;
+    }
+}
+```
+
+Mientras una tarea espera, el **ejecutor** atiende a otras. Cuando ninguna puede avanzar, Embassy **duerme la CPU** (ahorra batería) hasta que una interrupción (el temporizador, el pin) **despierta** a la tarea que esperaba esa señal. Las interrupciones se convierten en `Waker`s.
+
+## Pruébalo
+
+Un ejecutor mínimo, como los que se escriben en blog_os: sondea la tarea en un bucle hasta que termina.
+
+<Ejecutar ej="m23/ejecutor" />
+
+Seis sondeos: el primer futuro devuelve `Pending` dos veces y luego `Ready`; el segundo, tres veces y luego `Ready`. Embassy hace exactamente esto, pero en vez de dar vueltas sin parar, duerme hasta que alguien llama a `wake`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Sin heap.** Cada tarea de Embassy se guarda en un `static` cuyo tamaño calcula el compilador (el tamaño de la máquina de estados). Por eso se puede saber, al compilar, cuánta memoria usará el programa. En el mundo 21 viste cómo se calcula ese tamaño.
+
+**Embassy y RTIC** resuelven el mismo problema desde lados distintos: RTIC usa el hardware de interrupciones como planificador, con prioridades; Embassy usa `async` y un ejecutor cooperativo. Se pueden combinar (varios ejecutores Embassy a distintas prioridades de interrupción).
+
+**`Pin::new_unchecked` en el ejemplo** es `unsafe` porque el ejecutor promete no mover el futuro mientras lo sondea. Los ejecutores reales usan `core::pin::pin!`, que lo garantiza sin `unsafe`.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace Embassy cuando ninguna tarea puede avanzar?"
+  opciones={["Sondear todas las tareas sin parar", "Poner la CPU a dormir hasta la siguiente interrupción", "Crear un hilo nuevo", "Terminar el programa"]}
+  correcta={1}
+  explicacion="Dormir la CPU ahorra energía, y la interrupción que llegue despertará a la tarea que la esperaba."
+  porque={["Eso gastaría energía sin motivo.", "", "No hay hilos sin sistema operativo.", "Un programa embebido no termina."]}
+/>

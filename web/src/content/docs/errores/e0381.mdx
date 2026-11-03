@@ -1,0 +1,87 @@
+---
+title: "E0381: usar una variable que quizá no está inicializada"
+description: "Usas una variable que, en algún camino del programa, no ha recibido valor."
+sidebar:
+  order: 28
+insignias: ["Propiedad y movimientos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` used binding `total` is possibly-uninitialized ``
+
+## Qué significa
+
+Puedes declarar `let total: i32;` y darle valor más tarde, pero el compilador comprueba que **todos** los caminos le den valor antes de usarla. Aquí, si `hay_datos` es falso, `total` no se asigna. El compilador no mira qué valor tiene la condición: revisa todos los caminos posibles.
+
+## Qué error evita
+
+Leer memoria sin inicializar, que puede contener cualquier cosa: es **comportamiento indefinido**.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0381" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0381]: used binding `total` is possibly-uninitialized
+ --> E0381.rs:7:16
+  |
+2 |     let total: i32;
+  |         ----- binding declared here but left uninitialized
+3 |     let hay_datos = false;
+4 |     if hay_datos {
+  |        --------- if this `if` condition is `false`, `total` is not initialized
+5 |         total = 10;
+6 |     }
+  |      - an `else` arm might be missing here, initializing `total`
+7 |     println!("{total}");
+  |                ^^^^^ `total` used here but it is possibly-uninitialized
+  |
+  = note: when checking initialization, the compiler describes possible control-flow paths without evaluating whether branch conditions can actually have the values shown
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Asignar solo en la rama `if` y no en la `else`.
+- Asignar dentro de un bucle que podría no ejecutarse ninguna vez.
+- Declarar `let x;` y olvidarse de asignarla.
+
+## Cómo arreglarlo
+
+Asigna en todos los caminos (añade el `else`), o mejor, usa `if` como expresión: `let total = if hay_datos { 10 } else { 0 };`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let total: i32;
+    let hay_datos = false;
+    if hay_datos {
+        total = 10;
+    } else {
+        total = 0;
+    }
+    println!("{total}");
+}
+```
+
+**Salida:**
+
+```text
+0
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0381` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0384](/errores/e0384/): asignar dos veces a una variable inmutable
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/)

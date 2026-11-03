@@ -1,0 +1,82 @@
+---
+title: "E0204: Copy no se puede implementar para este tipo"
+description: "Pides Copy para un tipo que contiene campos que no son Copy (String, Vec, Box…)."
+sidebar:
+  order: 20
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` the trait `Copy` cannot be implemented for this type ``
+
+## Qué significa
+
+`Copy` significa «copiar este valor es copiar sus bytes, y ya está». Un `String` es dueño de memoria en el montón: copiar sus bytes daría dos dueños del mismo bloque. Por eso un struct solo puede ser `Copy` si **todos** sus campos lo son.
+
+## Qué error evita
+
+Si un tipo con `String` fuera `Copy`, las dos copias liberarían el mismo bloque: **doble liberación**.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0204" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0204]: the trait `Copy` cannot be implemented for this type
+ --> E0204.rs:2:8
+  |
+1 | #[derive(Clone, Copy)]
+  |                 ---- in this derive macro expansion
+2 | struct Usuario {
+  |        ^^^^^^^
+3 |     nombre: String,
+  |     -------------- this field does not implement `Copy`
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- `#[derive(Clone, Copy)]` en un struct con `String`, `Vec`, `Box` u otro tipo con propiedad.
+
+## Cómo arreglarlo
+
+Quita `Copy` y usa `Clone` (copia explícita con `.clone()`), o cambia el campo por un tipo `Copy` si tiene sentido.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+#[derive(Clone)]
+struct Usuario {
+    nombre: String,
+    edad: u32,
+}
+
+fn main() {
+    let u = Usuario { nombre: String::from("Ana"), edad: 30 };
+    let v = u.clone();
+    println!("{} {}", u.edad, v.nombre);
+}
+```
+
+**Salida:**
+
+```text
+30 Ana
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0204` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0184](/errores/e0184/): Copy y Drop a la vez
+- [E0382](/errores/e0382/): uso de un valor ya movido
+
+## Aprende esto en
+
+- [Mundo 06 · Ownership](/curso/06-ownership/)
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

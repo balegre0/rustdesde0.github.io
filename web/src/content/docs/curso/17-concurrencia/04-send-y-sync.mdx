@@ -1,0 +1,171 @@
+---
+title: "Send y Sync"
+description: "Los dos traits automáticos que deciden qué puede viajar a otro hilo y qué se puede compartir entre hilos, leídos en el código real de la biblioteca estándar."
+sidebar:
+  order: 4
+duracion: 14
+desde: "1.0"
+requiere: ["17-concurrencia/03-hilos-con-ambito", "15-punteros-inteligentes/10-arc"]
+tarjetas:
+  - p: "¿Qué significa T: Send?"
+    r: "Que es seguro MOVER un valor de tipo T a otro hilo (transferir su propiedad)."
+  - p: "¿Qué significa T: Sync?"
+    r: "Que es seguro COMPARTIR un T entre hilos mediante préstamos: T: Sync si y solo si &T: Send."
+  - p: "¿Por qué Send y Sync son auto traits?"
+    r: "El compilador los implementa solo para cualquier tipo cuyos campos los cumplan todos. Nadie escribe impl Send para un struct normal."
+  - p: "¿Por qué implementar Send o Sync a mano es unsafe?"
+    r: "Porque el compilador no puede comprobar la promesa: si te equivocas, permites carreras de datos (comportamiento indefinido)."
+  - p: "¿Es Cell<i32> Send? ¿Y Sync?"
+    r: "Send sí (puede moverse a otro hilo); Sync no (dos hilos con &Cell podrían mutarla a la vez)."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer las dos piezas que hacen que el compilador pueda **rechazar** una carrera de datos: `Send` y `Sync`.
+
+## Predice
+
+<NoCompila ej="m17/rc-en-hilo" explicacion="`Rc` cuenta sus referencias con un contador normal (no atómico). Si un `Rc` y sus clones vivieran en hilos distintos, dos hilos podrían clonar o soltar a la vez y perder una actualización del contador: el valor se liberaría mientras alguien aún lo usa. Por eso `Rc` no es `Send`, y el error lo dice con todas las letras: «the trait `Send` is not implemented for `Rc<i32>`». El arreglo usa `Arc`." />
+
+## La idea
+
+`thread::spawn` exige `F: Send`. **`Send`** es un trait marcador (no tiene métodos) que significa: «es seguro **mover** un valor de este tipo a otro hilo». Su hermano **`Sync`** significa: «es seguro **compartir** este tipo entre hilos a través de préstamos `&T`». La definición precisa es una equivalencia: **`T` es `Sync` si y solo si `&T` es `Send`**. Compartir es, al fin y al cabo, enviar un préstamo compartido a otro hilo.
+
+Lo sorprendente es que **casi nunca los escribes**. Son *auto traits*: el compilador los implementa solo, para cada tipo, mirando sus campos. Un struct es `Send` si todos sus campos son `Send`, y `Sync` si todos son `Sync`. Tu `struct Punto { x: i32, y: i32 }` es `Send + Sync` sin que hagas nada, porque `i32` lo es. La cadena se rompe en unos pocos tipos que la biblioteca marca a propósito: punteros crudos, `Rc`, `Cell`, `RefCell`, `MutexGuard`…
+
+La tabla resume lo que importa (`T` dentro cumple lo necesario):
+
+| Tipo | `Send` | `Sync` | Por qué |
+|---|---|---|---|
+| `i32`, `String`, `Vec<T>`, `Box<T>` | sí | sí | Son dueños de sus datos y no tienen mutabilidad interior. |
+| `Rc<T>` | **no** | **no** | Contador no atómico: clonar en dos hilos a la vez lo corrompería. |
+| `Arc<T>` (con `T: Send + Sync`) | sí | sí | Contador atómico. |
+| `Cell<T>`, `RefCell<T>` | sí | **no** | Mutan a través de `&`; sin candado, dos hilos chocarían. |
+| `Mutex<T>` (con `T: Send`) | sí | sí | El candado convierte el acceso compartido en exclusivo. |
+| `MutexGuard<T>` | **no** | sí si `T: Sync` | El candado debe soltarlo el mismo hilo que lo tomó. |
+| `*const T`, `*mut T` | **no** | **no** | El compilador no sabe qué hay detrás; los tipos que los usan deciden. |
+
+## Pruébalo
+
+Este ejemplo sí corre en tu navegador: no lanza hilos, solo **pregunta al compilador** si cada tipo cumple el trait.
+
+<Ejecutar ej="m17/comprobar-send-sync" />
+
+1. `fn es_send<T: Send>() {}` no hace nada al ejecutarse. Su único efecto es que **no compila** si `T` no es `Send`. Es una prueba que se hace al compilar.
+2. `Punto` es `Send + Sync` sin escribir ningún `impl`.
+3. `Cell<i32>` pasa `es_send` pero no pasaría `es_sync`.
+4. `Mutex<Cell<i32>>` sí es `Sync`: el candado arregla lo que a `Cell` le faltaba.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Las declaraciones reales.** En la biblioteca `core` de Rust 1.99.1:
+
+```rust
+pub unsafe auto trait Send { }
+pub unsafe auto trait Sync { }
+
+impl<T: PointeeSized> !Send for *const T {}
+impl<T: PointeeSized> !Send for *mut T {}
+unsafe impl<T: Sync + PointeeSized> Send for &T {}   // T: Sync ⇒ &T: Send
+```
+
+- `auto`: el compilador lo implementa por composición de campos.
+- `unsafe trait`: implementarlo a mano (`unsafe impl Send for MiTipo {}`) es una **promesa** que el compilador no puede comprobar. Se hace al envolver punteros crudos, y si la promesa es falsa el resultado es comportamiento indefinido (mundo 20).
+- `impl !Send for ...`: una implementación **negativa**. Solo la biblioteca estándar puede escribirlas en Rust estable; desactivan el trait automático.
+
+**`Rc`, `Cell` y `Mutex`** (en `alloc` y `std`):
+
+```rust
+impl<T: ?Sized, A: Allocator> !Send for Rc<T, A> {}
+impl<T: ?Sized, A: Allocator> !Sync for Rc<T, A> {}
+
+unsafe impl<T: ?Sized> Send for Cell<T> where T: Send {}
+impl<T: ?Sized> !Sync for Cell<T> {}
+
+unsafe impl<T: ?Sized + Send> Send for Mutex<T> {}
+unsafe impl<T: ?Sized + Send> Sync for Mutex<T> {}   // ¡solo pide T: Send!
+impl<T: ?Sized> !Send for MutexGuard<'_, T> {}
+unsafe impl<T: ?Sized + Sync> Sync for MutexGuard<'_, T> {}
+```
+
+Fíjate en `Sync for Mutex<T>` con solo `T: Send`: como el candado garantiza que **un único hilo a la vez** toca el `T`, compartir el `Mutex` equivale a ir pasando el `T` de mano en mano, y para eso basta con `Send`.
+
+**El error se explica solo.** En el error del principio, rustc razona en cadena: el closure contiene un `Rc<i32>` («within this closure»), luego el closure no es `Send`, luego no cumple el bound de `spawn` («required by this bound in `spawn`»). Así funcionan todos los errores de auto traits.
+
+**Una prueba formal.** El proyecto académico RustBelt demostró matemáticamente que estas reglas, junto con el código `unsafe` de `Arc`, `Mutex`, `Cell` o `RefCell`, son sólidas. En el proceso encontró un fallo real: `MutexGuard<T>` era `Sync` en casos en que no debía (con un `T` como `Cell`), y se corrigió en Rust 1.19 (la línea lleva la marca `since = "1.19.0"`). De ahí viene el `T: Sync` de la última línea: a través de `&MutexGuard` se puede obtener un `&T` (por `Deref`).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Cell es para un hilo»: sí, y el compilador lo hace cumplir">
+
+❌ Compartir una `Cell` entre dos hilos con ámbito:
+
+<NoCompila ej="m17/cell-compartida" explicacion="Cada closure captura `&Cell<i32>`. Para que `&Cell<i32>` sea Send, `Cell<i32>` tendría que ser Sync, y no lo es. Fíjate en la nota del error: te sugiere `RwLock` o `AtomicI32`." />
+
+✅ Para un contador compartido usa un atómico (`AtomicU32`, pulsa «Ver arreglo») o un `Mutex`. Y no intentes llevarte un candado tomado a otro hilo:
+
+<NoCompila ej="m17/guard-no-send" explicacion="`MutexGuard` no es Send. La propia biblioteca lo justifica: en las plataformas que usan hilos POSIX, un candado debe soltarse en el mismo hilo que lo tomó, y soltar el guard en otro hilo rompería esa regla." />
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m17/reto-arc" enunciado="El programa no compila porque `Rc` no es `Send`. Cámbialo para que los dos hilos compartan la MISMA `Config` (sin clonarla entera). Debe imprimir `servidor #0` y `servidor #1`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Defines `struct Sesion { id: u64, nombre: String }`. ¿Es `Send`?"
+  opciones={[
+    "No, hasta que escribas `impl Send for Sesion`",
+    "Sí, automáticamente, porque `u64` y `String` son Send",
+    "Solo si lo marcas con `#[derive(Send)]`",
+    "Solo dentro de un Arc"
+  ]}
+  correcta={1}
+  explicacion="Send es un auto trait: se cumple por composición de campos."
+  porque={["No hace falta (y escribirlo sería `unsafe impl`).", "Correcto.", "No existe ese derive.", "Arc lo necesita, no lo concede."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál de estas afirmaciones es la definición de `Sync`?"
+  opciones={[
+    "`T: Sync` si T se puede mover a otro hilo",
+    "`T: Sync` si y solo si `&T: Send`",
+    "`T: Sync` si T tiene un Mutex dentro",
+    "`T: Sync` si T es Copy"
+  ]}
+  correcta={1}
+  explicacion="Compartir un T entre hilos es enviar préstamos `&T` a otros hilos."
+  porque={["Esa es la definición de Send.", "Correcto.", "Un i32 es Sync sin Mutex.", "Cell<i32> no es Sync aunque i32 sea Copy."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `Mutex<Cell<i32>>` es Sync, si `Cell<i32>` no lo es?"
+  opciones={[
+    "Es un error de la biblioteca estándar",
+    "Porque `Sync for Mutex<T>` solo exige `T: Send`: el candado garantiza que un único hilo toca el T a la vez",
+    "Porque Mutex copia el Cell en cada hilo",
+    "No lo es"
+  ]}
+  correcta={1}
+  explicacion="El Mutex convierte el acceso compartido en exclusivo, así que lo que importa es poder pasar el T de un hilo a otro (Send)."
+  porque={["Está demostrado correcto (RustBelt).", "Correcto.", "Mutex no copia: hay un solo T.", "El ejemplo de esta lección lo comprueba al compilar."]}
+/>
+
+<Pregunta
+  pregunta="Un struct tuyo tiene un campo `*mut u8`. ¿Qué pasa con Send?"
+  opciones={[
+    "Es Send igualmente",
+    "No es Send ni Sync automáticamente; si es seguro, tendrás que prometerlo con `unsafe impl`",
+    "Es Send pero no Sync",
+    "No compila el struct"
+  ]}
+  correcta={1}
+  explicacion="Los punteros crudos son `!Send` y `!Sync`, y eso se contagia al struct. Quien envuelve un puntero crudo (como `Vec` o `Box`) decide y promete."
+  porque={["Un campo que no es Send rompe la cadena.", "Correcto.", "Los punteros crudos tampoco son Sync.", "El struct compila; solo pierde los auto traits."]}
+/>

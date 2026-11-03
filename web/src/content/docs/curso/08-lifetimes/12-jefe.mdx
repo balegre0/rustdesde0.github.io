@@ -1,0 +1,56 @@
+---
+title: "Jefe: el cortador de palabras"
+description: "Escribe un struct con lifetime que reparte las palabras de un texto sin copiarlas, con la firma correcta para que puedas guardarlas todas."
+sidebar:
+  order: 12
+duracion: 20
+desde: "1.0"
+requiere: ["08-lifetimes/11-varianza"]
+tarjetas:
+  - p: "Firma de un método que devuelve trozos del texto prestado por un struct `Palabras<'a>`:"
+    r: "`fn siguiente(&mut self) -> Option<&'a str>`: atado al texto (`'a`), no al préstamo de `self`."
+  - p: "Tres preguntas ante un error de lifetimes:"
+    r: "¿De dónde sale la referencia? ¿Hasta dónde se usa? ¿Vive su dueña hasta ahí? Casi siempre la respuesta lleva a reordenar o a devolver un valor propio."
+---
+
+import { Reto, Pregunta } from '~/components';
+
+Vas a construir el tipo que más se usa con lifetimes en código real: un **recorrido sin copias**. `Palabras` presta un texto y va entregando sus palabras, una a una, como slices del texto original. Ni un byte copiado.
+
+## El reto
+
+<Reto
+  ej="m08/jefe"
+  enunciado="Completa `siguiente`: salta los espacios del principio (`trim_start`), devuelve `None` si no queda nada y, si queda, busca el siguiente espacio (`find(' ')`), guarda el resto en `self.resto` y devuelve la palabra. Pon también la lifetime correcta en la salida (el `/* ? */`): si la atas a `self`, `main` no compilará al guardar dos palabras."
+/>
+
+Fíjate en que `mas_larga` no lleva ninguna anotación: una sola referencia de entrada, así que la elisión ata la salida a `texto`. Y dentro, guarda en `mejor` palabras que salen de `p` sin problema, gracias a tu `'a`.
+
+## Repaso relámpago
+
+<Pregunta
+  pregunta="Si escribes `fn siguiente(&mut self) -> Option<&str>`, ¿qué línea de `main` deja de compilar primero?"
+  opciones={["`let mut p = Palabras::new(&texto);`", "`let b = p.siguiente();`, porque `a` mantiene vivo un préstamo exclusivo de `p`", "`println!(\"más larga: …\")`", "Ninguna"]}
+  correcta={1}
+  explicacion="Con la salida atada a `&mut self`, `a` mantiene prestado `p` en exclusiva. Pedir `b` crea un segundo préstamo exclusivo con `a` aún vivo (se usa en el `println!`): E0499."
+  porque={["Crear el struct no tiene problema.", "", "Antes ya falla la segunda llamada.", "Es el error de la lección 7."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuánta memoria del heap reserva `Palabras` para entregar cuatro palabras?"
+  opciones={["La de cuatro `String`", "Ninguna: cada palabra es una slice del texto original", "La de un `Vec<String>`", "La del texto completo, otra vez"]}
+  correcta={1}
+  explicacion="Cada `&str` es una dirección y una longitud dentro de `texto`. (El `Vec<&str>` de `main` sí reserva memoria para guardar las cuatro slices, pero no copia el texto.)"
+  porque={["No se crea ningún `String`.", "", "El `Vec` de `main` guarda slices, no `String`.", "Nunca se copia el texto."]}
+/>
+
+## Lo que te llevas del mundo 08
+
+- Una lifetime es una **región** del programa, calculada al compilar. No alarga nada.
+- `'a` en una firma **relaciona** entradas y salida. Repítela solo donde de verdad van juntas.
+- Las tres reglas de la **elisión** te ahorran casi todas las anotaciones.
+- Un struct con referencias queda atado a lo que tiene prestado. Usa dueños (`String`) para lo que tiene que vivir mucho.
+- `T: 'static` significa «sin préstamos cortos», no «vive para siempre».
+- `&T` es covariante; detrás de `&mut`, el tipo tiene que coincidir.
+
+Con ownership, préstamos y lifetimes ya tienes el núcleo de Rust. En el mundo 09 vas a construir tus propios tipos.

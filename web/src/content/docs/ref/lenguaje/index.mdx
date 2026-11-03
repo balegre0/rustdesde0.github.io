@@ -1,0 +1,47 @@
+---
+title: "Referencia del lenguaje"
+description: "Ficha técnica de cada palabra clave y cada concepto de Rust 1.99 (edición 2024), con ejemplos comprobados."
+sidebar:
+  order: 0
+desde: "1.0"
+---
+
+Esta es la **referencia del lenguaje**: fichas cortas y exactas para consultar, no para leer de corrido. Si estás aprendiendo desde cero, empieza por el [curso](/curso/) y vuelve aquí cuando quieras el detalle.
+
+Todo lo que ves corresponde a **Rust 1.99.1, edición 2024**. Cada salida y cada error que aparecen se han obtenido compilando y ejecutando el ejemplo de verdad.
+
+## Cómo leer una ficha
+
+- **Sinopsis**: la forma exacta de escribirlo.
+- **Qué hace**: el comportamiento, regla a regla.
+- **Ejemplo**: un programa que puedes ejecutar en el navegador.
+- **Errores**: el error real del compilador cuando se usa mal, y cómo arreglarlo.
+- **Desde**: la versión de Rust (o la edición) en que apareció.
+- **Ver también** y **Aprende esto en**: fichas relacionadas y la lección del curso.
+
+## Palabras clave
+
+[Todas las palabras clave](/ref/lenguaje/palabras-clave/): 39 estrictas (`as`, `fn`, `let`, `match`, `unsafe`…), 14 reservadas para el futuro (`gen`, `try`, `yield`…) y 5 débiles (`'static`, `macro_rules`, `raw`, `safe`, `union`).
+
+## Conceptos
+
+| Ficha | De qué trata |
+|---|---|
+| [Tipos](/ref/lenguaje/tipos/) | todos los tipos: primitivos, compuestos, punteros, funciones, closures, objetos trait |
+| [Layout de tipos](/ref/lenguaje/layout-de-tipos/) | tamaño, alineación, relleno, `repr`, nichos, punteros anchos |
+| [Coerciones](/ref/lenguaje/coerciones/) | conversiones implícitas: dónde y cuáles |
+| [Subtipos y varianza](/ref/lenguaje/subtipos-y-varianza/) | tiempos de vida largos y cortos; por qué `&mut T` es invariante |
+| [Destructores y orden de drop](/ref/lenguaje/destructores-y-orden-de-drop/) | cuándo y en qué orden se destruye cada valor |
+| [Elisión de lifetimes](/ref/lenguaje/elision-de-lifetimes/) | los tiempos de vida que no escribes |
+| [Expresiones](/ref/lenguaje/expresiones/) | todas las expresiones y la tabla de precedencia |
+| [Patrones](/ref/lenguaje/patrones/) | todas las formas de patrón, refutabilidad y exhaustividad |
+| [Atributos](/ref/lenguaje/atributos/) | todos los atributos integrados |
+| [Macros](/ref/lenguaje/macros/) | gramática de `macro_rules!` y macros procedurales |
+| [Visibilidad y rutas](/ref/lenguaje/visibilidad-y-rutas/) | módulos, rutas, `use`, preludios, privacidad |
+| [Evaluación const](/ref/lenguaje/evaluacion-const/) | lo que se calcula al compilar |
+
+## Fichas generales
+
+- [Comportamiento indefinido](/ref/ub/): la lista completa de lo que nunca debe pasar.
+- [Ediciones](/ref/ediciones/): 2015, 2018, 2021 y 2024, cambio a cambio.
+- [Versiones](/ref/versiones/): de 1.0 a 1.99.

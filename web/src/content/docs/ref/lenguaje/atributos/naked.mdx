@@ -1,0 +1,39 @@
+---
+title: "#[unsafe(naked)]"
+description: "Una función sin prólogo ni epílogo: su cuerpo es solo ensamblador (naked_asm!). Para puntos de entrada, rutinas de interrupción y cambios de contexto."
+sidebar:
+  order: 26
+insignias: ["Desde 1.88", "Generación de código", "unsafe"]
+---
+
+Una función **desnuda** no tiene el código que el compilador añade normalmente al entrar y salir (guardar registros, preparar la pila). Su cuerpo es solo ensamblador.
+
+## Sinopsis
+
+```rust
+#[unsafe(naked)]
+pub extern "sysv64" fn sumar_uno(x: u64) -> u64 {
+    core::arch::naked_asm!(
+        "lea rax, [rdi + 1]",
+        "ret",
+    )
+}
+```
+
+## Qué hace
+
+- El cuerpo tiene que ser **una única** llamada a `naked_asm!`.
+- La función tiene que declarar una ABI explícita (`extern "C"`, `"sysv64"`…), porque el ensamblador depende de en qué registros llegan los argumentos.
+- El ensamblador es responsable de **todo**: leer los argumentos, respetar los registros que hay que preservar y volver con `ret`.
+
+Se usa en puntos de entrada de núcleos y cargadores de arranque, rutinas de interrupción y cambios de contexto entre hilos o corrutinas.
+
+Es **inseguro** porque el compilador no puede comprobar nada del ensamblador: un error rompe la pila o los registros de quien llama.
+
+## Desde
+
+Rust 1.88.
+
+## Ver también
+
+[`asm!`](/ref/std/) · [Mundo 20 · Unsafe](/curso/20-unsafe-y-ub/) · [Mundo 23](/curso/23-embebido-y-tu-so/)

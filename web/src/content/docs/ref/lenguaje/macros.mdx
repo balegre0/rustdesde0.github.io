@@ -1,0 +1,126 @@
+---
+title: "Macros"
+description: "Resumen de la gramática de macro_rules!, fragmentos, repeticiones, higiene, alcance y macros procedurales."
+sidebar:
+  order: 121
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Una **macro** es código que **escribe código**: el compilador la expande antes de comprobar tipos. Se reconocen por el `!` al llamarlas: `println!`, `vec!`.
+
+## En una frase
+
+Las macros **declarativas** (`macro_rules!`) comparan la llamada con patrones y la sustituyen por una plantilla; las **procedurales** son funciones de Rust que reciben y devuelven tokens.
+
+## Gramática de `macro_rules!`
+
+```text
+macro_rules! nombre {
+    ( matcher ) => { transcriptor } ;
+    …
+}
+
+matcher:
+    tokens literales                  // deben aparecer tal cual
+    $nombre:fragmento                 // metavariable
+    $( … ) separador? repetidor       // repetidor: *  +  ?
+
+transcriptor:
+    tokens, $nombre, $( … ) separador? repetidor, $crate
+```
+
+- Los delimitadores de cada regla y de la llamada pueden ser `()`, `[]` o `{}`.
+- Las reglas se prueban **en orden**; gana la primera que encaja. No hay vuelta atrás dentro de una regla: si el compilador no puede decidir token a token, da error.
+- En el transcriptor, cada repetición `$( … )*` debe contener al menos una metavariable repetida, que decide cuántas veces se expande.
+
+### Fragmentos
+
+| Fragmento | Encaja con |
+|---|---|
+| `block` | un bloque `{ … }` |
+| `expr` | una expresión (en 2024, también `_` y `const { … }`) |
+| `expr_2021` | una expresión, sin `_` ni `const { … }` sueltos |
+| `ident` | un identificador o palabra clave (no `_`) |
+| `item` | un elemento: `fn`, `struct`, `impl`… |
+| `lifetime` | un tiempo de vida `'a` |
+| `literal` | un literal, con `-` opcional |
+| `meta` | el contenido de un atributo |
+| `pat` | un patrón, incluidas alternativas `A \| B` (desde 2021) |
+| `pat_param` | un patrón sin alternativas en el nivel superior |
+| `path` | una ruta de tipo |
+| `stmt` | una sentencia sin el `;` final |
+| `tt` | un árbol de tokens: un token o un grupo entre delimitadores |
+| `ty` | un tipo |
+| `vis` | una visibilidad, posiblemente vacía |
+
+### Reglas de seguimiento (*follow-set*)
+
+Para que las macros sigan funcionando cuando la gramática del lenguaje crezca, tras ciertos fragmentos solo pueden venir ciertos tokens:
+
+- `expr` y `stmt`: solo `=>`, `,` o `;`;
+- `pat_param`: `=>`, `,`, `=`, `|`, `if`, `in`;
+- `pat`: `=>`, `,`, `=`, `if`, `in`;
+- `path` y `ty`: `=>`, `,`, `=`, `|`, `;`, `:`, `>`, `>>`, `[`, `{`, `as`, `where`, o una metavariable `block`;
+- `vis`: `,`, un identificador, algo que empiece un tipo, o una metavariable `ident`, `ty` o `path`;
+- el resto: sin restricciones.
+
+### Higiene
+
+Las variables locales y etiquetas creadas **dentro** de la macro no se confunden con las de quien la llama (higiene «de sitio mixto»). Los elementos (funciones, tipos) **no** son higiénicos: se resuelven donde se expande la macro. `$crate` se sustituye por la ruta al crate que define la macro.
+
+### Alcance
+
+- **Textual**: una `macro_rules!` existe desde su definición hacia abajo, también en los módulos hijos definidos después. `#[macro_use]` sobre un `mod` extiende su alcance al módulo padre.
+- **Por ruta**: con `#[macro_export]` la macro queda en la raíz del crate y se importa con `use crate::nombre;` o desde otro crate con `use otro::nombre;`.
+- Límite de recursión: 128 expansiones anidadas por defecto (`#![recursion_limit = "N"]`).
+
+## Macros procedurales
+
+Viven en un crate propio con `proc-macro = true` y usan `proc_macro::TokenStream`:
+
+| Tipo | Definición | Uso |
+|---|---|---|
+| tipo función | `#[proc_macro] pub fn m(input: TokenStream) -> TokenStream` | `m!(…)` |
+| derive | `#[proc_macro_derive(Nombre, attributes(ayuda))]` | `#[derive(Nombre)]` |
+| atributo | `#[proc_macro_attribute] pub fn a(attr: TokenStream, item: TokenStream) -> TokenStream` | `#[a(…)]` sobre un elemento |
+
+Una derive solo **añade** código; una macro atributo **sustituye** el elemento. Desde 1.99, una macro atributo también puede aplicarse a un `mod nombre;` en otro archivo.
+
+## Macros integradas
+
+`println!`, `print!`, `eprintln!`, `eprint!`, `format!`, `write!`, `writeln!`, `format_args!`, `panic!`, `assert!`, `assert_eq!`, `assert_ne!`, `debug_assert!` (y variantes), `assert_matches!` (1.96), `unreachable!`, `todo!`, `unimplemented!`, `matches!`, `vec!`, `dbg!`, `cfg!`, `cfg_select!` (1.95), `env!`, `option_env!`, `concat!`, `stringify!`, `line!`, `column!`, `file!`, `module_path!`, `include!`, `include_str!`, `include_bytes!`, `compile_error!`, `thread_local!`, `asm!`, `global_asm!`, `naked_asm!`, `offset_of!`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/macros-fragmentos" />
+
+Salida:
+
+```text
+3 4
+4
+un literal / un identificador / una expresión
+{"a": 1, "b": 2}
+x sigue valiendo 1
+1 + 2 * 3
+```
+
+## Errores típicos
+
+<NoCompila ej="ref-lenguaje/macros-follow-error" />
+
+`error: $a:expr is followed by +, which is not allowed for expr fragments`, con la nota `allowed there are: =>, , or ;`.
+
+## Desde
+
+Rust 1.0. Derive procedurales: 1.15. Macros procedurales tipo función y atributo, y `use` de macros: 1.30. `$( … )?`: edición 2018 (1.32). `pat_param`: 1.53. `expr_2021`: 1.83.
+
+## Ver también
+
+- [`macro_rules`](/ref/lenguaje/palabras-clave/macro-rules/) · [`macro`](/ref/lenguaje/palabras-clave/macro/) · [Atributos](/ref/lenguaje/atributos/) · [Ediciones](/ref/ediciones/)
+
+## Aprende esto en
+
+- [Mundo 19 · Macros](/curso/19-macros/)

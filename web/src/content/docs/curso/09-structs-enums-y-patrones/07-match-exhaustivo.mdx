@@ -1,0 +1,102 @@
+---
+title: "match exhaustivo"
+description: "Deja que el compilador compruebe que has tratado todos los casos, y aprende a leer el error E0004."
+sidebar:
+  order: 7
+duracion: 11
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones/05-enums-con-datos"]
+tarjetas:
+  - p: "¿Qué significa que `match` sea exhaustivo?"
+    r: "Que sus brazos tienen que cubrir todos los valores posibles del tipo. Si falta alguno, no compila (E0004) y rustc te dice cuál falta."
+  - p: "¿Qué hace el patrón `_`?"
+    r: "Es el comodín: encaja con cualquier valor y no lo guarda. Suele ir el último para recoger «todo lo demás»."
+  - p: "¿Por qué hay que tener cuidado con `_` en un enum propio?"
+    r: "Porque si mañana añades una variante, el `_` se la traga en silencio y el compilador ya no te avisa de que tienes que decidir qué hacer con ella."
+  - p: "¿En qué orden se prueban los brazos de un `match`?"
+    r: "De arriba abajo; se ejecuta el primero que encaja. Un brazo detrás de `_` nunca se alcanza (aviso «unreachable pattern»)."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a usar la garantía más valiosa de `match`: el compilador **no te deja olvidarte de ningún caso**.
+
+## Predice
+
+<Predice
+  ej="m09/match-predice"
+  opciones={["`cero`, `poco`, `bastante`, `mucho`", "`cero`, `poco`, `poco`, `mucho`", "No compila: falta tratar los números negativos", "`cero`, `mucho`, `mucho`, `mucho`"]}
+  correcta={0}
+  explicacion="Los brazos se prueban de arriba abajo. 3 encaja con `1 | 2 | 3`; 8, con el rango `4..=9`; 15 no encaja con ninguno salvo con el comodín `_`."
+  porque={["Correcto.", "8 no es 1, 2 ni 3; está en `4..=9`.", "El comodín `_` cubre todo lo que no se ha nombrado, negativos incluidos.", "`_` solo recoge lo que no encajó antes, y está al final."]}
+/>
+
+## La idea
+
+`match` compara un valor con una lista de **patrones** (*patterns*), de arriba abajo, y ejecuta el **brazo** (*arm*) del primero que encaja. Ya lo conoces del mundo 4; lo nuevo es lo que pasa con los enums.
+
+Un `match` tiene que ser **exhaustivo** (*exhaustive*): entre todos sus brazos, cada valor posible del tipo tiene que encajar en alguno. Con un enum, eso significa «una vez por variante» (o un comodín). Si añades una variante nueva a un enum, **todos** los `match` que la olvidan dejan de compilar, y rustc te lleva uno por uno a cada sitio donde tienes que decidir qué hacer. Es como una lista de tareas que escribe el compilador.
+
+Con números, cubrir todos los valores a mano es imposible (un `u8` tiene 256, un `i32` más de cuatro mil millones). Ahí se usa el comodín **`_`**, que encaja con todo, o un nombre como `otro`, que encaja con todo y además guarda el valor.
+
+## Pruébalo
+
+<Ejecutar ej="m09/match-exhaustivo" />
+
+`match` es una **expresión**: devuelve el valor del brazo elegido, y todos los brazos tienen que dar el mismo tipo (aquí, `u32` y luego `bool`).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Comprobar que unos patrones lo cubren todo es un problema serio: hay patrones anidados, rangos y combinaciones. rustc usa un algoritmo de **utilidad** (*usefulness*): un brazo es «útil» si existe algún valor que encaja con él y con ninguno de los anteriores. Con ese mismo cálculo detecta dos cosas:
+
+- si **falta** algún valor → error E0004, y te dice cuál (incluso con rangos: `11_u8..=u8::MAX`);
+- si un brazo **no puede alcanzarse** nunca → aviso `unreachable pattern`.
+
+Al ejecutar, un `match` sobre un enum lee la etiqueta (lección 5) y salta al brazo que toca; con muchos casos, el compilador suele generar una **tabla de saltos** en vez de una cadena de comparaciones.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m09/match-falta"
+  explicacion="E0004 (patrones no exhaustivos). Fíjate en lo útil que es el mensaje: dice qué variante falta (`Direccion::Oeste`), señala dónde está declarada y propone el brazo que hay que añadir."
+/>
+
+<Trampa titulo="Con números, el compilador cuenta todos los valores">
+
+Una nota va de 0 a 10… pero el tipo `u8` llega hasta 255, y el compilador razona con el tipo, no con tu intención:
+
+<NoCompila ej="m09/match-enteros" explicacion="Faltan los valores de 11 a 255 (`11_u8..=u8::MAX`). El arreglo añade un brazo `_` que devuelve «nota imposible». Mejor aún sería que la nota fuera un tipo propio que solo admita 0..=10 (lección 11)." />
+
+Y al revés: un brazo detrás de `_` no se alcanza nunca.
+
+<Ejecutar ej="m09/match-inalcanzable" titulo="Brazo inalcanzable (compila con aviso)" />
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m09/estacion"
+  enunciado="Completa `estacion(mes)` con un `match`: `3..=5` primavera, `6..=8` verano, `9..=11` otoño, `12 | 1 | 2` invierno y cualquier otro número `mes inválido`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tu enum `Estado` tenía 3 variantes y le añades una cuarta. Tienes 10 `match` sobre `Estado`: 7 nombran cada variante y 3 terminan en `_ =>`. ¿Cuántos dejan de compilar?"
+  opciones={["7", "10", "3", "Ninguno: las variantes nuevas se ignoran"]}
+  correcta={0}
+  explicacion="Los 3 con `_` siguen compilando: el comodín se traga la variante nueva. Por eso, en enums propios, conviene nombrar las variantes cuando la decisión importa."
+  porque={["Correcto.", "Los que tienen `_` ya cubren cualquier variante nueva.", "Es justo al revés: los de `_` son los que siguen compilando.", "Un `match` sin la variante nueva y sin `_` deja de ser exhaustivo."]}
+/>
+
+<Pregunta
+  pregunta="`match x { otro => …, 0 => … }` con `x: i32`. ¿Qué pasa?"
+  opciones={["Compila con un aviso: el brazo `0` es inalcanzable", "No compila: falta `_`", "Funciona bien: el `0` se prueba primero porque es más concreto", "No compila: `otro` no está declarado"]}
+  correcta={0}
+  porque={["Correcto: `otro` encaja con todo y va primero.", "`otro` ya cubre todos los valores, como `_`.", "Los brazos se prueban en el orden escrito, no por lo concretos que son.", "Un nombre en un patrón declara una variable nueva."]}
+/>

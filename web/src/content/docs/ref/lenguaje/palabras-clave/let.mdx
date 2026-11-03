@@ -1,0 +1,62 @@
+---
+title: "let"
+description: "Palabra clave estricta: introduce variables a partir de un patrón; también en if let, while let y let-else."
+sidebar:
+  order: 19
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`let` crea **variables**: le da nombre a un valor para poder usarlo después.
+
+## Sinopsis
+
+```text
+let patrón: Tipo = expresión;                 // tipo e inicializador opcionales
+let patrón = expresión else { …diverge… };    // let-else
+if let patrón = expresión { … }
+while let patrón = expresión { … }
+```
+
+## Qué hace
+
+- Las variables son **inmutables** por defecto. `let mut x` permite cambiarlas.
+- El tipo se deduce casi siempre; `let x: u8 = 5;` lo fija.
+- La parte izquierda es un **patrón**: `let (a, b) = par;` desestructura. En un `let` simple, el patrón debe ser **irrefutable** (no puede fallar); para patrones que pueden fallar usa `let … else`, `if let` o `match`.
+- **Sombreado** (*shadowing*): un nuevo `let` con el mismo nombre crea **otra** variable; la anterior queda tapada. Puede tener otro tipo.
+- **Inicialización diferida**: `let x;` sin valor está permitido; el compilador comprueba que se asigna una vez antes de cada lectura.
+- La variable vive hasta el final de su bloque; entonces su valor se destruye (en orden inverso de declaración).
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-let" />
+
+Salida:
+
+```text
+5
+50
+1 = uno
+grande
+a
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-let-error" />
+
+`error[E0384]: cannot assign twice to immutable variable x`, con la ayuda `consider making this binding mutable` (añadir `mut`).
+
+## Desde
+
+Rust 1.0. `let … else`: 1.65. `let` dentro de cadenas `&&` en `if`/`while`: 1.88 (edición 2024).
+
+## Ver también
+
+- [`mut`](/ref/lenguaje/palabras-clave/mut/) · [`else`](/ref/lenguaje/palabras-clave/else/) · [Patrones](/ref/lenguaje/patrones/) · [Destructores y orden de drop](/ref/lenguaje/destructores-y-orden-de-drop/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/) · [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)

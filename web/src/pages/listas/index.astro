@@ -1,0 +1,33 @@
+---
+// /listas/ — colecciones curadas de preguntas y problemas (contenido/listas.yaml).
+import Practica from '../../components/paginas/Practica.astro';
+import { listas } from '../../lib/practica';
+---
+<Practica titulo="Listas" descripcion="Colecciones de preguntas y problemas de Rust para practicar en orden: lo esencial, ownership, préstamos…">
+  <p class="rdc-lead">Recorridos cerrados por la biblioteca: haz una lista de principio a fin y mira cuánto te queda.</p>
+  {listas.length === 0 ? <p>Todavía no hay listas publicadas.</p> : (
+    <ul class="rdc-tarjetas" role="list">
+      {listas.map((l) => (
+        <li data-lista={l.id} data-preguntas={JSON.stringify(l.preguntas)} data-problemas={JSON.stringify(l.problemas)}>
+          <a href={`/listas/${l.id}/`} class="rdc-tarjeta-enlace">
+            <span class="rdc-tarjeta-titulo">{l.titulo}</span>
+            {l.descripcion && <span class="rdc-tarjeta-desc">{l.descripcion}</span>}
+            <span class="rdc-tarjeta-meta">{l.preguntas.length} preguntas · {l.problemas.length} problemas · <span data-hechos>0</span> de {l.preguntas.length + l.problemas.length} hechos</span>
+            <span class="rdc-barra-progreso" aria-hidden="true"><span data-barra style="transform:scaleX(0)"></span></span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )}
+</Practica>
+<script>
+  import { leer } from '../../runtime/progreso';
+  const p = leer();
+  for (const li of document.querySelectorAll<HTMLElement>('[data-lista]')) {
+    const pr: string[] = JSON.parse(li.dataset.preguntas!), pb: string[] = JSON.parse(li.dataset.problemas!);
+    const n = pr.filter((x) => p.preguntas[x]?.ok).length + pb.filter((x) => p.problemas[x]?.ok).length;
+    const tot = pr.length + pb.length;
+    li.querySelector('[data-hechos]')!.textContent = String(n);
+    li.querySelector<HTMLElement>('[data-barra]')!.style.transform = `scaleX(${tot ? n / tot : 0})`;
+  }
+</script>

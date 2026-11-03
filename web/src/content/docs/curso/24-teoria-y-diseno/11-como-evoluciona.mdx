@@ -1,0 +1,96 @@
+---
+title: "Cómo evoluciona Rust (y cómo contribuir)"
+description: "Quién decide qué entra en Rust: equipos, RFCs, el tren de versiones, nightly y las features inestables, las ediciones y la promesa de estabilidad. Y por dónde empezar a contribuir al compilador."
+sidebar:
+  order: 11
+duracion: 13
+requiere: ["24-teoria-y-diseno/10-la-especificacion"]
+tarjetas:
+  - p: "¿Qué es una RFC en Rust?"
+    r: "Un documento (*Request for Comments*) que propone un cambio importante al lenguaje, la biblioteca o las herramientas. Se discute en público y lo aprueba el equipo correspondiente."
+  - p: "¿Cómo funciona el tren de versiones?"
+    r: "Cada noche sale una versión nightly; cada 6 semanas, lo que hay en beta pasa a stable y nightly pasa a beta."
+  - p: "¿Qué es una feature inestable?"
+    r: "Algo ya implementado que solo se puede usar en nightly con `#![feature(nombre)]`, mientras se prueba antes de estabilizarlo."
+  - p: "¿Qué garantiza la promesa de estabilidad de Rust?"
+    r: "Que el código que compila en una versión estable seguirá compilando en las siguientes (salvo fallos de seguridad o de soundness). Los cambios incompatibles solo llegan con una edición nueva, que es opcional."
+  - p: "¿Por dónde se empieza a contribuir a `rustc`?"
+    r: "Leyendo la *rustc-dev-guide*, compilando el compilador con `./x build` y buscando incidencias marcadas como *E-easy* o *E-mentor* en el repositorio rust-lang/rust."
+---
+
+import { Pregunta, Ordena, BajoElCapo } from '~/components';
+
+Rust no lo diseña una empresa ni una persona: lo diseña un proyecto abierto con cientos de colaboradores. Saber cómo se toman las decisiones te permite seguir la evolución del lenguaje y, si quieres, participar en ella.
+
+## Quién decide
+
+El proyecto se organiza en **equipos**: lenguaje (*lang*), biblioteca (*libs* y *libs-api*), compilador, Cargo, documentación, especificación, semántica operacional, infraestructura… Por encima está un **consejo** (*Leadership Council*) que coordina. La **Rust Foundation** es una organización aparte que da apoyo económico y legal, pero no decide el diseño.
+
+Los cambios grandes pasan por una **RFC** (*Request for Comments*):
+
+1. Alguien escribe un documento con la motivación, el diseño, las alternativas y los inconvenientes.
+2. Se discute en público (en el repositorio `rust-lang/rfcs`).
+3. El equipo responsable propone aceptarla (*final comment period*, unos 10 días) y decide.
+4. Se implementa detrás de una **feature inestable**.
+5. Se prueba en nightly, a veces durante años.
+6. Se **estabiliza** y llega a la siguiente versión estable.
+
+Además, cada año el proyecto define unos **objetivos** (*project goals*): las prioridades que concentran esfuerzo, como el nuevo resolutor de traits o Polonius.
+
+## El tren y la estabilidad
+
+- **Nightly**: cada noche, con todo lo nuevo, incluidas las features inestables (`#![feature(…)]`).
+- **Beta**: lo que será la próxima estable.
+- **Stable**: cada **6 semanas**. Es la que usas.
+
+La **promesa de estabilidad**: el código que compila en una versión estable seguirá compilando en todas las siguientes. Hay excepciones muy acotadas (arreglos de seguridad o de *soundness*, como el #25860), y se comprueban compilando **todo crates.io** con la versión nueva antes de publicarla (*crater*).
+
+Los cambios que romperían código se hacen con una **edición** (2015, 2018, 2021, 2024): cada paquete elige la suya en `Cargo.toml`, `cargo fix --edition` migra casi todo de forma automática, y paquetes de ediciones distintas se usan entre sí sin problema.
+
+## Contribuir
+
+Contribuir a Rust no exige ser experto. Por orden de dificultad:
+
+1. **Documentación**: arreglar o mejorar la de la biblioteca estándar (está en el propio código, con `///`).
+2. **Diagnósticos**: mejorar un mensaje de error confuso. Los mensajes de `rustc` son buenos porque mucha gente los ha pulido así.
+3. **Incidencias marcadas** como *E-easy* o *E-mentor* en `rust-lang/rust`.
+4. **Clippy**: añadir o mejorar un aviso.
+5. **Verificación** de la biblioteca estándar (lección 9).
+
+El punto de partida es la **rustc-dev-guide** (la guía oficial de desarrollo del compilador). Para compilar el compilador:
+
+```powershell
+git clone https://github.com/rust-lang/rust
+cd rust
+./x setup        # elige el perfil «compiler»
+./x build        # compila rustc (la primera vez tarda bastante)
+./x test tests/ui --bless   # pruebas de la interfaz de errores
+```
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Bootstrapping.** `rustc` está escrito en Rust, así que para compilarlo hace falta un `rustc`. El sistema `x` descarga el compilador beta (la *etapa 0*), compila con él el compilador nuevo (*etapa 1*) y, opcionalmente, vuelve a compilarlo con ese (*etapa 2*). Lo viste en el mundo 21.
+
+**Las pruebas de interfaz** (`tests/ui`) son programas pequeños junto con el mensaje de error exacto que deben producir. Si mejoras un mensaje, `--bless` actualiza los archivos esperados y la revisión de tu cambio consiste, sobre todo, en leer esa diferencia.
+
+</BajoElCapo>
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena el camino de una idea hasta Rust estable."
+  lineas={["Se escribe una RFC", "El equipo la acepta", "Se implementa detrás de una feature inestable", "Se prueba en nightly", "Se estabiliza", "Llega a la siguiente versión estable"]}
+  explicacion="Las ideas se discuten primero, se implementan después y se estabilizan solo cuando se han probado en la práctica."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cómo introduce Rust un cambio que rompería código existente (por ejemplo, una palabra reservada nueva)?"
+  opciones={["En cualquier versión estable", "Con una edición nueva, que cada paquete elige cuándo adoptar", "No puede hacerlo nunca", "Solo en nightly"]}
+  correcta={1}
+  explicacion="Las ediciones permiten cambiar reglas de superficie sin romper a nadie: los paquetes viejos siguen en su edición y se pueden combinar con los nuevos."
+  porque={["Rompería la promesa de estabilidad.", "", "Puede, con las ediciones.", "Nightly es para probar; el cambio tiene que llegar a estable."]}
+/>

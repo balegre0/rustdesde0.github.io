@@ -1,0 +1,86 @@
+---
+title: "E0119: implementaciones en conflicto"
+description: "Dos impl del mismo trait se solapan para algún tipo."
+sidebar:
+  order: 17
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` conflicting implementations of trait `Describir` for type `i32` ``
+
+## Qué significa
+
+Para cada tipo, un trait puede tener **una sola** implementación (**coherencia**). `impl<T: Debug> Describir for T` ya cubre `i32` (porque `i32` es `Debug`), así que `impl Describir for i32` sería una segunda implementación para el mismo tipo.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0119" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0119]: conflicting implementations of trait `Describir` for type `i32`
+  --> E0119.rs:11:1
+   |
+ 5 | impl<T: std::fmt::Debug> Describir for T {
+   | ---------------------------------------- first implementation here
+...
+11 | impl Describir for i32 {
+   | ^^^^^^^^^^^^^^^^^^^^^^ conflicting implementation for `i32`
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Una implementación general (*blanket impl*) más otra concreta que cae dentro.
+- Implementar a mano un trait que ya se deriva con `#[derive]`.
+
+## Cómo arreglarlo
+
+Quita una de las dos, o haz la general más estrecha (implementa tipo a tipo). La especialización (elegir la más concreta) no existe en Rust estable.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+trait Describir {
+    fn describir(&self) -> String;
+}
+
+impl Describir for i32 {
+    fn describir(&self) -> String {
+        String::from("un entero")
+    }
+}
+
+impl Describir for &str {
+    fn describir(&self) -> String {
+        format!("el texto {:?}", self)
+    }
+}
+
+fn main() {
+    println!("{}", 5.describir());
+    println!("{}", "hola".describir());
+}
+```
+
+**Salida:**
+
+```text
+un entero
+el texto "hola"
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0119` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0117](/errores/e0117/): regla huérfana: trait y tipo ajenos
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

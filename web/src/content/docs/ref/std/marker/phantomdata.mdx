@@ -1,0 +1,48 @@
+---
+title: "PhantomData<T>"
+description: "Un campo de tamaño cero que actúa como si el tipo guardara un T: para marcas de tipo y para unsafe."
+sidebar:
+  order: 4
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::marker::PhantomData`
+
+## Sinopsis
+
+```rust
+pub struct PhantomData<T>
+where
+    T: ?Sized;
+```
+
+## Qué hace
+
+`PhantomData<T>` ocupa **0 bytes**, pero el compilador razona como si tu tipo contuviera un `T`. Se usa para marcar tipos (unidades, estados), para que un parámetro genérico no quede sin usar ([E0392](/errores/e0392/)) y, en código `unsafe`, para indicar propiedad o tiempos de vida de datos a los que solo apuntas con punteros crudos (afecta a la varianza, a `Send`/`Sync` y al *drop check*).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/marker-phantomdata" />
+
+**Salida:**
+
+```text
+7.5
+8 bytes
+0 bytes
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [E0392](/errores/e0392/)
+- [std::ptr](/ref/std/ptr/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)
+- [Mundo 20 · Unsafe y comportamiento indefinido](/curso/20-unsafe-y-ub/)

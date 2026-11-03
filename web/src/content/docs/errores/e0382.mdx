@@ -1,0 +1,86 @@
+---
+title: "E0382: uso de un valor ya movido"
+description: "Usas una variable después de que su valor se movió a otra variable o a una función."
+sidebar:
+  order: 29
+insignias: ["Propiedad y movimientos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` borrow of moved value: `saludo` ``
+
+## Qué significa
+
+Cada valor de Rust tiene **un único dueño**. Cuando escribes `let otro = saludo;` con un tipo que no es `Copy` (como `String`), la propiedad **se mueve** (*move*): `otro` pasa a ser el dueño y `saludo` queda inutilizable. Usar `saludo` después es lo que rustc rechaza. Pasar un valor a una función es exactamente lo mismo que asignarlo: también lo mueve.
+
+## Qué error evita
+
+Si las dos variables pudieran usarse, las dos creerían ser dueñas del mismo bloque de memoria del montón (*heap*). Al terminar, las dos lo liberarían: una **doble liberación** (*double free*), o una usaría memoria ya liberada (**uso tras liberar**, *use after free*). Rust lo impide antes de ejecutar.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0382" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0382]: borrow of moved value: `saludo`
+ --> E0382.rs:4:16
+  |
+2 |     let saludo = String::from("hola");
+  |         ------ move occurs because `saludo` has type `String`, which does not implement the `Copy` trait
+3 |     let otro = saludo; // la propiedad se mueve a `otro`
+  |                ------ value moved here
+4 |     println!("{saludo}");
+  |                ^^^^^^ value borrowed here after move
+  |
+help: consider cloning the value if the performance cost is acceptable
+  |
+3 |     let otro = saludo.clone(); // la propiedad se mueve a `otro`
+  |                      ++++++++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Asignar un `String`, un `Vec` u otro tipo con datos en el montón a otra variable y seguir usando la original.
+- Pasar el valor a una función que lo recibe por valor (`fn f(s: String)`) y usarlo después.
+- Recorrer un `Vec` con `for x in v` (lo consume) y usar `v` después del bucle.
+- Mover el valor dentro de un bucle: en la segunda vuelta ya no está.
+
+## Cómo arreglarlo
+
+Decide quién debe ser el dueño. Si solo necesitas **mirar** el valor, préstalo con `&saludo`. Si de verdad necesitas dos copias independientes, usa `.clone()` (copia los datos del montón, cuesta tiempo y memoria). En los bucles, recorre con `for x in &v`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let saludo = String::from("hola");
+    let otro = saludo.clone(); // copia completa: cada variable tiene su String
+    println!("{saludo}");
+    println!("{otro}");
+}
+```
+
+**Salida:**
+
+```text
+hola
+hola
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0382` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0505](/errores/e0505/): mover un valor que está prestado
+- [E0507](/errores/e0507/): mover desde detrás de una referencia
+- [E0499](/errores/e0499/): dos préstamos exclusivos a la vez
+
+## Aprende esto en
+
+- [Mundo 06 · Ownership](/curso/06-ownership/)

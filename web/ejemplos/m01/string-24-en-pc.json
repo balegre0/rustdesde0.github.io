@@ -1,0 +1,4 @@
+{
+  "plataforma": "local",
+  "nota": "Este archivo comprueba tamaños de un PC de 64 bits; no se ejecuta en el navegador (allí String mide 12 bytes y la comprobación fallaría)."
+}

@@ -1,0 +1,44 @@
+---
+title: "#[macro_export] y #[macro_use]"
+description: "macro_export hace visible una macro_rules! en la raíz del crate y para otros crates; macro_use amplía el alcance textual de las macros de un módulo."
+sidebar:
+  order: 12
+insignias: ["Desde 1.0", "Macros"]
+---
+import { Ejecutar } from '~/components';
+
+Las macros `macro_rules!` tienen reglas de visibilidad propias. Estos dos atributos las controlan.
+
+## Sinopsis
+
+```text
+#[macro_export]
+macro_rules! m { … }        // disponible como crate::m! y para otros crates
+
+#[macro_use]
+mod macros;                 // las macros de `macros` siguen visibles después del módulo
+
+#[macro_use]
+extern crate otro;          // forma antigua de importar las macros de otro crate
+```
+
+## Qué hace
+
+Una `macro_rules!` sin atributos tiene **alcance textual**: se puede usar solo **después** de su definición, en ese módulo y en sus hijos.
+
+- **`#[macro_export]`** la coloca en la **raíz del crate**, se defina donde se defina, y la hace pública para otros crates (`otro_crate::m!`). Dentro del crate se llama con `crate::m!`.
+- **`#[macro_use]`** en un `mod` hace que sus macros sigan disponibles por alcance textual después del módulo. En `extern crate` importa todas las macros exportadas de ese crate (desde la edición 2018 basta con `use otro::m;`).
+
+Dentro de una macro exportada, usa `$crate::` para nombrar elementos de tu crate: así funciona igual cuando la usa otro crate.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-macro-export" />
+
+## Desde
+
+Rust 1.0. Importar macros con `use`: 1.30.
+
+## Ver también
+
+[Macros](/ref/lenguaje/macros/) · [Mundo 19 · Macros](/curso/19-macros/)

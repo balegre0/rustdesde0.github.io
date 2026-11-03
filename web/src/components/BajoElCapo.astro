@@ -1,0 +1,10 @@
+---
+// <BajoElCapo titulo?>…markdown…</BajoElCapo> — bloque plegable
+import { Icon } from '@astrojs/starlight/components';
+interface Props { titulo?: string }
+const { titulo } = Astro.props;
+---
+<details class="rdc-capo">
+  <summary><Icon name="setting" /><span>Bajo el capó{titulo ? <>: <span class="rdc-capo-sub">{titulo}</span></> : null}</span></summary>
+  <div class="rdc-capo-cuerpo"><slot /></div>
+</details>

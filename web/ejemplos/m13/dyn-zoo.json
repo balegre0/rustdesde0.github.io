@@ -1,0 +1,1 @@
+{ "nota": "En el navegador (wasm32) una dirección mide 4 bytes: &Perro = 4 y &dyn Animal = 8. En un PC de 64 bits son 8 y 16." }

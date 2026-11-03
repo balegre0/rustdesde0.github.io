@@ -1,0 +1,182 @@
+---
+title: "Mover"
+description: "Entiende qué pasa en memoria con let s2 = s1: se copia la ficha de la pila, los bytes del heap no se tocan y s1 pierde la propiedad (E0382)."
+sidebar:
+  order: 4
+duracion: 12
+desde: "1.0"
+requiere: ["06-ownership/03-ambito-y-drop"]
+tarjetas:
+  - p: "Al hacer `let s2 = s1;` con un `String`, ¿qué bytes se copian?"
+    r: "Solo la ficha de la pila: puntero, capacidad y longitud (24 bytes en 64 bits, 12 en el navegador). Los bytes del texto en el heap no se tocan."
+  - p: "¿Qué permisos tiene `s1` después de `let s2 = s1;`?"
+    r: "Ninguno (`---`): la propiedad pasó a `s2`. Usar `s1` da E0382."
+  - p: "¿Qué dice E0382?"
+    r: "Que usas un valor que ya se movió («borrow of moved value» / «use of moved value»)."
+  - p: "¿Cuántas liberaciones inserta el compilador para `let s1 = String::from(\"x\"); let s2 = s1;`?"
+    r: "Una sola: la de `s2`. La variable movida (`s1`) no se libera."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Vas a entender la operación más frecuente de Rust y el error más frecuente de quien empieza (E0382). Spoiler: mover es **barato**, y el error te protege de algo grave.
+
+## Predice
+
+<NoCompila ej="m06/usar-tras-mover" explicacion={"Antes de leer la explicación del compilador, piensa: después de `let s2 = s1;`, ¿quién es la dueña de \"hola\"? Si ahora hubiera **dos** dueñas, ¿cuántas veces se liberaría el texto al final de `main`?"} />
+
+## La idea
+
+`let s2 = s1;` no hace una copia del texto. Hace un **movimiento** (*move*): la propiedad pasa de `s1` a `s2`. Desde ese momento:
+
+- `s2` es la dueña, con los permisos que tenía `s1`.
+- `s1` **pierde todos sus permisos**. Sigue escrita en tu código, pero el compilador no te deja leerla, modificarla ni moverla: ya no es dueña de nada.
+
+Recuerda la regla 2: **un solo dueño a la vez**. Si `s1` siguiera siendo dueña, al final de `main` habría dos liberaciones del mismo texto. Mover es la forma de cumplir la regla sin copiar nada caro.
+
+Lo que se mueve físicamente es la **ficha** de la pila (puntero, capacidad, longitud). El texto en el heap se queda donde estaba; simplemente lo señala otra variable.
+
+## Pruébalo
+
+<Ejecutar ej="m06/mover" />
+
+La dirección de los bytes es la misma antes y después: el texto no se ha copiado ni movido. Esta es la tabla de permisos:
+
+<Prestamos lineas={[
+  { codigo: "let s1 = String::from(\"hola\");", permisos: { s1: "R-O" } },
+  { codigo: "let direccion_antes = s1.as_ptr();", permisos: { s1: "R-O", direccion_antes: "R-O" }, nota: "Leer s1 solo necesita R." },
+  { codigo: "let s2 = s1;", permisos: { s1: "---", s2: "R-O", direccion_antes: "R-O" }, nota: "Mover necesita O. s1 lo pierde todo; s2 lo recibe." },
+  { codigo: "let direccion_despues = s2.as_ptr();", permisos: { s1: "---", s2: "R-O", direccion_antes: "R-O", direccion_despues: "R-O" } },
+  { codigo: "println!(\"s2 = {s2}\");", permisos: { s1: "---", s2: "R-O" } }
+]} />
+
+¿Y cuánto ocupa la ficha que se copia? Compruébalo:
+
+<Ejecutar ej="m06/tamano-string" />
+
+En el navegador, un `usize` mide 4 bytes, así que la ficha mide 12. En un PC de 64 bits mide 24. Mover un `String` copia **siempre** esos 12 o 24 bytes, tenga el texto 4 bytes o un millón.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El dibujo de memoria** (64 bits, direcciones de ejemplo):
+
+```text
+ANTES de let s2 = s1;                DESPUÉS
+  PILA                                 PILA
+  s1 ┌──────────────┐                  s1 ┌──────────────┐  (sin permisos:
+     │ ptr  ────────┼──┐                  │ ptr  ────────┼─┐  el compilador
+     │ cap  4       │  │                  │ cap  4       │ │  no deja usarla)
+     │ len  4       │  │                  │ len  4       │ │
+     └──────────────┘  │                  └──────────────┘ │
+                       │               s2 ┌──────────────┐ │
+                       │                  │ ptr  ────────┼─┤
+                       │                  │ cap  4       │ │
+                       │                  │ len  4       │ │
+                       │                  └──────────────┘ │
+  HEAP                 ▼               HEAP                ▼
+       ┌───┬───┬───┬───┐                    ┌───┬───┬───┬───┐
+       │ h │ o │ l │ a │                    │ h │ o │ l │ a │
+       └───┴───┴───┴───┘                    └───┴───┴───┴───┘
+```
+
+Fíjate en algo importante: **los bytes de `s1` siguen ahí**, con el mismo puntero. Mover no borra nada. Lo que cambia es lo que el compilador **te deja hacer**. «Invalidar» `s1` es una decisión del compilador, no una operación en memoria.
+
+**Lo que dice el MIR.** En el MIR de un programa así, el movimiento es una línea explícita y solo hay **una** liberación, la de `s2`:
+
+```text
+        _2 = move _1;
+        ...
+        drop(_2) -> [return: bb3, unwind continue];
+```
+
+No existe ningún `drop(_1)`: como `s1` (`_1`) entregó su propiedad, el compilador no la libera. Si existieran los dos `drop`, el texto se liberaría dos veces.
+
+**Mover es copiar bytes de pila.** El ensamblador de un movimiento es copiar la ficha a otro sitio (y a menudo el optimizador ni eso: usa directamente el mismo hueco). Mover un `String` de un millón de bytes cuesta lo mismo que mover uno de 4:
+
+<Ejecutar ej="m06/mover-grande" />
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Leer el error de abajo arriba">
+
+E0382 siempre cuenta la historia en tres marcas. Léelas en orden:
+
+1. `move occurs because s1 has type String, which does not implement the Copy trait`: por qué se mueve (en la lección 6 verás qué tipos **no** se mueven, sino que se copian).
+2. `value moved here`: **dónde** perdió `s1` la propiedad.
+3. `value borrowed here after move`: dónde intentaste usarla después.
+
+❌ Aplicar el `help:` sin pensar: «consider cloning the value» (`s1.clone()`) arregla el error, pero **duplica** el texto en el heap. A veces es lo correcto; muchas veces no hace falta.
+
+✅ Primero pregúntate: ¿necesito de verdad dos textos? Si no, usa la dueña nueva (`s2`), como en el arreglo de arriba. En el mundo 07 aprenderás la tercera vía: **prestar** sin mover.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena estas líneas para que el programa compile e imprima «hola» y luego «hola, mundo» (sin usar `clone`)."
+  lineas={[
+    "let s1 = String::from(\"hola\");",
+    "println!(\"{s1}\");",
+    "let mut s2 = s1;",
+    "s2.push_str(\", mundo\");",
+    "println!(\"{s2}\");"
+  ]}
+  distractores={["println!(\"{s1}, mundo\");"]}
+  explicacion="`s1` se puede leer **antes** de moverla. Después de `let mut s2 = s1;`, la dueña es `s2` (y además con `mut`, así que puede modificar). Usar `s1` tras el movimiento daría E0382."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En un PC de 64 bits, `let b = a;` mueve un `String` que contiene un texto de 1 MB. ¿Cuántos bytes se copian?"
+  opciones={["1 MB", "24 bytes", "8 bytes", "0 bytes"]}
+  correcta={1}
+  explicacion="Se copia la ficha de la pila: puntero + capacidad + longitud = 3 × 8 = 24 bytes. El megabyte del heap no se toca."
+  porque={[
+    "Eso sería una copia profunda (lo que hace `clone`), no un movimiento.",
+    "",
+    "8 bytes sería solo el puntero; la ficha tiene tres campos.",
+    "Algo se copia: la ficha. (El optimizador a veces lo evita, pero el modelo es «se copian 24 bytes».)"
+  ]}
+/>
+
+<Pregunta
+  pregunta="Después de `let b = a;` (con `a` un `String`), ¿qué hay en la memoria de la pila donde estaba `a`?"
+  opciones={[
+    "Ceros: Rust la borra",
+    "Los mismos bytes de antes; el compilador simplemente no te deja usarla",
+    "Un puntero nulo para evitar la doble liberación",
+    "Nada: la pila se encoge"
+  ]}
+  correcta={1}
+  explicacion="«Invalidar» es una regla del compilador, no una operación en memoria. Como el compilador no inserta `drop` para `a` ni te deja usarla, esos bytes viejos son inofensivos."
+  porque={[
+    "No se borra nada: no hace falta, y costaría tiempo.",
+    "",
+    "No hace falta marcar nada al ejecutar: el compilador ya sabe, al compilar, que `a` no debe liberarse.",
+    "El marco de `main` tiene un tamaño fijo durante toda la función."
+  ]}
+/>
+
+<Pregunta
+  pregunta={"¿Qué error de memoria evita E0382 en `let s2 = s1; println!(\"{s1}\");`?"}
+  opciones={[
+    "Ninguno: es solo una regla de estilo",
+    "Un desbordamiento de pila",
+    "Que haya dos dueñas del mismo texto y, por tanto, una doble liberación (o leer un texto que otra dueña ya liberó)",
+    "Una fuga de memoria"
+  ]}
+  correcta={2}
+  explicacion="Si `s1` siguiera siendo usable después del movimiento, el programa tendría dos caminos al mismo texto con una sola dueña responsable. Si `s2` liberase el texto (por ejemplo, pasándolo a `drop`), leer `s1` sería un uso tras liberar."
+  porque={[
+    "Cada regla de la propiedad evita un fallo de memoria concreto; esta, dos.",
+    "La pila no tiene nada que ver aquí.",
+    "",
+    "Mover nunca pierde memoria: la nueva dueña la liberará."
+  ]}
+/>

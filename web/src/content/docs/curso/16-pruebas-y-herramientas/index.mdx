@@ -1,0 +1,41 @@
+---
+title: "Mundo 16 · Pruebas y herramientas"
+description: "Demuestra que tu código hace lo que dices, documéntalo con ejemplos que se comprueban solos y deja que las herramientas de Rust vigilen por ti."
+sidebar:
+  order: 0
+---
+
+import { Historia } from '~/components';
+
+Hasta ahora sabías que tu programa funcionaba porque lo ejecutabas y mirabas la salida. Eso vale para diez líneas. Para mil, no: cada cambio puede romper algo que funcionaba ayer y no te enterarías.
+
+En este mundo aprendes a escribir **pruebas** (*tests*): pequeños programas que comprueban tu código automáticamente, cada vez, en un segundo. Y a usar las herramientas que vienen con Rust —y algunas de su ecosistema— para que la máquina vigile lo que a una persona se le escapa:
+
+- **`cargo test`** ejecuta todas tus pruebas: unitarias, de integración y los ejemplos de tu documentación.
+- **rustdoc** convierte tus comentarios en una web de documentación, y sus ejemplos en pruebas.
+- **Clippy** revisa tu código y te sugiere formas más claras o más correctas de escribirlo.
+- **rustfmt** lo formatea siempre igual, para que nadie discuta por espacios.
+- **Benchmarks**, **fuzzing**, **auditoría de dependencias** y **Miri** cubren lo que las pruebas normales no ven: la velocidad, las entradas que nunca imaginaste, las vulnerabilidades conocidas y el comportamiento indefinido.
+
+## Lo que vas a conseguir
+
+| # | Lección | Al terminar sabrás… |
+|---|---|---|
+| 1 | Tu primer test | escribir `#[test]` con `assert!`, `assert_eq!` y `assert_ne!`, y leer lo que dice `cargo test` |
+| 2 | Cuando una prueba falla | leer un fallo, poner mensajes útiles, probar pánicos y errores, ignorar pruebas lentas |
+| 3 | Organizar las pruebas | `#[cfg(test)]`, el módulo `tests`, probar funciones privadas y filtrar qué se ejecuta |
+| 4 | Pruebas de integración | la carpeta `tests/` y probar tu biblioteca como la usaría otra persona |
+| 5 | Doctests | escribir ejemplos en la documentación que `cargo test` comprueba solos |
+| 6 | Documentar con rustdoc | `///`, `//!`, las secciones de costumbre, enlaces entre páginas y `cargo doc` |
+| 7 | Clippy | leer sus avisos, configurar sus grupos y niveles, y cuándo hacerle caso |
+| 8 | rustfmt | formatear tu código con un comando y comprobarlo en cada cambio |
+| 9 | Medir el rendimiento | por qué medir es difícil, `black_box`, y qué aportan criterion y divan |
+| 10 | Fuzzing y pruebas de propiedades | encontrar fallos con entradas generadas en lugar de elegidas |
+| 11 | Dependencias seguras y Miri | `cargo audit`, `cargo deny` y cazar comportamiento indefinido con Miri |
+| 12 | Jefe: la clave a prueba de bombas | una función con su batería completa de pruebas |
+
+Requisitos: los mundos 0–15. Sobre todo el 10 (errores: `Result`, `panic!`), el 12 (crates, módulos y Cargo) y el 14 (closures e iteradores, que usarás mucho dentro de las pruebas).
+
+<Historia titulo="Una nota sobre Windows">
+`cargo test` compila tus pruebas a un programa y lo ejecuta, así que **necesita el enlazador** (*linker*), igual que `cargo run`. Si ves ``linker `link.exe` not found`` o un mensaje raro de `link`, vuelve a la lección del mundo 0 sobre las Build Tools o la toolchain `gnullvm`. `cargo clippy`, `cargo fmt` y `cargo doc` no enlazan y funcionan sin ellas. Todas las salidas de `cargo test` de este mundo se obtuvieron de verdad, compilando las pruebas a WebAssembly (la misma plataforma que usa este navegador); el formato es el mismo que verás en tu PC.
+</Historia>

@@ -1,0 +1,147 @@
+---
+title: "Vtables por dentro"
+description: "Construye un `dyn Trait` a mano con punteros a función y compáralo con la vtable real que rustc deja en el ensamblador."
+sidebar:
+  order: 11
+duracion: 13
+desde: "1.0"
+requiere: ["21-el-compilador-por-dentro/10-layout-y-nichos", "13-traits-y-genericos"]
+tarjetas:
+  - p: "¿Qué dos cosas contiene un `&dyn Trait`?"
+    r: "Un puntero a los datos y un puntero a la vtable del tipo concreto: es un puntero gordo de dos palabras (16 bytes en x86-64)."
+  - p: "¿Qué hay en una vtable generada por rustc, en orden?"
+    r: "Tres palabras de cabecera (puntero a `drop_in_place`, o nulo si no hace falta; tamaño; alineamiento) y luego un puntero por cada método del trait."
+  - p: "¿A qué se compila `f.area()` con `f: &dyn Forma` en x86-64 Windows?"
+    r: "A un salto indirecto a través de la vtable: `jmp qword ptr [rdx + 24]`, porque la vtable llega en `rdx` y el primer método está tras 3 palabras de 8 bytes."
+  - p: "¿Por qué la vtable guarda el tamaño y el alineamiento?"
+    r: "Para que `Box<dyn Trait>` pueda liberar la memoria (el asignador necesita el tamaño y el alineamiento) y para `size_of_val`/`align_of_val`."
+---
+
+import { Ejecutar, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+En el mundo 13 usaste `dyn Trait` para guardar tipos distintos en un mismo `Vec`. ¿Cómo sabe el programa qué método llamar si el tipo no se conoce al compilar? Con una **vtable**: una tabla de punteros a función. Hoy construyes una a mano y luego la buscas en el ensamblador real.
+
+## Predice
+
+<Pregunta
+  pregunta="En x86-64, `&u8` mide 8 bytes. ¿Cuánto mide `&dyn std::fmt::Debug`?"
+  opciones={["8 bytes", "16 bytes", "24 bytes", "Depende del tipo concreto que haya detrás"]}
+  correcta={1}
+  explicacion="Un `&dyn Trait` es un **puntero gordo**: puntero a los datos + puntero a la vtable. Siempre dos palabras, sea cual sea el tipo de detrás."
+  porque={["Con un solo puntero no habría forma de saber qué métodos llamar.", "", "Tres palabras son las de un `Vec` (puntero, capacidad, longitud).", "Precisamente el tamaño es fijo para poder mezclar tipos distintos."]}
+/>
+
+## La idea
+
+Cuando conviertes un `&Circulo` en `&dyn Forma`, el compilador **sabe** en ese momento que el tipo es `Circulo`. Aprovecha para fabricar el puntero gordo: la dirección del círculo y la dirección de **la vtable de `Circulo` para `Forma`**, una tabla constante que generó al compilar. Hay una vtable por cada combinación de tipo concreto y trait que se usa como `dyn`.
+
+Una llamada `f.area()` sobre un `&dyn Forma` hace tres cosas: leer la dirección de la vtable del puntero gordo, leer de la tabla la casilla de `area`, y saltar ahí pasando el puntero a los datos como `self`. Es una **llamada indirecta**: el procesador no sabe adónde va hasta que lee la tabla, y el compilador no puede inlinear el método. Es el precio de tener **una sola copia** de tu código para todos los tipos (lo contrario que la monomorfización).
+
+La vtable no solo guarda métodos. Las tres primeras casillas son: cómo destruir el valor (`drop_in_place`), su **tamaño** y su **alineamiento**. Con ellas, un `Box<dyn Forma>` sabe liberar su memoria sin conocer el tipo.
+
+## Pruébalo
+
+Un `dyn Forma` construido a mano, con la misma estructura que usa rustc. (En el navegador los punteros miden 4 bytes, así que el `&dyn Fn()` del final mide 8.)
+
+<Ejecutar ej="m21/vtable-a-mano" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+El trait y la llamada reales:
+
+```rust
+pub trait Forma { fn area(&self) -> f64; fn nombre(&self) -> &'static str; }
+pub struct Circulo(pub f64);
+impl Forma for Circulo { /* area = 3.0 * r * r; nombre = "círculo" */ }
+#[unsafe(no_mangle)] pub fn llama_area(f: &dyn Forma) -> f64 { f.area() }
+#[unsafe(no_mangle)] pub fn crea() -> &'static dyn Forma { &Circulo(1.0) }
+```
+
+Ensamblador real de rustc 1.99.1 con `-O` (x86-64 Windows, sintaxis Intel), abreviado:
+
+```text
+llama_area:
+	rex64 jmp	qword ptr [rdx + 24]
+
+crea:
+	lea	rax, [rip + anon.ec52ba5edbb80fa10e5d9edf22da8244.1]
+	lea	rdx, [rip + anon.ec52ba5edbb80fa10e5d9edf22da8244.2]
+	ret
+
+anon.ec52ba5edbb80fa10e5d9edf22da8244.1:
+	.ascii	"\000\000\000\000\000\000\360?"
+
+anon.ec52ba5edbb80fa10e5d9edf22da8244.2:
+	.asciz	"\000\000\000\000\000\000\000\000\b\000\000\000\000\000\000\000\b\000\000\000\000\000\000"
+	.quad	_RNvXCs9L5mWb26O0Y_2vtNtB2_7CirculoNtB2_5Forma4area
+	.quad	_RNvXCs9L5mWb26O0Y_2vtNtB2_7CirculoNtB2_5Forma6nombre
+```
+
+Léelo así:
+
+- **La vtable** (`.2`): los primeros 24 bytes son tres palabras. La primera es **0**: `Circulo` no necesita `drop`, así que no hay función de destrucción. La segunda es `\b` = 8 (tamaño) y la tercera 8 (alineamiento), en little-endian. Detrás, un `.quad` por método en orden de declaración: `area` y `nombre`.
+- **`crea`** devuelve el puntero gordo en **dos registros**: `rax` = datos (el `.1`, que contiene el `f64` 1.0: los bytes `00 … F0 3F`) y `rdx` = vtable.
+- **`llama_area`** es **una sola instrucción**. El puntero gordo llega en `rcx` (datos) y `rdx` (vtable); `[rdx + 24]` es la casilla del primer método (tras 3 × 8 bytes de cabecera). Es un `jmp` y no un `call` porque es una llamada de cola: `area` devolverá el resultado directamente a quien llamó a `llama_area`.
+
+Detalle curioso: en el mismo archivo, `nombre` hace `mov edx, 8` para devolver la longitud de `"círculo"`: son 7 letras pero **8 bytes**, porque la `í` ocupa 2 en UTF-8.
+
+El layout de la vtable **no es estable**: puede cambiar entre versiones, y con *trait upcasting* (convertir `&dyn Sub` en `&dyn Super`) las tablas de los supertraits se combinan de formas internas. Tu código nunca debe leer una vtable a mano.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Pensar que `dyn Trait` guarda una copia del valor">
+
+❌ «Al convertir a `&dyn Forma` se crea un objeto nuevo con los métodos dentro.»
+
+✅ No se copia nada: el valor sigue donde estaba y la vtable es **compartida** por todos los `Circulo`. Convertir a `dyn` solo construye un par de punteros. Por eso `&dyn Trait` es un préstamo como cualquier otro, con las mismas reglas de lifetimes.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={[
+    "Leer del puntero gordo la dirección de la vtable",
+    "Leer de la vtable la casilla del método (tras las 3 de cabecera)",
+    "Saltar a esa dirección pasando el puntero a los datos como self"
+  ]}
+  distractores={["Buscar el método por su nombre en una tabla de cadenas", "Copiar el valor a la pila antes de llamar"]}
+  explicacion="La llamada dinámica es una lectura doble y un salto indirecto. No hay búsqueda por nombre: la posición de cada método en la tabla se decide al compilar."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué la primera casilla de la vtable de `Circulo` vale 0?"
+  opciones={[
+    "Porque `Circulo` mide 0 bytes",
+    "Porque `Circulo` no necesita hacer nada al destruirse, así que no hay función `drop_in_place` que guardar",
+    "Porque la vtable está vacía",
+    "Porque es la casilla de `area`"
+  ]}
+  correcta={1}
+  explicacion="Un `f64` no tiene recursos que liberar. Si el tipo tuviera un `String` dentro, ahí habría un puntero a la función que lo destruye."
+  porque={["`Circulo` mide 8 bytes: lo dice la segunda casilla.", "", "Tiene cabecera y dos métodos.", "`area` está en el desplazamiento 24, tras la cabecera."]}
+/>
+
+<Pregunta
+  pregunta="¿Para qué necesita la vtable el tamaño y el alineamiento del tipo?"
+  opciones={[
+    "Para imprimirlos con `{:?}`",
+    "Para que `Box<dyn Trait>` pueda devolver la memoria al asignador, que necesita el tamaño y el alineamiento",
+    "Para comprobar en cada llamada que el tipo es correcto",
+    "No los necesita; son relleno"
+  ]}
+  correcta={1}
+  explicacion="En Rust, liberar memoria requiere decir cuánta y con qué alineamiento. Con un `Box<dyn Trait>` el tipo ya no se conoce, así que esos datos viajan en la vtable."
+  porque={["`Debug` no tiene nada que ver con la cabecera de la vtable.", "", "No hay comprobaciones en tiempo de ejecución en una llamada `dyn`.", "Se usan al liberar un `Box<dyn Trait>` y en `size_of_val`."]}
+/>
+
+## Para saber más
+
+- [Monomorfización](/curso/21-el-compilador-por-dentro/08-monomorfizacion/), la estrategia opuesta.
+- Rustonomicon, «Exotically Sized Types»: https://doc.rust-lang.org/nomicon/exotic-sizes.html

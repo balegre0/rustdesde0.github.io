@@ -1,0 +1,203 @@
+---
+title: "Comportamiento indefinido"
+description: "La lista completa de lo que un programa de Rust nunca debe hacer, con un ejemplo comprobado de cada caso."
+sidebar:
+  order: 3
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+El **comportamiento indefinido** (*undefined behavior*, UB) es lo que un programa de Rust **no puede hacer nunca**. Esta página recorre la lista oficial de la Referencia de Rust, punto por punto.
+
+## En una frase
+
+Si un programa hace algo de esta lista, **deja de tener significado**: el compilador ha optimizado suponiendo que nunca pasaría, y el resultado puede ser cualquier cosa. Puede fallar, dar un valor absurdo o, lo peor, **parecer que funciona**.
+
+## Lo que hay que saber antes
+
+- **El código seguro no puede provocar UB.** Es la gran promesa de Rust: si no escribes `unsafe`, el compilador y la biblioteca estándar garantizan que nada de esta lista ocurre. (Si ocurre, es un error del compilador o de una biblioteca, no tuyo.)
+- **`unsafe` no permite el UB.** Solo traslada a ti la responsabilidad de evitarlo. Un bloque `unsafe` es una promesa: «aquí he comprobado lo que el compilador no puede comprobar».
+- **Sólido** (*sound*): un código `unsafe` es sólido si **ningún** código seguro que lo use puede provocar UB. Si alguien puede, desde código seguro, provocar UB a través de tu API, tu API es **no sólida** (*unsound*), aunque nadie lo haya hecho aún.
+- **La lista no es exhaustiva** y puede cambiar: todavía no hay un modelo formal completo de qué está permitido en código `unsafe`.
+- **El UB contamina todo el programa**, incluido el código externo con el que hables por FFI, y viceversa.
+
+### Cómo se detecta
+
+- **Al compilar**, si el código se ejecuta en un contexto constante: el intérprete del compilador (el mismo motor que Miri) comprueba cada operación y rechaza el programa con `error[E0080]`. Los ejemplos de esta página que «no compilan» usan este truco para que veas el diagnóstico real.
+- **Al ejecutar en modo debug**, la biblioteca estándar comprueba algunas precondiciones de sus funciones `unsafe` y rustc comprueba la alineación al desreferenciar. Si fallan, el programa se detiene con un pánico. Son comprobaciones **opcionales**: en modo release desaparecen.
+- **Con Miri**, un intérprete que ejecuta tu programa paso a paso y detecta casi todo lo de esta lista. En el Rust Playground: menú *Tools* → *Miri*. Localmente: `cargo +nightly miri run`.
+
+## La lista
+
+### 1. Carreras de datos
+
+Dos accesos a la misma memoria desde hilos distintos, al mismo tiempo, al menos uno de ellos de escritura, sin sincronización. El código seguro no puede crearlas: los traits `Send` y `Sync` lo impiden. Con `unsafe` y un `static mut`, sí:
+
+<Ejecutar ej="ref-lenguaje/ub-carrera" />
+
+Usa hilos, así que se ejecuta en el Playground; allí, con Miri, se detecta la carrera. El arreglo es usar un atómico (o un `Mutex`):
+
+<Ejecutar ej="ref-lenguaje/ub-carrera-arreglada" />
+
+### 2. Acceder a un lugar colgante o desalineado
+
+**Colgante** (*dangling*): no todos los bytes a los que apunta el puntero pertenecen a una misma asignación viva (por ejemplo, porque la variable ya se destruyó). Es un **uso tras liberar**.
+
+<NoCompila ej="ref-lenguaje/ub-colgante" />
+
+`error[E0080]: memory access failed: alloc2 has been freed, so this pointer is dangling`.
+
+**Desalineado**: el último `*` del lugar se hizo sobre un puntero cuya dirección no es múltiplo de la alineación de su tipo. Solo es UB **al leer o escribir**; crear `&raw const` de ese lugar está permitido.
+
+<Ejecutar ej="ref-lenguaje/ub-desalineado" />
+
+En modo debug, rustc comprueba la alineación y detiene el programa con `misaligned pointer dereference: address must be a multiple of 0x4 but is …`.
+
+Un puntero a un tipo de **tamaño cero** nunca cuelga, aunque sea nulo.
+
+### 3. Proyecciones fuera de límites
+
+Acceder a un campo, a un elemento de tupla o a un índice de array a través de un puntero exige que el desplazamiento caiga **dentro** de la asignación. La aritmética de punteros (`add`, `offset`) tiene la misma regla.
+
+<NoCompila ej="ref-lenguaje/ub-fuera-de-limites" />
+
+`error[E0080]: in-bounds pointer arithmetic failed: attempting to offset pointer by 5 bytes, but got alloc2 which is only 3 bytes from the end of the allocation`.
+
+### 4. Romper las reglas de aliasing
+
+Las reglas exactas aún no están cerradas, pero las ideas son firmes:
+
+- mientras viva un `&T`, la memoria a la que apunta **no cambia** (salvo dentro de un `UnsafeCell`);
+- mientras viva un `&mut T`, **nadie más** lee ni escribe esa memoria salvo a través de él;
+- un `Box<T>` se trata casi como un `&'static mut T`;
+- una referencia pasada a una función se considera viva **durante toda la llamada**, aunque no se use más.
+
+<Ejecutar ej="ref-lenguaje/ub-aliasing" />
+
+Este programa imprime `2` y parece correcto, pero crea dos `&mut` del mismo valor a la vez. El compilador no puede verlo; Miri sí. Es el UB más fácil de cometer sin darse cuenta, y es lo que permite al compilador optimizar suponiendo que dos `&mut` nunca se solapan.
+
+### 5. Mutar bytes inmutables
+
+Son inmutables: los bytes de un `static` sin `UnsafeCell`, los de una variable sin `mut`, los de expresiones constantes promovidas, y todo lo alcanzable a través de un `&T`. **Cualquier** escritura cuenta, aunque escriba el mismo valor que ya había.
+
+<NoCompila ej="ref-lenguaje/ub-mutar-inmutable" />
+
+`error[E0080]: writing to alloc1 which is read-only`.
+
+### 6. UB a través de intrínsecos del compilador
+
+Muchas funciones `unsafe` de la biblioteca tienen precondiciones; violarlas es UB. Por ejemplo, `std::hint::unreachable_unchecked` promete que esa línea **nunca** se alcanza:
+
+<NoCompila ej="ref-lenguaje/ub-unreachable" />
+
+`error[E0080]: entering unreachable code`.
+
+Otro clásico: `ptr::copy_nonoverlapping` con origen y destino solapados.
+
+<Ejecutar ej="ref-lenguaje/ub-solapados" />
+
+En modo debug, std lo detecta: `unsafe precondition(s) violated: ptr::copy_nonoverlapping requires that both pointer arguments are aligned and non-null and the specified memory ranges do not overlap`. Compilado en modo release, en el navegador, el mismo programa imprimió `[1, 1, 2, 3, 5]` sin quejarse: **eso** es lo peligroso del UB.
+
+Lo mismo con `get_unchecked` y un índice fuera de rango:
+
+<Ejecutar ej="ref-lenguaje/ub-get-unchecked" />
+
+En modo debug: `unsafe precondition(s) violated: slice::get_unchecked requires that the index is within the slice`.
+
+### 7. Ejecutar código con características de CPU no disponibles
+
+Una función con `#[target_feature(enable = "avx2")]` está compilada con instrucciones AVX2. Ejecutarla en una CPU sin AVX2 es UB. Por eso llamarla es `unsafe` (salvo desde otra función con la misma característica), y conviene comprobarlo antes con `is_x86_feature_detected!`. No hay ejemplo ejecutable: depende de la CPU.
+
+### 8. Llamar con una ABI equivocada o desenrollar donde no se puede
+
+Declarar como `extern "C"` una función que en realidad tiene otra convención de llamada, o dejar que un pánico (o una excepción externa) cruce un marco que no lo permite: por ejemplo, desenrollar a través de una función importada como `"C"` cuando debía ser `"C-unwind"`. No hay ejemplo autocontenido.
+
+### 9. Producir un valor inválido
+
+«Producir» significa asignar, leer, pasar a una función o devolver. **No hace falta usar el valor**: basta con que exista. Qué es válido depende del tipo:
+
+| Tipo | Valores válidos |
+|---|---|
+| `bool` | `0` (`false`) o `1` (`true`) |
+| `char` | hasta `char::MAX` (`0x10FFFF`), sin el rango de suplentes `0xD800..=0xDFFF` |
+| `!` | ninguno: nunca puede existir un valor |
+| enteros, flotantes, punteros crudos, `str` | cualquier patrón de bits, pero **inicializado** |
+| `enum` | un discriminante de una variante existente, con campos válidos |
+| `struct`, tupla, array | todos sus campos válidos |
+| `union` | aún sin decidir del todo; con un campo de tamaño cero, cualquiera |
+| `&T`, `&mut T`, `Box<T>` | no nulo, alineado, no colgante (y, en debate, apuntando a un valor válido) |
+| punteros anchos | metadatos correctos: vtable real del trait, longitud válida; tamaño total como mucho `isize::MAX` |
+| `fn` | no nulo |
+| `NonNull<T>`, `NonZero<T>` | dentro de su rango (no nulo / no cero) |
+
+Estas restricciones son las que crean los **nichos**: como un `bool` nunca vale 3, `Option<bool>` puede usar el 3 para `None`. Ver [Layout de tipos](/ref/lenguaje/layout-de-tipos/).
+
+Un `bool` que no es 0 ni 1:
+
+<NoCompila ej="ref-lenguaje/ub-bool-invalido" />
+
+`error[E0080]: constructing invalid value of type bool: encountered 0x03, but expected a boolean`.
+
+Un `char` suplente:
+
+<NoCompila ej="ref-lenguaje/ub-char-invalido" />
+
+`error[E0080]: constructing invalid value of type char: encountered 0x0000d800, but expected a valid unicode scalar value`.
+
+Un `enum` con una etiqueta inexistente:
+
+<NoCompila ej="ref-lenguaje/ub-enum-invalido" />
+
+`error[E0080]: constructing invalid value of type Color: at .<enum-tag>, encountered 0x07, but expected a valid enum tag`.
+
+Una referencia nula:
+
+<NoCompila ej="ref-lenguaje/ub-referencia-nula" />
+
+`error[E0080]: constructing invalid value of type &u8: encountered a null reference`.
+
+Memoria sin inicializar leída como entero:
+
+<NoCompila ej="ref-lenguaje/ub-sin-inicializar" />
+
+`error[E0080]: reading memory at alloc12[0x0..0x4], but memory is uninitialized at [0x0..0x4], and this operation requires initialized memory`. La memoria sin inicializar **no** es «basura aleatoria»: para el compilador es un valor especial que no equivale a ningún número. Leerla solo está permitido dentro de una `union` o en el relleno entre campos. Para trabajar con ella existe `MaybeUninit<T>`.
+
+### 10. Usar mal el ensamblador en línea
+
+`asm!` tiene sus propias reglas (qué registros puedes tocar, qué debes declarar como modificado, no saltar fuera del bloque sin declararlo…). Romperlas es UB.
+
+### 11. Violar suposiciones del runtime de Rust
+
+Por ejemplo, el runtime supone que un marco de pila de Rust no desaparece sin ejecutar los destructores de sus variables locales. Una función externa que salta hacia atrás por la pila sin desenrollarla (sin ejecutar esos destructores) puede romperlo.
+
+### 12. En contextos constantes: procedencia de punteros
+
+Durante la evaluación constante, un valor que contiene datos enteros (enteros, flotantes, `bool`, `char`, discriminantes, longitudes) **no puede** llevar *procedencia* (*provenance*, la información de a qué asignación pertenece un puntero). Por tanto, reinterpretar un puntero como entero en un `const` es UB:
+
+<NoCompila ej="ref-lenguaje/ub-provenance-const" />
+
+`error[E0080]: unable to turn pointer into integer`, con la ayuda de que la dirección absoluta de un puntero no se conoce al compilar.
+
+## Lo que **no** es comportamiento indefinido
+
+La Referencia también lista cosas que son indeseables pero **no** son UB, y por eso pueden pasar en código seguro:
+
+- bloqueos mutuos (*deadlocks*);
+- fugas de memoria y de otros recursos (`mem::forget`, ciclos de `Rc`);
+- salir sin ejecutar destructores (`process::exit`);
+- exponer la dirección de memoria de algo;
+- **desbordamiento de enteros**: en debug es un pánico; en release da la vuelta (*wrapping*), un resultado definido;
+- condiciones de carrera lógicas (*race conditions*) que no son carreras de datos.
+
+## Desde
+
+La lista evoluciona con cada versión. La comprobación de precondiciones de std en modo debug y la de alineación de rustc son recientes; los errores de evaluación constante existen desde que hay `const fn` (1.31).
+
+## Ver también
+
+- [`unsafe`](/ref/lenguaje/palabras-clave/unsafe/) · [`union`](/ref/lenguaje/palabras-clave/union/) · [`raw`](/ref/lenguaje/palabras-clave/raw/) · [Layout de tipos](/ref/lenguaje/layout-de-tipos/) · [Evaluación const](/ref/lenguaje/evaluacion-const/)
+
+## Aprende esto en
+
+- [Mundo 20 · Unsafe y UB](/curso/20-unsafe-y-ub/)

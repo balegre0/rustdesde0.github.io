@@ -1,0 +1,92 @@
+---
+title: "El Waker: «vuelve a llamarme»"
+description: "Construir un Waker propio con el trait Wake y entender por qué tiene que poder viajar entre hilos."
+sidebar:
+  order: 3
+duracion: 11
+desde: "1.51"
+requiere: ["18-async/02-future-y-poll", "17-concurrencia/04-send-y-sync"]
+tarjetas:
+  - p: "¿Qué hace un Waker?"
+    r: "Avisa al ejecutor de que una tarea puede avanzar y merece la pena volver a sondearla."
+  - p: "¿Qué diferencia hay entre wake() y wake_by_ref()?"
+    r: "wake() consume el Waker; wake_by_ref() lo usa por referencia y lo deja vivo."
+  - p: "¿Qué hay que cumplir para convertir un Arc<W> en Waker?"
+    r: "W: Wake + Send + Sync + 'static, porque un Waker puede clonarse y usarse desde cualquier hilo."
+  - p: "¿Qué cuatro funciones tiene la vtable de un RawWaker?"
+    r: "clone, wake, wake_by_ref y drop."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a fabricar tu propio **waker** y a contar cuántas veces un future pide que lo despierten.
+
+## Predice
+
+<NoCompila ej="m18/waker-cell" explicacion="El waker guarda un `Cell<u32>`. `Cell` permite mutar a través de una referencia compartida, pero solo dentro de un hilo: no es `Sync`. Y un `Waker` se puede clonar y llamar desde cualquier hilo, así que el compilador exige `Sync`. El arreglo usa un `AtomicU32`." />
+
+## La idea
+
+En la lección anterior hicimos trampa: sondeábamos sin parar, aunque el future no pudiera avanzar. Un ejecutor de verdad no hace eso, porque gastaría la CPU en bucles vacíos. En su lugar, **duerme** hasta que alguien le avisa.
+
+Ese aviso es el **`Waker`** (*despertador*). Cada vez que el ejecutor sondea un future, le pasa un `Context` que lleva dentro un waker atado a esa tarea. Si el future devuelve `Pending`, guarda (clona) el waker y se lo da a quien producirá el dato: el sistema operativo cuando llegue un paquete de red, un temporizador cuando suene, otra tarea cuando envíe un mensaje. Cuando el dato llega, ese alguien llama a `waker.wake()` y el ejecutor vuelve a poner la tarea en la cola.
+
+La forma fácil de crear un waker es implementar el trait **`Wake`** (Rust 1.51) en un tipo tuyo y convertir un `Arc` de ese tipo con `Waker::from(arc)`.
+
+## Pruébalo
+
+<Ejecutar ej="m18/waker-cuenta" />
+
+`DosVueltas` devuelve `Pending` dos veces, y cada vez llama a `wake_by_ref()`. Nuestro `Contador` lo registra. Las dos cuentas coinciden: **cada `Pending` vino con su aviso**. Así es como un ejecutor sabe a quién sondear.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Un `Waker` es un puntero gordo hecho a mano.** Por dentro es un `RawWaker`: un puntero de datos (`*const ()`) y un puntero a una tabla de cuatro funciones (`RawWakerVTable`): `clone`, `wake`, `wake_by_ref` y `drop`. Es la misma idea que un `dyn Trait` (mundo 13), pero construida sin `dyn` para que funcione también sin asignador de memoria (en sistemas embebidos) y para que cada ejecutor decida qué significa «despertar».
+
+**`Wake` lo hace por ti.** Cuando escribes `Waker::from(Arc::new(Contador { .. }))`, la biblioteca estándar rellena esa tabla: `clone` incrementa el contador del `Arc`, `drop` lo decrementa, y `wake` llama a tu método. Construir la tabla a mano (`RawWaker::new`) es `unsafe`, porque el compilador no puede comprobar que tus cuatro funciones sean coherentes entre sí.
+
+**Por qué `Send + Sync`.** La conversión exige `W: Wake + Send + Sync + 'static`. Un waker puede clonarse y enviarse a otro hilo (por ejemplo, al hilo que vigila la red), y llamarse desde allí. Si `W` pudiera tener un `Cell` dentro, dos hilos podrían modificarlo a la vez: una **carrera de datos**. Por eso el ejemplo del principio no compila.
+
+**`wake` frente a `wake_by_ref`.** `wake(self)` consume el waker (útil cuando ya no lo necesitas); `wake_by_ref(&self)` lo deja vivo. Con `Wake`, si solo implementas `wake`, la versión por referencia por defecto clona el `Arc` y llama a `wake`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Guardar un waker viejo">
+
+❌ Guardar el waker del **primer** `poll` y reutilizarlo siempre. Un ejecutor puede mover la tarea a otro hilo y darle un waker distinto en el siguiente sondeo.
+
+✅ En cada `poll`, actualiza el waker guardado. `Waker::will_wake(&otro)` te dice si dos wakers despiertan la misma tarea, para no clonar sin necesidad:
+
+```rust
+if !guardado.will_wake(cx.waker()) {
+    guardado = cx.waker().clone();
+}
+```
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m18/reto-waker" enunciado="Implementa `Wake` para `Hucha` de modo que cada despertar sume 10 al contador atómico. Ojo: `wake_by_ref` también debe sumar 10 (implementa los dos métodos)." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Un future devuelve `Pending`. ¿Qué tiene que pasar para que el ejecutor lo vuelva a sondear?"
+  opciones={["Nada, el ejecutor lo sondea cada milisegundo", "Que alguien llame a `wake` sobre el waker que recibió en su `Context`", "Que el future entre en pánico", "Que termine otra tarea"]}
+  correcta={1}
+  explicacion="Un ejecutor eficiente solo sondea tareas despertadas. El waker es el canal para avisar."
+  porque={["Eso sería espera activa (*busy polling*), que gasta CPU.", "Correcto.", "Un pánico no despierta, rompe.", "El final de otra tarea no tiene por qué afectarle."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué crear un waker con `RawWaker::new` es `unsafe` y con `Waker::from(arc)` no?"
+  opciones={["Porque `RawWaker` es más rápido", "Porque con `RawWaker` tú prometes que las cuatro funciones de la vtable son correctas, y el compilador no lo puede comprobar", "Porque `Arc` usa un hilo aparte", "No hay diferencia"]}
+  correcta={1}
+  explicacion="La vtable maneja punteros crudos; un `clone` o un `drop` mal hecho causaría uso tras liberar. `Wake` + `Arc` lo construye por ti de forma segura."
+  porque={["El coste es prácticamente el mismo.", "Correcto.", "`Arc` no crea hilos.", "La hay: uno es `unsafe` y otro no."]}
+/>

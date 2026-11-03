@@ -1,0 +1,77 @@
+---
+title: "stdout y stderr"
+description: "Las dos salidas del programa: la normal (stdout) y la de errores (stderr); flush y lock."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::io::stdout, std::io::stderr`
+
+## Sinopsis
+
+```rust
+pub fn stdout() -> Stdout
+
+pub fn stderr() -> Stderr
+```
+
+## Qué hace
+
+`stdout()` es la salida normal (la que usa `println!`) y `stderr()` la de errores (la que usa `eprintln!`). Son distintas a propósito: quien ejecuta tu programa puede guardar los resultados en un archivo y seguir viendo los errores en pantalla. `stdout` guarda en un búfer hasta cada salto de línea; `stderr` no tiene búfer.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`flush`](#flush) | Escribe ya lo que haya en el búfer. | 1.0 |
+| [`lock`](#lock) | Bloquea la salida para tu hilo: escribir muchas veces con el cerrojo cogido es más rápido. | 1.0 |
+
+### `flush`
+
+```rust
+fn flush(&mut self) -> Result<()>
+```
+
+Escribe ya lo que haya en el búfer.
+
+### `lock`
+
+```rust
+pub fn lock(&self) -> StdoutLock<'static>
+```
+
+Bloquea la salida para tu hilo: escribir muchas veces con el cerrojo cogido es más rápido.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/io-write" />
+
+**Salida:**
+
+```text
+línea con writeln!
+bytes sueltos
+[50, 43, 50, 61, 52] -> 2+2=4
+```
+
+**Salida de error** (*stderr*):
+
+```text
+esto va a la salida de errores
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [Write](/ref/std/io/write/)
+- [println! y eprintln!](/ref/std/macros/println/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)

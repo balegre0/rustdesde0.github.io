@@ -1,0 +1,82 @@
+---
+title: "Display"
+description: "El trait de {}: cómo se muestra un valor a una persona. También da to_string()."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::fmt::Display`
+
+## Sinopsis
+
+```rust
+pub trait Display {
+    // Required method
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error>;
+}
+```
+
+## Qué hace
+
+Implementa `Display` para decir cómo se ve tu tipo con `{}`. Solo tiene un método, `fmt`, que recibe un `Formatter` y escribe en él (casi siempre con `write!`). No se puede derivar: tienes que decidir tú el formato. El `Formatter` te da las opciones que pidió quien imprime (`precision()`, `width()`, `alternate()`…).
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`fmt`](#fmt) | Escribe la representación del valor en el `Formatter`. | 1.0 |
+| [`precision`](#precision) | La precisión pedida (`{:.2}`), si la hay. | 1.5 |
+| [`width`](#width) | El ancho pedido (`{:8}`), si lo hay. | 1.5 |
+
+### `fmt`
+
+```rust
+fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error>
+```
+
+Escribe la representación del valor en el `Formatter`. Devuelve `fmt::Result` (`Ok(())` o `Err(fmt::Error)`).
+
+### `precision`
+
+```rust
+pub fn precision(&self) -> Option<usize>
+```
+
+La precisión pedida (`{:.2}`), si la hay.
+
+### `width`
+
+```rust
+pub fn width(&self) -> Option<usize>
+```
+
+El ancho pedido (`{:8}`), si lo hay.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/fmt-display" />
+
+**Salida:**
+
+```text
+21.5 °C
+21.46 °C
+21.5 °C (8 bytes)
+```
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `precision` (1.5), `width` (1.5).
+
+## Ver también
+
+- [Debug](/ref/std/fmt/debug/)
+- [E0277 (falta Display)](/errores/e0277/)
+- [E0117 (Display para un tipo ajeno)](/errores/e0117/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

@@ -1,0 +1,114 @@
+---
+title: "Cadenas del sistema"
+description: "Conoce `OsString`, `CString` y `CStr`, los tipos de texto que usa el sistema operativo, y los literales `c\"…\"`."
+sidebar:
+  order: 7
+duracion: 10
+desde: "1.77"
+requiere: ["22-sistemas-y-ffi/06-un-servidor-tcp", "11-colecciones-y-texto"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre `String` y `CString`?"
+    r: "`String` es UTF-8 con longitud y puede contener bytes 0. `CString` son bytes sin ningún 0 interior terminados en un 0: el formato que esperan las funciones del ABI de C."
+  - p: "¿Qué es un literal `c\"hola\"`?"
+    r: "Un `&'static CStr` escrito directamente en el código (estable desde Rust 1.77): los bytes de `hola` más un 0 final."
+  - p: "¿Para qué sirve `OsString`?"
+    r: "Para texto tal como lo maneja el sistema operativo (nombres de archivo, variables de entorno), que puede no ser UTF-8 válido."
+  - p: "¿Por qué `CString::new(\"ho\\0la\")` devuelve un error?"
+    r: "Porque el 0 interior marcaría el final de la cadena para quien la lea: se perdería `la` en silencio."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+`String` es el texto de Rust: UTF-8 y con su longitud guardada. Pero el sistema operativo y las bibliotecas externas no siempre hablan así. Rust tiene tipos específicos para esas fronteras, y elegir bien evita errores sutiles.
+
+## Predice
+
+<Pregunta
+  pregunta={"`String::from(\"año\").len()` vale 4. ¿Cuántos bytes ocupa en memoria `CString::new(\"año\").unwrap()`, contando todo?"}
+  opciones={["3", "4", "5", "8"]}
+  correcta={2}
+  explicacion="`año` son 4 bytes en UTF-8 (la `ñ` ocupa 2) y `CString` añade un byte 0 al final: 5."
+  porque={["Son 3 letras, pero la `ñ` ocupa 2 bytes.", "Esos son los bytes del texto; falta el 0 final.", "", "No hay ninguna cabecera extra en los bytes."]}
+/>
+
+## La idea
+
+Hay **dos parejas** nuevas, igual que `String`/`&str` o `PathBuf`/`&Path` (con propiedad / prestado):
+
+- **`CString` / `&CStr`**: bytes **terminados en 0** y sin ningún 0 dentro. Es el formato de texto del **ABI de C**, el que usan casi todas las bibliotecas del sistema y muchas externas. Una función de ese mundo recibe un puntero al primer byte y lee hasta encontrar el 0; no recibe la longitud.
+- **`OsString` / `&OsStr`**: texto en el formato nativo del sistema operativo. En Unix son bytes cualquiera; en Windows, una codificación de 16 bits que admite secuencias que no son UTF-16 válido. Los nombres de archivo, los argumentos (`args_os`) y las variables de entorno (`var_os`) pueden no ser UTF-8, y `OsString` los guarda sin perder nada.
+
+Desde Rust 1.77 puedes escribir un `&CStr` literal con `c"texto"`: el compilador añade el 0 final y comprueba que no haya ninguno dentro.
+
+Conversiones: `CString::new(texto)` falla si hay un 0 interior; `cstr.to_str()` falla si no es UTF-8; `os.to_str()` devuelve `None` si no es UTF-8, y `to_string_lossy()` sustituye lo inválido por `�`.
+
+## Pruébalo
+
+<Ejecutar ej="m22/cadenas-c" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Tamaños y punteros.** Un `&str` es un puntero gordo (puntero + longitud). Un `&CStr` hoy también lo es en la implementación, pero el **contrato** es el de las funciones externas: lo que se pasa por la frontera es `cstr.as_ptr()`, un `*const c_char` al primer byte, y quien lo recibe busca el 0 para saber dónde acaba. Por eso el 0 interior está prohibido: partiría la cadena en silencio.
+
+**Vida de los punteros.** Este es el error clásico en la frontera:
+
+```rust
+let p = CString::new("hola").unwrap().as_ptr(); // el CString temporal se destruye al final de la línea
+// usar p aquí sería un uso tras liberar
+```
+
+El `CString` es temporal y se libera al acabar la sentencia; `p` queda colgando. Compila (un puntero crudo no tiene lifetime), pero usarlo es comportamiento indefinido. Guarda el `CString` en una variable que viva mientras se use el puntero. El compilador avisa de este patrón concreto con la lint `dangling_pointers_from_temporaries`.
+
+**Windows.** En Windows las API «W» reciben texto de 16 bits terminado en 0. `std::os::windows::ffi::OsStrExt::encode_wide` convierte un `OsStr` a esa forma (verás `windows-sys` en la lección 12).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Convertir nombres de archivo a String con unwrap">
+
+❌ `let nombre = entrada.file_name().into_string().unwrap();` dentro de un recorrido de carpetas: el primer nombre que no sea UTF-8 válido tumba el programa.
+
+✅ Trabaja con `OsString`/`Path` mientras puedas y convierte solo para mostrar, con `to_string_lossy()` o `display()`.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta={"¿Qué tipo usarías para pasar el nombre `\"datos.txt\"` a una función externa que espera un `const char*` terminado en 0?"}
+  opciones={["`&str` con `as_ptr()`", "`c\"datos.txt\"` (o un `CString`) con `as_ptr()`", "`String` con `as_ptr()`", "`OsString`"]}
+  correcta={1}
+  explicacion="Un `&str` no lleva 0 final: la función seguiría leyendo memoria más allá del texto. `CStr`/`CString` garantizan el 0."
+  porque={["Sin 0 final, quien lee no sabe dónde parar.", "", "`String` tampoco tiene 0 final.", "`OsString` es para el formato del sistema operativo, no para el ABI de C."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta={"¿Qué devuelve `CString::new(\"ho\\\\0la\")`?"}
+  opciones={["`Ok` con `ho`", "`Ok` con `ho\\0la`", "`Err(NulError)`: hay un byte 0 en la posición 2", "Un pánico"]}
+  correcta={2}
+  explicacion="Salida real del ejemplo: `nul byte found in provided data at position: 2`."
+  porque={["No trunca en silencio: ese es justo el peligro que evita.", "Un 0 interior no se puede representar.", "", "Devuelve `Result`; el pánico solo vendría de un `unwrap`."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué existe `OsString` además de `String`?"
+  opciones={[
+    "Porque es más rápido",
+    "Porque los nombres de archivo, argumentos y variables de entorno pueden no ser UTF-8 válido, y hay que poder guardarlos sin perder información",
+    "Porque `String` no funciona en Windows",
+    "Por compatibilidad con Rust anterior a 1.0"
+  ]}
+  correcta={1}
+  explicacion="El sistema operativo no garantiza UTF-8. `OsString` representa lo que el sistema da, tal cual."
+  porque={["La razón es de corrección, no de velocidad.", "", "`String` funciona en todas partes; lo que pasa es que el sistema puede darte texto que no es UTF-8.", "Existe por diseño desde 1.0."]}
+/>
+
+## Para saber más
+
+- Documentación de `std::ffi`: https://doc.rust-lang.org/std/ffi/index.html
+- La lección siguiente: [Llamar a una biblioteca externa](/curso/22-sistemas-y-ffi/08-llamar-a-una-biblioteca-externa/).

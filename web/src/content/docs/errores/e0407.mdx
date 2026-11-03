@@ -1,0 +1,88 @@
+---
+title: "E0407: el método no pertenece al trait"
+description: "Dentro de un impl Trait for Tipo defines un método que el trait no declara."
+sidebar:
+  order: 32
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` method `adios` is not a member of trait `Saludo` ``
+
+## Qué significa
+
+Un bloque `impl Saludo for Robot` solo puede contener lo que declara `Saludo`. `adios` no forma parte del trait, así que no puede estar ahí.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0407" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0407]: method `adios` is not a member of trait `Saludo`
+  --> E0407.rs:11:5
+   |
+11 | /     fn adios(&self) {
+12 | |         println!("adiós");
+13 | |     }
+   | |_____^ not a member of trait `Saludo`
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Querer añadir un método extra «de paso» en el `impl` del trait.
+- Errata en el nombre de un método del trait.
+
+## Cómo arreglarlo
+
+Pon los métodos propios en un bloque `impl Robot { ... }` aparte, o añádelos a la definición del trait si deben formar parte de él.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+trait Saludo {
+    fn hola(&self);
+}
+
+struct Robot;
+
+impl Saludo for Robot {
+    fn hola(&self) {
+        println!("hola");
+    }
+}
+
+impl Robot {
+    fn adios(&self) { // método propio del tipo, fuera del trait
+        println!("adiós");
+    }
+}
+
+fn main() {
+    Robot.hola();
+    Robot.adios();
+}
+```
+
+**Salida:**
+
+```text
+hola
+adiós
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0407` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0046](/errores/e0046/): faltan elementos del trait
+- [E0599](/errores/e0599/): no existe ese método para el tipo
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

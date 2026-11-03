@@ -1,0 +1,70 @@
+---
+title: "no_std y alloc"
+description: "Las tres capas de la biblioteca estándar —core, alloc y std— y cómo escribir una biblioteca que funcione en cualquier sitio, también sin sistema operativo."
+sidebar:
+  order: 10
+duracion: 11
+desde: "1.36"
+requiere: ["22-sistemas-y-ffi/09-que-te-llamen-a-ti"]
+tarjetas:
+  - p: "¿Qué contiene cada capa: core, alloc, std?"
+    r: "core: todo lo que no necesita ni memoria dinámica ni sistema operativo. alloc: Vec, String, Box, Rc… (necesita un asignador). std: archivos, hilos, red, entrada/salida (necesita un sistema operativo)."
+  - p: "¿Por qué escribir una biblioteca como no_std?"
+    r: "Para que funcione también en microcontroladores, núcleos y WebAssembly sin WASI. Quien la use desde std no pierde nada."
+  - p: "¿Qué hace `extern crate alloc;` en un crate no_std?"
+    r: "Da acceso a alloc (Vec, String, Box…). Alguien tendrá que poner un #[global_allocator]."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+Todo lo que has usado hasta aquí viene de `std`. Pero `std` no es un bloque: es la última de **tres capas**. Saber cuál necesita cada cosa te permite escribir código que funcione en un servidor, en un navegador y en un chip de dos euros.
+
+## La idea
+
+| Capa | Necesita | Ejemplos |
+|---|---|---|
+| `core` | nada | `Option`, `Result`, iteradores, slices, `str`, `fmt`, `mem`, `ptr`, atómicos, `cell` |
+| `alloc` | un asignador de memoria | `Vec`, `String`, `Box`, `Rc`, `Arc`, `BTreeMap`, `format!` |
+| `std` | un sistema operativo | `fs`, `net`, `thread`, `io::stdin`, `println!`, `HashMap` (por su semilla aleatoria), `time` |
+
+`std` vuelve a exportar todo lo de `core` y `alloc`: `std::vec::Vec` y `alloc::vec::Vec` son el mismo tipo.
+
+Para escribir una biblioteca portable:
+
+```rust
+#![no_std]           // sin std: solo core
+extern crate alloc;  // y alloc, si hace falta memoria dinámica
+
+use alloc::vec::Vec;
+use core::fmt::Write;
+```
+
+Lo habitual en el ecosistema: ser `no_std` por defecto y ofrecer una feature `std` para lo que la necesite (por ejemplo, implementar `std::error::Error`).
+
+## Pruébalo
+
+Una biblioteca que solo usa `core` y `alloc` (aquí solo se comprueba que compila):
+
+<Ejecutar ej="m22/no-std-capas" />
+
+`write!` funciona sobre cualquier `core::fmt::Write`, también sobre un `String` sin `std`. Y `maximo` no reserva nada: solo usa `core`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué `HashMap` está en `std`.** Su hasher por defecto (`RandomState`) pide al sistema operativo una semilla aleatoria, para resistir ataques que fuerzan colisiones. Sin sistema operativo no hay semilla. En `no_std` se usa `alloc::collections::BTreeMap` o el crate `hashbrown` (la misma tabla que usa `std` por dentro) con otro hasher.
+
+**Pánicos.** En una biblioteca `no_std` puedes usar `panic!` sin problema. Quien produce el binario final da el [`#[panic_handler]`](/ref/lenguaje/atributos/panic_handler/) y el [`#[global_allocator]`](/ref/lenguaje/atributos/global_allocator/), si usa `alloc`. Lo viste en el mundo 23… o lo verás, si vas en orden.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tu biblioteca `no_std` necesita un mapa de clave a valor. ¿Qué usas sin depender de `std`?"
+  opciones={["`alloc::collections::BTreeMap`", "`std::collections::HashMap`", "`core::collections::HashMap`", "No se puede"]}
+  correcta={0}
+  explicacion="`BTreeMap` solo necesita un asignador, así que está en `alloc`. `HashMap` necesita una semilla aleatoria del sistema."
+  porque={["", "Exige `std`.", "No existe: `core` no tiene colecciones que reserven memoria.", "Sí se puede, con `alloc`."]}
+/>

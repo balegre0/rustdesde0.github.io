@@ -1,0 +1,92 @@
+---
+title: "Ownership y colecciones"
+description: "Un Vec es dueño de sus elementos: push se queda con el valor, for los consume y no puedes sacar uno por índice (E0507)."
+sidebar:
+  order: 10
+duracion: 12
+desde: "1.0"
+requiere: ["06-ownership/09-devolver-la-propiedad"]
+tarjetas:
+  - p: "¿Quién es el dueño de un `String` después de `v.push(s)`?"
+    r: "El `Vec`. La variable `s` pierde sus permisos (E0382 si la usas)."
+  - p: "¿Qué hace `for x in v` con el vector `v`?"
+    r: "Lo consume: cada elemento se mueve a `x` y, al terminar, el vector ya no existe."
+  - p: "¿Por qué `let x = v[0];` da E0507 con un `Vec<String>`?"
+    r: "Porque movería el elemento fuera del vector, dejando un hueco del que el vector seguiría creyéndose dueño (doble liberación al liberar el vector)."
+  - p: "¿Cómo se saca de verdad un elemento de un `Vec`?"
+    r: "Con métodos que dejan el vector coherente: `remove(i)`, `pop()`, `swap_remove(i)` o `std::mem::take(&mut v[i])`."
+  - p: "¿En qué orden se liberan un `Vec` y sus elementos?"
+    r: "Al liberar el `Vec`, primero se liberan sus elementos (en orden) y luego su propio bloque del heap."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Las colecciones también tienen dueño, y además son dueñas de lo que guardan. Vas a ver qué pasa al meter, recorrer y sacar elementos de un `Vec`.
+
+## Predice
+
+<NoCompila ej="m06/push-y-usar" explicacion={"`push` recibe el `String`. ¿Lo copia o lo mueve? Si lo mueve, ¿quién es la dueña de \"Ana\" en la línea del `println!`?"} />
+
+## La idea
+
+Un `Vec<String>` es **dueño** de sus elementos. Eso tiene tres consecuencias:
+
+1. **`push` mueve.** `invitados.push(ana)` se queda con el `String`; `ana` pierde sus permisos.
+2. **`for x in v` consume.** Cada elemento se mueve a `x`, uno a uno. Al acabar, el vector ya no existe.
+3. **No se saca por índice.** `let x = v[0];` intentaría mover un elemento fuera del vector. El vector se quedaría con un hueco que sigue considerando suyo, y al liberarse lo liberaría otra vez. El compilador lo prohíbe: **E0507**.
+
+<NoCompila ej="m06/sacar-de-vec" explicacion="`invitados[0]` es el `String` que vive dentro del vector. Moverlo fuera dejaría al vector con un hueco que liberaría al final: doble liberación. En el arreglo se usa `remove`, que lo saca de verdad." />
+
+## Pruébalo
+
+<Ejecutar ej="m06/vec-posee" />
+
+Mirar sin quitar (`&invitados[0]`) es un **préstamo**, que verás a fondo en el mundo 07. Sacar de verdad (`remove`) entrega la propiedad y deja el vector coherente.
+
+El `for` que consume:
+
+<NoCompila ej="m06/for-consume" explicacion="`for n in nombres` mueve cada elemento a `n`, y el vector se consume. Para usar `nombres` después, el arreglo mide antes del bucle." />
+
+Y otra forma de sacar un elemento sin dejar hueco: cambiarlo por un valor vacío.
+
+<Ejecutar ej="m06/p-mem-take" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Cómo se libera un `Vec<String>`.** Su `drop` hace dos cosas, en este orden: primero llama al `drop` de **cada elemento** (liberando cada texto) y después libera su **propio bloque** del heap, donde estaban las fichas. Si el vector tuviera un hueco «movido», el primer paso liberaría ese texto otra vez.
+
+**Por qué `remove` sí puede.** `remove(i)` copia el elemento fuera y **desplaza** los siguientes una posición a la izquierda, reduciendo la longitud. El vector nunca tiene huecos. `swap_remove(i)` es más rápido (pone el último en el hueco), pero cambia el orden. `pop()` saca el último.
+
+**`for` es azúcar.** `for x in v` se convierte en `IntoIterator::into_iter(v)`, que recibe `v` **por valor**. Por eso lo consume. En el mundo 07 verás `for x in &v`, que recorre sin consumir.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Pensar que v[0] siempre funciona">
+
+Con un `Vec<i32>`, `let x = v[0];` compila: `i32` es `Copy` y se copia. Con un `Vec<String>`, la misma línea da E0507. Lo que cambia no es el vector: es si el elemento se puede **copiar** o hay que **moverlo**.
+
+✅ Para mirar: `&v[0]`. Para quedártelo: `v.remove(0)` o `std::mem::take(&mut v[0])`. Para tener tu propia copia: `v[0].clone()`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta={"`let s = String::from(\"x\"); v.push(s); v.push(s);` ¿Qué pasa?"}
+  opciones={["El vector tiene dos `\"x\"`", "E0382 en el segundo `push`: `s` ya se movió", "El segundo `push` sustituye al primero", "E0507"]}
+  correcta={1}
+  explicacion="El primer `push` mueve `s` al vector. En el segundo, `s` ya no tiene permisos."
+  porque={["Para eso harían falta dos `String`: por ejemplo, `v.push(s.clone()); v.push(s);`.", "", "`push` siempre añade al final.", "E0507 es sacar de algo prestado o indexado, no esto."]}
+/>
+
+<Pregunta
+  pregunta="Cuando un `Vec<String>` con 3 elementos sale de ámbito, ¿cuántas liberaciones hay?"
+  opciones={["1", "3", "4", "0"]}
+  correcta={2}
+  explicacion="Una por cada texto (3) más la del bloque donde el vector guarda las fichas (1)."
+  porque={["Faltan los textos de cada elemento.", "Falta el bloque del propio vector.", "", "Todo lo que se reservó se libera."]}
+/>

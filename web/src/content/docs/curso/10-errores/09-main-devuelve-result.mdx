@@ -1,0 +1,90 @@
+---
+title: "main que devuelve Result"
+description: "Usa ? directamente en main y descubre qué imprime Rust y qué código de salida da cuando algo falla."
+sidebar:
+  order: 9
+duracion: 10
+desde: "1.26"
+requiere: ["10-errores/08-box-dyn-error"]
+tarjetas:
+  - p: "¿Qué pasa si `main` devuelve `Err(e)`?"
+    r: "Rust escribe en stderr «Error: » seguido del `Debug` del error (`{:?}`), y el programa termina con código de salida 1."
+  - p: "¿Qué firma de `main` se usa más para aplicaciones pequeñas?"
+    r: "`fn main() -> Result<(), Box<dyn Error>>`: así `?` acepta cualquier error."
+  - p: "¿Cómo eliges el código de salida y el formato del mensaje?"
+    r: "Devolviendo `std::process::ExitCode` desde `main` y tratando el error tú mismo: `eprintln!(\"error: {e}\")` y `ExitCode::from(2)`."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a usar `?` en el sitio donde más se echa de menos: `main`.
+
+## Predice
+
+<Predice
+  ej="m10/main-result"
+  opciones={["`ancho = 12` y luego `Error: ParseIntError { kind: InvalidDigit }`", "`ancho = 12` y luego `Error: invalid digit found in string`", "Un pánico", "No compila: `main` no puede devolver nada"]}
+  correcta={0}
+  explicacion="El segundo `parse` falla y `?` hace que `main` devuelva el `Err`. Rust lo muestra con `Error: ` y el **Debug** del error (no el Display), y el programa termina con código 1."
+  porque={["Correcto.", "Rust usa `{:?}` (Debug) para el error de `main`, no `{}`.", "No hay pánico: `main` devuelve un error con normalidad.", "Desde Rust 1.26, `main` puede devolver `Result`."]}
+/>
+
+## La idea
+
+`main` puede devolver `Result<(), E>`, con cualquier `E` que implemente `Debug`. Así puedes usar `?` en `main` igual que en cualquier otra función:
+
+- si `main` devuelve `Ok(())`, el programa termina bien (código de salida **0**);
+- si devuelve `Err(e)`, Rust escribe `Error: ` y el error **con formato Debug** en la salida de errores (*stderr*), y el programa termina con código **1**.
+
+El **código de salida** es un número que el programa entrega al sistema operativo al terminar: 0 significa «todo bien» y cualquier otro, «algo falló». Lo usan los scripts y otras herramientas para saber si tu programa funcionó.
+
+La firma favorita para programas pequeños es `fn main() -> Result<(), Box<dyn Error>>`: con ella, `?` acepta cualquier error.
+
+## Pruébalo
+
+<Ejecutar ej="m10/main-box" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Tu `main` no es lo primero que se ejecuta: la biblioteca estándar tiene un pequeño arranque que prepara el entorno, llama a tu `main` y, con lo que devuelve, decide el código de salida. Para eso usa el trait `Termination`, que implementan `()`, `ExitCode`, `Result<(), E>` (con `E: Debug`) y algunos más. La implementación para `Result` es la que imprime `Error: {:?}` y devuelve el código 1. Lo has visto en el ejemplo: el arranque mostró `Error: SinPermiso { usuario: "marta" }` y el programa terminó con código 1.
+
+Que use **Debug** y no Display es una decisión de diseño: Debug existe casi siempre (se deriva) y muestra más detalle. Pero para un usuario final suele ser feo. Si quieres controlar el mensaje y el código, haz que `main` devuelva `ExitCode` y trata el error tú:
+
+<Ejecutar ej="m10/main-display" titulo="Mensaje con Display y código 2" />
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="El mensaje de error sale en Debug">
+
+❌ Esperabas ver `nadie tiene permiso` y Rust imprime `Error: SinPermiso { usuario: "marta" }`. No es un fallo: el `Result` de `main` siempre usa `{:?}`.
+
+✅ Para un mensaje bonito: o implementas `Debug` a mano para que muestre lo mismo que `Display`, o usas el patrón de `ExitCode` de arriba (lo más claro).
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m10/main-saludo"
+  enunciado="Cambia `main` para que devuelva `Result<(), ParseIntError>`, sustituye el `unwrap()` por `?` y termina con `Ok(())`. Debe imprimir `hola` tres veces."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`fn main() -> Result<(), Box<dyn Error>>` devuelve un error. ¿Con qué código de salida termina el programa?"
+  opciones={["1", "0", "-1", "Depende del error"]}
+  correcta={0}
+  porque={["Correcto.", "0 significa éxito.", "Los códigos de salida de Rust con `Result` son 0 o 1.", "Con `Result`, siempre es 1; para elegir otro código, usa `ExitCode`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué condición debe cumplir `E` para que `main` pueda devolver `Result<(), E>`?"
+  opciones={["Implementar `Debug`", "Implementar `Display`", "Implementar `Copy`", "Ser `Box<dyn Error>`"]}
+  correcta={0}
+  porque={["Correcto: el arranque lo imprime con `{:?}`.", "No hace falta `Display`; el arranque usa Debug.", "`Copy` no se exige.", "Vale cualquier tipo con `Debug`, como `ParseIntError`."]}
+/>

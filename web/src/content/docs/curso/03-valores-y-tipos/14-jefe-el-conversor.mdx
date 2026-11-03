@@ -1,0 +1,110 @@
+---
+title: "Jefe del mundo: el conversor"
+description: "Junta todo el mundo en un programa: texto con ñ, un array de enteros, conversiones a f64, salida con formato, resta comprobada y una conversión que falla sin romper nada."
+sidebar:
+  order: 14
+duracion: 15
+desde: "1.0"
+requiere: ["03-valores-y-tipos/06-checked-wrapping-saturating", "03-valores-y-tipos/07-conversiones-con-as", "03-valores-y-tipos/11-arrays", "03-valores-y-tipos/12-string-y-str", "02-tu-primer-programa/04-formato-avanzado"]
+tarjetas:
+  - p: "¿Cómo conviertes un `i32` llamado `c` a decimal para calcular °F?"
+    r: "`c as f64 * 9.0 / 5.0 + 32.0`: primero `as f64`, después todo es aritmética de decimales."
+  - p: "¿Cuántos caracteres y cuántos bytes tiene \"Logroño\"?"
+    r: "7 caracteres y 8 bytes (la ñ ocupa 2 en UTF-8)."
+  - p: "¿Qué devuelve `u8::try_from(370)`?"
+    r: "`Err(TryFromIntError(PosOverflow))`: 370 no cabe en un `u8`."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Has llegado al final del mundo de los valores y los tipos. Hoy no hay ideas nuevas: hay un programa que necesita **casi todas** las de este mundo a la vez. Primero lo vas a leer y predecir; después lo vas a escribir tú.
+
+## Predice
+
+El programa convierte cuatro temperaturas de Logroño. ¿Qué imprime para 37 °C?
+
+<Predice
+  ej="m03/conversor"
+  opciones={["`37 °C =  98.6 °F = 310 K`", "`37 °C =  98 °F = 310 K`", "`37 °C =  66.6 °F = 310 K`", "No compila: no se puede multiplicar un `i32` por `9.0`"]}
+  correcta={0}
+  explicacion="`c as f64` convierte 37 en 37.0; 37.0 × 9 / 5 + 32 = 98.6. `{f:>5.1}` lo muestra con un decimal y ancho 5. Los kelvin son enteros: 37 + 273 = 310."
+  porque={["", "Con `as f64` la división ya no es entera: los decimales se conservan.", "Eso es 37 × 9 / 5 sin sumar los 32.0.", "Sin el `as f64` no compilaría (E0277); con él, sí."]}
+/>
+
+## La idea
+
+Para leer cualquier programa con números, hazte siempre las mismas tres preguntas que has practicado en este mundo:
+
+1. **¿De qué tipo es cada valor?** El array es `[i32; 4]`; `f` es `f64` porque viene de `c as f64`; `k` es `i32`.
+2. **¿Puede salirse del rango?** `maxima - minima` cabe de sobra, pero se usa `checked_sub` para decirlo en el código. `maxima * 10` (370) **no** cabe en un `u8`, y `try_from` lo detecta.
+3. **¿Bytes o caracteres?** «Logroño» tiene 7 caracteres pero 8 bytes.
+
+## Pruébalo
+
+<Ejecutar ej="m03/conversor" />
+
+Salida real:
+
+```text
+Logroño: 7 letras, 8 bytes
+ -5 °C =  23.0 °F = 268 K
+  0 °C =  32.0 °F = 273 K
+ 21 °C =  69.8 °F = 294 K
+ 37 °C =  98.6 °F = 310 K
+diferencia: Some(42)
+máxima × 10 en un u8: Err(TryFromIntError(PosOverflow))
+```
+
+Repasa cada línea con su lección: los bytes de la ñ (lección 12), el `as f64` (lecciones 7 y 8), la desestructuración `let (minima, maxima) = (celsius[0], celsius[3]);` (lecciones 10 y 11), `checked_sub` (lección 6) y `try_from` (lección 7).
+
+## Bajo el capó
+
+<BajoElCapo titulo="Dónde vive cada cosa">
+Dibuja la memoria de este programa con lo que sabes:
+
+- `celsius: [i32; 4]` son **16 bytes** seguidos en la **pila**: `fb ff ff ff` (−5 en complemento a dos, little-endian), `00 00 00 00`, `15 00 00 00` y `25 00 00 00`.
+- `ciudad: String` es una ficha de 3 `usize` en la pila (12 bytes en el navegador, 24 en tu PC) que apunta a **8 bytes** en el montón: `4c 6f 67 72 6f c3 b1 6f`.
+- El texto `"Logroño"` del `String::from` también está dentro del programa como literal; `String::from` lo **copia** al montón para que el `String` sea su dueño.
+- `f`, `k` y `c` son variables nuevas en cada vuelta del bucle: un `f64` (8 bytes) y dos `i32` (4 bytes).
+
+`diferencia` es un `Option<i32>` y `en_u8` un `Result<u8, TryFromIntError>`: tipos que «envuelven» un valor que puede faltar o fallar. Los estudiarás en los Mundos 9 y 10; por ahora ya sabes leerlos con `{:?}`.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Hacer la división antes de convertir">
+❌ `let f = (c * 9 / 5) as f64 + 32.0;`. La división `c * 9 / 5` se hace **con enteros**, así que con 21 °C da 37 en vez de 37,8, y el resultado sale 69.0 °F en lugar de 69.8.
+
+✅ Convierte **primero**: `c as f64 * 9.0 / 5.0 + 32.0`. A partir del `as f64`, todas las operaciones son decimales.
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m03/conversor"
+  enunciado="Completa el conversor siguiendo los comentarios numerados. Tu salida debe ser idéntica a la del ejemplo: nombre de la ciudad con letras y bytes, las cuatro temperaturas con formato `{c:>3}` y `{f:>5.1}`, la diferencia con `checked_sub` y la conversión de `maxima * 10` a `u8` con `try_from`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En el conversor, ¿de qué tipo es `k = c + 273`?"
+  opciones={["`f64`", "`i32`", "`u32`", "`usize`"]}
+  correcta={1}
+  explicacion="`c` es un `i32` (sale del array `[i32; 4]`) y 273 se adapta a él: el resultado es `i32`."
+  porque={["Solo `f` pasa por `as f64`.", "", "Nada convierte a sin signo; y −5 + 273 podría haber sido negativo con otros datos.", "`usize` es para índices y longitudes."]}
+/>
+
+<Pregunta
+  pregunta="Si añadieras −300 °C al array, ¿qué pasaría con `k`?"
+  opciones={["Pánico, porque −27 no es una temperatura válida", "`k` valdría −27: un `i32` admite negativos", "No compilaría", "`k` daría la vuelta a un número enorme"]}
+  correcta={1}
+  explicacion="−300 + 273 = −27 cabe en un `i32`. Rust no sabe de física: el tipo solo garantiza el rango. Validar que la temperatura tenga sentido es trabajo tuyo."
+  porque={["El compilador no conoce el cero absoluto: comprueba rangos de tipos, no de física.", "", "Un literal negativo en un array de `i32` es válido.", "Solo los enteros **sin** signo dan la vuelta al bajar de 0."]}
+/>
+
+<Respuesta
+  pregunta={'¿Cuántos bytes ocupa el texto "Logroño" en UTF-8?'}
+  respuestas={["8", "ocho"]}
+  explicacion="6 letras ASCII de 1 byte + la ñ de 2 bytes = 8."
+/>

@@ -1,0 +1,38 @@
+---
+title: "std::ops"
+description: "Los traits de los operadores (+, -, *, ==, [], *x…), Deref, Drop, los Fn y los rangos."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+**Ruta:** `std::ops`
+
+## Para qué sirve
+
+Cada operador de Rust es la llamada a un método de un trait de este módulo: `a + b` es `Add::add(a, b)`, `v[i]` es `Index::index(&v, i)`, `*x` usa `Deref`… Implementando estos traits, tus tipos pueden usar los operadores. Los de comparación (`==`, `<`) están en [`std::cmp`](/ref/std/cmp/).
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Add, Sub, Mul, Div, Rem, Neg...`](/ref/std/ops/operadores/) | Operadores aritméticos y de bits, y sus versiones `+=`. | 1.0 |
+| [`Index, IndexMut`](/ref/std/ops/operadores/) | El operador `[]`. | 1.47 |
+| [`Deref, DerefMut`](/ref/std/ops/deref/) | El operador `*` y la coerción automática. | 1.0 |
+| [`Drop`](/ref/std/ops/drop/) | El destructor. | 1.13 |
+| [`Fn, FnMut, FnOnce`](/ref/std/ops/fn/) | Lo que se puede llamar. | 1.35 |
+| `Range, RangeInclusive...` | Los rangos `a..b`, `a..=b`, `..b`… | 1.0 |
+| `ControlFlow` | Seguir o parar antes de tiempo (`try_for_each`…). | 1.55 |
+
+## Conceptos clave
+
+- **Solo los que existen**: no se pueden inventar operadores nuevos ni cambiar su precedencia.
+- **Por valor**: `Add::add(self, rhs)` consume los operandos; implementa también `Add for &T` si quieres sumar sin mover, o deriva `Copy`.
+
+## Ver también
+
+- [std::cmp](/ref/std/cmp/)
+- [E0369](/errores/e0369/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

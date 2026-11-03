@@ -1,0 +1,56 @@
+---
+title: "Traits como clases de tipos"
+description: "Los traits de Rust descienden de las clases de tipos (type classes): un nombre para un comportamiento, implementaciones por tipo y un resolutor que elige cuál usar. La coherencia garantiza que haya una sola."
+sidebar:
+  order: 5
+duracion: 10
+requiere: ["24-teoria-y-diseno/04-parametricidad"]
+tarjetas:
+  - p: "¿Qué son las clases de tipos (type classes)?"
+    r: "Un mecanismo de polimorfismo ad hoc (Wadler y Blott, 1989): se declara una interfaz y cada tipo da su implementación; el compilador elige cuál usar según el tipo."
+  - p: "¿Qué garantiza la coherencia de traits?"
+    r: "Que para cada trait y cada tipo haya, como mucho, una implementación en todo el programa, sin importar qué crates se combinen."
+  - p: "¿Qué es un tipo asociado, en teoría de tipos?"
+    r: "Una función de tipos: dado el tipo que implementa el trait, devuelve otro tipo (como `Iterator::Item`)."
+  - p: "¿Qué hace el resolutor de traits?"
+    r: "Busca, para cada cota `T: Trait`, una implementación que la cumpla. Funciona como un pequeño motor de deducción lógica."
+---
+
+import { Pregunta, BajoElCapo } from '~/components';
+
+Los traits del mundo 13 tienen una historia académica clara. Conocerla explica por qué funcionan como funcionan y, sobre todo, por qué existe la regla huérfana.
+
+## La idea
+
+En 1989, Philip Wadler y Stephen Blott propusieron las **clases de tipos** (*type classes*) para tener polimorfismo ad hoc «sin que sea ad hoc»: en vez de sobrecargar nombres de cualquier manera, se declara una **interfaz** con nombre y cada tipo da su **implementación**. Los traits de Rust son esa misma idea:
+
+| Clases de tipos | Rust |
+|---|---|
+| clase `Eq a` | `trait PartialEq` |
+| instancia `Eq Int` | `impl PartialEq for i32` |
+| restricción `Eq a => …` | cota `T: PartialEq` |
+| familia de tipos asociada | tipo asociado (`type Item;`) |
+
+**Coherencia.** Para que el compilador elija siempre la misma implementación, Rust exige que, para cada trait y cada tipo, haya **como mucho una** en todo el programa. Esa es la razón de la **regla huérfana** del mundo 13: solo puedes implementar un trait para un tipo si el trait o el tipo son de tu crate. Si no, dos crates independientes podrían implementar `Display for Vec<u8>` de formas distintas y, al combinarlos, el programa tendría dos respuestas para la misma pregunta.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Los traits son lógica.** Cada `impl` es una regla de deducción: `impl<T: Display> Display for Caja<T>` se lee «si `T` es `Display`, entonces `Caja<T>` es `Display`». Comprobar una cota es **buscar una demostración** con esas reglas, como hace un motor de programación lógica. El proyecto *chalk* formalizó esa idea, y el **nuevo resolutor de traits** de `rustc` (`-Znext-solver`, activado en nightly en 2026) está construido sobre ella.
+
+**Tipos asociados y existenciales.** Un tipo asociado es una **función de tipos**: `<Vec<u8> as IntoIterator>::IntoIter` «calcula» un tipo a partir de otro. `impl Trait` como tipo de retorno es un **tipo existencial**: «existe un tipo que cumple Trait, pero no te digo cuál» (Mitchell y Plotkin, 1988, *Abstract types have existential type*). `dyn Trait` es otra forma de existencial, resuelta al ejecutar con una vtable.
+
+**Por qué la especialización es difícil.** Permitir dos implementaciones solapadas (una general y otra más específica) choca con la coherencia y, en presencia de lifetimes, abre agujeros de seguridad: el compilador borra las lifetimes antes de generar código, así que no puede elegir la implementación según ellas. Por eso solo existe una versión mínima e inestable (`min_specialization`).
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué problema evita la coherencia de traits?"
+  opciones={["Que los traits sean lentos", "Que haya dos implementaciones del mismo trait para el mismo tipo y el programa dependa de cuál se elija", "Que un trait tenga métodos sin implementar", "Que un tipo implemente demasiados traits"]}
+  correcta={1}
+  explicacion="Con una sola implementación posible, el comportamiento no depende del orden en que se combinen los crates."
+  porque={["La coherencia no tiene coste al ejecutar.", "", "Eso lo controla la comprobación de cada `impl`.", "Un tipo puede implementar todos los traits que quiera."]}
+/>

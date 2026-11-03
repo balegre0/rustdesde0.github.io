@@ -1,0 +1,107 @@
+---
+// Bloque ejecutable: código (Expressive Code) + perfiles debug/release + acciones + consola.
+// Lo usan <Ejecutar> y <Predice>. Los datos vienen de src/generated/ejemplos.json.
+import { Code } from '@astrojs/starlight/components';
+import Consola from './Consola.astro';
+import { ejemplo, nombreArchivo, urlWasm } from '../../lib/ejemplos';
+import type { Herramienta } from '../../runtime/playground';
+
+interface Props {
+  ej: string;
+  titulo?: string;
+  componente?: string;
+  /** Predice: el botón Ejecutar queda bloqueado hasta responder */
+  bloqueado?: boolean;
+  /** Botones opt-in «Ver MIR / ensamblador / Miri / Clippy en el Playground» */
+  playground?: boolean | Herramienta[];
+  /** Interno (<NoCompila>): ejecuta <id>.arreglo.rs en vez de <id>.rs */
+  arreglo?: boolean;
+}
+const { ej, titulo, componente = 'Ejecutar', bloqueado = false, playground, arreglo = false } = Astro.props;
+const original = ejemplo(ej, componente);
+if (arreglo && !original.arreglo) throw new Error(`<${componente} ej="${ej}">: no existe ejemplos/${original.id}.arreglo.rs`);
+const e = arreglo && original.arreglo
+  ? { ...original, id: original.id + '.arreglo', codigo: original.arreglo.codigo, debeFallar: false, perfiles: ['debug' as const], ejecuciones: { debug: original.arreglo.ejecucion }, hash: original.hash + 'a' }
+  : original;
+if (e.debeFallar) throw new Error(`<${componente} ej="${ej}">: este ejemplo tiene "debe_fallar"; usa <NoCompila ej="${ej}" />.`);
+const herramientas: Herramienta[] = playground === true ? ['mir', 'asm', 'miri', 'clippy'] : Array.isArray(playground) ? playground : [];
+const perfiles = e.perfiles.filter((p) => e.plataforma !== 'wasm' || e.ejecuciones[p]);
+const datos = {
+  id: e.id, codigo: e.codigo, stdin: e.stdin, nota: e.nota, plataforma: e.plataforma, herramientas,
+  perfiles: Object.fromEntries(perfiles.map((p) => {
+    const x = e.ejecuciones[p];
+    return [p, x ? { wasm: urlWasm(x.wasm), salida: x.salida, error: x.error, exit: x.exit, trap: x.trap } : null];
+  })),
+};
+const uid = 'ej-' + e.hash;
+const plataformaTxt = e.plataforma === 'playground' ? 'Necesita el Rust Playground' : e.plataforma === 'local' ? 'Se ejecuta en tu ordenador' : 'Se ejecuta en tu navegador';
+const nombrePerfil = { debug: 'debug', release: 'release' } as const;
+const ayudaPerfil = { debug: 'Modo debug: comprueba el desbordamiento de enteros (overflow-checks) y los debug_assert!.', release: 'Modo release (--release): optimizado y sin comprobar el desbordamiento; el valor da la vuelta.' } as const;
+---
+<div class="rdc-ejecutable" data-ejecutable data-plataforma={e.plataforma} data-bloqueado={bloqueado ? 'true' : undefined}>
+  <div class="rdc-ejecutable-codigo" data-codigo>
+    <Code code={e.codigo.replace(/\n$/, '')} lang="rust" title={titulo ?? nombreArchivo(e)} />
+  </div>
+  <div class="rdc-ejecutable-editor" data-editor hidden></div>
+  <slot name="entre" />
+  {perfiles.length > 1 && (
+    <div class="rdc-perfiles" role="radiogroup" aria-label="Perfil de compilación">
+      <span class="rdc-perfiles-txt">Compilado en:</span>
+      {perfiles.map((p, i) => (
+        <button type="button" class="rdc-perfil" role="radio" aria-checked={i === 0 ? 'true' : 'false'} data-perfil={p} title={ayudaPerfil[p]}>
+          <span class="rdc-mono">{nombrePerfil[p]}</span>
+        </button>
+      ))}
+      <span class="rdc-perfiles-ayuda" data-perfil-ayuda>{ayudaPerfil[perfiles[0]]}</span>
+    </div>
+  )}
+  <div class="rdc-barra">
+    {e.plataforma === 'wasm' && (
+      <>
+        <button type="button" class="rdc-boton" data-accion="ejecutar" disabled={bloqueado} aria-describedby={bloqueado ? `${uid}-bloq` : undefined}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15a1 1 0 0 0 1.5.86l12.2-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z" /></svg>
+          <span data-etiqueta>Ejecutar</span>
+        </button>
+        <button type="button" class="rdc-boton secundario" data-accion="editar" hidden={bloqueado}>Editar</button>
+        <button type="button" class="rdc-boton sutil" data-accion="restaurar" hidden>Volver al original</button>
+      </>
+    )}
+    {e.plataforma === 'playground' && (
+      <button type="button" class="rdc-boton secundario" data-accion="pg">Ejecutar en el Playground</button>
+    )}
+    <span class="rdc-plataforma">{plataformaTxt}</span>
+  </div>
+  {bloqueado && <p class="rdc-bloqueo" id={`${uid}-bloq`} data-aviso-bloqueo>Elige primero tu predicción; después podrás ejecutarlo.</p>}
+  {e.plataforma === 'playground' && (
+    <p class="rdc-aviso-ext">Este programa usa algo que el navegador no puede ejecutar (hilos, red o crates externos). Si pulsas el botón, <strong>tu código se enviará a play.rust-lang.org</strong> (el Rust Playground oficial, un servicio externo) y se ejecutará allí.</p>
+  )}
+  {e.plataforma === 'local' && (
+    <p class="rdc-aviso-ext">Este ejemplo hay que compilarlo y ejecutarlo en tu ordenador: <code>cargo run</code>.</p>
+  )}
+  {e.plataforma !== 'wasm' && e.nota && <p class="rdc-consola-nota">{e.nota}</p>}
+  <p class="rdc-aviso-ext" data-aviso-edicion hidden>Tu versión editada se compila en <strong>play.rust-lang.org</strong> (tu código se envía allí). El Playground no admite entrada por teclado: si el programa lee de stdin, recibirá una entrada vacía.</p>
+  <div class="rdc-compilacion" data-compilacion hidden aria-live="polite"></div>
+  <Consola />
+  {herramientas.length > 0 && (
+    <details class="rdc-pg" data-pg>
+      <summary>Ver más en el Playground: {herramientas.map((h) => ({ mir: 'MIR', asm: 'ensamblador', miri: 'Miri', clippy: 'Clippy' })[h]).join(' · ')}</summary>
+      <p class="rdc-aviso-ext">Opcional. {`Al pulsar un botón, `}<strong>este código se enviará a play.rust-lang.org</strong> y verás lo que devuelve.</p>
+      <div class="rdc-barra">
+        {herramientas.map((h) => (
+          <button type="button" class="rdc-boton secundario pequeno" data-herramienta={h}>
+            {({ mir: 'Ver MIR', asm: 'Ver ensamblador', miri: 'Pasar Miri', clippy: 'Pasar Clippy' })[h]}
+          </button>
+        ))}
+        <a class="rdc-boton sutil pequeno" data-abrir-pg href="https://play.rust-lang.org/" target="_blank" rel="noopener">Abrir en el Playground ↗</a>
+      </div>
+      <pre class="rdc-pg-salida" data-pg-salida hidden tabindex="0"></pre>
+    </details>
+  )}
+  <script type="application/json" data-datos set:html={JSON.stringify(datos).replace(/</g, '\\u003c')} />
+</div>
+
+<script>
+  import { iniciarEjecutables } from '../../runtime/ejecutable-cliente';
+  iniciarEjecutables();
+  document.addEventListener('astro:page-load', iniciarEjecutables);
+</script>

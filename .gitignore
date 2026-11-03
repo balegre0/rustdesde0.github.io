@@ -1,0 +1,9 @@
+# Notas de investigación y pruebas locales (no forman parte de la web)
+investigacion/
+# Herramientas locales
+.claude/
+.playwright-mcp/
+# Copias para compartir a mano
+*.zip
+# La web genera lo suyo (ver web/.gitignore)
+web/LEEME.txt

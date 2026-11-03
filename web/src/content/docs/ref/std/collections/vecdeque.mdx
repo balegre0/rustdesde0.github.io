@@ -1,0 +1,131 @@
+---
+title: "VecDeque<T>"
+description: "Cola de doble extremo: añadir y sacar por delante y por detrás en tiempo constante."
+sidebar:
+  order: 4
+insignias: ["Desde 1.0", "alloc"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::collections::VecDeque`
+
+## Sinopsis
+
+```rust
+pub struct VecDeque<T, A = Global>
+where
+    A: Allocator,
+{ /* private fields */ }
+```
+
+## Qué hace
+
+Un `VecDeque` es un búfer circular: un bloque de memoria donde el principio puede estar en cualquier posición. Así, añadir o quitar por **los dos extremos** es O(1). Úsalo para colas (entra por detrás, sale por delante).
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`push_back`](#push_back) | Añade al final. | 1.0 |
+| [`push_front`](#push_front) | Añade al principio. | 1.0 |
+| [`pop_front`](#pop_front) | Saca el primero. | 1.0 |
+| [`pop_back`](#pop_back) | Saca el último. | 1.0 |
+| [`front`](#front) | Mira el primero sin sacarlo. | 1.0 |
+| [`back`](#back) | Mira el último sin sacarlo. | 1.0 |
+| [`rotate_left`](#rotate_left) | Gira los elementos: los `n` primeros pasan al final. | 1.36 |
+| [`make_contiguous`](#make_contiguous) | Reordena la memoria para dejar los elementos seguidos y los presta como un slice. | 1.48 |
+
+### `push_back`
+
+```rust
+pub fn push_back(&mut self, value: T)
+```
+
+Añade al final.
+
+### `push_front`
+
+```rust
+pub fn push_front(&mut self, value: T)
+```
+
+Añade al principio.
+
+### `pop_front`
+
+```rust
+pub fn pop_front(&mut self) -> Option<T>
+```
+
+Saca el primero.
+
+### `pop_back`
+
+```rust
+pub fn pop_back(&mut self) -> Option<T>
+```
+
+Saca el último.
+
+### `front`
+
+```rust
+pub fn front(&self) -> Option<&T>
+```
+
+Mira el primero sin sacarlo.
+
+### `back`
+
+```rust
+pub fn back(&self) -> Option<&T>
+```
+
+Mira el último sin sacarlo.
+
+### `rotate_left`
+
+```rust
+pub fn rotate_left(&mut self, n: usize)
+```
+
+Gira los elementos: los `n` primeros pasan al final.
+
+### `make_contiguous`
+
+```rust
+pub fn make_contiguous(&mut self) -> &mut [T]
+```
+
+Reordena la memoria para dejar los elementos seguidos y los presta como un slice.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/collections-vecdeque" />
+
+**Salida:**
+
+```text
+["Eva", "Ana", "Luis"]
+Some("Eva")
+Some("Ana") Some("Luis")
+Some("Sol") 2
+[3, 4, 5, 1, 2] 3
+```
+
+## Rendimiento
+
+`push_*` y `pop_*`: O(1) amortizado. Indexar: O(1).
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `rotate_left` (1.36), `make_contiguous` (1.48).
+
+## Ver también
+
+- [Vec](/ref/std/vec/vec/)
+- [BinaryHeap](/ref/std/collections/binaryheap/)
+
+## Aprende esto en
+
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

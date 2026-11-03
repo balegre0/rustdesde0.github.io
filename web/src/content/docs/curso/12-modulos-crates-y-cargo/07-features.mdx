@@ -1,0 +1,89 @@
+---
+title: "Features"
+description: "Las features son interruptores de compilación: partes opcionales de un crate que se activan desde Cargo.toml y se consultan con cfg(feature = …)."
+sidebar:
+  order: 7
+duracion: 11
+desde: "1.0"
+requiere: ["12-modulos-crates-y-cargo/06-dependencias-y-semver"]
+tarjetas:
+  - p: "¿Qué es una feature de Cargo?"
+    r: "Un interruptor de compilación con nombre. Al activarla, Cargo compila el crate con `--cfg feature=\"nombre\"` y puede activar dependencias opcionales."
+  - p: "¿Cómo activas la feature `derive` de serde?"
+    r: "`serde = { version = \"1\", features = [\"derive\"] }` en `Cargo.toml`, o `cargo add serde --features derive`."
+  - p: "¿Qué diferencia hay entre `cfg!(feature = \"x\")` y `#[cfg(feature = \"x\")]`?"
+    r: "`cfg!` es una expresión que vale `true` o `false` (el código existe siempre). `#[cfg]` hace que el código marcado ni siquiera se compile si la condición es falsa."
+  - p: "¿Por qué las features deben ser aditivas?"
+    r: "Porque Cargo unifica las features: si dos crates piden el mismo crate con features distintas, se compila una sola vez con la unión de todas."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Muchos crates tienen partes que no todo el mundo necesita: soporte para un formato, una integración, colores en la terminal. Compilarlo todo siempre haría los programas más lentos de compilar y más grandes. Las **features** son la solución.
+
+## La idea
+
+Una **feature** es un interruptor de compilación con nombre. Se declara en el `Cargo.toml` del crate:
+
+```toml
+[features]
+default = ["colores"]        # las que se activan si no dices nada
+colores = []                 # una feature sin más efecto que el interruptor
+json = ["dep:serde_json"]    # activa una dependencia opcional
+
+[dependencies]
+serde_json = { version = "1", optional = true }
+```
+
+Y quien la usa la activa al declarar la dependencia:
+
+```toml
+[dependencies]
+mi_crate = { version = "1", features = ["json"] }
+mi_crate_sin_nada = { version = "1", default-features = false }
+```
+
+En el código, la feature se consulta con `cfg`:
+
+- `if cfg!(feature = "colores") { … }`: una **expresión** que vale `true` o `false`. Las dos ramas existen y se compilan.
+- `#[cfg(feature = "colores")]` sobre una función, un módulo o una sentencia: si la feature no está activa, ese código **ni se compila**.
+
+## Pruébalo
+
+El mismo programa, compilado sin la feature y con ella (así lo haría Cargo, pasando `--cfg feature="colores"` a `rustc`):
+
+<Ejecutar ej="m12/feature-off" />
+
+<Ejecutar ej="m12/feature-on" />
+
+En la segunda versión existe la función `solo_con_colores`. En la primera, ni siquiera está en el programa.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Unificación.** Si en tu árbol de dependencias dos crates usan `serde`, uno con la feature `derive` y otro sin ella, Cargo compila `serde` **una sola vez** con la **unión** de las features. Por eso las features tienen que ser **aditivas**: activar una solo puede **añadir** cosas, nunca quitar ni cambiar el comportamiento de otras. Una feature `sin_std` que desactivara cosas rompería a quien sí las usa.
+
+**`--check-cfg`.** Desde Rust 1.80, el compilador avisa si consultas una feature (o cualquier `cfg`) que no está declarada: un error de escritura como `feature = "color"` ya no pasa desapercibido. Cargo le pasa automáticamente la lista de features válidas.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Features que se excluyen entre sí">
+
+❌ Dos features `backend-a` y `backend-b` que no pueden estar activas a la vez. Por la unificación, cualquier día algún crate del árbol activará una y otro la otra, y tu crate no compilará (o hará algo raro).
+
+✅ Si de verdad son alternativas, deja que se puedan activar las dos y elige en el código (por ejemplo, con una función de configuración), o usa crates separados.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta={"¿Qué hace `#[cfg(feature = \"json\")] fn exportar() { … }` si la feature `json` no está activa?"}
+  opciones={["La función existe pero no hace nada", "La función no se compila: no existe en el programa", "Da un error de compilación", "La función se ejecuta en modo prueba"]}
+  correcta={1}
+  explicacion="`#[cfg]` elimina el elemento antes de compilar. Si algún código llama a `exportar` sin el mismo `cfg`, ese código no compilará."
+  porque={["Eso se haría con `cfg!` dentro del cuerpo.", "", "No da error por sí mismo; solo desaparece.", "No tiene relación con los tests."]}
+/>

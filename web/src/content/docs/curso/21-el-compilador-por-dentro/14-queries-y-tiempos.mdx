@@ -1,0 +1,137 @@
+---
+title: "Queries, incremental y tiempos de compilación"
+description: "Programa un sistema de consultas con memoización como el de rustc y aprende a medir y reducir el tiempo de compilación."
+sidebar:
+  order: 14
+duracion: 13
+desde: "1.24"
+requiere: ["21-el-compilador-por-dentro/08-monomorfizacion", "12-modulos-crates-y-cargo"]
+tarjetas:
+  - p: "¿Qué es una *query* en rustc?"
+    r: "Una función del compilador memoizada y bajo demanda, como `type_of(def)`, `typeck(fn)` u `optimized_mir(fn)`: se calcula la primera vez que alguien la pide y su resultado se guarda."
+  - p: "¿Cómo funciona la compilación incremental?"
+    r: "rustc registra qué queries leyó cada query (grafo de dependencias). Al recompilar, marca en verde lo que no cambió y reutiliza su resultado guardado en disco; solo recalcula lo rojo."
+  - p: "¿Cuál es la primera herramienta para saber por qué tarda tu compilación?"
+    r: "`cargo build --timings`: genera un informe HTML con cuánto tardó cada crate y qué se compiló en paralelo."
+  - p: "¿Por qué `cargo check` es mucho más rápido que `cargo build`?"
+    r: "Porque se para tras el análisis y solo produce metadatos (`.rmeta`): no hay monomorfización, ni LLVM, ni enlazado."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Hasta ahora has visto el compilador como una cadena de etapas. Es una buena imagen para aprender, pero el `rustc` real está organizado de otra forma: como un conjunto de **preguntas** que se hacen unas a otras y recuerdan sus respuestas. Esa organización es la que permite recompilar rápido cuando cambias una línea.
+
+## Predice
+
+<Pregunta
+  pregunta="En el sistema de consultas de juguete de abajo, calculamos el total dos veces, luego editamos **un** archivo de dos y lo calculamos otra vez. ¿Cuántas ejecuciones reales de la query `lineas` habrá en total?"
+  opciones={["2", "3", "4", "6"]}
+  correcta={1}
+  explicacion="Primera vez: 2 (un archivo cada una). Segunda: 0, todo viene de la caché. Tras editar `lib.rs`: solo se recalcula esa (1). Total: 3."
+  porque={["Faltaría recalcular el archivo editado.", "", "La segunda llamada no recalcula nada: los resultados están en verde.", "Eso sería sin caché: recalcular todo cada vez."]}
+/>
+
+## La idea
+
+En `rustc`, casi todo es una **query**: `type_of(id)` («¿qué tipo tiene esto?»), `typeck(función)`, `mir_built(función)`, `mir_borrowck(función)`, `optimized_mir(función)`, `codegen_unit(nombre)`… Cuando una etapa necesita algo, **lo pide**, y la query se calcula en ese momento si nadie la había pedido antes (*bajo demanda*). El resultado queda guardado (*memoizado*), así que cada pregunta se responde una sola vez.
+
+Mientras una query se ejecuta, rustc anota **qué otras queries consulta**. Así construye un **grafo de dependencias**. Al recompilar, usa el algoritmo **rojo-verde**: para cada resultado guardado, comprueba si alguna de sus entradas cambió. Si ninguna cambió, la query es **verde** y su resultado se carga del disco (carpeta `target/debug/incremental`). Si alguna cambió, es **roja** y se recalcula. Cambiar el cuerpo de una función no obliga a recalcular el tipo de las demás, porque `type_of` de otra función no dependía de ese cuerpo.
+
+¿Y por qué tarda tanto compilar Rust? Las causas principales: la **monomorfización** genera mucho código para LLVM; **LLVM** optimizando es la fase más cara en release; el **enlazado** de binarios grandes; las **macros procedurales** y los `build.rs`, que son programas que se compilan y se ejecutan; y crates enormes que no se pueden repartir entre núcleos.
+
+## Pruébalo
+
+Un sistema de queries en miniatura con caché y versiones (una forma simplificada de rojo-verde):
+
+<Ejecutar ej="m21/mini-queries" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Todo gira alrededor de `TyCtxt`.** El contexto central del compilador se llama `TyCtxt<'tcx>` y las queries son métodos suyos: `tcx.type_of(def_id)`, `tcx.optimized_mir(def_id)`. Los tipos se guardan **internados** en una arena: cada tipo distinto existe una sola vez en memoria, así que comparar dos tipos es comparar dos punteros. La lifetime `'tcx` es la de esa arena.
+
+**Identificadores estables.** Para reutilizar resultados entre una compilación y la siguiente, rustc no puede usar números que cambian (como el `DefId(0:3)` que viste en el THIR). Usa `DefPathHash`, un hash estable de la **ruta** de cada definición, y huellas de 128 bits (*fingerprints*) de los resultados.
+
+**Medir, siempre antes de tocar:**
+
+- `cargo build --timings`: informe HTML por crate, con el paralelismo. Es lo primero.
+- `cargo check` en lugar de `build` mientras editas: solo produce `.rmeta` (metadatos), sin LLVM ni enlazado. El `--emit=metadata` que usa este curso para verificar código es lo mismo.
+- Con nightly, `-Zself-profile` registra cuánto tarda cada query; las herramientas de `measureme` lo resumen.
+- `cargo llvm-lines` (lección 8) para encontrar genéricos que inflan el IR.
+
+**Palancas típicas en `Cargo.toml`:**
+
+```toml
+[profile.dev]
+debug = "line-tables-only"   # menos información de depuración
+
+[profile.dev.package."*"]
+opt-level = 2                # optimiza las dependencias una vez; tu código sigue rápido de compilar
+```
+
+Más: dividir un crate grande en varios de un *workspace* (se compilan en paralelo y se cachean por separado), usar un enlazador más rápido, y el backend Cranelift para debug (lección 9).
+
+**Lo que viene.** El proyecto tiene en 2026 una hoja de ruta de «compilaciones rápidas»: un **frontend paralelo** (que las queries de distintas funciones se calculen a la vez en varios hilos; en nightly se prueba con `-Zthreads=8`), Cranelift listo para producción y mejoras de enlazado. El rendimiento del compilador se vigila en https://perf.rust-lang.org/, donde se mide cada cambio que entra.
+
+**rust-analyzer** (el que usa tu editor) no usa las queries de rustc: tiene su propio motor incremental, **salsa**, con la misma idea de fondo, y reutiliza algunas piezas del compilador como el lexer.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Hacer `cargo clean` cada vez que algo va lento o raro">
+
+❌ Borrar `target/` «por si acaso» antes de cada compilación.
+
+✅ Borrar `target/` tira a la basura toda la caché incremental y todas las dependencias compiladas: la siguiente compilación es la más lenta posible. La incrementalidad está diseñada para ser correcta; si sospechas de un fallo, mide con `--timings` primero. (Si encuentras un caso real en que la caché da un resultado incorrecto, es un error del compilador digno de informe.)
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Cambias el **cuerpo** de una función privada `f` (no su firma). ¿Qué queries de otra función `g`, que llama a `f`, necesitan recalcularse para comprobar tipos?"
+  opciones={[
+    "Todas: cualquier cambio invalida todo el crate",
+    "Ninguna de las de comprobación de tipos de `g`: el `typeck` de `g` depende de la **firma** de `f`, que no cambió",
+    "Solo el lexer de `g`",
+    "Depende del sistema operativo"
+  ]}
+  correcta={1}
+  explicacion="Las firmas son la frontera: cada cuerpo se comprueba contra las firmas de lo que usa. Por eso Rust exige firmas completas: hacen posible la incrementalidad. (La generación de código sí puede tener que rehacerse si `f` se inlineaba dentro de `g`.)"
+  porque={["El grafo de dependencias existe justamente para evitar eso.", "", "El lexer trabaja por archivo; lo que importa aquí son las queries de tipos.", "El grafo de dependencias es el mismo en todos los sistemas."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué significa que una query sea «verde» al recompilar?"
+  opciones={[
+    "Que se ejecutó sin errores",
+    "Que ninguna de sus entradas cambió, así que su resultado guardado se reutiliza",
+    "Que es una query nueva",
+    "Que se ejecutará en paralelo"
+  ]}
+  correcta={1}
+  explicacion="Verde = válida sin recalcular. Roja = alguna dependencia cambió y hay que volver a calcularla."
+  porque={["El color habla de reutilización, no de errores.", "", "Una query nueva no tiene resultado guardado: se calcula.", "El paralelismo es otro tema (frontend paralelo)."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `cargo check` es la herramienta adecuada mientras escribes código?"
+  opciones={[
+    "Porque compila con más optimizaciones",
+    "Porque hace todo el análisis (tipos, borrow checker) y para antes de monomorfizar, de LLVM y del enlazado, que es lo más caro",
+    "Porque no comprueba los préstamos",
+    "Porque descarga menos dependencias"
+  ]}
+  correcta={1}
+  explicacion="Te da todos los errores que te importan al editar, sin pagar la generación de código."
+  porque={["No genera código, así que no optimiza nada.", "", "Sí los comprueba: el borrow checker se ejecuta en `check`.", "Las dependencias son las mismas que en `build`."]}
+/>
+
+## Para saber más
+
+- *rustc-dev-guide*, «Queries: demand-driven compilation» e «Incremental compilation»: https://rustc-dev-guide.rust-lang.org/query.html
+- *The Rust Performance Book*, «Compile Times»: https://nnethercote.github.io/perf-book/compile-times.html

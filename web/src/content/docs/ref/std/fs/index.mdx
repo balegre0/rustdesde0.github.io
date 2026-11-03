@@ -1,0 +1,58 @@
+---
+title: "std::fs"
+description: "El sistema de archivos: leer y escribir archivos enteros, File, carpetas, copiar, renombrar y borrar."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::fs`
+
+## Para qué sirve
+
+Funciones para trabajar con **archivos y carpetas**. Para lo sencillo hay funciones de una línea (`fs::read_to_string`, `fs::write`). Para leer o escribir poco a poco, abre un [`File`](/ref/std/fs/file/). Todas devuelven `io::Result`, porque el disco siempre puede fallar (no existe, no hay permiso, está lleno…).
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`File`](/ref/std/fs/file/) | Un archivo abierto. | 1.0 |
+| `OpenOptions` | Abrir con opciones: añadir, crear, truncar… | 1.0 |
+| `read_to_string` | Lee un archivo de texto entero. | 1.26 |
+| `read` | Lee un archivo entero como bytes. | 1.26 |
+| `write` | Crea o sobrescribe un archivo con el contenido dado. | 1.26 |
+| `create_dir_all` | Crea una carpeta y las que falten por encima. | 1.0 |
+| `read_dir` | Lista el contenido de una carpeta. | 1.0 |
+| `copy, rename` | Copiar y renombrar (o mover). | 1.0 |
+| `remove_file, remove_dir_all` | Borrar un archivo o una carpeta con todo su contenido. | 1.0 |
+| `metadata` | Tamaño, tipo, permisos y fechas. | 1.0 |
+
+## Conceptos clave
+
+- **Rutas**: reciben `impl AsRef<Path>`, así que vale un `&str`, un `String` o un `Path`. En Windows se admiten `/` y `\`.
+- **Cierre automático**: un `File` se cierra al destruirse; no hay que cerrarlo a mano.
+- **En el navegador** hay un sistema de archivos vacío y en memoria: los ejemplos funcionan, pero lo que escriben desaparece al terminar.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/fs-basico" />
+
+**Salida:**
+
+```text
+"primera línea\nsegunda línea\n"
+["2024", "copia.txt"]
+30 bytes
+error: NotFound
+```
+
+## Ver también
+
+- [std::io](/ref/std/io/)
+- [std::env (carpeta actual)](/ref/std/env/)
+
+## Aprende esto en
+
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)
+- [Mundo 10 · Errores](/curso/10-errores/)

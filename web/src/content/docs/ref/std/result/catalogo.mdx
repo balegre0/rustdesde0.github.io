@@ -1,0 +1,64 @@
+---
+title: "Result: todos los métodos"
+description: "Catálogo completo de los métodos estables de Result<T, E>: preguntar, sacar el valor o el error, transformar los dos lados, combinar y convertir."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+Todos estos métodos existen en Rust estable 1.99 (comprobado compilando cada uno).
+
+## Preguntar
+
+| Método | Devuelve |
+|---|---|
+| `is_ok()`, `is_err()` | `bool` |
+| `is_ok_and(p)`, `is_err_and(p)` | además, ¿cumple `p`? (1.70; consumen el `Result`) |
+
+## Sacar el valor o el error
+
+| Método | Qué hace |
+|---|---|
+| `unwrap()`, `expect("msg")` | el valor; pánico si es `Err` |
+| `unwrap_err()`, `expect_err("msg")` | el error; pánico si es `Ok` |
+| `unwrap_or(v)`, `unwrap_or_else(f)`, `unwrap_or_default()` | el valor, o una alternativa |
+| `ok()`, `err()` | `Option<T>` / `Option<E>`, descartando el otro lado |
+| `?` (operador) | el valor; si es `Err`, devuelve el error convertido con `From` |
+
+## Transformar
+
+| Método | Qué hace |
+|---|---|
+| `map(f)` | transforma el `Ok` |
+| `map_err(f)` | transforma el `Err` (muy usado para convertir errores) |
+| `map_or(v, f)`, `map_or_else(g, f)` | `map` + qué hacer con el error |
+| `and_then(f)` | encadenar otro paso que puede fallar |
+| `inspect(f)`, `inspect_err(f)` | mirar el valor o el error sin cambiarlo (1.76) |
+| `copied()`, `cloned()` | `Result<&T, E>` → `Result<T, E>` |
+
+## Combinar
+
+| Método | Resultado |
+|---|---|
+| `and(otro)` | `otro` si este es `Ok`; si no, este error |
+| `or(otro)`, `or_else(f)` | este si es `Ok`; si no, intenta la alternativa |
+
+## Convertir
+
+| Método | De → a |
+|---|---|
+| `as_ref()`, `as_mut()` | `&Result<T, E>` → `Result<&T, &E>` |
+| `as_deref()` | `Result<String, E>` → `Result<&str, &E>` |
+| `transpose()` | `Result<Option<T>, E>` → `Option<Result<T, E>>` |
+| `iter()` | 0 o 1 elementos (el `Ok`) |
+
+Y con iteradores: `collect::<Result<Vec<T>, E>>()` se detiene en el primer error, y `flatten()` sobre un iterador de `Result` se queda solo con los `Ok`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/cat-result" />
+
+## Ver también
+
+[`Result`](/ref/std/result/result/) · [`Option`: todos los métodos](/ref/std/option/catalogo/) · [Mundo 10 · Errores](/curso/10-errores/)

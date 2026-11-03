@@ -1,0 +1,122 @@
+---
+title: "El orden de los bytes"
+description: "Descubre que un número de varios bytes puede guardarse en dos órdenes distintos y aprende a leer bytes que vienen de fuera."
+sidebar:
+  order: 9
+duracion: 10
+desde: "1.0"
+requiere: ["01-la-maquina/08-coma-flotante"]
+tarjetas:
+  - p: "¿Qué es little-endian?"
+    r: "Guardar primero (en la dirección más baja) el byte menos significativo de un número. Así lo hacen los PC x86-64 y WebAssembly."
+  - p: "¿Qué es big-endian?"
+    r: "Guardar primero el byte más significativo, en el mismo orden en que escribimos el número. Es el orden habitual en los protocolos de red."
+  - p: "¿Qué hacen `to_le_bytes`, `to_be_bytes` y `to_ne_bytes`?"
+    r: "Dan los bytes de un número en orden little-endian, big-endian o el nativo de la máquina, respectivamente."
+  - p: "¿Le afecta el orden de los bytes a un `u8`?"
+    r: "No. Un solo byte no tiene orden: el problema solo aparece con valores de 2 bytes o más."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a descubrir que hay dos maneras de colocar los bytes de un número en memoria, y a no dejar que eso te engañe.
+
+## Predice
+
+`0x1234_5678` es un `u32`: 4 bytes, que en hex son `12`, `34`, `56` y `78`. `to_le_bytes()` da esos bytes en el orden **little-endian**. ¿Qué imprime?
+
+<Predice
+  ej="m01/orden-predice"
+  opciones={["`78 56 34 12`", "`12 34 56 78`", "`87 65 43 21`", "`12345678`"]}
+  correcta={0}
+  explicacion="Little-endian pone **primero el byte menos significativo** (el de la derecha, `78`). Los bytes se dan la vuelta, pero cada byte queda intacto."
+  porque={["Correcto.", "Ese es el orden big-endian, el mismo en que escribimos el número.", "Se invierte el orden de los **bytes**, no el de las cifras: `78` sigue siendo `78`.", "El programa imprime cada byte por separado con `{:02x}` y un espacio."]}
+/>
+
+## La idea
+
+Un número de 4 bytes ocupa 4 casillas seguidas de memoria. Pero ¿qué byte va en la primera? Hay dos convenios, y a esto se le llama **orden de los bytes** (*endianness*):
+
+- **Little-endian** (*little-endian*): primero el byte **menos** significativo, el que menos vale. Lo usan los PC x86-64, casi todos los ARM de los móviles y WebAssembly, donde corren los ejemplos de este curso.
+- **Big-endian** (*big-endian*): primero el byte **más** significativo, como lo escribimos. Es el orden de los protocolos de red, por eso también se le llama *orden de red*.
+
+```text
+0x12345678 en memoria, de la dirección más baja a la más alta:
+little-endian:  [78] [56] [34] [12]
+big-endian:     [12] [34] [56] [78]
+```
+
+Mientras tu programa lea y escriba sus propios números, nunca lo notarás: la CPU usa siempre el mismo orden. El orden importa cuando los bytes **salen o entran** del programa: un archivo, un mensaje por la red, un volcado de memoria. Ahí tienes que saber en qué orden vienen.
+
+## Pruébalo
+
+<Ejecutar ej="m01/orden-de-los-bytes" />
+
+Salida real:
+
+```text
+le: [78, 56, 34, 12]
+be: [12, 34, 56, 78]
+ne: [78, 56, 34, 12]
+leídos como le: 300
+leídos como be: 738263040
+```
+
+`ne` (*native endian*) es el orden de la máquina donde corre el programa. En el navegador coincide con `le`: WebAssembly es little-endian. La parte 4 lee los mismos 4 bytes de las dos maneras. Como `le`, son `0x0000012c` = 300. Como `be`, son `0x2c010000`, un número enorme.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+¿Por qué alguien elegiría little-endian, si parece «al revés»? Porque tiene una ventaja práctica: el byte de la dirección más baja es siempre el de las unidades, mida el número 2, 4 u 8 bytes. Si guardas el 300 en un `u32` y lees solo su primer byte, obtienes `0x2c` = 44, que es 300 módulo 256, igual que si lo hubieras guardado en un `u8`.
+
+Lo que **no** cambia con el orden:
+
+- Un byte suelto. Dentro de un byte, los bits no se reordenan.
+- Los arrays: el elemento `[0]` sigue estando antes que el `[1]`. Lo que se reordena son los bytes **dentro** de cada elemento.
+- El texto UTF-8, que es una secuencia de bytes sueltos (lección 10).
+
+Los flotantes también tienen orden: `f32::to_le_bytes` y `f32::from_le_bytes` existen igual que para los enteros.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Leer con el orden equivocado">
+
+❌ Recibir los bytes `2c 01 00 00` de un archivo de un PC little-endian y leerlos con `from_be_bytes`. Sale 738 263 040 en lugar de 300.
+
+✅ Antes de leer bytes de fuera, averigua su orden (lo dice el formato del archivo o el protocolo) y usa la función que le corresponde: `from_le_bytes` o `from_be_bytes`. Usa `from_ne_bytes` solo para bytes que tu propio programa escribió en esa misma máquina.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m01/orden-reto"
+  enunciado="Los dos bytes `[0x1f, 0x90]` son un número de puerto que llega por la red (big-endian). Cambia SOLO la función de lectura para que el programa imprima `puerto 8080`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En un PC x86-64, ¿qué byte de `0xaabbccdd` (un `u32`) está en la dirección más baja?"
+  opciones={["`dd`", "`aa`", "`ab`", "Depende de cada ejecución"]}
+  correcta={0}
+  porque={["Correcto: x86-64 es little-endian, así que va primero el byte menos significativo.", "`aa` iría primero en big-endian.", "El orden se aplica a bytes enteros; `ab` no es un byte del número.", "El orden es una propiedad fija de la máquina, no cambia de una ejecución a otra."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué devuelve `u16::from_le_bytes([0x01, 0x00])`?"
+  opciones={["1", "256", "100", "10"]}
+  correcta={0}
+  explicacion="En little-endian el primer byte es el menos significativo: `0x0001` = 1."
+  porque={["Correcto.", "256 (`0x0100`) es lo que daría `from_be_bytes`.", "Los bytes se combinan en base 256, no se pegan como cifras decimales.", "No se pegan las cifras: el número es `0x0001`."]}
+/>
+
+<Pregunta
+  pregunta="¿A cuál de estos datos **no** le afecta el orden de los bytes?"
+  opciones={["Un `u8`", "Un `u32`", "Un `f64`", "Un `i16`"]}
+  correcta={0}
+  porque={["Correcto: un solo byte no se puede reordenar.", "Un `u32` tiene 4 bytes, que se pueden colocar en dos órdenes.", "Los flotantes también tienen varios bytes y también tienen orden.", "Un `i16` tiene 2 bytes: también le afecta."]}
+/>

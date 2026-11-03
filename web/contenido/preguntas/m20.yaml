@@ -1,0 +1,775 @@
+# Banco de preguntas — Mundo 20: Unsafe y comportamiento indefinido
+# Todo código, salida y error citado se ha verificado con rustc 1.99.1 (edición 2024).
+
+- id: m20-cinco-superpoderes
+  titulo: "Los cinco superpoderes"
+  mundo: 20-unsafe-y-ub
+  tema: unsafe
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál de estas operaciones **no** es uno de los cinco superpoderes de `unsafe`?"
+  opciones: ["Desreferenciar un puntero crudo", "Acceder a un `static mut`", "Desactivar el borrow checker en un bloque", "Leer un campo de una `union`"]
+  correcta: 2
+  solucion: |
+    Los cinco superpoderes son: desreferenciar punteros crudos, llamar a funciones `unsafe`, acceder a un `static mut`, implementar traits `unsafe` y leer campos de una `union`.
+    El borrow checker **nunca** se desactiva: dentro de `unsafe { }` los préstamos y tiempos de vida se comprueban igual.
+  etiquetas: ["unsafe", "superpoderes"]
+
+- id: m20-unsafe-no-apaga
+  titulo: "unsafe no apaga nada"
+  mundo: 20-unsafe-y-ub
+  tema: unsafe
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa, si los préstamos están dentro de un bloque `unsafe`?"
+  ej: m20/unsafe-no-apaga
+  opciones: ["Porque no se puede desreferenciar `p` dentro de unsafe", "E0499: `a` y `b` son dos préstamos exclusivos de `n` vivos a la vez; unsafe no cambia las reglas de préstamos", "Porque `n` no es `mut`", "Porque falta un comentario `// SAFETY:`"]
+  correcta: 1
+  solucion: |
+    `rustc` da `error[E0499]: cannot borrow `n` as mutable more than once at a time`. El bloque `unsafe` solo permite las cinco operaciones extra (aquí, `*p += 1`); la regla de exclusividad sigue intacta.
+    Desreferenciar `p` sí está permitido dentro del bloque, `n` es `mut`, y los comentarios `// SAFETY:` son una convención, no un requisito del compilador.
+  etiquetas: ["E0499", "unsafe"]
+
+- id: m20-crear-puntero
+  titulo: "¿Crear o usar?"
+  mundo: 20-unsafe-y-ub
+  tema: punteros
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál de estas líneas compila **sin** `unsafe`?"
+  opciones: ["`let y = *p;` con `p: *const i32`", "`let p = &raw const x;`", "`let v = u.campo;` con `u` una union", "`let r = &STATIC_MUT;`"]
+  correcta: 1
+  solucion: |
+    Crear un puntero crudo es inofensivo: es solo un valor. Lo peligroso es desreferenciarlo (`*p`, error E0133 sin unsafe), leer un campo de union, o crear referencias a un `static mut` (que además en la edición 2024 es un error aunque esté en unsafe).
+  etiquetas: ["&raw", "punteros"]
+
+- id: m20-deref-e0133
+  titulo: "Desreferencia sin permiso"
+  mundo: 20-unsafe-y-ub
+  tema: punteros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da este programa?"
+  ej: m20/deref-sin-unsafe
+  opciones: ["E0133: desreferenciar un puntero crudo requiere un bloque unsafe", "E0382: uso tras mover", "E0499", "Compila pero imprime basura"]
+  correcta: 0
+  solucion: |
+    `error[E0133]: dereference of raw pointer is unsafe and requires unsafe block`. La nota del compilador explica por qué: un puntero crudo puede ser nulo, colgante o desalineado, o violar las reglas de aliasing.
+  etiquetas: ["E0133"]
+
+- id: m20-add-elementos
+  titulo: "add cuenta elementos"
+  mundo: 20-unsafe-y-ub
+  tema: punteros
+  dificultad: facil
+  tipo: predice
+  enunciado: "El array empieza siendo `[1, 2, 3, 4]`. ¿Qué imprime la línea `tercero = …`?"
+  ej: m20/punteros-crudos
+  opciones: ["tercero = 2", "tercero = 3", "tercero = 4", "tercero = 40"]
+  correcta: 1
+  solucion: |
+    `p.add(2)` avanza **dos elementos** (8 bytes para `i32`), del índice 0 al 2, que vale 3. La salida real es `tercero = 3`.
+  etiquetas: ["add", "aritmética de punteros"]
+
+- id: m20-add-fuera
+  titulo: "UB sin leer"
+  mundo: 20-unsafe-y-ub
+  tema: punteros
+  dificultad: media
+  tipo: opcion
+  enunciado: "Con `let v = [1u8, 2, 3]; let p = v.as_ptr();`, ¿cuál de estas líneas es UB **aunque nunca se desreferencie** el resultado?"
+  opciones: ["`p.wrapping_add(10)`", "`unsafe { p.add(3) }`", "`unsafe { p.add(10) }`", "`p.addr() + 10`"]
+  correcta: 2
+  solucion: |
+    `add` exige que el resultado quede dentro de la asignación o justo una posición después del final. `p.add(3)` es justo el final (legal calcularlo, no leerlo); `p.add(10)` se sale y ya es UB.
+    `wrapping_add` y la aritmética sobre `addr()` se pueden calcular siempre.
+  etiquetas: ["add", "wrapping_add", "UB"]
+
+- id: m20-packed-e0793
+  titulo: "Referencia a un campo empaquetado"
+  mundo: 20-unsafe-y-ub
+  tema: punteros
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `let r = &c.largo;`?"
+  ej: m20/packed
+  opciones: ["Porque `largo` es privado", "E0793: el campo puede estar desalineado, y una referencia desalineada es UB aunque no se use", "Porque los structs packed no admiten u32", "Porque falta `unsafe`"]
+  correcta: 1
+  solucion: |
+    `error[E0793]: reference to field of packed struct is unaligned`. Con `repr(packed)`, `largo` empieza en el byte 1. La ayuda del compilador propone copiar el campo a una variable o usar un puntero crudo con `read_unaligned`. Añadir `unsafe` no lo arregla.
+  etiquetas: ["E0793", "repr(packed)"]
+
+- id: m20-packed-tamano
+  titulo: "Sin relleno"
+  mundo: 20-unsafe-y-ub
+  tema: punteros
+  dificultad: media
+  tipo: respuesta
+  enunciado: "`#[repr(packed)] struct Cabecera { tipo: u8, largo: u32 }`. ¿Cuántos bytes mide? (solo el número)"
+  respuestas: ["5"]
+  solucion: |
+    Sin relleno: 1 + 4 = 5 bytes. El ejemplo `m20/packed` (versión arreglada) lo imprime: `tamaño = 5 bytes`. Sin `packed` mediría 8, por la alineación del `u32`.
+  etiquetas: ["repr(packed)", "layout"]
+
+- id: m20-que-es-ub
+  titulo: "Qué significa UB"
+  mundo: 20-unsafe-y-ub
+  tema: ub
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué describe mejor el comportamiento indefinido?"
+  opciones: ["El programa siempre se cuelga", "El programa no tiene significado: el compilador asume que el UB no ocurre y el resultado puede ser cualquiera", "Un aviso del compilador", "Un pánico en modo debug"]
+  correcta: 1
+  solucion: |
+    El UB no es un fallo concreto: es la ausencia de significado. Puede funcionar en tus pruebas, fallar con otra optimización, o afectar a código anterior. Un pánico, en cambio, es un comportamiento perfectamente definido.
+  etiquetas: ["UB"]
+
+- id: m20-no-es-ub
+  titulo: "Errores que no son UB"
+  mundo: 20-unsafe-y-ub
+  tema: ub
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál de estos **sí** es comportamiento indefinido?"
+  opciones: ["Una fuga de memoria", "Un deadlock entre dos hilos", "Un overflow de `u8` en release", "Crear un `bool` con el byte 2"]
+  correcta: 3
+  solucion: |
+    Producir un valor inválido es UB, y un `bool` solo puede ser 0 o 1. Las fugas, los deadlocks y el overflow de enteros (que en release da la vuelta) son errores, pero el programa sigue teniendo significado: el Rust seguro puede tenerlos.
+  etiquetas: ["UB", "valores inválidos"]
+
+- id: m20-char-sustituto
+  titulo: "Un char imposible"
+  mundo: 20-unsafe-y-ub
+  tema: ub
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la línea de `from_u32(0xD800)`?"
+  ej: m20/valores-validos
+  opciones: ["`from_u32(0xD800) = Some('\\u{d800}')`", "`from_u32(0xD800) = None`", "Entra en pánico", "Es UB"]
+  correcta: 1
+  solucion: |
+    0xD800..=0xDFFF no son valores Unicode escalares, así que no hay ningún `char` válido con ese número. La función segura devuelve `None`; la salida real es `from_u32(0xD800) = None`.
+  etiquetas: ["char", "validez"]
+
+- id: m20-nicho-nonzero
+  titulo: "El nicho del cero"
+  mundo: 20-unsafe-y-ub
+  tema: ub
+  dificultad: media
+  tipo: respuesta
+  enunciado: "¿Cuántos bytes mide `Option<NonZeroU32>`? (solo el número)"
+  respuestas: ["4"]
+  solucion: |
+    Como 0 no es un `NonZeroU32` válido, `Option` usa ese patrón para `None` y no necesita espacio extra: 4 bytes, frente a los 8 de `Option<u32>`. Lo imprime `m20/valores-validos`.
+  etiquetas: ["nicho", "NonZero"]
+
+- id: m20-producir-valor
+  titulo: "Producir es suficiente"
+  mundo: 20-unsafe-y-ub
+  tema: ub
+  dificultad: media
+  tipo: opcion
+  enunciado: "`let b: bool = unsafe { std::mem::transmute::<u8, bool>(2) };` y luego **nunca** se usa `b`. ¿Hay UB?"
+  opciones: ["No, porque no se usa", "Sí: producir un valor inválido ya es UB", "Solo en release", "Solo si se imprime"]
+  correcta: 1
+  solucion: |
+    La Reference dice que *producir* un valor inválido es UB, y producir incluye asignarlo. No hace falta usarlo después. Miri lo detiene en el `transmute`.
+  etiquetas: ["transmute", "validez"]
+
+- id: m20-sound-definicion
+  titulo: "Qué es ser sound"
+  mundo: 20-unsafe-y-ub
+  tema: soundness
+  dificultad: media
+  tipo: opcion
+  enunciado: "Una función segura con unsafe dentro es *sound* si…"
+  opciones: ["funciona con los argumentos de los tests", "ningún programa que la llame solo con código seguro puede provocar UB, con ningún argumento", "tiene un comentario `// SAFETY:`", "no usa punteros crudos"]
+  correcta: 1
+  solucion: |
+    La solidez es una propiedad sobre **todas** las llamadas seguras posibles. Basta un argumento que lleve a UB para que sea *unsound*, aunque nadie lo use. Los comentarios ayudan a auditar, pero no la hacen sound.
+  etiquetas: ["soundness"]
+
+- id: m20-dos-mut-slice
+  titulo: "Dos mitades exclusivas"
+  mundo: 20-unsafe-y-ub
+  tema: soundness
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "Los rangos `..2` y `2..` no se solapan. ¿Por qué no compila?"
+  ej: m20/dos-mut-slice
+  opciones: ["Porque los arrays no admiten rangos", "E0499: el borrow checker trata `&mut v[..2]` como un préstamo exclusivo de todo `v`", "Porque falta `unsafe`", "Porque `v` no es `mut`"]
+  correcta: 1
+  solucion: |
+    El borrow checker no razona sobre índices. El propio error sugiere `use .split_at_mut(position) to obtain two mutable non-overlapping sub-slices`: una función segura implementada con unsafe por dentro.
+  etiquetas: ["E0499", "split_at_mut"]
+
+- id: m20-assert-sound
+  titulo: "La línea que lo hace sound"
+  mundo: 20-unsafe-y-ub
+  tema: soundness
+  dificultad: media
+  tipo: opcion
+  enunciado: "En una `partir_mut(s, mitad)` hecha con `from_raw_parts_mut`, ¿qué línea es imprescindible para que sea sound?"
+  opciones: ["Un `println!` de depuración", "`assert!(mitad <= s.len())` antes de crear los slices", "`#[inline]`", "Ninguna: from_raw_parts_mut comprueba los límites"]
+  correcta: 1
+  solucion: |
+    Sin la comprobación, `partir_mut(&mut v, 99)` crearía un slice fuera de la memoria desde código seguro. Un pánico no es UB, así que el `assert!` convierte el caso malo en un error definido. `from_raw_parts_mut` es `unsafe` precisamente porque **no** comprueba.
+  etiquetas: ["soundness", "split_at_mut"]
+
+- id: m20-invariantes
+  titulo: "Validez o seguridad"
+  mundo: 20-unsafe-y-ub
+  tema: soundness
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "«Los bytes de un `String` son UTF-8 válido». ¿Qué tipo de invariante es?"
+  opciones: ["De validez: romperla es UB inmediato", "De seguridad: la promete el tipo y el UB aparece cuando otro código confía en ella", "Ninguna, es una recomendación", "De tiempo de vida"]
+  correcta: 1
+  solucion: |
+    Cada byte sigue siendo un `u8` válido; lo que se rompe es la promesa del tipo `String`, de la que dependen otras funciones (por ejemplo, las que recorren los `char`). Por eso `from_utf8_unchecked` es `unsafe`.
+  etiquetas: ["invariantes", "String"]
+
+- id: m20-frontera-privacidad
+  titulo: "Un método inocente"
+  mundo: 20-unsafe-y-ub
+  tema: soundness
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Un tipo `Ascii { bytes: Vec<u8> }` (campo privado) usa `from_utf8_unchecked` en `como_str`. ¿Qué método **seguro** añadido en el mismo módulo lo volvería unsound?"
+  opciones: ["`pub fn len(&self) -> usize`", "`pub fn bytes_mut(&mut self) -> &mut Vec<u8>`", "`pub fn es_vacio(&self) -> bool`", "`impl Clone`"]
+  correcta: 1
+  solucion: |
+    Con `bytes_mut`, código de fuera podría escribir `0xFF` y luego pedir el `&str`: UB desde código seguro, sin una sola línea `unsafe` nueva. Por eso la unidad de auditoría es el **módulo**, no el bloque.
+  etiquetas: ["privacidad", "invariantes"]
+
+- id: m20-noalias-e0499
+  titulo: "Mismo destino y origen"
+  mundo: 20-unsafe-y-ub
+  tema: aliasing
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `sumar_en(&mut a, &mut a)`?"
+  ej: m20/noalias
+  opciones: ["E0499: dos préstamos exclusivos del mismo valor a la vez", "Porque la función no devuelve nada", "E0382", "Porque `a` es un entero"]
+  correcta: 0
+  solucion: |
+    `error[E0499]: cannot borrow `a` as mutable more than once at a time`. Si se permitiera, el compilador (que da por hecho que `destino` y `origen` son distintos) podría optimizar con resultados imposibles.
+  etiquetas: ["E0499", "aliasing"]
+
+- id: m20-stacked-pila
+  titulo: "La pila de permisos"
+  mundo: 20-unsafe-y-ub
+  tema: aliasing
+  dificultad: dificil
+  tipo: opcion
+  enunciado: |
+    En Stacked Borrows, tras `let p = &raw mut x; let r = unsafe { &mut *p };` la pila de `x` es `[x, p, r]`. ¿Qué pasa al ejecutar `unsafe { *p = 1 }`?
+  opciones: ["Nada", "Se quita `r` de la pila; usar `r` después es UB", "Se quita `p`", "`r` pasa a ser de solo lectura"]
+  correcta: 1
+  solucion: |
+    Usar un puntero elimina de la pila todo lo creado después de él. `r` desaparece; si luego se escribe `*r = 2`, Miri lo rechaza por violar las reglas de aliasing (lo mismo ocurre con Tree Borrows).
+  etiquetas: ["Stacked Borrows", "Miri"]
+
+- id: m20-tree-borrows
+  titulo: "Árbol en vez de pila"
+  mundo: 20-unsafe-y-ub
+  tema: aliasing
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué afirma correctamente sobre Tree Borrows (PLDI 2025)?"
+  opciones: ["Es el modelo de aliasing oficial de Rust", "Usa un árbol con estados por nodo y rechaza un 54 % menos de casos de test reales que Stacked Borrows", "Lo aplica rustc al compilar", "Prohíbe los punteros crudos"]
+  correcta: 1
+  solucion: |
+    Tree Borrows cambia la pila por un árbol con estados (Reserved, Active, Frozen, Disabled); un `&mut` solo es exclusivo tras su primera escritura. Se evaluó sobre los 30 000 crates más usados. Pero **no** es oficial: Rust aún no tiene un modelo de aliasing fijado, y se comprueba con Miri, no con rustc.
+  etiquetas: ["Tree Borrows"]
+
+- id: m20-rustc-no-ve
+  titulo: "Silencio del compilador"
+  mundo: 20-unsafe-y-ub
+  tema: aliasing
+  dificultad: media
+  tipo: opcion
+  enunciado: "El programa `m20/aliasing-ub` usa un `&mut` después de que un puntero hermano escribiera en la misma memoria. ¿Qué hace `rustc`?"
+  opciones: ["Error E0499", "Lo compila sin ningún aviso", "Un aviso de aliasing", "Lo rechaza el lint invalid_reference_casting"]
+  correcta: 1
+  solucion: |
+    Comprobado: compila sin errores ni avisos. El compilador no sigue los alias que creas con punteros crudos; hace falta Miri para detectar este UB.
+  etiquetas: ["aliasing", "Miri"]
+
+- id: m20-miri-limite
+  titulo: "Lo que Miri no ve"
+  mundo: 20-unsafe-y-ub
+  tema: miri
+  dificultad: media
+  tipo: opcion
+  enunciado: "Tus tests pasan bajo Miri. ¿Qué puedes afirmar?"
+  opciones: ["Que el crate no tiene UB", "Que las ejecuciones que hicieron los tests no tuvieron UB detectable por Miri", "Que el crate es correcto", "Que también es seguro con FFI"]
+  correcta: 1
+  solucion: |
+    Miri vigila lo que se ejecuta, una traza cada vez, y casi no admite llamadas a bibliotecas externas. Es una red muy buena, no una demostración. Conviene `-Zmiri-many-seeds`, tests de propiedades y fuzzing.
+  etiquetas: ["Miri"]
+
+- id: m20-miri-comando
+  titulo: "Lanzar Miri"
+  mundo: 20-unsafe-y-ub
+  tema: miri
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "Escribe el comando de Cargo que ejecuta los tests de tu crate bajo Miri (con la toolchain nightly)."
+  respuestas: ["cargo +nightly miri test", "cargo miri test"]
+  solucion: |
+    `cargo +nightly miri test` (después de `rustup +nightly component add miri`). Miri es un componente de nightly. En el Playground: *Tools → Miri*.
+  etiquetas: ["Miri", "cargo"]
+
+- id: m20-precondicion-debug
+  titulo: "La red de debug"
+  mundo: 20-unsafe-y-ub
+  tema: miri
+  dificultad: media
+  tipo: predice
+  enunciado: "En modo debug, ¿qué ocurre al llamar a `copy_nonoverlapping` con rangos que se solapan?"
+  ej: m20/precondicion-debug
+  opciones: ["Copia y muestra `después: [1, 1, 2, 3]`", "Aborta con «unsafe precondition(s) violated» antes de copiar", "No compila", "Copia al revés"]
+  correcta: 1
+  solucion: |
+    La salida real: imprime `antes de copiar` y después el pánico `unsafe precondition(s) violated: ptr::copy_nonoverlapping requires that both pointer arguments are aligned and non-null and the specified memory ranges do not overlap`, que aborta. La propia std avisa de que esta comprobación es opcional: en release sería UB silencioso.
+  etiquetas: ["copy_nonoverlapping", "debug"]
+
+- id: m20-memoria-sin-init
+  titulo: "Ni cero ni basura"
+  mundo: 20-unsafe-y-ub
+  tema: maybeuninit
+  dificultad: media
+  tipo: opcion
+  enunciado: "Lees con unsafe un `u32` que nadie inicializó. ¿Qué valor tiene?"
+  opciones: ["0", "Lo que hubiera antes en esa memoria", "Ninguno: es UB", "u32::MAX"]
+  correcta: 2
+  solucion: |
+    Para la máquina abstracta de Rust, la memoria sin inicializar no contiene ningún valor. El optimizador puede tratar cada lectura de forma distinta. Por eso los enteros deben estar inicializados (lista de UB).
+  etiquetas: ["MaybeUninit", "UB"]
+
+- id: m20-maybeuninit-unsafe
+  titulo: "La única afirmación"
+  mundo: 20-unsafe-y-ub
+  tema: maybeuninit
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué método de `MaybeUninit<T>` es `unsafe`?"
+  opciones: ["`uninit()`", "`write(v)`", "`as_mut_ptr()`", "`assume_init()`"]
+  correcta: 3
+  solucion: |
+    Crear, escribir y obtener un puntero son seguros. `assume_init` afirma que hay un `T` válido; si no es cierto, hay UB.
+  etiquetas: ["MaybeUninit"]
+
+- id: m20-maybeuninit-tamano
+  titulo: "Sin indicador"
+  mundo: 20-unsafe-y-ub
+  tema: maybeuninit
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuántos bytes mide `MaybeUninit<u64>`? (solo el número)"
+  respuestas: ["8"]
+  solucion: |
+    Lo mismo que `u64`. No guarda si está inicializado: eso lo sabes tú. La salida de `m20/maybeuninit-array` lo muestra: `size_of MaybeUninit<u64> = 8`.
+  etiquetas: ["MaybeUninit", "layout"]
+
+- id: m20-zeroed-ref
+  titulo: "Ceros en una referencia"
+  mundo: 20-unsafe-y-ub
+  tema: maybeuninit
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué dice `rustc` 1.99.1 ante `let r: &i32 = unsafe { std::mem::zeroed() };`?"
+  opciones: ["Nada", "Un aviso: the type `&i32` does not permit zero-initialization", "Error E0133", "Que falta un `// SAFETY:`"]
+  correcta: 1
+  solucion: |
+    Es el lint `invalid_value` (aviso por defecto): «this code causes undefined behavior when executed», con la nota «references must be non-null» y la sugerencia de usar `MaybeUninit`. Compila, pero ejecutarlo es UB.
+  etiquetas: ["mem::zeroed", "invalid_value"]
+
+- id: m20-cast-mut
+  titulo: "El truco que no vale"
+  mundo: 20-unsafe-y-ub
+  tema: unsafecell
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Se convierte `&i32` en `*mut i32` y se escribe. ¿Qué dice el compilador?"
+  ej: m20/cast-mut-ub
+  opciones: ["Compila sin avisos", "Error: assigning to `&T` is undefined behavior, consider using an `UnsafeCell`", "E0499", "E0133"]
+  correcta: 1
+  solucion: |
+    El lint `invalid_reference_casting` es *deny* por defecto: reconoce la conversión y la escritura. Mutar a través de `&T` sin `UnsafeCell` es UB aunque pases por punteros crudos.
+  etiquetas: ["UnsafeCell", "invalid_reference_casting"]
+
+- id: m20-unsafecell-quien
+  titulo: "Quién usa UnsafeCell"
+  mundo: 20-unsafe-y-ub
+  tema: unsafecell
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál de estos tipos **no** contiene un `UnsafeCell`?"
+  opciones: ["`RefCell<T>`", "`AtomicBool`", "`Rc<T>` (su valor)", "`Mutex<T>`"]
+  correcta: 2
+  solucion: |
+    El valor dentro de un `Rc<T>` no se puede mutar con `&` (para eso se combina con `RefCell`). `RefCell`, los atómicos y `Mutex` permiten mutar con `&self`, y por eso se construyen sobre `UnsafeCell`. (Los contadores internos de `Rc` sí usan `Cell`, pero el `T` no.)
+  etiquetas: ["UnsafeCell", "mutabilidad interior"]
+
+- id: m20-cell-no-sync
+  titulo: "Cell entre hilos"
+  mundo: 20-unsafe-y-ub
+  tema: unsafecell
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué falla `exige_sync(&c)` con `c: Cell<i32>`?"
+  ej: m20/cell-no-sync
+  opciones: ["E0277: `Cell` no es `Sync`", "E0382", "Porque Cell no es Copy", "Porque falta unsafe"]
+  correcta: 0
+  solucion: |
+    `error[E0277]: Cell<{integer}> cannot be shared between threads safely`. Su `UnsafeCell` no es `Sync`, y el auto trait se propaga. La ayuda sugiere `RwLock` para compartir con mutación entre hilos.
+  etiquetas: ["E0277", "Sync", "Cell"]
+
+- id: m20-provenance
+  titulo: "Misma dirección, otro permiso"
+  mundo: 20-unsafe-y-ub
+  tema: provenance
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Un puntero justo después del final de `a` tiene la misma dirección que el inicio de `b`. ¿Puedes leer `b[0]` con él?"
+  opciones: ["Sí, la dirección es la misma", "No: su provenance es de `a`; leer `b` con él es UB", "Solo si son del mismo tipo", "Solo en debug"]
+  correcta: 1
+  solucion: |
+    Un puntero es dirección + provenance (el permiso sobre una asignación concreta). El de `a` no autoriza a tocar `b`, aunque las direcciones coincidan.
+  etiquetas: ["provenance"]
+
+- id: m20-map-addr
+  titulo: "Etiquetar sin perder el permiso"
+  mundo: 20-unsafe-y-ub
+  tema: provenance
+  dificultad: media
+  tipo: opcion
+  enunciado: "Quieres poner a 1 el bit bajo de un `*const u32` y luego quitarlo para leer. ¿Qué API conserva la provenance?"
+  opciones: ["`(p as usize | 1) as *const u32`", "`p.map_addr(|a| a | 1)`", "`std::ptr::without_provenance(p.addr() | 1)`", "`p.addr() | 1`"]
+  correcta: 1
+  solucion: |
+    `map_addr` (y `with_addr`) cambian la dirección conservando el permiso; son estables desde Rust 1.84. La ida y vuelta por `usize` con `as` pierde la provenance estricta, `without_provenance` crea un puntero sin permiso, y `addr()` es solo un número.
+  etiquetas: ["strict provenance", "map_addr"]
+
+- id: m20-varianza-cell
+  titulo: "¿Quién es invariante?"
+  mundo: 20-unsafe-y-ub
+  tema: varianza
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál de estos tipos es **invariante** en `T`?"
+  opciones: ["`&'a T`", "`Vec<T>`", "`*mut T`", "`Box<T>`"]
+  correcta: 2
+  solucion: |
+    `*mut T` (como `&mut T`, `Cell<T>` y `UnsafeCell<T>`) es invariante porque permite escribir un `T`. `&'a T`, `Vec<T>` y `Box<T>` son covariantes.
+  etiquetas: ["varianza"]
+
+- id: m20-invarianza-mut
+  titulo: "Algo corto en un 'static"
+  mundo: 20-unsafe-y-ub
+  tema: varianza
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `meter(&mut global, &corta)` con `global: &'static str`?"
+  ej: m20/invarianza-mut
+  opciones: ["E0597: como `&mut T` es invariante en `T`, `'a` debe ser `'static` y `corta` no vive tanto", "E0499", "Porque `meter` no devuelve nada", "Porque los String no se pueden prestar"]
+  correcta: 0
+  solucion: |
+    `error[E0597]: corta does not live long enough`, con la nota `type annotation requires that corta is borrowed for 'static`. Si `&mut &'static str` pudiera verse como `&mut &'corto str`, tras el bloque `global` apuntaría a memoria liberada.
+  etiquetas: ["E0597", "varianza"]
+
+- id: m20-phantom-tamano
+  titulo: "Un campo que no ocupa"
+  mundo: 20-unsafe-y-ub
+  tema: varianza
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuántos bytes mide `PhantomData<String>`? (solo el número)"
+  respuestas: ["0"]
+  solucion: |
+    `PhantomData<T>` es de tamaño cero para cualquier `T`. Solo informa al compilador (varianza, auto traits, drop check). `m20/phantom-unidades` lo imprime.
+  etiquetas: ["PhantomData"]
+
+- id: m20-phantom-send
+  titulo: "Atado a su hilo"
+  mundo: 20-unsafe-y-ub
+  tema: varianza
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué `SoloEsteHilo` no se puede pasar a `exige_send`?"
+  ej: m20/phantom-no-send
+  opciones: ["E0277: `*const ()` no es `Send`, y aparece dentro de `PhantomData<*const ()>` dentro del struct", "Porque `id` es privado", "E0382", "Porque PhantomData nunca es Send"]
+  correcta: 0
+  solucion: |
+    El error recorre la cadena: `*const ()` no es `Send` → aparece en `PhantomData<*const ()>` → aparece en `SoloEsteHilo`. `PhantomData<T>` es `Send` si `T` lo es; con un puntero crudo, no.
+  etiquetas: ["E0277", "Send", "PhantomData"]
+
+- id: m20-orden-drop
+  titulo: "Lo primero en morir"
+  mundo: 20-unsafe-y-ub
+  tema: drop
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué línea imprime primero este programa?"
+  ej: m20/orden-drop
+  opciones: ["`drop a (local 1)`", "`fin de main`", "`drop temporal con _`", "`drop campo 2`"]
+  correcta: 2
+  solucion: |
+    `let _ = Ruido(..)` no enlaza: el temporal se destruye en esa sentencia. Salida real: `drop temporal con _`, `fin de main`, `drop campo 1`, `drop campo 2`, `drop b (local 2)`, `drop a (local 1)`. Locales en orden inverso; campos en orden de declaración.
+  etiquetas: ["Drop", "orden"]
+
+- id: m20-dropck
+  titulo: "El inspector y los días"
+  mundo: 20-unsafe-y-ub
+  tema: drop
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "El mismo código compila si se quita `impl Drop for Inspector`. ¿Por qué no compila con él?"
+  ej: m20/dropck
+  opciones: ["Porque Drop no se puede implementar en tipos con tiempos de vida", "E0597: el destructor de `Inspector` podría usar `&mundo.dias`, que muere a la vez que `mundo`", "Porque `Box<u8>` no implementa Drop", "E0499"]
+  correcta: 1
+  solucion: |
+    Es el *drop check*: si un tipo genérico implementa `Drop`, lo que toma prestado debe vivir estrictamente más. El error lo dice: «borrow might be used here, when `mundo` is dropped and runs the destructor for type `Mundo<'_>`».
+  etiquetas: ["E0597", "drop check"]
+
+- id: m20-may-dangle
+  titulo: "La promesa de Vec"
+  mundo: 20-unsafe-y-ub
+  tema: drop
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Qué promete `#[may_dangle]` en el `Drop` de `Vec<T>`?"
+  opciones: ["Que el vector nunca libera memoria", "Que su `drop` no usará los `T` prestados, solo los destruirá", "Que T puede ser nulo", "Que el vector es Sync"]
+  correcta: 1
+  solucion: |
+    Es un atributo inestable de la biblioteca estándar, usado con `unsafe impl`. Permite que los `T` (por ejemplo, referencias) mueran a la vez que el vector. Se acompaña de `PhantomData<T>` para seguir comprobando el drop de cada elemento.
+  etiquetas: ["may_dangle", "drop check"]
+
+- id: m20-extern-2024
+  titulo: "Un extern a secas"
+  mundo: 20-unsafe-y-ub
+  tema: ffi
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da `extern \"C\" { fn abs(x: i32) -> i32; }` en la edición 2024?"
+  ej: m20/extern-sin-unsafe
+  opciones: ["extern blocks must be unsafe", "E0133", "No da error", "E0425"]
+  correcta: 0
+  solucion: |
+    `error: extern blocks must be unsafe`, con la ayuda «needs `unsafe` before the extern keyword». Declarar una firma externa es una promesa que el compilador no puede verificar.
+  etiquetas: ["unsafe extern", "edición 2024"]
+
+- id: m20-safe-fn
+  titulo: "safe fn en un extern"
+  mundo: 20-unsafe-y-ub
+  tema: ffi
+  dificultad: media
+  tipo: opcion
+  enunciado: "Dentro de `unsafe extern \"C\" { … }`, ¿cuál de estas declaraciones es razonable marcar como `safe fn`?"
+  opciones: ["`fn strlen(s: *const c_char) -> usize`", "`fn abs(x: c_int) -> c_int`", "`fn free(p: *mut c_void)`", "`fn memcpy(d: *mut c_void, s: *const c_void, n: usize) -> *mut c_void`"]
+  correcta: 1
+  solucion: |
+    `abs` recibe un entero y no puede causar UB con ningún argumento. Las otras reciben punteros cuya validez depende de quien llama: deben quedarse como `fn` (unsafe de llamar).
+  etiquetas: ["safe fn", "FFI"]
+
+- id: m20-repr-c
+  titulo: "Relleno a la vista"
+  mundo: 20-unsafe-y-ub
+  tema: ffi
+  dificultad: media
+  tipo: predice
+  enunciado: "`#[repr(C)] struct EnOrdenC { a: u8, b: u32, c: u16 }`. ¿Qué tamaño imprime?"
+  ej: m20/repr-c
+  opciones: ["7 bytes", "8 bytes", "12 bytes", "16 bytes"]
+  correcta: 2
+  solucion: |
+    `repr(C)` respeta el orden: `a` en 0, 3 de relleno, `b` en 4..8, `c` en 8..10 y 2 de relleno final (para que el tamaño sea múltiplo de 4): 12. El mismo struct sin `repr(C)` mide 8 porque el compilador reordena los campos.
+  etiquetas: ["repr(C)", "layout"]
+
+- id: m20-cstring-temporal
+  titulo: "Un puntero de vida corta"
+  mundo: 20-unsafe-y-ub
+  tema: ffi
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué tiene de malo `let p = CString::new(\"hola\").unwrap().as_ptr();`?"
+  opciones: ["Nada", "El CString temporal se destruye al acabar la sentencia y `p` queda colgando", "CString no admite texto con letras", "as_ptr es unsafe"]
+  correcta: 1
+  solucion: |
+    `rustc` avisa: «this creates a dangling pointer because temporary `CString` is dropped at end of statement» (lint `dangling_pointers_from_temporaries`). Crear el puntero es seguro; usarlo después es un uso tras liberar. Guarda el `CString` en una variable.
+  etiquetas: ["CString", "FFI"]
+
+- id: m20-panico-ffi
+  titulo: "Pánico en la frontera"
+  mundo: 20-unsafe-y-ub
+  tema: ffi
+  dificultad: media
+  tipo: opcion
+  enunciado: "Desde Rust 1.81, ¿qué pasa si un pánico intenta salir de una función `extern \"C\"`?"
+  opciones: ["Se propaga al llamante", "El proceso aborta", "Es UB", "Se convierte en un código de error"]
+  correcta: 1
+  solucion: |
+    Antes era UB; ahora el proceso aborta de forma definida. Para propagar el desenrollado se usa la ABI `"C-unwind"`; para convertirlo en código de error, `std::panic::catch_unwind`.
+  etiquetas: ["FFI", "pánico"]
+
+- id: m20-no-mangle-2024
+  titulo: "Un atributo inseguro"
+  mundo: 20-unsafe-y-ub
+  tema: edicion-2024
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `#[no_mangle] pub extern \"C\" fn sumar(..)` en la edición 2024?"
+  ej: m20/no-mangle
+  opciones: ["unsafe attribute used without unsafe: hay que escribir `#[unsafe(no_mangle)]`", "Porque las funciones extern no pueden ser pub", "E0133", "Porque falta `unsafe extern`"]
+  correcta: 0
+  solucion: |
+    En 2024, `no_mangle`, `export_name` y `link_section` son atributos inseguros (dos símbolos con el mismo nombre son UB). El compilador sugiere `#[unsafe(no_mangle)]`.
+  etiquetas: ["no_mangle", "edición 2024"]
+
+- id: m20-set-var
+  titulo: "El entorno es compartido"
+  mundo: 20-unsafe-y-ub
+  tema: edicion-2024
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué `std::env::set_var` es `unsafe` en la edición 2024?"
+  opciones: ["Porque es lenta", "Porque modificar el entorno mientras otro hilo lo lee es una carrera de datos que la función no puede impedir", "Porque puede borrar archivos", "Porque solo funciona en Windows"]
+  correcta: 1
+  solucion: |
+    En muchos sistemas el entorno es una estructura global sin protección que leen funciones muy usadas. Sin `unsafe` da `error[E0133]: call to unsafe function set_var is unsafe and requires unsafe block`. Lo correcto: cambiarlo al inicio de `main`, antes de crear hilos.
+  etiquetas: ["set_var", "E0133", "edición 2024"]
+
+- id: m20-static-mut-ref
+  titulo: "Referencia a un static mut"
+  mundo: 20-unsafe-y-ub
+  tema: edicion-2024
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Qué dice el compilador ante `let r: &u32 = unsafe { &CONTADOR };` con `static mut CONTADOR`?"
+  ej: m20/static-mut-ref
+  opciones: ["Compila porque está en unsafe", "Error: creating a shared reference to mutable static (static_mut_refs es deny en 2024)", "E0499", "Un aviso"]
+  correcta: 1
+  solucion: |
+    En la edición 2024 el lint `static_mut_refs` es un error por defecto. Sugiere `&raw const CONTADOR`. Mejor aún, cambia el `static mut` por un `AtomicU32`.
+  etiquetas: ["static mut", "edición 2024"]
+
+- id: m20-25860
+  titulo: "El agujero de 2015"
+  mundo: 20-unsafe-y-ub
+  tema: soundness
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Sobre el issue #25860 en Rust 1.99.1, ¿qué es cierto?"
+  opciones: ["Está cerrado del todo", "La forma simple (puntero a función normal) se rechaza, pero una variante de orden superior sigue compilando", "Solo afecta a código con unsafe", "Aparece a menudo en código normal"]
+  correcta: 1
+  solucion: |
+    Comprobado con rustc 1.99.1: la forma simple da «lifetime may not live long enough»; una variante con un puntero a función de orden superior compila y permite un uso tras liberar en código seguro. Requiere una combinación rebuscada de tipos que no aparece en código normal.
+  etiquetas: ["#25860", "soundness"]
+
+- id: m20-forget-seguro
+  titulo: "Olvidar es seguro"
+  mundo: 20-unsafe-y-ub
+  tema: soundness
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Aparece `drop de a` en la salida?"
+  ej: m20/forget-seguro
+  opciones: ["Sí, al final", "No: `mem::forget(a)` impide su destructor, y es seguro", "No compila: forget es unsafe", "Sí, dos veces"]
+  correcta: 1
+  solucion: |
+    Salida real: `c = 42`, `drop de b`, `fin`. Desde la *leakpocalypse* (2015), filtrar memoria es seguro y ninguna API sound puede depender de que un destructor se ejecute.
+  etiquetas: ["mem::forget", "leakpocalypse"]
+
+- id: m20-rustbelt
+  titulo: "Una prueba, no un test"
+  mundo: 20-unsafe-y-ub
+  tema: soundness
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué demostró RustBelt (POPL 2018)?"
+  opciones: ["Que rustc no tiene bugs", "Que el sistema de tipos de un subconjunto realista de Rust, con bibliotecas con unsafe como Arc, Cell o Mutex, es sound", "Que unsafe debería eliminarse", "Que Miri encuentra todo el UB"]
+  correcta: 1
+  solucion: |
+    RustBelt es una prueba formal (en lógica de separación, con Iris) del **diseño**. Encontró un bug real (`MutexGuard` era `Sync` cuando no debía). No verifica la implementación del compilador, que puede tener agujeros como #25860.
+  etiquetas: ["RustBelt"]
+
+- id: m20-forbid
+  titulo: "Prohibido del todo"
+  mundo: 20-unsafe-y-ub
+  tema: auditoria
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m20/forbid-unsafe
+  opciones: ["Por `#![forbid(unsafe_code)]`: cualquier bloque unsafe es un error", "E0133", "Porque `&raw const` no existe", "E0499"]
+  correcta: 0
+  solucion: |
+    `error: usage of an unsafe block`, con la nota de que el nivel del lint se define en `#![forbid(unsafe_code)]`. A diferencia de `deny`, ningún `allow` posterior puede reactivarlo.
+  etiquetas: ["forbid", "unsafe_code"]
+
+- id: m20-safety-comentario
+  titulo: "Dónde va cada cosa"
+  mundo: 20-unsafe-y-ub
+  tema: auditoria
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Dónde se escribe por qué un bloque `unsafe` concreto es correcto?"
+  opciones: ["En la sección `# Safety` de la documentación", "En un comentario `// SAFETY:` justo encima del bloque", "En el `Cargo.toml`", "No se escribe"]
+  correcta: 1
+  solucion: |
+    `// SAFETY:` justifica un bloque (descarga la obligación). `# Safety` documenta, en una `unsafe fn`, qué debe cumplir quien la llama (declara la obligación). Clippy tiene `undocumented_unsafe_blocks` y `missing_safety_doc`.
+  etiquetas: ["SAFETY", "documentación"]
+
+- id: m20-geiger
+  titulo: "Contar no es auditar"
+  mundo: 20-unsafe-y-ub
+  tema: auditoria
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué herramienta compara tu `Cargo.lock` con los avisos de seguridad publicados para crates?"
+  opciones: ["cargo geiger", "cargo audit", "cargo fmt", "cargo expand"]
+  correcta: 1
+  solucion: |
+    `cargo audit` usa la base de datos RustSec (vulnerabilidades, crates unsound, sin mantenimiento). `cargo geiger` solo cuenta cuánto unsafe hay en cada dependencia: dice dónde mirar, no si hay un problema.
+  etiquetas: ["cargo audit", "RustSec"]
+
+- id: m20-build-rs
+  titulo: "Compilar es ejecutar"
+  mundo: 20-unsafe-y-ub
+  tema: auditoria
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué partes de una dependencia se ejecutan en tu máquina **al compilar** tu proyecto?"
+  opciones: ["Ninguna", "Su `build.rs` y sus macros procedurales", "Solo sus tests", "Solo su `main`"]
+  correcta: 1
+  solucion: |
+    Los scripts de compilación y las macros procedurales son programas que corren durante `cargo build`, con tus permisos. Por eso conviene revisar dependencias nuevas, fijar versiones y usar herramientas como `cargo vet`.
+  etiquetas: ["cadena de suministro", "build.rs"]
+
+- id: m20-write-vs-asignar
+  titulo: "Escribir en memoria vacía"
+  mundo: 20-unsafe-y-ub
+  tema: unsafe
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En el `push` de un vector propio, la casilla `ptr.add(len)` no está inicializada. ¿Por qué se usa `ptr.add(len).write(v)` y no `*ptr.add(len) = v`?"
+  opciones: ["Por rendimiento", "Porque `=` destruiría primero el valor «anterior», que no existe: con un `String` sería liberar un puntero basura", "Porque `*p = v` no compila", "Son equivalentes"]
+  correcta: 1
+  solucion: |
+    La asignación ejecuta el drop del valor viejo. `write` escribe sin leer ni destruir. Para tipos sin destructor (como `i32`) daría igual, pero un contenedor genérico debe ser correcto para todos.
+  etiquetas: ["ptr::write", "Vec"]
+
+- id: m20-pop-doble-drop
+  titulo: "Dos dueños"
+  mundo: 20-unsafe-y-ub
+  tema: unsafe
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En `pop`, ¿qué pasa si haces `ptr.add(len - 1).read()` sin decrementar `len`?"
+  opciones: ["Nada", "El valor devuelto y la casilla «viva» son dos dueños del mismo dato: al destruirse ambos, doble liberación", "Pánico", "No compila"]
+  correcta: 1
+  solucion: |
+    `read` copia los bits y deja el original «lógicamente movido». Si la casilla sigue dentro de `0..len`, el `Drop` del vector la destruirá otra vez. Hay que bajar `len` antes de `read`.
+  etiquetas: ["ptr::read", "doble liberación"]

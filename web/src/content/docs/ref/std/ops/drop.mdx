@@ -1,0 +1,59 @@
+---
+title: "Drop y drop"
+description: "El destructor: código que se ejecuta solo cuando un valor deja de existir. Y drop(x) para destruirlo antes."
+sidebar:
+  order: 3
+insignias: ["Desde 1.13", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::ops::Drop, std::mem::drop` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub trait Drop {
+    // ... y 2 métodos provistos (con implementación por defecto)
+}
+
+pub fn drop<T>(_x: T)
+```
+
+## Qué hace
+
+Cuando un valor sale de su ámbito, Rust lo **destruye**: llama a su `Drop::drop` (si lo tiene) y después destruye sus campos. Las variables se destruyen en **orden inverso** al que se crearon; los campos de un struct y los elementos de un `Vec`, en orden. Así funcionan `String`, `Vec`, `File` o `MutexGuard`: liberan su memoria, cierran o desbloquean solos (RAII).
+
+No puedes llamar a `valor.drop()` tú mismo ([E0040](/errores/e0040/)): usa la función `drop(valor)`, que se lleva la propiedad y lo destruye en ese momento.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/ops-drop" />
+
+**Salida:**
+
+```text
+fin del bloque
+  drop: b
+  drop: d
+fin de main (2 en el vector)
+  drop: v0
+  drop: v1
+  drop: c
+  drop: a
+```
+
+## Desde
+
+Rust 1.13 (estable).
+
+## Ver también
+
+- [mem::forget](/ref/std/mem/forget/)
+- [E0040](/errores/e0040/)
+- [E0184 (Copy + Drop)](/errores/e0184/)
+- [E0509](/errores/e0509/)
+
+## Aprende esto en
+
+- [Mundo 06 · Ownership](/curso/06-ownership/)
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

@@ -1,0 +1,123 @@
+---
+title: "Prestar"
+description: "Con &x una función usa tu valor sin quedárselo: la dueña sigue siendo la misma y nada se copia ni se libera."
+sidebar:
+  order: 1
+duracion: 10
+desde: "1.0"
+requiere: ["06-ownership/09-devolver-la-propiedad"]
+tarjetas:
+  - p: "¿Qué hace `&nombre`?"
+    r: "Crea una referencia: un préstamo compartido de `nombre`. Quien la recibe puede leer el valor, pero la dueña sigue siendo `nombre`."
+  - p: "Si una función recibe `s: &String`, ¿libera el texto al terminar?"
+    r: "No. Solo tenía un préstamo. Al terminar desaparece la referencia, no el `String`: lo liberará su dueña."
+  - p: "¿Cómo se llama crear una referencia en Rust?"
+    r: "Prestar (*borrow*). La referencia creada es un préstamo."
+  - p: "¿Por qué `fn longitud(s: String)` es mala idea si solo vas a leer?"
+    r: "Porque mueve el `String` dentro de la función: después de llamarla, el que llama ya no puede usarlo (E0382). Para leer basta con `&String` (o mejor `&str`)."
+---
+
+import { Ejecutar, NoCompila, Predice, Prestamos, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Vas a resolver el problema que dejó abierto el mundo 06: usar un valor en una función **sin perderlo**. La herramienta es el préstamo, y se escribe con un solo carácter: `&`.
+
+## Predice
+
+<NoCompila ej="m07/sin-prestar" explicacion={"Antes de leer el error: `longitud` recibe un `String`. ¿Qué le pasa a `nombre` cuando se lo pasas? Recuerda la lección [Mover a funciones](/curso/06-ownership/08-mover-a-funciones/)."} />
+
+## La idea
+
+`longitud(nombre)` **mueve** `nombre` a la función: la propiedad se va con ella y, al terminar `longitud`, el texto se libera. Por eso la línea siguiente ya no puede leer `nombre` (E0382).
+
+El arreglo cambia dos caracteres:
+
+```rust
+fn longitud(s: &String) -> usize { s.len() }   // recibe un préstamo
+let n = longitud(&nombre);                      // presta nombre
+```
+
+- `&nombre` crea una **referencia** a `nombre`. A esa acción se la llama **prestar** (*borrow*), y la referencia es un **préstamo**.
+- El tipo `&String` se lee «referencia a un `String`».
+- `nombre` **sigue siendo la dueña**. La función solo recibió permiso para leer.
+- Cuando `longitud` termina, desaparece la referencia, no el texto. Nadie libera nada, porque la dueña sigue viva.
+
+Como en la vida real: si prestas un libro, sigue siendo tuyo. Quien lo lee no puede regalarlo ni tirarlo, y te lo devuelve cuando termina.
+
+## Pruébalo
+
+<Predice
+  ej="m07/prestar-predice"
+  opciones={["`banana: 3 + 3 = 6`", "No compila: `palabra` se movió en la primera llamada", "`banana: 3 + 0 = 3`", "No compila: no se puede prestar dos veces"]}
+  correcta={0}
+  explicacion="`contar_a` recibe un préstamo: puede leer el texto, pero no se lo queda. Por eso se puede llamar dos veces y después seguir usando `palabra`."
+  porque={["", "Se movería si `contar_a` recibiera `String`. Recibe `&String`: es un préstamo.", "La primera llamada no consume nada: el texto sigue intacto para la segunda.", "Los préstamos compartidos se pueden repetir tantas veces como quieras."]}
+/>
+
+<Ejecutar ej="m07/prestar" />
+
+Así cambian los permisos. Fíjate en `r`: es una variable nueva cuyo valor es una referencia.
+
+<Prestamos lineas={[
+  { codigo: "let saludo = String::from(\"hola\");", permisos: { saludo: "R-O" } },
+  { codigo: "mostrar(&saludo);", permisos: { saludo: "R-O" }, nota: "El préstamo vive solo durante la llamada. Al volver, saludo lo tiene todo otra vez." },
+  { codigo: "let r = &saludo;", permisos: { saludo: "R--", r: "R-O", "*r": "R--" }, nota: "Mientras r esté viva, saludo no puede moverse (pierde O). *r es «lo que hay al otro lado de r»: solo se lee." },
+  { codigo: "println!(\"… {r} … {}\", r.len());", permisos: { saludo: "R-O" }, nota: "Último uso de r: el préstamo termina y saludo recupera la propiedad." }
+]} />
+
+La columna `*r` es nueva: no es la variable `r`, sino **lo que hay al otro lado** de la referencia. Que `*r` tenga solo `R` significa que a través de `r` se puede leer, pero no escribir ni mover.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Qué viaja a la función.** Con `fn longitud(s: String)`, a la función le llega la ficha entera del `String` (puntero, capacidad y longitud: 12 bytes en el navegador, 24 en un PC de 64 bits) y, con ella, la obligación de liberarlo. Con `fn longitud(s: &String)`, le llega **una sola dirección** (4 u 8 bytes): dónde está la ficha de `nombre`. Lo verás en la próxima lección.
+
+**Quién inserta el `drop`.** El compilador decide en qué punto se libera cada valor mirando quién es su dueño. Con la versión que mueve, el `drop` del texto queda **dentro** de `longitud`. Con la versión que presta, queda al final de `main`, porque la dueña es `nombre`. Una referencia nunca tiene `drop` propio: no posee nada.
+
+**Coste al ejecutar: cero.** El comprobador de préstamos trabaja al compilar. Ni la referencia lleva un contador ni hay nada que «devolver» al ejecutar: un préstamo, en el programa final, es una dirección y nada más.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Poner & en un lado y olvidarlo en el otro">
+
+El tipo del parámetro y el argumento tienen que coincidir:
+
+❌ `fn longitud(s: &String)` y llamar con `longitud(nombre)` → error E0308 (*mismatched types*): esperaba `&String` y le das un `String`.
+
+❌ `fn longitud(s: String)` y llamar con `longitud(&nombre)` → el mismo error al revés.
+
+✅ Si la función solo lee, el parámetro es una referencia **y** la llamada presta: `longitud(&nombre)`.
+
+El compilador te lo dice con un `help: consider borrowing here: &nombre`. Ese `help` sí suele ser buena idea.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Quieres una función `saludar` que imprima un nombre y que, después de llamarla, puedas seguir usando el nombre. ¿Qué firma eliges?"
+  opciones={["`fn saludar(n: String)`", "`fn saludar(n: &String)`", "`fn saludar(n: String) -> String`", "`fn saludar(&n: String)`"]}
+  correcta={1}
+  explicacion="Para leer basta con un préstamo. La tercera opción funciona (devolviendo el `String`), pero obliga a escribir `let n = saludar(n);` en cada llamada. La cuarta es un patrón, no una referencia, y no compila."
+  porque={["Mueve el nombre dentro de la función: después ya no podrías usarlo.", "", "Funciona, pero es la solución incómoda que los préstamos vienen a sustituir.", "`&n` a la izquierda del tipo es un patrón y no encaja con `String`: no compila."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una función recibe `s: &String`. Al llegar a su `}` final, ¿qué se libera?"
+  opciones={["El texto del heap", "Nada del `String`: solo desaparece la referencia", "La ficha del `String` en la pila de quien llamó", "Depende de si se usó `s`"]}
+  correcta={1}
+  explicacion="Una referencia no posee nada, así que el compilador no inserta ningún `drop` para el valor prestado. Lo liberará su dueña, cuando termine su ámbito."
+  porque={["El texto pertenece a la dueña, no a la función.", "", "La pila de quien llama no la toca la función llamada.", "Usar o no la referencia no cambia quién es la dueña."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuánto cuesta, al ejecutar, comprobar que un préstamo es válido?"
+  opciones={["Un contador por referencia", "Una comprobación en cada acceso", "Nada: se comprueba al compilar", "Lo mismo que copiar el valor"]}
+  correcta={2}
+  explicacion="El comprobador de préstamos (*borrow checker*) es parte del compilador. Si tu programa compila, no queda ninguna comprobación de préstamos para el momento de ejecutar."
+  porque={["Ese sería un modelo de recuento de referencias; los préstamos no lo usan.", "No hay comprobaciones ocultas: el programa final accede directamente a la dirección.", "", "Prestar copia solo una dirección, nunca el valor."]}
+/>

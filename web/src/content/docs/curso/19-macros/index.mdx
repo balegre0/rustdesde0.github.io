@@ -1,0 +1,28 @@
+---
+title: "Mundo 19 · Macros"
+description: "Código que escribe código: macro_rules!, higiene, recursión y macros procedurales."
+sidebar:
+  order: 0
+---
+
+Desde tu primer `println!` llevas usando macros sin escribir ninguna. En este mundo abres la caja: verás que una macro es un programa que **recibe trozos de código y devuelve más código**, y que el compilador la ejecuta *antes* de comprobar tipos y préstamos.
+
+Al terminar sabrás leer y escribir macros `macro_rules!` de verdad (con repeticiones, recursión y reglas internas), entenderás por qué no pisan tus variables (la **higiene**), sabrás qué hacen por dentro las macros de la biblioteca estándar, cómo funcionan las macros procedurales (`#[derive]`, atributos y macros tipo función) y, quizá lo más importante, **cuándo no usar una macro**.
+
+## Lo que vas a conseguir
+
+| # | Lección | Te llevas |
+|---|---|---|
+| 1 | [¿Qué es una macro?](./01-que-es-una-macro/) | Tokens, expansión y por qué `println!` no es una función |
+| 2 | [Tu primera `macro_rules!`](./02-macro-rules/) | Reglas, brazos y el orden en que se prueban |
+| 3 | [Fragmentos](./03-fragmentos/) | `expr`, `ident`, `ty`, `tt`…, `expr_2021` y el *follow-set* |
+| 4 | [Repeticiones](./04-repeticiones/) | `$(...),*`, `+`, `?` y tu propio `vec!` |
+| 5 | [Higiene y `$crate`](./05-higiene/) | Por qué la macro no ve tus variables (y sí tus funciones) |
+| 6 | [Recursión y *tt-munchers*](./06-recursion/) | Contar, masticar tokens y reglas internas `@` |
+| 7 | [Dónde vive una macro](./07-ambito-y-exportar/) | Ámbito textual, `use` de macros y `#[macro_export]` |
+| 8 | [Las macros de `std`](./08-macros-de-std/) | `format_args!`, `dbg!`, `assert!`, `matches!`, `cfg!`… |
+| 9 | [Macros procedurales](./09-macros-procedurales/) | `derive`, atributos, tipo función, `syn` y `quote` |
+| 10 | [Ver la expansión y cuándo no usar macros](./10-expandir-y-cuando-no/) | `cargo expand` y la regla «primero una función» |
+| 11 | [Jefe: genera un enum](./11-jefe/) | Todo junto en una macro que escribe un tipo entero |
+
+Requisitos: haber pasado por traits y genéricos (mundo 13) y closures (mundo 14). Las macros procedurales se explican como concepto: para compilarlas hace falta una crate aparte y el enlazador de tu sistema.

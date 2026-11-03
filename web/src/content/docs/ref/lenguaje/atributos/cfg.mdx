@@ -1,0 +1,45 @@
+---
+title: "#[cfg] y #[cfg_attr]"
+description: "Compilación condicional: incluye un elemento solo si se cumple una condición sobre la plataforma, el perfil o las features, o añade atributos solo en ese caso."
+sidebar:
+  order: 10
+insignias: ["Desde 1.0", "Compilación condicional"]
+---
+import { Ejecutar } from '~/components';
+
+`#[cfg(…)]` decide si un elemento **existe**. `#[cfg_attr(…)]` decide si se le **añaden** atributos.
+
+## Sinopsis
+
+```text
+#[cfg(predicado)]
+#[cfg_attr(predicado, atributo1, atributo2…)]
+
+predicado: unix | windows | test | debug_assertions | true | false
+         | target_os = "linux" | target_family = "wasm" | target_arch = "x86_64"
+         | target_pointer_width = "64" | target_endian = "little"
+         | target_feature = "avx2" | target_has_atomic = "64" | panic = "abort"
+         | feature = "x" | all(…) | any(…) | not(…)
+```
+
+## Qué hace
+
+- **`cfg`**: si el predicado es falso, el elemento se elimina **antes** de comprobar nombres y tipos, como si no estuviera escrito. Se aplica a elementos, campos, variantes, sentencias, expresiones de bloque y brazos de `match`.
+- **`cfg_attr`**: si el predicado es verdadero, se comporta como si escribieras los atributos de la lista. Muy usado con `derive` opcionales (`#[cfg_attr(feature = "serde", derive(Serialize))]`) y con `windows_subsystem`.
+- La macro **`cfg!(…)`** evalúa el mismo predicado como un `bool`, sin eliminar código.
+
+Desde 1.80, los nombres y valores de `cfg` se comprueban (`--check-cfg`): un nombre mal escrito da el aviso `unexpected_cfgs`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-cfg" />
+
+En el navegador (`wasm32`, punteros de 32 bits) `Dato` tiene `Debug`; compilado para tu PC (64 bits), no.
+
+## Desde
+
+Rust 1.0. `cfg(true)` y `cfg(false)`: 1.88.
+
+## Ver también
+
+[Perfiles y cfg](/curso/12-modulos-crates-y-cargo/08-perfiles-y-cfg/) · [Features](/curso/12-modulos-crates-y-cargo/07-features/)

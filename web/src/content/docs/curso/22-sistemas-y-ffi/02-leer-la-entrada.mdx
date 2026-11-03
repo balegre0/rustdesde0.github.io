@@ -1,0 +1,116 @@
+---
+title: "Leer la entrada"
+description: "Lee la entrada estándar línea a línea con `BufRead`, maneja los errores de lectura y escribe código que funcione igual con stdin, archivos o texto en memoria."
+sidebar:
+  order: 2
+duracion: 11
+desde: "1.0"
+requiere: ["22-sistemas-y-ffi/01-argumentos-y-entorno"]
+tarjetas:
+  - p: "¿Qué añade `BufRead` a `Read`?"
+    r: "Un buffer interno y métodos por líneas: `read_line`, `lines()`, `split`. `Read` solo sabe leer bytes en un array."
+  - p: "¿Por qué hacer `io::stdin().lock()`?"
+    r: "Porque stdin es compartido por todos los hilos y cada lectura sin bloquear toma y suelta un cerrojo. Con `lock()` lo tomas una vez y obtienes un `StdinLock`, que implementa `BufRead`."
+  - p: "¿Qué tipo tiene cada elemento de `stdin.lock().lines()`?"
+    r: "`io::Result<String>`: cada línea puede fallar al leerse (por ejemplo, si no es UTF-8 válido)."
+  - p: "¿Para qué sirve `std::io::Cursor`?"
+    r: "Para envolver datos en memoria (`&str`, `Vec<u8>`) y que implementen `Read`/`BufRead`/`Seek`; ideal para probar funciones que leen."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Casi todas las herramientas de terminal leen texto de la **entrada estándar** (*stdin*): lo que escribes en el teclado o lo que otro programa les pasa por una tubería (`|`). Aquí aprendes la forma idiomática de leerla en Rust.
+
+## Predice
+
+<Pregunta
+  pregunta="El programa de abajo suma las líneas numéricas de la entrada y avisa por stderr de las que no lo son. Con la entrada `10`, `20`, `treinta`, ` -5 ` (una por línea), ¿qué imprime al final?"
+  opciones={["`total = 25 (1 línea(s) ignorada(s))`", "`total = 30 (0 línea(s) ignorada(s))`", "Un pánico en `treinta`", "`total = 25 (0 línea(s) ignorada(s))`"]}
+  correcta={0}
+  explicacion="`trim()` quita los espacios de ` -5 `, que se convierte en `-5`. `treinta` falla al convertirse y se cuenta como ignorada. 10 + 20 − 5 = 25."
+  porque={["", "`-5` sí cuenta: `trim()` le quita los espacios.", "El `match` sobre `parse` maneja el error sin pánico.", "`treinta` no se convierte: es una línea ignorada."]}
+/>
+
+## La idea
+
+`std::io::stdin()` te da un manejador de la entrada estándar. Hay dos formas de leer:
+
+- **Una línea cada vez**: `stdin.read_line(&mut s)` **añade** la línea (con su `\n`) al `String` que le pasas y devuelve cuántos bytes leyó; 0 significa fin de la entrada.
+- **Todas las líneas con un iterador**: `stdin.lock().lines()` da `io::Result<String>` por línea, ya sin el `\n`.
+
+`lock()` merece una explicación. La entrada estándar es **una** para todo el proceso y puede usarse desde varios hilos, así que está protegida por un cerrojo (*mutex*). Si lees sin bloquear, cada lectura toma y suelta el cerrojo. Con `lock()` lo tomas una vez y obtienes un `StdinLock`, que implementa el trait **`BufRead`**: lectura con buffer y por líneas.
+
+La clave de diseño: escribe tus funciones para que reciban **`impl BufRead`** en vez de `Stdin`. Así funcionan igual con la entrada estándar, con un archivo (`BufReader::new(File::open(...)?)`) o con texto en memoria (`Cursor::new("…")`), que es lo que usarás en los tests.
+
+## Pruébalo
+
+La entrada de este ejemplo ya está preparada. En el navegador puedes cambiarla; en tu PC, prueba `echo 1 2 3 | cargo run` o escribe líneas y termina con Ctrl+Z (Windows) o Ctrl+D (Linux/macOS).
+
+<Ejecutar ej="m22/suma-lineas" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Tres capas.** `Read` es el trait mínimo: `fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>`, «llena este array con lo que tengas y dime cuántos bytes». Una llamada a `read` sobre stdin suele ser una **llamada al sistema** (*syscall*), que es cara. `BufReader` (y el `StdinLock`, que ya lleva uno dentro) añade un buffer: pide al sistema muchos bytes de golpe y te los va dando. `BufRead` es el trait que expone ese buffer: `fill_buf`, `consume`, y encima de ellos `read_line` y `lines`.
+
+**UTF-8.** `lines()` y `read_line` producen `String`, así que exigen UTF-8 válido: si llega un byte inválido, esa línea es un `Err` con `ErrorKind::InvalidData`. Para datos binarios usa `read_until(b'\n', &mut vec)` o `split(b'\n')`, que dan `Vec<u8>`.
+
+**En el navegador**, la entrada es un buffer que la plataforma le pasa al programa WebAssembly; por eso los ejemplos que leen tienen su entrada preparada. Antes de leer de forma interactiva hay que vaciar la salida con `print!` + `io::stdout().flush()`, porque la salida estándar también tiene buffer.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Reutilizar el String de `read_line` sin vaciarlo">
+
+❌
+
+```rust
+let mut linea = String::new();
+for _ in 0..3 {
+    std::io::stdin().read_line(&mut linea).unwrap();
+    println!("leí: {linea:?}");
+}
+```
+
+`read_line` **añade** al final; en la segunda vuelta `linea` contiene la primera línea **y** la segunda.
+
+✅ Llama a `linea.clear()` al principio de cada vuelta, o usa `lines()`, que te da un `String` nuevo por línea y ya sin el `\n`.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m22/contar-palabras"
+  enunciado="Completa `contar` para que devuelva `(líneas, palabras)` de cualquier `impl BufRead`. El `main` le pasa un `Cursor` con texto en memoria, que se comporta igual que stdin. Salida esperada: `3 líneas, 5 palabras` (la línea vacía también cuenta como línea)."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué devuelve `read_line` cuando la entrada ya ha terminado?"
+  opciones={["`Err(...)`", "`Ok(0)`", "Un `String` vacío como valor de retorno", "Se queda esperando para siempre"]}
+  correcta={1}
+  explicacion="Devuelve cuántos bytes leyó; 0 bytes significa fin de la entrada (*EOF*). Es la condición típica para salir de un bucle de lectura."
+  porque={["El fin de la entrada no es un error.", "", "El texto se añade al `String` que le pasas; el retorno es un `usize`.", "Si la entrada terminó, vuelve enseguida con 0."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué conviene que una función reciba `impl BufRead` en vez de `std::io::Stdin`?"
+  opciones={[
+    "Porque `Stdin` no se puede pasar a funciones",
+    "Porque así sirve con stdin, archivos y texto en memoria, y se puede probar con `Cursor` sin teclado",
+    "Porque es más rápido",
+    "Porque `Stdin` no implementa `Read`"
+  ]}
+  correcta={1}
+  explicacion="Programar contra el trait separa *qué* haces con los datos de *de dónde* vienen. Es lo que hace testeable una herramienta de terminal."
+  porque={["Sí se puede, pero ataría la función a una sola fuente.", "", "El rendimiento es el mismo: los genéricos se monomorfizan.", "`Stdin` sí implementa `Read`."]}
+/>
+
+## Para saber más
+
+- Documentación de `std::io`: https://doc.rust-lang.org/std/io/index.html
+- La lección siguiente: [Escribir la salida](/curso/22-sistemas-y-ffi/03-escribir-la-salida/).

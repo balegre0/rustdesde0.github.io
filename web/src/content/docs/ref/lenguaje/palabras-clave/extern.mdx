@@ -1,0 +1,75 @@
+---
+title: "extern"
+description: "Palabra clave estricta: ABI de funciones, bloques de declaraciones externas y extern crate."
+sidebar:
+  order: 12
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`extern` tiene que ver con hablar con código **de fuera** de Rust (o de fuera del crate): convenciones de llamada, declaraciones de funciones ajenas y enlace con otros crates.
+
+## Sinopsis
+
+```text
+extern "ABI" fn f(…) { … }           // función Rust con otra convención de llamada
+extern "ABI" fn(T) -> U              // tipo puntero a función con esa ABI
+unsafe extern "ABI" {                // bloque de declaraciones externas (2024: con unsafe)
+    safe fn g(x: i32) -> i32;
+    unsafe fn h(p: *const u8);
+    static VALOR: i32;
+}
+extern crate nombre;
+```
+
+## Qué hace
+
+### Uso 1 · ABI de una función
+
+La **ABI** (*application binary interface*) es el acuerdo sobre cómo se pasan argumentos y resultados entre funciones compiladas. La de Rust (`"Rust"`) no es estable; `extern "C" fn` usa la convención estándar de la plataforma, la que entiende casi cualquier otro código compilado. Otras: `"system"`, `"C-unwind"` (permite que un pánico cruce la frontera), `"efiapi"`… `extern fn` sin cadena significa `"C"`.
+
+### Uso 2 · Bloques `unsafe extern`
+
+Declaran funciones y `static` que se definen **fuera** (en una biblioteca enlazada). El compilador no puede comprobar que las firmas sean ciertas; por eso, desde la edición 2024, el bloque se escribe `unsafe extern`: al escribirlo prometes que las declaraciones son correctas. Dentro, cada elemento se marca:
+
+- `safe fn` / `safe static`: se puede usar sin `unsafe`;
+- `unsafe fn` (o sin marca): llamarla exige un bloque `unsafe`.
+
+### Uso 3 · `extern crate`
+
+Ver [`crate`](/ref/lenguaje/palabras-clave/crate/).
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-extern" />
+
+Salida:
+
+```text
+15
+21
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-extern-error" />
+
+En la edición 2024: `error: extern blocks must be unsafe`, con la ayuda de añadir `unsafe` delante.
+
+## Seguridad
+
+Una declaración externa equivocada (tipos de parámetros distintos de los reales, ABI incorrecta) es **comportamiento indefinido** al llamarla. Marcar una función como `safe fn` es una promesa tuya de que **cualquier** llamada con argumentos válidos es segura. Ver [Comportamiento indefinido](/ref/ub/).
+
+## Desde
+
+Rust 1.0. `unsafe extern` y los calificadores `safe`/`unsafe` dentro del bloque: 1.82; obligatorio en la edición 2024. ABI `"C-unwind"`: 1.71.
+
+## Ver también
+
+- [`unsafe`](/ref/lenguaje/palabras-clave/unsafe/) · [`safe`](/ref/lenguaje/palabras-clave/safe/) · [`fn`](/ref/lenguaje/palabras-clave/fn/) · [Atributos](/ref/lenguaje/atributos/): `link`, `no_mangle`, `export_name`.
+
+## Aprende esto en
+
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)

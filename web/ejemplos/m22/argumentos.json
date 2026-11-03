@@ -1,0 +1,1 @@
+{ "nota": "En el navegador el programa se lanza sin argumentos y sin variables de entorno. En tu PC prueba: cargo run -- Ana" }

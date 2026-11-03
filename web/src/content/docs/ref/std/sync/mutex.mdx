@@ -1,0 +1,110 @@
+---
+title: "Mutex<T>"
+description: "Exclusión mutua: protege un valor para que solo un hilo cada vez pueda usarlo."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::sync::Mutex`
+
+## Sinopsis
+
+```rust
+pub struct Mutex<T: ?Sized> { /* private fields */ }
+```
+
+## Qué hace
+
+Un `Mutex<T>` **contiene** el dato que protege: no se puede tocar sin bloquearlo. `lock()` espera hasta conseguir el cerrojo y devuelve un **guard** (`MutexGuard`) que se comporta como `&mut T`. Cuando el guard se destruye (al final del bloque o con `drop`), el cerrojo se libera solo: es imposible olvidarse de desbloquear.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`new`](#new) | Crea un `Mutex` con el valor dentro. | 1.0 |
+| [`lock`](#lock) | Espera y bloquea. | 1.0 |
+| [`try_lock`](#try_lock) | Intenta bloquear sin esperar; falla si otro lo tiene. | 1.0 |
+| [`into_inner`](#into_inner) | Consume el `Mutex` y devuelve el valor. | 1.6 |
+| [`get_mut`](#get_mut) | Con `&mut Mutex` no hace falta bloquear: da `&mut T` directamente. | 1.6 |
+
+### `new`
+
+```rust
+pub const fn new(t: T) -> Mutex<T>
+```
+
+Crea un `Mutex` con el valor dentro.
+
+### `lock`
+
+```rust
+pub fn lock(&self) -> LockResult<MutexGuard<'_, T>>
+```
+
+Espera y bloquea. Devuelve `Err` si está envenenado (otro hilo entró en pánico con él bloqueado).
+
+### `try_lock`
+
+```rust
+pub fn try_lock(&self) -> TryLockResult<MutexGuard<'_, T>>
+```
+
+Intenta bloquear sin esperar; falla si otro lo tiene.
+
+### `into_inner`
+
+```rust
+pub fn into_inner(self) -> LockResult<T>
+where
+    T: Sized,
+```
+
+Consume el `Mutex` y devuelve el valor.
+
+### `get_mut`
+
+```rust
+pub fn get_mut(&mut self) -> LockResult<&mut T>
+```
+
+Con `&mut Mutex` no hace falta bloquear: da `&mut T` directamente.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/sync-mutex" />
+
+**Salida:**
+
+```text
+11
+true
+11
+```
+
+<Ejecutar ej="ref-std/sync-mutex-hilos" />
+
+Este ejemplo crea **hilos**, y el navegador no puede ejecutarlos: el botón lo envía al Playground de Rust (play.rust-lang.org). Aquí se ha comprobado que compila; su salida no se reproduce en esta página porque solo la da una ejecución real.
+
+## Pánicos
+
+Llamar a `lock()` dos veces seguidas en el **mismo hilo** sin soltar el primer guard no es comportamiento indefinido, pero puede quedarse esperando para siempre o entrar en pánico (depende del sistema).
+
+## Errores
+
+`lock` devuelve `Err(PoisonError)` si el cerrojo quedó envenenado; el error todavía permite recuperar el guard con `into_inner()` si decides que el dato sigue siendo válido.
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `into_inner` (1.6), `get_mut` (1.6).
+
+## Ver también
+
+- [RwLock](/ref/std/sync/rwlock/)
+- [Arc](/ref/std/sync/arc/)
+- [RefCell (un solo hilo)](/ref/std/cell/refcell/)
+
+## Aprende esto en
+
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

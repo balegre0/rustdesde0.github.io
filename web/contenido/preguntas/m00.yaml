@@ -1,0 +1,328 @@
+# Banco de preguntas del mundo 00 — El taller (CONTENIDO.md §7.1).
+# Mensajes de error del enlazador capturados en esta máquina (Windows 11, rustc 1.99.1, sin Build Tools).
+
+- id: m00-ruta-relativa
+  titulo: "Subir una carpeta"
+  mundo: 00-el-taller
+  tema: taller
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Estás en `C:\\dev\\hola`. ¿Qué ruta relativa lleva a `C:\\dev\\otro\\src\\main.rs`?"
+  opciones: ["`..\\otro\\src\\main.rs`", "`otro\\src\\main.rs`", "`\\otro\\src\\main.rs`", "`.\\otro\\src\\main.rs`"]
+  correcta: 0
+  solucion: |
+    `..` sube a `C:\dev`; desde ahí, `otro\src\main.rs`. Empezar por `\` sería la raíz de la unidad; `.` es la carpeta actual.
+  etiquetas: ["rutas"]
+
+- id: m00-absoluta
+  titulo: "Absoluta o relativa"
+  mundo: 00-el-taller
+  tema: taller
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál de estas rutas es absoluta?"
+  opciones: ["`C:\\Users\\ana\\rust\\hola`", "`src\\main.rs`", "`..\\hola`", "`.\\Cargo.toml`"]
+  correcta: 0
+  solucion: |
+    Una ruta absoluta empieza en la unidad. Las demás dependen de la carpeta donde estés.
+  etiquetas: ["rutas"]
+
+- id: m00-partes-ruta
+  titulo: "Las piezas de una ruta"
+  mundo: 00-el-taller
+  tema: taller
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la línea de la extensión?"
+  ej: m00/partes-de-una-ruta
+  opciones: ["`extensión: Some(\"rs\")`", "`extensión: \".rs\"`", "`extensión: Some(\"main.rs\")`", "`extensión: None`"]
+  correcta: 0
+  solucion: |
+    `Path::extension` devuelve lo que hay después del último punto, sin el punto, envuelto en `Option` (un archivo puede no tener extensión).
+  etiquetas: ["Path"]
+
+- id: m00-onedrive
+  titulo: "Dónde guardar proyectos"
+  mundo: 00-el-taller
+  tema: taller
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Por qué no conviene guardar proyectos de Rust en una carpeta sincronizada con OneDrive?"
+  opciones:
+    - "Porque la sincronización intenta subir y bloquea los miles de archivos que Cargo crea en `target`, y la compilación falla o va muy lenta"
+    - "Porque Rust no funciona en Windows"
+    - "Porque OneDrive borra los `.rs`"
+    - "No hay ningún problema"
+  correcta: 0
+  solucion: |
+    Usa una carpeta corta y local, como `C:\dev`.
+  etiquetas: ["OneDrive", "target"]
+
+- id: m00-cd
+  titulo: "Moverse en la terminal"
+  mundo: 00-el-taller
+  tema: terminal
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Qué orden de PowerShell muestra la carpeta en la que estás? (Solo la orden.)"
+  respuestas: ["pwd", "Get-Location", "get-location"]
+  solucion: |
+    `pwd` (alias de `Get-Location`). `ls` lista el contenido y `cd` cambia de carpeta.
+  etiquetas: ["terminal"]
+
+- id: m00-rustc-no-reconocido
+  titulo: "rustc no se reconoce"
+  mundo: 00-el-taller
+  tema: instalacion
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Acabas de instalar Rust y `rustc --version` dice que «rustc» no se reconoce como un comando. ¿Qué es lo más probable?"
+  opciones:
+    - "La terminal se abrió antes de instalar y no conoce el PATH nuevo: ciérrala y abre otra"
+    - "Rust no se instaló"
+    - "Hay que reiniciar el PC dos veces"
+    - "Falta el enlazador"
+  correcta: 0
+  solucion: |
+    El instalador añade `%USERPROFILE%\.cargo\bin` al PATH, pero las terminales ya abiertas no se enteran.
+  etiquetas: ["PATH", "rustup"]
+
+- id: m00-herramientas
+  titulo: "¿Quién hace qué?"
+  mundo: 00-el-taller
+  tema: instalacion
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué herramienta instala y actualiza las versiones de Rust?"
+  opciones: ["`rustup`", "`cargo`", "`rustc`", "`rustfmt`"]
+  correcta: 0
+  solucion: |
+    `rustup` gestiona toolchains y componentes; `rustc` es el compilador; `cargo` gestiona proyectos; `rustfmt` da formato.
+  etiquetas: ["rustup"]
+
+- id: m00-link-exe
+  titulo: "La trampa de link.exe"
+  mundo: 00-el-taller
+  tema: instalacion
+  dificultad: media
+  tipo: opcion
+  enunciado: "`cargo check` funciona, pero `cargo run` dice ``linker `link.exe` not found``. ¿Qué haces?"
+  opciones:
+    - "Instalar las Build Tools de Visual Studio con «Desarrollo para el escritorio con C++»"
+    - "Revisar el código: tiene un error"
+    - "Instalar otro editor"
+    - "Reinstalar Rust"
+  correcta: 0
+  solucion: |
+    `check` no enlaza, así que tu código está bien. Lo que falta es el enlazador de Microsoft, que viene con las Build Tools. El propio error lo dice: «VS Code is a different product, and is not sufficient».
+  etiquetas: ["link.exe", "Build Tools"]
+
+- id: m00-git-bash-link
+  titulo: "missing operand"
+  mundo: 00-el-taller
+  tema: instalacion
+  dificultad: media
+  tipo: opcion
+  enunciado: "Compilas desde Git Bash y aparece `link: missing operand after '\\377\\376'`. ¿Qué ha pasado?"
+  opciones:
+    - "Git Bash tiene su propio `link.exe`, que no es el enlazador. Compila desde PowerShell (y con las Build Tools instaladas)"
+    - "El archivo está corrupto"
+    - "Falta una dependencia en `Cargo.toml`"
+    - "Es un error de Rust"
+  correcta: 0
+  solucion: |
+    Rust busca un programa llamado `link.exe` y encuentra el de las herramientas de Git, que crea enlaces entre archivos y no entiende nada de lo que le pasa.
+  etiquetas: ["Git Bash", "link.exe"]
+
+- id: m00-check-vs-build
+  titulo: "La orden más rápida"
+  mundo: 00-el-taller
+  tema: cargo
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Solo quieres saber si tu código compila. ¿Qué orden es la más rápida?"
+  opciones: ["`cargo check`", "`cargo build`", "`cargo run`", "`cargo build --release`"]
+  correcta: 0
+  solucion: |
+    `check` hace todo el análisis (tipos, préstamos) pero no genera código ni enlaza.
+  etiquetas: ["cargo check"]
+
+- id: m00-release
+  titulo: "Dos perfiles"
+  mundo: 00-el-taller
+  tema: cargo
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa compilado con `cargo build --release`?"
+  ej: m00/perfil
+  opciones:
+    - "`Compilado en modo release: optimizado para ir rápido.`"
+    - "`Compilado en modo debug: rápido de compilar, con comprobaciones extra.`"
+    - "Las dos líneas"
+    - "Nada"
+  correcta: 0
+  solucion: |
+    En release, `debug_assertions` está desactivado y `cfg!(debug_assertions)` vale `false`. El ejemplo tiene los dos perfiles para comprobarlo.
+  etiquetas: ["perfiles", "cfg!"]
+
+- id: m00-target
+  titulo: "La carpeta target"
+  mundo: 00-el-taller
+  tema: cargo
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Dónde deja Cargo el ejecutable de `cargo build` (sin `--release`) de un proyecto `hola`?"
+  opciones: ["`target\\debug\\hola.exe`", "`target\\release\\hola.exe`", "`src\\hola.exe`", "`hola.exe`, en la raíz"]
+  correcta: 0
+  solucion: |
+    Cada perfil tiene su subcarpeta en `target`. La carpeta se puede borrar (`cargo clean`): se regenera al compilar.
+  etiquetas: ["target"]
+
+- id: m00-sin-cargo-toml
+  titulo: "could not find Cargo.toml"
+  mundo: 00-el-taller
+  tema: cargo
+  dificultad: facil
+  tipo: opcion
+  enunciado: "`cargo run` dice «could not find `Cargo.toml` in `C:\\dev` or any parent directory». ¿Qué pasa?"
+  opciones:
+    - "Estás en `C:\\dev` y no dentro de la carpeta del proyecto: haz `cd` al proyecto"
+    - "Hay que crear `Cargo.toml` a mano"
+    - "Falta el enlazador"
+    - "El proyecto está roto"
+  correcta: 0
+  solucion: |
+    Cargo busca `Cargo.toml` en la carpeta actual y en las de arriba, nunca en las de abajo.
+  etiquetas: ["Cargo.toml"]
+
+- id: m00-printn
+  titulo: "Una errata"
+  mundo: 00-el-taller
+  tema: cargo
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué te dice el compilador?"
+  ej: m00/printn
+  opciones:
+    - "Que no encuentra la macro `printn` y sugiere `println`"
+    - "Que falta un punto y coma"
+    - "Que falta el enlazador"
+    - "Nada: imprime el texto"
+  correcta: 0
+  solucion: |
+    `error: cannot find macro printn in this scope`, con la ayuda de un nombre parecido. Leer el `help:` resuelve muchos errores.
+  etiquetas: ["errores", "macros"]
+
+- id: m00-edition
+  titulo: "La edición"
+  mundo: 00-el-taller
+  tema: cargo
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué indica `edition = \"2024\"` en `Cargo.toml`?"
+  opciones:
+    - "El conjunto de reglas del lenguaje que usa el paquete; paquetes de ediciones distintas se pueden usar entre sí"
+    - "El año en que se creó el proyecto"
+    - "La versión de Cargo"
+    - "La versión del paquete"
+  correcta: 0
+  solucion: |
+    Hay cuatro ediciones: 2015, 2018, 2021 y 2024. `cargo new` usa la más reciente.
+  etiquetas: ["edición", "Cargo.toml"]
+
+- id: m00-cargo-add
+  titulo: "Añadir una dependencia"
+  mundo: 00-el-taller
+  tema: cargo
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Qué orden de Cargo añade la biblioteca `rand` a tu proyecto? (La orden completa.)"
+  respuestas: ["cargo add rand"]
+  solucion: |
+    `cargo add rand` escribe la línea en `[dependencies]` con la última versión compatible.
+  etiquetas: ["cargo add"]
+
+- id: m00-cargo-lock
+  titulo: "Cargo.lock"
+  mundo: 00-el-taller
+  tema: cargo
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Para qué sirve `Cargo.lock`?"
+  opciones:
+    - "Guarda las versiones exactas elegidas de cada dependencia, para que la compilación sea reproducible"
+    - "Bloquea el proyecto para que nadie lo edite"
+    - "Guarda la contraseña de crates.io"
+    - "Lista los archivos del proyecto"
+  correcta: 0
+  solucion: |
+    No se edita a mano. En un programa, se guarda en Git.
+  etiquetas: ["Cargo.lock"]
+
+- id: m00-rust-analyzer
+  titulo: "rust-analyzer no hace nada"
+  mundo: 00-el-taller
+  tema: editor
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Arrastras `main.rs` a VS Code y rust-analyzer no muestra tipos ni errores. ¿Qué es lo más probable?"
+  opciones:
+    - "Que abriste un archivo suelto y no la carpeta del proyecto (con su `Cargo.toml`)"
+    - "Que el código está perfecto"
+    - "Que falta el enlazador"
+    - "Que VS Code no admite Rust"
+  correcta: 0
+  solucion: |
+    rust-analyzer necesita ver el proyecto entero. Usa *Archivo → Abrir carpeta…*.
+  etiquetas: ["rust-analyzer", "VS Code"]
+
+- id: m00-git-orden
+  titulo: "Guardar una foto"
+  mundo: 00-el-taller
+  tema: git
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿En qué orden se guarda un cambio con Git?"
+  opciones:
+    - "`git add .` y después `git commit -m \"mensaje\"`"
+    - "`git commit` y después `git add`"
+    - "Solo `git status`"
+    - "`git log` y después `git commit`"
+  correcta: 0
+  solucion: |
+    `add` prepara los cambios y `commit` guarda la foto. `status` y `diff` sirven para mirar antes; `log`, para ver la historia.
+  etiquetas: ["git"]
+
+- id: m00-gitignore
+  titulo: "target no se guarda"
+  mundo: 00-el-taller
+  tema: git
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Por qué `git status` no muestra la carpeta `target`?"
+  opciones:
+    - "Porque el `.gitignore` que crea `cargo new` la excluye: son archivos generados"
+    - "Porque está vacía"
+    - "Porque Git no ve carpetas"
+    - "Porque está oculta"
+  correcta: 0
+  solucion: |
+    Guardar lo que se puede regenerar solo ocupa espacio y crea conflictos.
+  etiquetas: ["git", ".gitignore"]
+
+- id: m00-ia
+  titulo: "Aprender con IA"
+  mundo: 00-el-taller
+  tema: aprender
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Llevas un rato con un error de préstamos que no entiendes. ¿Qué uso de un asistente de IA te ayuda más a **aprender**?"
+  opciones:
+    - "Pedirle que te explique el error y qué regla protege, sin darte el código arreglado"
+    - "Pedirle el código arreglado y copiarlo"
+    - "Pedirle que reescriba todo el programa"
+    - "No leer el error y preguntar «¿por qué no compila?»"
+  correcta: 0
+  solucion: |
+    Lo que construyes con esfuerzo se queda. Entender la regla te sirve para ese error y para los cien siguientes.
+  etiquetas: ["aprender", "IA"]

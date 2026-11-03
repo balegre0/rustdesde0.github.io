@@ -1,0 +1,109 @@
+---
+title: "Sobrecarga de operadores"
+description: "Haz que +, *, -, += y [] funcionen con tus propios tipos implementando los traits de std::ops."
+sidebar:
+  order: 10
+duracion: 12
+desde: "1.0"
+requiere: ["13-traits-y-genericos/09-conversiones"]
+tarjetas:
+  - p: "¿Qué hace el compilador con `a + b`?"
+    r: "Lo convierte en `Add::add(a, b)`. Si el tipo de `a` implementa `Add` para el tipo de `b`, funciona; si no, E0369."
+  - p: "¿Qué significa `type Output` en `Add`?"
+    r: "El tipo del resultado de la suma. Normalmente es el mismo (`V2 + V2 = V2`), pero no tiene por qué."
+  - p: "¿Cómo haces que `v * 2.0` funcione con `v: V2`?"
+    r: "Con `impl Mul<f64> for V2`: el parámetro genérico de `Mul` es el tipo del lado derecho (por defecto, `Self`)."
+  - p: "¿Qué trait corresponde a `v[i]` y qué devuelve?"
+    r: "`Index`. Su método `index(&self, i)` devuelve una referencia `&Self::Output`; el compilador añade el `*`: `v[i]` es `*v.index(i)`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a sumar vectores con `+`, escalarlos con `*` y leer sus componentes con `[]`, como si fueran números de la biblioteca estándar.
+
+## Predice
+
+<Predice
+  ej="m13/suma-vectores"
+  opciones={["`V2 { x: 12, y: 24 }`", "`V2 { x: 11, y: 22 }`", "No compila: `a` se usa después de moverse", "No compila: no se pueden encadenar dos `+`"]}
+  correcta={0}
+  explicacion="`a + b + a` es `(a + b) + a` = (11, 22) + (1, 2) = (12, 24). Y `a` se puede usar dos veces porque `V2` es `Copy`: `add(self, …)` recibe una copia."
+  porque={["Correcto.", "Esa es solo la primera suma; falta `+ a`.", "`V2` deriva `Copy`, así que pasar `a` por valor lo copia.", "`+` devuelve otro `V2`, que se puede volver a sumar."]}
+/>
+
+## La idea
+
+En Rust los operadores **son traits**. Cuando escribes `a + b`, el compilador lo traduce a `Add::add(a, b)`, y lo mismo pasa con casi todos:
+
+| Escribes | Se convierte en | Trait (`std::ops`) |
+|---|---|---|
+| `a + b`, `a - b`, `a * b`, `a / b`, `a % b` | `a.add(b)`… | `Add`, `Sub`, `Mul`, `Div`, `Rem` |
+| `-a`, `!a` | `a.neg()`, `a.not()` | `Neg`, `Not` |
+| `a += b` (y `-=`, `*=`…) | `a.add_assign(b)` | `AddAssign`, `SubAssign`… |
+| `a & b`, `a \| b`, `a ^ b`, `a << b`, `a >> b` | `a.bitand(b)`… | `BitAnd`, `BitOr`, `BitXor`, `Shl`, `Shr` |
+| `v[i]` | `*v.index(i)` | `Index` (e `IndexMut` para escribir) |
+| `a == b`, `a < b` | `a.eq(&b)`, `a.lt(&b)` | `PartialEq`, `PartialOrd` (en `std::cmp`) |
+
+Así que para que `+` funcione con tu tipo basta con implementar `Add`. El trait tiene un **parámetro genérico** para el lado derecho, `Add<Rhs = Self>` (por defecto, el mismo tipo), y un **tipo asociado** para el resultado, `type Output`. Por eso puedes implementar `Mul<f64> for V2` (vector por número) además de, si quisieras, `Mul<V2> for V2`.
+
+Una regla de buen diseño: usa operadores solo cuando el significado sea obvio (sumar vectores, multiplicar matrices, concatenar). Si hay que pensar qué hace `a * b`, es mejor un método con nombre.
+
+## Pruébalo
+
+<Ejecutar ej="m13/operadores" />
+
+La última línea, `a[2]`, termina en pánico a propósito: el `Index` que escribiste decide qué pasa con un índice no válido, igual que hace un `Vec`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`add(self, otro)` recibe los dos operandos **por valor**: los mueve. Con tipos `Copy` (como `V2` aquí) no lo notas, porque se copian. Con tipos que poseen memoria del heap, `a + b` consume `a` y `b`. Por eso la biblioteca estándar implementa `Add<&str> for String`: `s + "texto"` consume `s` (y reutiliza su buffer) pero solo **presta** el `&str`. Si quieres que tus tipos grandes se sumen sin moverse, puedes implementar `Add` para referencias: `impl Add<&Matriz> for &Matriz`.
+
+`Index::index` devuelve una **referencia**, `&Self::Output`, y el compilador le pone el `*` delante. Esto es lo que permite que `v[0]` sea un *lugar* (*place expression*): puedes tomar `&v[0]`, o asignar `v[0] = 5` si implementas también `IndexMut`.
+
+Y no hay magia en el rendimiento: `a + b` con tu `impl Add` es una llamada normal a una función concreta, que el optimizador suele insertar. El resultado es el mismo código que si sumaras los campos a mano.
+
+Lo que **no** se puede sobrecargar: `=`, `&&`, `||`, `?` y el `.` de los métodos. `&&` y `||` no pueden ser traits porque no siempre evalúan el lado derecho.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m13/sin-add"
+  explicacion="`+` necesita que `Dinero` implemente `Add` (E0369). Derivar `Debug` no basta: `derive` no genera operadores aritméticos. Fíjate en que el error enseña la firma del trait en la biblioteca estándar, `Add<Rhs = Self>`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m13/reto-dinero"
+  enunciado="Implementa `Add` para `Dinero` y `Display` para que `Dinero { centimos: 425 }` se muestre como `4.25 €` (pista: `centimos / 100`, `centimos % 100` y el formato `{:02}`). Descomenta las líneas de `main`: deben salir `4.25 €` y `4.30 €`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Quieres que `precio * 3` funcione con `precio: Dinero` y `3: i64`. ¿Qué implementas?"
+  opciones={["`impl Mul<i64> for Dinero`", "`impl Mul for i64`", "`impl Mul<Dinero> for i64`", "`impl Multiplicar for Dinero`"]}
+  correcta={0}
+  explicacion="El tipo del **lado izquierdo** implementa el trait; el del **derecho** es el parámetro genérico."
+  porque={["Correcto.", "Eso sería `i64 * i64`, que ya existe (y la regla huérfana no te dejaría).", "Eso haría funcionar `3 * precio`, no `precio * 3`.", "El trait se llama `Mul` y está en `std::ops`."]}
+/>
+
+<Pregunta
+  pregunta="`let s = a + b;` con `a` y `b` de tipo `Matriz` (no `Copy`). ¿Puedes usar `a` después?"
+  opciones={["No: `add(self, …)` movió `a`", "Sí: los operadores siempre prestan", "Sí, porque `+` hace un `clone` automático", "Depende de si `s` se usa"]}
+  correcta={0}
+  explicacion="Los operadores aritméticos reciben por valor. Para no mover, implementa `Add` para `&Matriz` y suma `&a + &b`."
+  porque={["Correcto.", "Los de comparación (`==`, `<`) prestan; los aritméticos, no.", "Rust nunca clona sin que lo pidas.", "Mover ocurre en la suma, se use o no el resultado."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `v[i]` se puede usar en `&v[i]`, si `index` ya devuelve una referencia?"
+  opciones={["Porque `v[i]` es `*v.index(i)`: el compilador desreferencia, y `&` vuelve a tomar la referencia", "Porque `&v[i]` es una referencia a una referencia", "Porque `Index` copia el elemento", "No se puede: hay que escribir `v.index(i)`"]}
+  correcta={0}
+  explicacion="Gracias al `*` implícito, `v[i]` es un lugar (el elemento), y puedes prestarlo, leerlo o, con `IndexMut`, escribirlo."
+  porque={["Correcto.", "El `*` implícito evita la doble referencia.", "No se copia nada: se presta.", "`&v[i]` es la forma normal de prestar un elemento."]}
+/>

@@ -1,0 +1,1 @@
+{ "plataforma": "local", "flags": "--crate-type lib -C panic=abort", "nota": "Biblioteca no_std; se comprueba con rustc --crate-type lib." }

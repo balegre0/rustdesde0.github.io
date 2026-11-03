@@ -1,0 +1,97 @@
+---
+title: "std::sync::mpsc"
+description: "Canales para pasar mensajes entre hilos: varios emisores (Sender) y un receptor (Receiver)."
+sidebar:
+  order: 5
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::sync::mpsc`
+
+## Sinopsis
+
+```rust
+pub fn channel<T>() -> (Sender<T>, Receiver<T>)
+
+pub struct Sender<T> { /* private fields */ }
+
+pub struct Receiver<T> { /* private fields */ }
+```
+
+## Qué hace
+
+`mpsc::channel()` crea un **canal** (*multiple producer, single consumer*) y devuelve la pareja `(Sender<T>, Receiver<T>)`. Lo que envías con `send` **se mueve** al canal: el hilo que envía deja de tenerlo, así que no puede haber carreras sobre ese dato. El `Sender` se puede clonar para tener varios emisores. Cuando todos los `Sender` se destruyen, el receptor recibe `Err` y su iterador termina.
+
+`mpsc::sync_channel(n)` crea un canal con capacidad limitada: `send` espera si ya hay `n` mensajes sin recoger.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`send`](#send) | Envía un valor (lo mueve al canal). | 1.0 |
+| [`recv`](#recv) | Espera al siguiente mensaje. | 1.0 |
+| [`try_recv`](#try_recv) | Recoge un mensaje si lo hay, sin esperar. | 1.0 |
+| [`iter`](#iter) | Iterador que espera mensajes hasta que se cierra el canal. | 1.0 |
+
+### `send`
+
+```rust
+pub fn send(&self, t: T) -> Result<(), SendError<T>>
+```
+
+Envía un valor (lo mueve al canal). Devuelve `Err` si el receptor ya no existe.
+
+### `recv`
+
+```rust
+pub fn recv(&self) -> Result<T, RecvError>
+```
+
+Espera al siguiente mensaje. `Err` si no quedan emisores y el canal está vacío.
+
+### `try_recv`
+
+```rust
+pub fn try_recv(&self) -> Result<T, TryRecvError>
+```
+
+Recoge un mensaje si lo hay, sin esperar.
+
+### `iter`
+
+```rust
+pub fn iter(&self) -> Iter<'_, T>
+```
+
+Iterador que espera mensajes hasta que se cierra el canal.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/sync-mpsc" />
+
+**Salida:**
+
+```text
+Ok("hola")
+Ok("adiós")
+Err(Empty)
+Err(RecvError)
+```
+
+<Ejecutar ej="ref-std/sync-mpsc-hilos" />
+
+Este ejemplo crea **hilos**, y el navegador no puede ejecutarlos: el botón lo envía al Playground de Rust (play.rust-lang.org). Aquí se ha comprobado que compila; su salida no se reproduce en esta página porque solo la da una ejecución real.
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [thread::spawn](/ref/std/thread/spawn/)
+- [Mutex](/ref/std/sync/mutex/)
+
+## Aprende esto en
+
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

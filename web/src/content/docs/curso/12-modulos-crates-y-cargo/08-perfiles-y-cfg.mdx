@@ -1,0 +1,86 @@
+---
+title: "Perfiles y cfg"
+description: "Los perfiles de Cargo ajustan cómo se compila (optimización, comprobaciones, símbolos) y cfg permite compilar distinto según la plataforma de destino."
+sidebar:
+  order: 8
+duracion: 11
+desde: "1.0"
+requiere: ["12-modulos-crates-y-cargo/07-features"]
+tarjetas:
+  - p: "¿Qué perfiles trae Cargo por defecto?"
+    r: "`dev` (para `cargo build`/`run`), `release` (`--release`), `test` y `bench`. Se configuran en `[profile.<nombre>]` de `Cargo.toml`."
+  - p: "¿Qué controla `opt-level`?"
+    r: "El nivel de optimización: 0 (nada, por defecto en dev) a 3 (máximo, por defecto en release), y `\"s\"`/`\"z\"` para optimizar tamaño."
+  - p: "¿Qué es el *target* de una compilación?"
+    r: "La plataforma para la que se genera el programa: procesador, sistema operativo y ABI. Por ejemplo `x86_64-pc-windows-msvc` o `wasm32-wasip1`."
+  - p: "¿Cómo compilas código solo para Windows?"
+    r: "Con `#[cfg(target_os = \"windows\")]` o `cfg!(target_os = \"windows\")`."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+Un mismo código puede compilarse de muchas formas: rápido para probar, optimizado para publicar, para Windows o para un microcontrolador. Cargo y `cfg` te dejan controlar todo eso desde el proyecto.
+
+## Perfiles
+
+En el mundo 00 viste `dev` y `release`. Cada perfil es un conjunto de opciones que se puede ajustar en `Cargo.toml`:
+
+```toml
+[profile.dev]
+opt-level = 1            # un poco de optimización también al depurar
+
+[profile.release]
+lto = "thin"             # optimizar entre crates al enlazar
+codegen-units = 1        # más lento de compilar, algo más rápido al ejecutar
+panic = "abort"          # sin desenrollado de pila: binario más pequeño
+strip = true             # sin símbolos de depuración
+
+[profile.dev.package."*"]
+opt-level = 2            # optimizar las DEPENDENCIAS incluso en dev
+```
+
+Las opciones más útiles:
+
+| Opción | Qué hace | dev | release |
+|---|---|---|---|
+| `opt-level` | nivel de optimización (0–3, `"s"`, `"z"`) | 0 | 3 |
+| `debug` | información de depuración | sí | no |
+| `overflow-checks` | pánico al desbordar enteros | sí | no |
+| `debug-assertions` | activa `debug_assert!` y `cfg(debug_assertions)` | sí | no |
+| `lto` | optimización entre crates al enlazar | no | no |
+| `panic` | `"unwind"` o `"abort"` | unwind | unwind |
+
+La última línea del ejemplo es un truco muy usado: tu código se compila rápido (sin optimizar), pero las dependencias, que no cambias, se optimizan una vez y van rápidas.
+
+## cfg: compilar según el destino
+
+El **target** es la plataforma para la que se genera el programa. Tu PC compila para `x86_64-pc-windows-msvc`; los ejemplos de este curso se compilan para `wasm32-wasip1`. El código puede preguntar por él:
+
+<Ejecutar ej="m12/cfg-plataforma" />
+
+Las condiciones más habituales: `target_os` (`"windows"`, `"linux"`, `"macos"`…), `target_family` (`"unix"`, `"windows"`, `"wasm"`), `target_arch` (`"x86_64"`, `"aarch64"`, `"wasm32"`…), `target_pointer_width` (`"32"`, `"64"`), `debug_assertions`, `test` y `feature`. Se combinan con `all(…)`, `any(…)` y `not(…)`:
+
+```rust
+#[cfg(all(target_os = "windows", target_pointer_width = "64"))]
+fn ruta_por_defecto() -> &'static str { r"C:\dev" }
+```
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`cfg` actúa antes que casi todo.** El compilador elimina los elementos con un `#[cfg]` falso justo después de leer el código, antes de resolver nombres o comprobar tipos. Por eso el código de otra plataforma puede usar funciones que en la tuya no existen: ni se mira.
+
+**Compilar para otro target.** `rustup target add wasm32-wasip1` instala la biblioteca estándar para ese destino y `cargo build --target wasm32-wasip1` compila para él. Así se generan los ejemplos de este curso. Para targets sin sistema operativo (microcontroladores) se usa `#![no_std]` (mundos 22 y 23).
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En el perfil `release` por defecto, ¿qué pasa si un `u8` vale 255 y le sumas 1?"
+  opciones={["Pánico", "Da la vuelta y vale 0", "No compila", "Vale 256"]}
+  correcta={1}
+  explicacion="En release, `overflow-checks` está desactivado: la suma da la vuelta (aritmética modular). En dev daría un pánico. Si quieres el mismo comportamiento en los dos, usa `wrapping_add`, `checked_add`… (mundo 03)."
+  porque={["Eso pasa en dev.", "", "Si el valor no se conoce al compilar, compila.", "Un `u8` no puede valer 256."]}
+/>

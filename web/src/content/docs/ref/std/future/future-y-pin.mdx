@@ -1,0 +1,41 @@
+---
+title: "Future, Poll y pin!"
+description: "El trait Future, el resultado de cada sondeo (Poll) y cómo fijar un futuro en memoria con pin! para poder sondearlo."
+sidebar:
+  order: 1
+insignias: ["Desde 1.36", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::future::Future`, `std::task::{Poll, Context, Waker}`, `std::pin::{Pin, pin}`
+
+## Sinopsis
+
+```rust
+pub trait Future {
+    type Output;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
+}
+pub enum Poll<T> { Ready(T), Pending }
+macro_rules! pin { ($valor:expr $(,)?) => { … } } // -> Pin<&mut T>
+```
+
+## Qué hace
+
+Una función `async` devuelve un **futuro**: un valor que representa un cálculo que todavía no se ha hecho. No avanza solo: alguien (un **ejecutor**) tiene que llamar a `poll`. Cada llamada devuelve `Poll::Ready(valor)` si terminó o `Poll::Pending` si tiene que esperar; en ese caso, el futuro guarda el `Waker` de `cx` para avisar cuando pueda seguir.
+
+`poll` recibe `Pin<&mut Self>`: el futuro no se puede **mover** mientras se sondea, porque puede contener referencias a sus propios campos. `pin!` fija un valor en la pila y devuelve un `Pin<&mut T>` sin `unsafe`.
+
+## Ejemplo
+
+Un ejecutor mínimo que sondea una vez:
+
+<Ejecutar ej="ref-std/future-pin" />
+
+## Desde
+
+`Future` y `Poll`: Rust 1.36. `pin!`: 1.68. `Wake`: 1.51.
+
+## Ver también
+
+[Mundo 18 · Async](/curso/18-async/) · [Embassy](/curso/23-embebido-y-tu-so/05-embassy/)

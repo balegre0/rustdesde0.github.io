@@ -1,0 +1,117 @@
+---
+title: "Visibilidad y rutas"
+description: "Espacios de nombres, rutas, use, preludios y las reglas de privacidad de Rust."
+sidebar:
+  order: 122
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Cada cosa con nombre vive en un **módulo**. Una **ruta** (*path*) dice cómo llegar a ella, y la **visibilidad** decide desde dónde se puede llegar.
+
+## En una frase
+
+Todo es **privado** por defecto: lo ve su módulo y los descendientes de su módulo. `pub` (con sus variantes) lo abre; `use` crea atajos; las rutas empiezan en el crate (`crate::`), en el módulo actual (`self::`), en el padre (`super::`) o en otro crate.
+
+## Espacios de nombres
+
+Un mismo nombre puede significar cosas distintas según el **espacio de nombres**:
+
+- **tipos**: módulos, structs, enums, unions, traits, alias, parámetros de tipo;
+- **valores**: funciones, constantes, `static`, variables, constructores de structs tupla y unidad;
+- **macros**;
+- **tiempos de vida** y **etiquetas** de bucle.
+
+Por eso puedes tener un `struct Punto` y una función `fn Punto()`… aunque no deberías. Un struct tupla vive en ambos: es un tipo y su constructor es una función.
+
+## Rutas
+
+| Forma | Significado |
+|---|---|
+| `a::b::c` | relativa: `a` es algo en ámbito (un elemento local, un `use`, un crate) |
+| `crate::a` | desde la raíz del crate actual |
+| `self::a` | desde el módulo actual |
+| `super::a` | desde el módulo padre (se puede repetir) |
+| `::nombre_crate::a` | desde un crate externo (nunca un elemento local) |
+| `$crate::a` | en una macro: desde el crate que la define |
+| `<T as Trait>::elemento` | ruta calificada: el elemento del trait implementado por `T` |
+| `<T>::elemento` | un elemento asociado de `T`, sea inherente o de trait |
+| `Vec::<u8>::new()`, `x.parse::<i32>()` | *turbofish*: argumentos genéricos dentro de una expresión |
+
+En expresiones, los argumentos genéricos van tras `::<…>` porque `<` sería ambiguo con «menor que».
+
+## `use`
+
+`use ruta;` crea un nombre local. Formas: `use a::b;`, `use a::{b, c::d};`, `use a::b as c;`, `use a::*;`, `use a::{self, b};`, `use a::Trait as _;`, `pub use` (reexportar). Ver [`use`](/ref/lenguaje/palabras-clave/use/).
+
+Los nombres importados con `*` tienen **menos prioridad**: si un nombre se declara o importa explícitamente, tapa al del glob. Si dos globs traen el mismo nombre y lo usas, el compilador da un error de ambigüedad.
+
+## Preludios
+
+Nombres que están en ámbito sin `use`:
+
+- **prelude de la biblioteca estándar**, según la edición: `Option`, `Some`, `None`, `Result`, `Ok`, `Err`, `Vec`, `String`, `Box`, `ToString`, `Clone`, `Copy`, `Iterator`, `IntoIterator`, `Drop`, `Fn*`… En 2021 se añadieron `TryFrom`, `TryInto` y `FromIterator`; en 2024, `Future` e `IntoFuture`. Desde 1.80 también `size_of`, `size_of_val`, `align_of` y `align_of_val`.
+- **prelude externo**: los crates que pasa Cargo (y `core`/`std`).
+- **prelude del lenguaje**: los tipos primitivos (`u8`, `bool`, `str`…).
+- **prelude de herramientas**: `rustfmt`, `clippy`, `diagnostic`… para atributos.
+- **prelude de `macro_use`**: macros importadas con `#[macro_use] extern crate`.
+
+Los nombres locales tapan a los del prelude.
+
+## Visibilidad
+
+| Escritura | Visible en |
+|---|---|
+| (nada) | el módulo actual y sus descendientes |
+| `pub` | donde se vea el módulo que lo contiene |
+| `pub(crate)` | todo el crate |
+| `pub(super)` | el módulo padre (y sus descendientes) |
+| `pub(self)` | el módulo actual (= sin nada) |
+| `pub(in ruta)` | la ruta indicada, que debe ser un antepasado |
+
+Reglas:
+
+- Un elemento privado es visible para su módulo **y para todos los módulos hijos**: los hijos ven lo privado de sus antepasados, no al revés.
+- Para usar algo hace falta poder ver **cada** tramo de la ruta.
+- Las variantes de un `enum` público y los elementos de un `trait` público son públicos.
+- Los campos se marcan **uno a uno**.
+- Los avisos `private_interfaces` y `private_bounds` señalan APIs públicas que mencionan tipos privados.
+
+## Resolución de métodos
+
+En `x.metodo()`, el compilador prueba, en orden, el tipo de `x`, luego `&x` y `&mut x`, y después desreferencia (`*x`) y repite. En cada paso, los métodos **inherentes** (de `impl Tipo`) tienen prioridad sobre los de traits. Para que un método de un trait se pueda usar, el trait tiene que estar **en ámbito**.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/visibilidad-rutas" />
+
+Salida:
+
+```text
+a::publica
+b::para_el_crate
+b::para_a
+a::privada
+Saludo::hola Otro::hola
+42 true
+7
+```
+
+## Errores típicos
+
+<NoCompila ej="ref-lenguaje/visibilidad-error" />
+
+`error[E0603]: function solo_para_a is private`: `pub(super)` dentro de `a::b` abre el elemento para `a`, pero no para la raíz.
+
+## Desde
+
+Rust 1.0. `pub(restringido)`: 1.18. Rutas de la edición 2018 (`crate::`, sin `extern crate`): 1.30/1.31. Renombrar `self` en importaciones (`use a::{self as b}`): 1.95.
+
+## Ver también
+
+- [`pub`](/ref/lenguaje/palabras-clave/pub/) · [`use`](/ref/lenguaje/palabras-clave/use/) · [`mod`](/ref/lenguaje/palabras-clave/mod/) · [`crate`](/ref/lenguaje/palabras-clave/crate/) · [`self`](/ref/lenguaje/palabras-clave/self/) · [`super`](/ref/lenguaje/palabras-clave/super/) · [Ediciones](/ref/ediciones/)
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

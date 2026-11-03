@@ -1,0 +1,148 @@
+---
+title: "Recursión"
+description: "Escribe funciones que se llaman a sí mismas, con su caso base y su caso recursivo, y entiende qué cuesta cada llamada."
+sidebar:
+  order: 5
+duracion: 11
+desde: "1.0"
+requiere: ["05-funciones-y-la-pila/04-sentencias-y-expresiones"]
+tarjetas:
+  - p: "¿Qué dos partes necesita toda función recursiva?"
+    r: "Un caso base (se responde sin llamarse otra vez) y un caso recursivo (se llama con un problema más pequeño que acerca al caso base)."
+  - p: "¿Qué pasa si una recursión no tiene caso base?"
+    r: "Se llama sin fin hasta agotar la pila (desbordamiento de pila, *stack overflow*). El compilador avisa: «function cannot return without recursing»."
+  - p: "¿Por qué `fib(n)` recursivo ingenuo es lento?"
+    r: "Cada llamada hace dos más: el número de llamadas crece exponencialmente (fib(25) hace 242 785 llamadas)."
+  - p: "¿Qué ocurre con `factorial(21)` en un `u64` en modo debug?"
+    r: "Pánico: «attempt to multiply with overflow». 21! no cabe en 64 bits."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir funciones que **se llaman a sí mismas** para resolver un problema a base de resolver versiones más pequeñas de él.
+
+## Predice
+
+<Predice
+  ej="m05/recursion"
+  pregunta="Fíjate en `cuenta_atras(3)`. ¿En qué orden salen las líneas «vuelvo de...»?"
+  opciones={[
+    "`vuelvo de cuenta_atras(2)`, luego `(1)`, luego `(0)`",
+    "`vuelvo de cuenta_atras(0)`, luego `(1)`, luego `(2)`",
+    "No sale ninguna: después de `return` el programa termina",
+    "Salen intercaladas con los números: `3...`, `vuelvo...`, `2...`"
+  ]}
+  correcta={1}
+  explicacion="Cada llamada imprime su número, se llama a sí misma y ESPERA a que la llamada interior termine. La más profunda (con 0) termina primero; luego vuelven las demás en orden inverso, como una pila de platos."
+  porque={[
+    "La primera en terminar es la más profunda, no la primera en empezar.",
+    "",
+    "`return` sale solo de la llamada actual; las de fuera siguen esperando para continuar.",
+    "El «vuelvo» de cada llamada se imprime DESPUÉS de que la llamada interior haya terminado del todo."
+  ]}
+/>
+
+## La idea
+
+Una función es **recursiva** cuando se llama a sí misma. Suena a trampa, pero es una forma muy natural de pensar algunos problemas. Por ejemplo, el factorial: 5! = 5 × 4 × 3 × 2 × 1, que es lo mismo que **5 × 4!**. Si sabes calcular el factorial de 4, sabes el de 5.
+
+Toda recursión necesita dos piezas. El **caso base**: una entrada tan sencilla que se responde directamente (0! = 1). Y el **caso recursivo**: la función se llama con un problema **más pequeño**, que la acerca al caso base (n! = n × (n − 1)!). Si falta el caso base, o el caso recursivo no se acerca a él, la función se llamaría para siempre.
+
+Cada llamada es una llamada de verdad, con su propio espacio en la pila (lo verás en la siguiente lección). Las llamadas que esperan se van **apilando**, y se resuelven en orden inverso: la última en empezar es la primera en terminar.
+
+## Pruébalo
+
+<Ejecutar ej="m05/recursion" />
+
+1. `factorial(0)` es el caso base y devuelve 1 directamente.
+2. `factorial(20)` hace 21 llamadas apiladas antes de empezar a multiplicar de vuelta: 2 432 902 008 176 640 000.
+3. `cuenta_atras` muestra el viaje de ida (los números) y el de vuelta (los «vuelvo de...»).
+
+Pero cuidado con el coste. Esta versión de Fibonacci se llama **dos veces** por llamada:
+
+<Ejecutar ej="m05/fibonacci" />
+
+Para `fib(25)` hacen falta 242 785 llamadas, porque se recalculan los mismos valores una y otra vez. Una recursión elegante no siempre es una recursión eficiente; en el problema de este mundo escribirás una versión con un bucle.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Cada llamada ocupa pila.** Una llamada recursiva no es «volver al principio»: es una llamada nueva, con un marco nuevo, sus propios parámetros y su dirección de retorno. Si la recursión es muy profunda, la pila se llena. La pila del hilo principal tiene un tamaño fijo, decidido cuando arranca el programa (en el navegador, la pila de tus programas ocupa 1 MiB, como verás en la lección siguiente).
+
+**Recursión sin caso base.** Si escribes `fn bajar(n: u64) -> u64 { 1 + bajar(n + 1) }`, el compilador lo detecta y avisa:
+
+```text
+warning: function cannot return without recursing
+  |
+2 | fn bajar(n: u64) -> u64 {
+  | ^^^^^^^^^^^^^^^^^^^^^^^ cannot return without recursing
+3 |     1 + bajar(n + 1)
+  |         ------------ recursive call site
+```
+
+Si aun así lo ejecutas en el navegador, se detiene con «RangeError: Maximum call stack size exceeded» (se superó el tamaño máximo de la pila de llamadas). En un PC, el programa también se detiene por **desbordamiento de pila** (*stack overflow*): al final de la pila hay una zona de memoria protegida, y tocarla detiene el programa en vez de dejarle pisar otra memoria.
+
+**El desbordamiento numérico tampoco se escapa.** 21! no cabe en un `u64`:
+
+<Ejecutar ej="m05/factorial-desborda" />
+
+En modo debug, la multiplicación se comprueba y el programa entra en pánico: «attempt to multiply with overflow» (intento de multiplicar con desbordamiento), como viste en el mundo 03.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="El caso recursivo que no se acerca">
+
+❌ Aquí hay caso base, pero `n + 1` se **aleja** de él: con `n = 3` nunca se llega a 0.
+
+```rust
+fn suma_hasta(n: u32) -> u32 {
+    if n == 0 { 0 } else { n + suma_hasta(n + 1) }
+}
+```
+
+✅ Cada llamada debe hacer el problema **más pequeño**: `n + suma_hasta(n - 1)`.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m05/potencia"
+  enunciado="Escribe `potencia(base, exp)` de forma **recursiva**: cualquier número elevado a 0 vale 1, y `b^e = b × b^(e−1)`. Debe imprimir `2^10 = 1024`, `3^4 = 81` y `7^0 = 1`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántas veces se llama a `factorial` en total al calcular `factorial(4)` con la versión de la lección?"
+  opciones={["4", "5", "1", "24"]}
+  correcta={1}
+  explicacion="factorial(4) → factorial(3) → factorial(2) → factorial(1) → factorial(0). Cinco llamadas: la de 0 es el caso base."
+  porque={[
+    "Te dejas la llamada del caso base, `factorial(0)`.",
+    "",
+    "Cada llamada recursiva es una llamada más.",
+    "24 es el resultado, no el número de llamadas."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Qué le falta a `fn f(n: u32) -> u32 { n + f(n - 1) }`?"
+  opciones={[
+    "Un tipo de retorno",
+    "Un caso base: nunca deja de llamarse",
+    "Un `return`",
+    "Nada, es correcta"
+  ]}
+  correcta={1}
+  explicacion="Sin caso base se llama sin fin: f(2) → f(1) → f(0) → f(0 − 1)... que en un `u32` es un desbordamiento (pánico en debug). El compilador avisa: «function cannot return without recursing»."
+  porque={[
+    "Ya tiene `-> u32`.",
+    "",
+    "`return` no arregla nada: la última expresión ya es el valor.",
+    "Nunca termina por un camino normal."
+  ]}
+/>

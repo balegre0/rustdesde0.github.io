@@ -1,0 +1,111 @@
+---
+title: "Tu primera macro_rules!"
+description: "Escribe macros con varias reglas y aprende en qué orden las prueba el compilador."
+sidebar:
+  order: 2
+duracion: 12
+desde: "1.0"
+requiere: ["19-macros/01-que-es-una-macro"]
+tarjetas:
+  - p: "¿Qué forma tiene cada regla de macro_rules!?"
+    r: "(patrón) => { plantilla }; el patrón se llama matcher y la plantilla, transcriber."
+  - p: "Si varias reglas encajan, ¿cuál se usa?"
+    r: "La primera que encaje, en el orden en que están escritas."
+  - p: "¿Qué error da invocar una macro con tokens que ninguna regla acepta?"
+    r: "«no rules expected …», señalando el token que sobra."
+  - p: "¿Qué delimitadores puede usar una invocación?"
+    r: "Paréntesis (), corchetes [] o llaves {}: los tres valen."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir tus propias macros con `macro_rules!` (*macros by example*, «macros por ejemplo») y a entender cómo elige el compilador qué regla aplicar.
+
+## Predice
+
+<Predice
+  ej="m19/brazos-orden"
+  opciones={["el literal cero / otro literal / una expresión", "el literal cero / el literal cero / una expresión", "otro literal / otro literal / una expresión", "una expresión / una expresión / una expresión"]}
+  correcta={0}
+  explicacion="Las reglas se prueban de arriba abajo y gana la primera que encaja. `0` encaja con la primera; `7` no, pero sí con `$x:literal`; `3 + 4` no es un literal, así que llega a `$x:expr`."
+  porque={["Correcto.", "La primera regla exige exactamente el token `0`; `7` es otro token.", "`0` encaja ya con la primera regla, que va antes.", "Una expresión también lo es `0`, pero las reglas anteriores ganan por orden."]}
+/>
+
+## La idea
+
+Una macro declarativa se define con `macro_rules!`, un nombre y una lista de **reglas** (*rules*), también llamadas brazos, separadas por `;`:
+
+```rust
+macro_rules! nombre {
+    (patrón 1) => { código generado 1 };
+    (patrón 2) => { código generado 2 };
+}
+```
+
+El **patrón** (*matcher*) describe qué tokens acepta la regla. Puede contener tokens literales, que deben aparecer tal cual (como el `0` de antes), y **metavariables** (*metavariables*) como `$nombre:expr`, que capturan un trozo de código de una clase concreta (aquí, una expresión). La **plantilla** (*transcriber*) es el código que se genera; dentro de ella, `$nombre` se sustituye por lo capturado.
+
+El compilador prueba las reglas **en orden** y usa la primera que encaja. Si ninguna encaja, es un error de compilación.
+
+## Pruébalo
+
+<Ejecutar ej="m19/hola-macro" />
+
+1. La primera regla no acepta nada: `saluda!()`.
+2. La segunda captura una expresión cualquiera: un literal, un `String::from(...)`, lo que sea.
+3. Los tres delimitadores `()`, `[]` y `{}` valen para invocar. Por costumbre se usan `()` para lo que parece una llamada, `[]` para colecciones (`vec![...]`) y `{}` para bloques de definiciones.
+
+## Bajo el capó
+
+<BajoElCapo>
+Así queda `main` después de la expansión (salida real de `-Zunpretty=expanded`, Rust 1.99.1):
+
+```rust
+fn main() {
+    { ::std::io::_print(format_args!("¡Hola, mundo!\n")); };
+    { ::std::io::_print(format_args!("¡Hola, {0}!\n", "Lucía")); };
+    {
+        ::std::io::_print(format_args!("¡Hola, {0}!\n",
+                String::from("Íñigo")));
+    };
+    { ::std::io::_print(format_args!("¡Hola, {0}!\n", "Mar")); }
+}
+```
+
+No queda rastro de `saluda!`: cada invocación se reemplazó por el código de su regla, y luego `println!` se expandió a su vez. El programa que se comprueba y se compila es este.
+
+Cómo se emparejan las reglas: el compilador recorre los tokens de la invocación y los del patrón a la vez. Un token literal tiene que coincidir exactamente. Una metavariable invoca al analizador sintáctico de Rust para leer un trozo de la clase pedida (una expresión, un tipo…). **No hay vuelta atrás dentro de una regla**: si el analizador empieza a leer una expresión y falla a mitad, la macro entera da error en lugar de probar la regla siguiente. Por eso conviene poner primero las reglas más específicas.
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m19/sin-brazo" explicacion={"Ninguna regla acepta dos argumentos. El compilador intentó la regla de `$nombre:expr`, leyó `\"Ana\"` y se encontró una coma que no esperaba. La solución es añadir una regla para dos expresiones."} />
+
+## Tu turno
+
+<Reto ej="m19/reto-maximo" enunciado="Añade una segunda regla para que `max!(a, b)` devuelva el mayor de los dos. Descomenta las dos líneas de `main`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="En `($x:expr) => { $x + 1 }`, ¿qué parte es el *transcriber*?"
+  opciones={["`($x:expr)`", "`$x:expr`", "`{ $x + 1 }`", "`=>`"]}
+  correcta={2}
+  explicacion="El transcriber (plantilla) es lo que va a la derecha de `=>`: el código que se genera."
+  porque={["Eso es el patrón (matcher).", "Eso es una metavariable con su fragmento, dentro del patrón.", "Correcto.", "La flecha solo separa patrón y plantilla."]}
+/>
+
+<Pregunta
+  pregunta="Tienes las reglas `($x:expr) => {...}` y luego `(0) => {...}`. ¿Qué pasa con `m!(0)`?"
+  opciones={["Se usa la regla `(0)` porque es más específica", "Se usa la regla `$x:expr`, porque va primero y `0` es una expresión", "Error: dos reglas encajan", "Se usan las dos"]}
+  correcta={1}
+  explicacion="No hay «la más específica»: gana la primera regla que encaja. La regla `(0)` nunca se usará. Pon siempre las reglas concretas antes que las generales."
+  porque={["macro_rules! no compara especificidad, solo orden.", "Correcto.", "Que varias encajen no es un error; se coge la primera.", "Solo se aplica una regla por invocación."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué significa el error «no rules expected `,`»?"
+  opciones={["Que la coma está prohibida en Rust", "Que ninguna regla de la macro acepta una coma en esa posición", "Que te falta un punto y coma", "Que la macro no existe"]}
+  correcta={1}
+  explicacion="El compilador probó las reglas y en todas se encontró con un token que no esperaba. Señala ese token."
+  porque={["Las comas son normales; lo que pasa es que el patrón no las prevé.", "Correcto.", "No tiene que ver con el `;` de la sentencia.", "Si no existiera, el error sería «cannot find macro»."]}
+/>

@@ -1,0 +1,51 @@
+---
+title: "Instant y Duration"
+description: "Medir cuánto tarda algo con Instant::now y elapsed, y operar con cantidades de tiempo con Duration."
+sidebar:
+  order: 1
+insignias: ["Desde 1.8", "std (Duration en core)"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::time::Instant`, `std::time::Duration`
+
+## Sinopsis
+
+```rust
+impl Instant {
+    pub fn now() -> Instant;
+    pub fn elapsed(&self) -> Duration;
+    pub fn duration_since(&self, antes: Instant) -> Duration;
+}
+impl Duration {
+    pub const fn from_secs(s: u64) -> Duration;      // también from_millis, from_micros, from_nanos
+    pub const fn as_secs(&self) -> u64;              // y as_millis, as_secs_f64…
+    pub const fn subsec_millis(&self) -> u32;
+    pub fn checked_sub(self, otra: Duration) -> Option<Duration>;
+}
+```
+
+## Qué hace
+
+- **`Instant`** es un momento de un reloj **monótono**: nunca va hacia atrás, aunque cambie la hora del sistema. Solo sirve para medir intervalos.
+- **`Duration`** es una cantidad de tiempo (segundos y nanosegundos), siempre positiva. Admite `+`, `-`, `*` y `/` por enteros; `-` entra en pánico si el resultado fuera negativo, por eso existe `checked_sub`.
+- Para la hora «de reloj» (fecha), `SystemTime`, que sí puede saltar hacia atrás.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/time-instant" />
+
+Los tiempos medidos cambian en cada ejecución, así que el ejemplo imprime una comparación en lugar del tiempo.
+
+## Errores típicos
+
+- Medir en el perfil `dev`: puede ser decenas de veces más lento que `--release`.
+- Medir una sola vez algo muy rápido: para comparar rendimiento de verdad, usa una biblioteca de *benchmarks* (mundo 16).
+
+## Desde
+
+`Duration`: Rust 1.3. `Instant`: 1.8.
+
+## Ver también
+
+[`std::time`](/ref/std/time/) · [Benchmarks](/curso/16-pruebas-y-herramientas/)

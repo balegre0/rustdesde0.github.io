@@ -1,0 +1,148 @@
+---
+title: "Decimales: f64 y f32"
+description: "Trabaja con números decimales, entiende por qué 0.1 + 0.2 no es 0.3, qué son inf y NaN, y por qué Rust no mezcla enteros con decimales."
+sidebar:
+  order: 8
+duracion: 15
+desde: "1.0"
+requiere: ["03-valores-y-tipos/07-conversiones-con-as", "01-la-maquina/08-coma-flotante"]
+tarjetas:
+  - p: "¿Qué tipo tiene el literal `2.5` si no dices nada?"
+    r: "`f64` (coma flotante de 64 bits, IEEE 754 binary64)."
+  - p: "¿Cuánto da `0.1 + 0.2 == 0.3` en Rust?"
+    r: "`false`: la suma da 0.30000000000000004 porque 0.1 y 0.2 no se pueden guardar exactos en binario."
+  - p: "¿Qué da `1.0 / 0.0`? ¿Y `0.0 / 0.0`?"
+    r: "`inf` y `NaN`. Con decimales, dividir entre cero no es un pánico."
+  - p: "¿Cuánto vale `nan == nan`?"
+    r: "`false`: NaN no es igual a nada, ni a sí mismo. Se comprueba con `is_nan()`."
+  - p: "¿Qué error da multiplicar un entero por un decimal, como `3 * 2.5`?"
+    r: "E0277: «cannot multiply `{integer}` by `{float}`». Hay que convertir con `as f64`."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Hoy vas a usar números con decimales. Son imprescindibles para medidas, dinero aproximado o física, pero tienen sorpresas que conviene conocer antes de que te muerdan.
+
+## Predice
+
+<Predice
+  ej="m03/flotantes"
+  opciones={["`0.1 + 0.2 = 0.3`", "`0.1 + 0.2 = 0.30000000000000004`", "`0.1 + 0.2 = 0.299999999`", "No compila"]}
+  correcta={1}
+  explicacion="0.1 y 0.2 no tienen representación exacta en binario (igual que 1/3 no la tiene en decimal). Cada uno se guarda redondeado, y la suma de los redondeos se queda un pelo por encima de 0.3. Rust imprime el valor guardado, con todos los decimales necesarios para distinguirlo."
+  porque={["Es lo que esperarías en papel, pero los decimales en binario no son exactos.", "", "El error es hacia arriba, y Rust no trunca a 9 decimales.", "Sumar dos `f64` es perfectamente válido."]}
+/>
+
+## La idea
+
+Rust tiene dos tipos de **coma flotante** (*floating point*), los dos con el estándar IEEE 754 que viste en el Mundo 1:
+
+- **`f64`**: 8 bytes, unas 15–17 cifras significativas. Es el tipo **por defecto**: `let x = 2.5;` es un `f64`.
+- **`f32`**: 4 bytes, unas 7 cifras. Ocupa la mitad, pero es menos preciso.
+
+Un literal con punto (`7.0`) es decimal; sin punto (`7`), entero. Y Rust **no los mezcla**: `7 / 2` es división entera (3) y `7.0 / 2.0` es decimal (3.5). Para operar un entero con un decimal tienes que convertirlo tú con `as f64`.
+
+Los decimales tienen tres valores especiales: **infinito** (`inf`, `-inf`), que sale al dividir entre cero, y **NaN** (*Not a Number*, «no es un número»), que sale de operaciones sin sentido como 0/0. NaN tiene una propiedad extraña: **no es igual a nada, ni siquiera a sí mismo**.
+
+## Pruébalo
+
+<Ejecutar ej="m03/flotantes" />
+
+Salida real:
+
+```text
+pi = 3.14159, e = 2.71828
+pi con 2 decimales: 3.14
+7.0 / 2.0 = 3.5
+7 / 2     = 3
+0.1 + 0.2 = 0.30000000000000004
+es 0.3: false
+f32: 0.3
+```
+
+Fíjate en la última línea: con `f32`, la misma suma **parece** exacta. No lo es: con menos bits, el error queda por debajo de lo que se imprime. `{pi:.2}` redondea **al mostrar**, no cambia el valor guardado.
+
+Los valores especiales:
+
+<Ejecutar ej="m03/especiales" />
+
+```text
+1.0 / 0.0 = inf
+-1.0 / 0.0 = -inf
+0.0 / 0.0 = NaN
+nan == nan: false
+nan.is_nan(): true
+-0.0 == 0.0: true
+casi iguales: true
+```
+
+## Bajo el capó
+
+<BajoElCapo titulo="Lo que hay de verdad en un 0.1">
+Con `{:.20}` puedes ver más decimales de los que Rust muestra por defecto, y con `to_bits()` los 64 bits tal cual:
+
+<Ejecutar ej="m03/bits-flotante" />
+
+Salida real:
+
+```text
+f32: 4 bytes, f64: 8 bytes
+0.1 con 20 decimales: 0.10000000000000000555
+bits de 0.1: 0x3fb999999999999a
+f64::MAX = 1.7976931348623157e308
+f64::EPSILON = 2.220446049250313e-16
+```
+
+`0x3fb999999999999a`: un bit de signo (0), 11 bits de exponente (`0x3fb`) y 52 de mantisa, `999…9a`. Ese patrón `1001 1001…` que se repite es el 0,1 en binario, que es **periódico** como 1/3 en decimal: no cabe en 52 bits y la última cifra se redondea (`…9a`). Por eso el valor guardado es 0,10000000000000000555…
+
+`EPSILON` es la distancia entre 1.0 y el siguiente `f64` que existe: unos 2,2 × 10⁻¹⁶. Es la medida de la precisión relativa del tipo.
+
+Que `NaN != NaN` tiene consecuencias en el diseño de Rust: los decimales **no** se pueden ordenar de forma total, así que `f64` implementa la comparación «parcial» (`PartialEq`, `PartialOrd`) pero no la total (`Eq`, `Ord`). Lo entenderás en el Mundo 13, cuando veas los traits.
+</BajoElCapo>
+
+## Trampa típica
+
+Multiplicar unidades (entero) por precio (decimal):
+
+<NoCompila ej="m03/mezcla" explicacion="E0277: no hay multiplicación definida entre un entero y un decimal. Rust nunca convierte en silencio; la solución es `unidades as f64 * precio`." />
+
+El error dice «no se puede multiplicar `{integer}` por `{float}`». `{integer}` y `{float}` son la forma del compilador de decir «un entero (o decimal) cuyo tipo exacto aún no he decidido». La versión arreglada imprime `7.5`.
+
+<Trampa titulo="Comparar decimales con ==">
+❌ `if total == 0.3 { ... }`. Como has visto, `0.1 + 0.2 == 0.3` es `false`.
+
+✅ Compara con un margen: `(total - 0.3).abs() < 1e-9`. Y para dinero exacto, usa enteros (céntimos) en lugar de decimales.
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m03/media"
+  enunciado="La suma de notas es 17 y hay 4 notas, ambos enteros. Ahora mismo el programa calcula una división entera. Conviértelos a `f64` e imprime la media con 2 decimales: `media: 4.25`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuánto vale `9 / 2` en Rust?"
+  opciones={["4.5", "4", "5", "Error de compilación"]}
+  correcta={1}
+  explicacion="Los dos son enteros, así que es división entera: se descartan los decimales."
+  porque={["Solo con decimales: `9.0 / 2.0`.", "", "No redondea al más cercano: corta hacia el cero.", "Dividir dos enteros es válido."]}
+/>
+
+<Pregunta
+  pregunta="`let x = 0.0 / 0.0;` ¿Cuál es la forma correcta de saber si `x` es NaN?"
+  opciones={["`x == f64::NAN`", "`x.is_nan()`", "`x == 0.0`", "No hace falta: dividir entre cero da pánico"]}
+  correcta={1}
+  explicacion="NaN no es igual a nada, ni a otro NaN: `x == f64::NAN` siempre da `false`. Para eso existe `is_nan()`."
+  porque={["Siempre `false`, aunque `x` sea NaN.", "", "NaN tampoco es igual a 0.", "Con decimales, dividir entre cero no da pánico: da `inf` o `NaN`."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `0.1f32 + 0.2f32` imprime `0.3` y con `f64` no?"
+  opciones={["Porque `f32` es exacto", "Porque el error de `f32` queda por debajo de las cifras que se imprimen", "Porque `f32` redondea las sumas", "Porque `f64` tiene un fallo"]}
+  correcta={1}
+  explicacion="Ninguno de los dos es exacto. Rust imprime las cifras justas para identificar el valor guardado; con `f32` hay menos cifras y el error no llega a verse."
+  porque={["`f32` es **menos** preciso que `f64`.", "", "Las dos sumas redondean igual: es IEEE 754.", "`f64` hace exactamente lo que dice el estándar."]}
+/>

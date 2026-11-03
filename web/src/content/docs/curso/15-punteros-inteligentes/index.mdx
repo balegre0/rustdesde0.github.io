@@ -1,0 +1,36 @@
+---
+title: "Mundo 15 · Punteros inteligentes y mutabilidad interior"
+description: "Box, Rc, Weak, Cell, RefCell, Arc, Cow y Pin: tipos que son dueños de memoria del heap y la gestionan por ti."
+sidebar:
+  order: 0
+  label: "Presentación"
+duracion: 5
+desde: "1.0"
+---
+
+Hasta ahora cada valor tenía **un solo dueño** y las reglas de préstamo se comprobaban **al compilar**. En este mundo aprendes las herramientas para los casos en que eso se queda corto: datos de tamaño desconocido o recursivos, datos con varios dueños y datos que hay que cambiar a través de un préstamo compartido.
+
+Un **puntero inteligente** (*smart pointer*) es un tipo que se comporta como una referencia (puedes usar `*` y llamar a métodos del valor de dentro) pero que además **es dueño** de lo que apunta y hace algo extra: liberar memoria, contar dueños o comprobar préstamos en ejecución.
+
+## Qué vas a aprender
+
+| # | Lección | Lo esencial |
+|---|---|---|
+| 1 | [Box: un valor en el heap](./01-box/) | propiedad única en el heap; el tamaño en la pila es solo un puntero |
+| 2 | [Tipos recursivos](./02-tipos-recursivos/) | el error E0072 y por qué `Box` lo arregla |
+| 3 | [Deref y la coerción automática](./03-deref/) | `*`, el trait `Deref`, `&Box<String>` → `&str` |
+| 4 | [Drop: el código de despedida](./04-drop/) | orden de destrucción, `drop(x)`, E0040 |
+| 5 | [Rc: varios dueños](./05-rc/) | contador de referencias, `Rc::clone`, E0596 |
+| 6 | [Weak y los ciclos](./06-weak-y-ciclos/) | ciclos que nunca se liberan; `Weak`, `upgrade` |
+| 7 | [Las fugas son seguras](./07-fugas-seguras/) | `mem::forget`, `Box::leak`; por qué no es UB |
+| 8 | [Cell y RefCell](./08-cell-y-refcell/) | mutabilidad interior; el pánico «RefCell already borrowed» |
+| 9 | [Rc con RefCell, y cuándo evitarlo](./09-rc-refcell/) | el patrón, su olor y la alternativa de índices |
+| 10 | [Arc: Rc para hilos](./10-arc/) | contador atómico; E0277 con `Rc` y hilos |
+| 11 | [Cow y Pin](./11-cow-y-pin/) | prestar o poseer según haga falta; fijar en memoria |
+| 12 | [Jefe: el árbol de carpetas](./12-jefe/) | todo junto: `Rc`, `Weak`, `RefCell` y `Drop` |
+
+## Antes de empezar
+
+Necesitas tener claros la **propiedad** y el **mover** (mundo 6), los **préstamos** `&T` y `&mut T` (mundo 7), los **traits** (mundo 13) y las **closures** (mundo 14).
+
+Un consejo de partida: los punteros inteligentes no son una forma de «escapar» del borrow checker. Cada uno traslada una regla a otro sitio (al heap, a un contador, a una comprobación en ejecución) y tiene un coste. Lo que aprenderás aquí es **qué regla mueve cada uno y cuánto cuesta**.

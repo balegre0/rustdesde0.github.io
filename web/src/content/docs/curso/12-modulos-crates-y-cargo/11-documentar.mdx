@@ -1,0 +1,111 @@
+---
+title: "Documentar con rustdoc"
+description: "/// documenta lo que viene después y //! lo que lo contiene. cargo doc genera una web como la de la biblioteca estándar, y los ejemplos de la documentación se ejecutan como pruebas."
+sidebar:
+  order: 11
+duracion: 11
+desde: "1.0"
+requiere: ["12-modulos-crates-y-cargo/10-build-rs"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre `///` y `//!`?"
+    r: "`///` documenta el elemento que viene DESPUÉS (función, struct…). `//!` documenta el elemento que lo CONTIENE (el módulo o el crate)."
+  - p: "¿Qué genera `cargo doc --open`?"
+    r: "La documentación HTML de tu crate y sus dependencias, con el mismo aspecto que la de la biblioteca estándar, y la abre en el navegador."
+  - p: "¿Qué es un doctest?"
+    r: "Un bloque de código en un comentario de documentación. `cargo test` lo compila y lo ejecuta: si falla, el test falla."
+  - p: "Secciones habituales de la documentación de una función:"
+    r: "`# Examples`/`# Ejemplos`, `# Panics`, `# Errors` y `# Safety` (obligatoria en las funciones `unsafe`)."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+La documentación de la biblioteca estándar que consultas en `rustup doc` está escrita **dentro del código**, con comentarios especiales. Tú puedes hacer lo mismo, y tus ejemplos se convertirán en pruebas automáticas.
+
+## La idea
+
+Hay dos comentarios de documentación, escritos en **Markdown**:
+
+- `///` documenta lo que viene **después**: una función, un struct, un campo, un método.
+- `//!` documenta lo que lo **contiene**: va al principio de `lib.rs` (para el crate) o de un archivo de módulo.
+
+```rust
+//! Utilidades matemáticas.
+
+/// Devuelve el mayor de dos números.
+///
+/// # Ejemplos
+///
+/// ```
+/// assert_eq!(mi_crate::mayor(3, 7), 7);
+/// ```
+pub fn mayor(a: i32, b: i32) -> i32 { if a > b { a } else { b } }
+```
+
+Secciones que la comunidad usa siempre que aplican:
+
+- **`# Examples`** (o `# Ejemplos`): cómo se usa.
+- **`# Panics`**: cuándo entra en pánico.
+- **`# Errors`**: qué errores devuelve, si devuelve `Result`.
+- **`# Safety`**: en funciones `unsafe`, qué tiene que garantizar quien llama (mundo 20).
+
+Con `cargo doc --open` se genera una web como la de la biblioteca estándar, con buscador, enlaces entre tipos y el código fuente.
+
+## Pruébalo
+
+Para el compilador, los comentarios de documentación no cambian nada del programa:
+
+<Ejecutar ej="m12/doc-comentarios" />
+
+En tu PC, en un paquete de biblioteca, `cargo doc --open` te mostrará la documentación. `cargo doc` funciona incluso sin el enlazador, porque no genera ejecutables.
+
+## Doctests
+
+Cada bloque de código de un comentario `///` es un **doctest**: `cargo test` lo compila como un programa aparte y lo ejecuta. Si el ejemplo deja de compilar o un `assert!` falla, el test falla. Así la documentación **no puede quedarse desactualizada** sin que te enteres.
+
+Opciones del bloque:
+
+````rust
+/// ```should_panic
+/// mi_crate::dividir(1, 0);
+/// ```
+/// ```no_run
+/// // compila pero no se ejecuta (por ejemplo, abre la red)
+/// ```
+/// ```compile_fail
+/// // tiene que NO compilar
+/// ```
+````
+
+Una línea que empieza por `# ` dentro del bloque se ejecuta pero **no se muestra** en la documentación: sirve para ocultar preparativos.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`///` es azúcar para un atributo.** `/// Hola` es exactamente `#[doc = " Hola"]`. Por eso la documentación se puede generar también con macros o con `#[doc = include_str!("../README.md")]`, que incluye un archivo entero.
+
+**Enlaces entre elementos.** En la documentación puedes escribir ``[`Vec`]`` o ``[`mayor`]`` y rustdoc lo convierte en un enlace al elemento correcto (*intra-doc links*). Si el nombre no existe, `cargo doc` avisa.
+
+**`#![warn(missing_docs)]`** al principio de `lib.rs` avisa de cada elemento público sin documentar. Muy recomendable en bibliotecas.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Doctests de un binario">
+
+❌ Escribir doctests en `main.rs` y esperar que `cargo test` los ejecute. Los doctests solo se ejecutan en crates **biblioteca**, porque cada doctest es un programa aparte que usa tu biblioteca como dependencia.
+
+✅ Mueve la lógica a `lib.rs` (lección 5) y documéntala ahí.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Al principio de `src/lib.rs` quieres explicar para qué sirve todo el crate. ¿Qué comentario usas?"
+  opciones={["`//`", "`///`", "`//!`", "`/* */`"]}
+  correcta={2}
+  explicacion="`//!` documenta el elemento que contiene el comentario: en `lib.rs`, el crate entero."
+  porque={["Es un comentario normal: rustdoc lo ignora.", "Documentaría el elemento siguiente, no el crate.", "", "Es un comentario normal de bloque."]}
+/>

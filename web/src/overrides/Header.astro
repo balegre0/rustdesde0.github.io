@@ -1,0 +1,89 @@
+---
+// Cabecera propia: título · navegación principal (práctica primero) · búsqueda · panel · tema.
+// En pantallas estrechas la navegación pasa a una segunda fila desplazable (sin menú oculto).
+import Search from 'virtual:starlight/components/Search';
+import SiteTitle from 'virtual:starlight/components/SiteTitle';
+import ThemeSelect from 'virtual:starlight/components/ThemeSelect';
+
+// Ruta sin la base de publicación (p. ej. /rust-desde-cero/), para comparar con los prefijos.
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const ruta = Astro.url.pathname.slice(Astro.url.pathname.startsWith(base) ? base.length : 0).replace(/\/?$/, '/');
+const enlaces = [
+  { href: '/curso/', texto: 'Aprender', prefijos: ['/curso/', '/demo/', '/repaso/', '/progreso/', '/arbol/'] },
+  { href: '/preguntas/', texto: 'Preguntas', prefijos: ['/preguntas/'] },
+  { href: '/problemas/', texto: 'Problemas', prefijos: ['/problemas/'] },
+  { href: '/listas/', texto: 'Listas', prefijos: ['/listas/'] },
+  { href: '/quizzes/', texto: 'Quizzes', prefijos: ['/quizzes/'] },
+  { href: '/juegos/', texto: 'Juegos', prefijos: ['/juegos/'] },
+  { href: '/ref/', texto: 'Referencia', prefijos: ['/ref/', '/errores/', '/recetas/', '/explicaciones/'] },
+];
+const activo = (p: string[]) => p.some((x) => ruta.startsWith(x));
+---
+<div class="rdc-header">
+  <div class="rdc-header-titulo"><SiteTitle /></div>
+  <nav class="rdc-nav" aria-label="Secciones principales">
+    <ul>
+      {enlaces.map((e) => (
+        <li><a href={e.href} aria-current={activo(e.prefijos) ? 'page' : undefined}>{e.texto}</a></li>
+      ))}
+    </ul>
+  </nav>
+  <div class="rdc-header-fin print:hidden">
+    <Search />
+    <a class="rdc-header-panel" href="/panel/" aria-current={ruta.startsWith('/panel/') ? 'page' : undefined} title="Tu panel: racha, aciertos y marcas">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm8 0h8v-9h-8v9Zm0-16v5h8V4h-8Z" /></svg>
+      <span>Panel</span>
+    </a>
+    <div class="rdc-header-tema"><ThemeSelect /></div>
+  </div>
+</div>
+
+<style>
+  .rdc-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'titulo nav fin';
+    align-items: center;
+    gap: 0 1.25rem;
+    height: 100%;
+  }
+  .rdc-header-titulo { grid-area: titulo; min-width: 0; overflow: clip; padding: 0.25rem; margin: -0.25rem; display: flex; }
+  .rdc-nav { grid-area: nav; min-width: 0; }
+  .rdc-nav ul { display: flex; gap: 0.15rem; list-style: none; margin: 0; padding: 0; }
+  .rdc-nav a {
+    display: block;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.3rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .rdc-nav a:hover { color: var(--sl-color-white); background: var(--rdc-superficie); }
+  .rdc-nav a[aria-current='page'] { color: var(--sl-color-white); background: var(--rdc-superficie-2); box-shadow: inset 0 -2px 0 var(--sl-color-accent); }
+  .rdc-header-fin { grid-area: fin; display: flex; align-items: center; gap: 0.75rem; }
+  .rdc-header-panel {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.35rem 0.55rem; border-radius: 0.3rem; border: 1px solid var(--rdc-borde);
+    color: var(--sl-color-gray-2); text-decoration: none; font-size: 0.875rem; font-weight: 600;
+  }
+  .rdc-header-panel:hover, .rdc-header-panel[aria-current='page'] { color: var(--sl-color-white); border-color: var(--sl-color-accent); }
+  @media (max-width: 71.99rem) {
+    .rdc-header {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: 'titulo fin' 'nav nav';
+      grid-template-rows: 3.25rem 2.75rem;
+    }
+    .rdc-nav { overflow-x: auto; scrollbar-width: none; margin-inline: calc(-1 * var(--sl-nav-pad-x)); padding-inline: var(--sl-nav-pad-x); border-top: 1px solid var(--rdc-borde); height: 100%; display: flex; align-items: center; }
+    .rdc-nav::-webkit-scrollbar { display: none; }
+  }
+  @media (max-width: 49.99rem) {
+    .rdc-header-panel span { display: none; }
+    .rdc-header-tema { display: none; }
+    .rdc-header-fin { gap: 0.5rem; margin-inline-end: 2.75rem; }
+  }
+</style>
+<style is:global>
+  @media (max-width: 71.99rem) { :root { --sl-nav-height: 6rem; } }
+</style>

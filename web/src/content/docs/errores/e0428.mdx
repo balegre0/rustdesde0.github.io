@@ -1,0 +1,74 @@
+---
+title: "E0428: nombre definido dos veces"
+description: "Defines dos elementos con el mismo nombre en el mismo módulo."
+sidebar:
+  order: 36
+insignias: ["Nombres, módulos y visibilidad"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` the name `Punto` is defined multiple times ``
+
+## Qué significa
+
+Dentro de un módulo, cada nombre de tipo (structs, enums, traits, alias) y cada nombre de valor (funciones, constantes) debe ser **único** en su espacio de nombres. Dos `struct Punto` en el mismo módulo chocan.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0428" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0428]: the name `Punto` is defined multiple times
+ --> E0428.rs:2:1
+  |
+1 | struct Punto;
+  | ------------- previous definition of the type `Punto` here
+2 | struct Punto;
+  | ^^^^^^^^^^^^^ `Punto` redefined here
+  |
+  = note: `Punto` must be defined only once in the type namespace of this module
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Copiar y pegar una definición.
+- Definir un tipo con el mismo nombre que otro que importas con `use`.
+
+## Cómo arreglarlo
+
+Renombra uno de los dos, bórralo si sobra, o mételo en otro módulo (`mod geo3d { pub struct Punto; }`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+struct Punto;
+struct Punto3d;
+
+fn main() {
+    let _a = Punto;
+    let _b = Punto3d;
+    println!("dos tipos distintos");
+}
+```
+
+**Salida:**
+
+```text
+dos tipos distintos
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0428` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0425](/errores/e0425/): nombre no encontrado
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

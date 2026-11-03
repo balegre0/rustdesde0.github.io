@@ -1,0 +1,37 @@
+---
+title: "std::option"
+description: "Option<T>: valores opcionales sin nulos. Some(valor) o None."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+**Ruta:** `std::option`
+
+## Para qué sirve
+
+En Rust **no hay valor nulo**. Cuando algo puede no existir (buscar en una lista, leer el primer elemento, convertir un texto), la función devuelve un `Option<T>`: o bien `Some(valor)`, o bien `None`. El compilador te obliga a tratar los dos casos antes de usar el valor, así que olvidar el caso «no hay nada» es un error de compilación, no un fallo al ejecutar.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Option`](/ref/std/option/option/) | El enum `Some(T)` / `None` y sus métodos. | 1.0 |
+| `Iter, IterMut, IntoIter` | Iteradores de cero o un elemento. | 1.0 |
+
+**Catálogo completo:** [Option: todos los métodos](/ref/std/option/catalogo/)
+
+## Conceptos clave
+
+- **Option es un enum normal**: `enum Option<T> { None, Some(T) }`. `Some` y `None` están en el preludio.
+- **Sin coste**: `Option<&T>`, `Option<Box<T>>` y `Option<NonZero<u32>>` ocupan lo mismo que el tipo de dentro, porque `None` se guarda en un valor imposible (el «nicho», como la dirección 0).
+- **Tres formas de sacarlo**: `match`/`if let` (tratas los dos casos), métodos (`unwrap_or`, `map`…) y `?` dentro de funciones que devuelven `Option`.
+
+## Ver también
+
+- [std::result](/ref/std/result/)
+- [E0004: patrones no exhaustivos](/errores/e0004/)
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)
+- [Mundo 10 · Errores](/curso/10-errores/)

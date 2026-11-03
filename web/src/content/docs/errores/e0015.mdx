@@ -1,0 +1,71 @@
+---
+title: "E0015: llamada a función no const en una constante"
+description: "Inicializas una const o static llamando a una función que no es const fn."
+sidebar:
+  order: 3
+insignias: ["Constantes, unsafe, async y otros"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot call non-const associated function `<String as From<&str>>::from` in constants ``
+
+## Qué significa
+
+Las `const` y `static` se calculan **al compilar**. Solo pueden usar operaciones que el compilador sabe evaluar: literales, aritmética y funciones marcadas `const fn`. `String::from` reserva memoria en el montón, cosa que no puede hacerse al compilar.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0015" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0015]: cannot call non-const associated function `<String as From<&str>>::from` in constants
+ --> E0015.rs:1:24
+  |
+1 | const SALUDO: String = String::from("hola");
+  |                        ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: calls in constants are limited to constant functions, tuple structs and tuple variants
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- `const X: String = String::from(...)`.
+- Llamar a funciones normales propias en una `const`.
+- Crear `Vec` con elementos en una `static`.
+
+## Cómo arreglarlo
+
+Usa un tipo que sí se pueda construir al compilar (`&str` en vez de `String`, arrays en vez de `Vec`), marca tu función como `const fn`, o calcula el valor la primera vez que se use con `std::sync::LazyLock`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+const SALUDO: &str = "hola";
+
+fn main() {
+    println!("{SALUDO}");
+}
+```
+
+**Salida:**
+
+```text
+hola
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0015` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0080](/errores/e0080/): error al evaluar una constante
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/)
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

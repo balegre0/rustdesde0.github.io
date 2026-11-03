@@ -1,0 +1,63 @@
+---
+title: "trait"
+description: "Palabra clave estricta: define un conjunto de comportamientos que distintos tipos pueden implementar."
+sidebar:
+  order: 33
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Un **trait** describe un comportamiento: una lista de métodos, tipos y constantes que un tipo **promete** tener. Cualquier tipo puede implementarlo.
+
+## Sinopsis
+
+```text
+unsafe? trait Nombre<genéricos>: Supertraits where … {
+    fn requerido(&self) -> T;                    // sin cuerpo: hay que implementarlo
+    fn con_defecto(&self) { … }                  // con cuerpo: opcional
+    type Asociado: Límites;                      // tipo asociado
+    type Gat<'a> where Self: 'a;                 // tipo asociado genérico (GAT)
+    const CONSTANTE: Tipo;                       // constante asociada
+}
+```
+
+## Qué hace
+
+- **Métodos requeridos y por defecto**: los que no tienen cuerpo son obligatorios en cada `impl`; los que lo tienen se pueden sobrescribir.
+- **Supertraits**: `trait Mascota: Animal` significa «para implementar `Mascota` hay que implementar también `Animal`», y dentro de `Mascota` puedes usar los métodos de `Animal`.
+- **Tipos asociados**: el implementador elige un tipo (`type Item = u32;`). Así funciona `Iterator`.
+- **Constantes asociadas**: valores que cada tipo fija.
+- **Límites**: un trait se usa para restringir genéricos (`T: Mascota`) o como tipo dinámico (`dyn Animal`, si es compatible con `dyn`).
+- Para llamar a un método de un trait, el trait tiene que estar **en ámbito** (importado con `use`, o en el prelude).
+- `unsafe trait`: implementarlo exige `unsafe impl`, porque el trait pide garantías que el compilador no comprueba (`Send`, `Sync`).
+- Los métodos de un trait pueden ser `async fn` y devolver `impl Trait`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-trait" />
+
+Salida:
+
+```text
+Soy un perro de Iris con 4 patas
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-trait-error" />
+
+`error[E0046]: not all trait items implemented, missing: adios`.
+
+## Desde
+
+Rust 1.0. Constantes asociadas: 1.20. GATs: 1.65. `async fn` e `impl Trait` en traits: 1.75. Conversión a supertrait de objetos `dyn`: 1.86.
+
+## Ver también
+
+- [`impl`](/ref/lenguaje/palabras-clave/impl/) · [`dyn`](/ref/lenguaje/palabras-clave/dyn/) · [`where`](/ref/lenguaje/palabras-clave/where/) · [`Self`](/ref/lenguaje/palabras-clave/self-tipo/) · [`type`](/ref/lenguaje/palabras-clave/type/) · [`unsafe`](/ref/lenguaje/palabras-clave/unsafe/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

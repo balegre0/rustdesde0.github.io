@@ -1,0 +1,1 @@
+{ "nota": "En el navegador (wasm32) una referencia mide 4 bytes; en un PC de 64 bits, 8." }

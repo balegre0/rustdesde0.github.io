@@ -1,0 +1,66 @@
+---
+title: "static"
+description: "Palabra clave estricta: variables globales con una única dirección que viven todo el programa."
+sidebar:
+  order: 30
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Un `static` es un valor que existe **una sola vez**, en **una dirección fija**, durante **todo** el programa.
+
+## Sinopsis
+
+```text
+static NOMBRE: Tipo = expresión_constante;
+static mut NOMBRE: Tipo = expresión_constante;     // acceso unsafe
+unsafe extern "C" { static EXTERNO: i32; }         // definido fuera
+```
+
+Para el tiempo de vida `'static`, ver [`'static`](/ref/lenguaje/palabras-clave/static-lifetime/).
+
+## Qué hace
+
+- El inicializador se calcula **al compilar**, como el de un `const`. Para valores que necesitan calcularse al ejecutar se usa `LazyLock` u `OnceLock`.
+- A diferencia de `const`, un `static` **no se copia** en cada uso: todas las referencias apuntan al mismo sitio. Por eso `&ESTATICO` tiene tipo `&'static T`.
+- Como puede usarse desde cualquier hilo, su tipo debe ser **`Sync`**.
+- Un `static` normal no se puede modificar… salvo a través de **mutabilidad interior** segura: atómicos, `Mutex`, `OnceLock`. Es la forma recomendada de tener estado global.
+- Su destructor **no se ejecuta** al terminar el programa.
+- Un `static` no puede ser genérico.
+
+### `static mut`
+
+Leer o escribir un `static mut` exige `unsafe`, porque dos hilos podrían tocarlo a la vez (**carrera de datos**). En la edición 2024, **crear una referencia** (`&` o `&mut`) a un `static mut` es un error (lint `static_mut_refs`, en modo *deny*): con esa referencia viva, cualquier otro acceso sería comportamiento indefinido. Si de verdad lo necesitas, usa `&raw const` o `&raw mut`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-static" />
+
+Salida:
+
+```text
+hola
+visitas: 3
+true
+30
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-static-error" />
+
+En la edición 2024: `error: creating a shared reference to mutable static`, con la ayuda de usar `&raw const`.
+
+## Desde
+
+Rust 1.0. Error por referencias a `static mut`: edición 2024.
+
+## Ver también
+
+- [`const`](/ref/lenguaje/palabras-clave/const/) · [`'static`](/ref/lenguaje/palabras-clave/static-lifetime/) · [`mut`](/ref/lenguaje/palabras-clave/mut/) · [`raw`](/ref/lenguaje/palabras-clave/raw/) · [Evaluación const](/ref/lenguaje/evaluacion-const/) · [Comportamiento indefinido](/ref/ub/)
+
+## Aprende esto en
+
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/) · [Mundo 20 · Unsafe y UB](/curso/20-unsafe-y-ub/)

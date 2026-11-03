@@ -1,0 +1,94 @@
+---
+title: "Structs con referencias"
+description: "Un struct que guarda una referencia necesita una lifetime en su definición, y ningún valor del struct puede vivir más que lo prestado."
+sidebar:
+  order: 6
+duracion: 12
+desde: "1.0"
+requiere: ["08-lifetimes/05-anotar-con-precision"]
+tarjetas:
+  - p: "¿Por qué `struct Extracto { parte: &str }` da E0106?"
+    r: "Porque un struct que guarda una referencia tiene que declarar la lifetime: `struct Extracto<'a> { parte: &'a str }`."
+  - p: "¿Qué significa `Extracto<'a>`?"
+    r: "Un extracto que tiene prestado algo válido durante `'a`. Ningún `Extracto<'a>` puede usarse fuera de `'a`."
+  - p: "¿Cuándo usar dos lifetimes en un struct (`<'a, 'b>`)?"
+    r: "Cuando sus referencias pueden venir de sitios con vidas distintas y quieres poder devolver una de ellas sin atarla a la otra."
+  - p: "¿Cuándo es mejor que un struct sea dueño (`String`) en vez de prestar (`&str`)?"
+    r: "Casi siempre que el struct tenga que vivir mucho, guardarse en colecciones o devolverse lejos. Prestar va bien para vistas de vida corta sobre datos que ya existen."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Un **struct** agrupa varios valores con nombre en un tipo nuevo: `struct Punto { x: i32, y: i32 }`, y se crea con `Punto { x: 1, y: 2 }`. Lo estudiarás a fondo en el mundo 09; aquí basta con eso. Un struct puede guardar referencias: una **vista** sobre datos que ya existen, sin copiarlos. Es muy eficiente, pero tiene un precio: el struct entero queda atado a la vida de lo que tiene prestado.
+
+## Predice
+
+<NoCompila ej="m08/p-struct-sin-lifetime" explicacion={"El campo `parte` es una referencia. Piensa: cuando alguien tenga un `Extracto`, ¿cómo sabrá hasta cuándo puede usarlo?"} />
+
+## La idea
+
+Si un struct guarda una referencia, su definición tiene que declarar una **lifetime genérica** y usarla en el campo:
+
+```rust
+struct Extracto<'a> {
+    parte: &'a str,
+}
+```
+
+Se lee: «un `Extracto<'a>` tiene prestado un texto válido durante `'a`». La consecuencia es la regla de siempre, aplicada al struct entero:
+
+> **Un valor de tipo `Extracto<'a>` no puede usarse fuera de `'a`.**
+
+Si el texto prestado muere, el extracto no puede usarse después:
+
+<NoCompila ej="m08/p-struct-sobrevive" explicacion="`e` tiene prestado un trozo de `novela`, que muere al cerrar el bloque. Usar `e.parte` después sería leer memoria liberada. El arreglo hace que `novela` viva tanto como `e`." />
+
+## Pruébalo
+
+A veces un struct presta de **dos** sitios con vidas distintas. Con una sola lifetime, quedarían atados. Con dos, cada referencia mantiene la suya:
+
+<Ejecutar ej="m08/p-struct-dos-lifetimes" />
+
+`clave` devuelve `&'a str`, atada solo a `k`. Por eso `c` puede usarse fuera del bloque, aunque `v` (y el propio `p`) ya hayan muerto. Con `struct Par<'a> { clave: &'a str, valor: &'a str }`, `'a` sería la vida de la más corta y `c` no podría salir del bloque.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El tamaño no cambia.** Un `Extracto<'a>` ocupa exactamente lo mismo que un `&str`: dirección y longitud. La lifetime es solo información para el compilador.
+
+**Ojo con `Drop`.** Si un struct con referencias implementa `Drop`, su destructor se ejecuta en la `}`, y el compilador cuenta eso como un **uso**: las referencias tienen que seguir válidas hasta ahí. Sin `Drop`, el struct deja de contar en su último uso (NLL). Esta comprobación tiene nombre: *drop check*. La verás a fondo en el mundo 20.
+
+**Los tipos con lifetime son tipos distintos.** `Extracto<'a>` y `Extracto<'b>` son, para el compilador, dos tipos diferentes, relacionados por la **varianza** (lección 11): un `Extracto` con una lifetime larga puede usarse donde se pide uno con una corta.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Poner referencias en todos los structs">
+
+Una vez que aprendes los structs con lifetime, parece elegante usar `&str` en todos los campos «para no copiar». Pronto te encontrarás con que no puedes devolver esos structs, ni guardarlos en un `Vec` que viva más que el texto original, ni moverlos a otro hilo.
+
+❌ `struct Usuario<'a> { nombre: &'a str }` para un usuario que vive todo el programa.
+
+✅ `struct Usuario { nombre: String }`. El struct es **dueño** de sus datos y vive lo que quiera. Usa structs con referencias para **vistas cortas** sobre datos que ya tienes: un analizador que recorre un texto, un iterador, un resultado de búsqueda.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`struct Vista<'a> { datos: &'a [u8] }`. Creas `let v = Vista { datos: &buf };`. ¿Cuál es el límite para usar `v`?"
+  opciones={["Ninguno", "La vida de `buf`", "El final de la línea", "Hasta que se cree otra `Vista`"]}
+  correcta={1}
+  explicacion="`v` tiene prestado `buf`, así que no puede usarse después de que `buf` muera (ni mientras `buf` se modifique: es un préstamo compartido)."
+  porque={["Un struct con referencias siempre está limitado por lo que tiene prestado.", "", "Puedes usarlo en muchas líneas, mientras `buf` viva.", "Crear más vistas no cambia nada: son más préstamos compartidos."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué en `p-struct-dos-lifetimes` se usan `'a` y `'b` en vez de una sola?"
+  opciones={["Porque un struct no puede tener dos campos con la misma lifetime", "Para que la clave devuelta no quede atada a la vida del valor, que es más corta", "Por estilo", "Porque `valor` es `mut`"]}
+  correcta={1}
+  explicacion="Con una sola lifetime, el compilador tendría que elegir una región válida para las dos referencias, la más corta. Con dos, la clave conserva su lifetime larga."
+  porque={["Pueden compartirla sin problema.", "", "Cambia qué programas compilan.", "Ningún campo es `mut`."]}
+/>

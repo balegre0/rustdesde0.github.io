@@ -1,0 +1,121 @@
+---
+title: "Aliasing: de Stacked Borrows a Tree Borrows"
+description: "Entiendes por qué un &mut es exclusivo también para el código unsafe y cómo lo modelan Stacked y Tree Borrows."
+sidebar:
+  order: 5
+duracion: 15
+desde: "1.0"
+requiere: ["20-unsafe-y-ub/04-abstracciones-seguras"]
+tarjetas:
+  - p: "¿Qué promete un `&mut T` al compilador?"
+    r: "Que mientras se use, ningún otro camino (referencia o puntero no derivado de él) accede a esa memoria. Por eso rustc puede optimizar como si nadie más la viera."
+  - p: "Idea de Stacked Borrows"
+    r: "Cada posición de memoria tiene una pila de permisos; usar un puntero quita de la pila los que se crearon después de él; usar un permiso que ya no está es UB."
+  - p: "¿Qué cambia Tree Borrows?"
+    r: "Usa un árbol con estados por nodo (Reserved, Active, Frozen, Disabled); un &mut empieza Reserved y solo es exclusivo al escribir. Rechaza un 54 % menos de casos de test reales (PLDI 2025)."
+  - p: "¿Hay ya un modelo de aliasing oficial en Rust?"
+    r: "No. La Reference dice que las reglas exactas no están fijadas; Stacked y Tree Borrows son propuestas implementadas en Miri."
+---
+
+import { Ejecutar, NoCompila, Ordena, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Vas a ver por qué la regla «un préstamo exclusivo a la vez» no es solo una regla del borrow checker: es una promesa que también el código `unsafe` debe cumplir, y que permite optimizar.
+
+## Predice
+
+¿Por qué Rust no deja llamar a `sumar_en(&mut a, &mut a)`?
+
+<NoCompila ej="m20/noalias" explicacion="Dos `&mut` al mismo `a` a la vez violan la exclusividad (E0499). Si se permitiera, `*origen = 0` borraría también `*destino`, y el compilador —que da por hecho que destino y origen son distintos— podría haber reordenado o guardado valores en registros con un resultado imposible." />
+
+## La idea
+
+Un `&mut T` no significa «mutable», significa **exclusivo**: mientras se usa, ningún otro camino toca esa memoria. El compilador aprovecha esa promesa para optimizar: puede guardar el valor en un registro, quitar lecturas repetidas o reordenar escrituras, porque sabe que «nadie más está mirando» (en LLVM, Rust marca estos parámetros como `noalias`).
+
+En Rust seguro, el borrow checker impone la promesa. En Rust inseguro, **tú** la tienes que respetar: los punteros crudos pueden crear alias, pero si usas un `&mut` cuando otro camino ha tocado la misma memoria «por detrás», tienes UB, aunque el programa compile sin un solo aviso.
+
+La pregunta difícil es: ¿cuáles son exactamente las reglas para el código unsafe? **Rust aún no tiene un modelo oficial.** Hay dos propuestas implementadas en Miri: **Stacked Borrows** (2020) y su sucesor **Tree Borrows** (2025).
+
+## Pruébalo
+
+La versión correcta: primero se usa el préstamo exclusivo `r` y, cuando ya no se va a usar más, se vuelve al puntero `p`.
+
+<Ejecutar ej="m20/aliasing-ok" />
+
+Ahora la versión rota. `rustc` la compila sin quejarse; es en Miri donde se ve el problema (ábrela en el Playground y elige *Tools → Miri*):
+
+<Ejecutar ej="m20/aliasing-ub" />
+
+Miri la detiene en el paso 4: `r` se usa después de que una escritura por `p` (su «padre») lo haya invalidado. No mires lo que imprime en una ejecución normal: con UB, cualquier salida carece de significado.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Stacked Borrows** (Jung, Dang, Kang y Dreyer, POPL 2020) da a cada posición de memoria una **pila de permisos**. Crear un préstamo apila su etiqueta encima de la de su padre. Usar un puntero *quita de la pila todo lo que está encima de él*. Usar una etiqueta que ya no está en la pila es UB. Para el programa roto:
+
+| Paso | Operación | Pila de `x` (abajo → arriba) |
+|---|---|---|
+| 0 | `let mut x` | `[x]` |
+| 1 | `p = &raw mut x` | `[x, p]` |
+| 2 | `r = &mut *p` | `[x, p, r]` |
+| 3 | `*p = 1` (usar `p`) | `[x, p]` — `r` se ha quitado |
+| 4 | `*r = 2` | `r` no está: **UB** |
+
+En el programa correcto, `r` se usa en el paso 3 (sigue en la pila) y después `p` lo quita: no pasa nada porque `r` ya no se vuelve a usar.
+
+**Tree Borrows** (Villani, Hostert, Dreyer y Jung, PLDI 2025, premio *Distinguished Paper*) cambia la pila por un **árbol** de préstamos con un estado por nodo: *Reserved*, *Active*, *Frozen*, *Disabled*. Un `&mut` nace *Reserved* y solo se vuelve exclusivo (*Active*) con su primera escritura, lo que acepta patrones reales que Stacked Borrows rechazaba (por ejemplo, sacar dos punteros seguidos de `as_mut_ptr()`). Evaluado sobre los 30 000 crates más usados, rechaza **un 54 % menos** de casos de test, conserva casi todas las optimizaciones y sus pruebas están mecanizadas en Rocq.
+
+En los dos modelos, el ejemplo de arriba es UB: el problema de fondo es el mismo.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Si rustc no avisa, está bien»">
+
+❌ El compilador **no** ve los alias entre punteros crudos y referencias creadas a partir de ellos. `aliasing-ub` compila sin un solo aviso.
+
+✅ Regla práctica para unsafe: **no mezcles** el uso de un `&mut` con el de otros caminos a la misma memoria. Si necesitas varios caminos, trabaja **solo con punteros crudos** durante esa parte y crea referencias al final, cuando ya no vayas a usar los punteros. Y pasa los tests por Miri con los dos modelos (`-Zmiri-tree-borrows` activa el segundo).
+
+</Trampa>
+
+## Tu turno
+
+Ordena las líneas para que el programa respete las reglas de aliasing (usar `r` mientras es el préstamo más reciente y no volver a usarlo después de tocar `p`):
+
+<Ordena
+  lineas={["let mut x = 10u8;", "let p = &raw mut x;", "let r = unsafe { &mut *p };", "*r += 1;", "unsafe { *p += 1 };", "println!(\"{x}\");"]}
+  distractores={["*r += 5; // después de usar p"]}
+  explicacion="`r` se crea desde `p` y se usa primero; luego `p` vuelve a usarse y `r` queda invalidado, pero ya nadie lo toca. Usar `r` después de `*p` sería UB en Stacked y Tree Borrows."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué importa al rendimiento que `&mut T` sea exclusivo?"
+  opciones={["No importa: es solo una regla de estilo", "Porque el compilador puede suponer que nadie más toca esa memoria y guardar valores en registros o reordenar accesos", "Porque los `&mut` se guardan en el heap", "Porque así no hace falta liberar memoria"]}
+  correcta={1}
+  explicacion="La exclusividad es información para el optimizador (en LLVM, `noalias`). Si el código unsafe la rompe, esas optimizaciones producen resultados imposibles."
+  porque={["Es una garantía que el optimizador usa de verdad.", "Correcto.", "Los `&mut` son direcciones; dónde vivan no tiene que ver.", "La liberación la gestiona la propiedad, no la exclusividad."]}
+/>
+
+<Pregunta
+  pregunta="En Stacked Borrows, ¿qué ocurre con un préstamo que está **encima** de `p` en la pila cuando se usa `p`?"
+  opciones={["Nada", "Se quita de la pila: usarlo después es UB", "Se convierte en `p`", "Se mueve al fondo de la pila"]}
+  correcta={1}
+  explicacion="Usar un puntero invalida lo creado después de él. Así se modela que un `&mut` hijo deja de ser exclusivo en cuanto su padre vuelve a actuar."
+  porque={["Si no pasara nada, el `&mut` hijo no sería exclusivo.", "Correcto.", "Las etiquetas no se transforman.", "Se elimina, no se reordena."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál es el modelo de aliasing **oficial** de Rust hoy (1.99.1)?"
+  opciones={["Stacked Borrows", "Tree Borrows", "Ninguno todavía: ambos son propuestas implementadas en Miri", "El de LLVM"]}
+  correcta={2}
+  explicacion="La Reference dice que las reglas exactas no están fijadas. Tree Borrows es el candidato más reciente, pero la decisión sigue pendiente."
+  porque={["Fue el primero y el predeterminado de Miri, pero no es oficial.", "Es la propuesta más nueva, no una norma aprobada.", "Correcto.", "LLVM recibe `noalias`, pero las reglas de Rust las define Rust."]}
+/>
+
+## Para saber más
+
+- Ralf Jung, «Tree Borrows» (blog, 2025, en inglés).
+- En este curso: [Miri](../06-miri/).

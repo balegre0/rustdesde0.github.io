@@ -1,0 +1,135 @@
+---
+title: "Hilos con ámbito: thread::scope"
+description: "Prestar datos locales a varios hilos con thread::scope, y ver que las reglas de préstamos siguen valiendo entre hilos."
+sidebar:
+  order: 3
+duracion: 12
+desde: "1.63"
+requiere: ["17-concurrencia/02-move-en-hilos"]
+tarjetas:
+  - p: "¿Qué garantiza thread::scope?"
+    r: "Que todos los hilos lanzados dentro del ámbito terminan antes de que scope devuelva. Por eso pueden tomar prestados datos locales."
+  - p: "¿Desde qué versión es estable thread::scope?"
+    r: "Desde Rust 1.63 (2022)."
+  - p: "¿Pueden dos hilos con ámbito tener a la vez un préstamo exclusivo y uno compartido del mismo Vec?"
+    r: "No: las reglas de préstamos valen igual entre hilos. El compilador da E0502 (o E0499 con dos exclusivos)."
+  - p: "¿Por qué la API de scope usa un closure en vez de un guard que se destruye al salir?"
+    r: "Porque destruir un guard no está garantizado (mem::forget es seguro). El closure obliga a esperar a los hilos antes de devolver, pase lo que pase."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa, Historia } from '~/components';
+
+Vas a repartir un trabajo entre varios hilos **sin mover ni clonar** los datos: prestándoselos.
+
+## Predice
+
+<NoCompila ej="m17/spawn-prestamo" explicacion="`a` y `b` son préstamos de `notas`. Aunque escribas `move`, lo que se mueve al hilo es el préstamo, no el Vec. Y `thread::spawn` exige `'static`: el hilo podría vivir más que `notas`. La nota del error señala justo esa exigencia (`F: Send + 'static`). Pulsa «Ver arreglo» para ver la solución con `thread::scope`." />
+
+## La idea
+
+En la lección anterior viste que `spawn` no admite préstamos porque **no sabe cuándo terminará el hilo**. Pero muchas veces tú sí lo sabes: quieres partir un vector, que cada hilo sume su trozo, y seguir. Para eso existe **`thread::scope`** (*ámbito*).
+
+`thread::scope(|s| { ... })` abre un ámbito. Dentro, `s.spawn(...)` lanza hilos igual que `thread::spawn`, con una diferencia clave: **`scope` no devuelve hasta que todos esos hilos han terminado**. Si no los esperas tú con `join`, los espera él al final. Como el compilador sabe que ningún hilo sobrevive al ámbito, les deja tomar **prestados** datos que viven fuera de él.
+
+Y como son préstamos de verdad, valen **todas** las reglas del mundo 7: muchos préstamos compartidos a la vez, o uno exclusivo, nunca las dos cosas. Ahora esas reglas protegen también contra hilos que se pisan.
+
+## Pruébalo
+
+<Ejecutar ej="m17/scope-trozos" />
+
+1. `numeros.chunks(250)` da cuatro trozos: cuatro préstamos compartidos de `numeros`.
+2. Cada `s.spawn` recibe un closure que **toma prestado** su trozo. Ni `move`, ni `clone`, ni `Arc`.
+3. El resultado del bloque es la suma de las sumas parciales: `suma = 500500`.
+4. Al salir de `scope`, `numeros` vuelve a estar libre: `main` lo sigue usando.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Las firmas lo cuentan todo** (std de Rust 1.99.1):
+
+```rust
+pub fn scope<'env, F, T>(f: F) -> T
+where
+    F: for<'scope> FnOnce(&'scope Scope<'scope, 'env>) -> T;
+
+impl<'scope, 'env> Scope<'scope, 'env> {
+    pub fn spawn<F, T>(&'scope self, f: F) -> ScopedJoinHandle<'scope, T>
+    where
+        F: FnOnce() -> T + Send + 'scope,
+        T: Send + 'scope;
+}
+```
+
+Donde `thread::spawn` pedía `'static`, `Scope::spawn` pide solo `'scope`: «el closure no contiene préstamos que caduquen **antes de que acabe el ámbito**». `'env` es la vida de lo que tomas prestado de fuera, y la definición de `Scope` exige `'env: 'scope` (lo de fuera vive al menos tanto como el ámbito). El compilador comprueba esas dos vidas como cualquier otra (mundo 8).
+
+**Qué hace al salir.** `scope` lleva la cuenta de cuántos hilos siguen vivos. Después de ejecutar tu closure, espera hasta que esa cuenta llega a cero. Si algún hilo entró en pánico y nadie hizo `join` sobre él, `scope` entra en pánico a su vez: no puedes ignorar un fallo sin enterarte.
+
+**Pistas de los errores.** Fíjate en que los errores de esta lección citan `scoped.rs:203` y la línea `F: FnOnce() -> T + Send + 'scope`. El compilador te enseña de dónde viene cada exigencia: léelas, no las saltes.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Las reglas de préstamos no se suspenden entre hilos">
+
+❌ Un hilo que añade elementos (préstamo exclusivo) y otro que lee (préstamo compartido) a la vez:
+
+<NoCompila ej="m17/scope-mut-conflicto" explicacion="Si compilara, un hilo podría estar leyendo el Vec mientras el otro hace push y lo realoja en otra zona del heap: el lector leería memoria liberada. Esa es exactamente la carrera de datos que la regla de exclusividad impide." />
+
+✅ Dale a cada hilo **una parte distinta** con `split_at_mut` (pulsa «Ver arreglo»): dos préstamos exclusivos de trozos que no se solapan. El resultado es `[10, 2, 30]`. Si de verdad dos hilos tienen que tocar **lo mismo**, necesitas un `Mutex` (lección 6).
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m17/reto-vocales" enunciado="Usa `thread::scope` para contar las vocales de cada texto en su propio hilo y guarda los resultados en orden en `cuentas`. Debe imprimir `murciélago: 5`, `ñandú: 2` y `ola: 2`. Pista: lanza los hilos con un `map` que guarde las manijas en un `Vec` y, después, recórrelo haciendo `join`. Si haces `join` dentro del mismo `map`, cada hilo esperará al anterior y perderás el paralelismo." />
+
+<Historia titulo="La leakpocalypse de 2015">
+
+Antes de Rust 1.0 existía `thread::scoped`, que devolvía un *guard*: al destruirse el guard, se esperaba al hilo. En abril de 2015 se descubrió que era posible **no destruir nunca** ese guard (por ejemplo, metiéndolo en un ciclo de `Rc`, o con `mem::forget`). El hilo seguía corriendo con préstamos de datos que ya no existían: un uso tras liberar en código seguro.
+
+La decisión fue de principios: **filtrar memoria (no ejecutar un destructor) es seguro** en Rust, `mem::forget` dejó de ser `unsafe`, y ninguna API puede depender de que un destructor se ejecute para ser segura. `thread::scoped` se retiró. Siete años después, Rust 1.63 trajo `thread::scope`, diseñada al revés: en lugar de un guard que podría olvidarse, **un closure**. La función no devuelve hasta que los hilos han terminado, y no hay nada que olvidar.
+
+</Historia>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `s.spawn(|| trozo.iter().sum())` compila dentro de `thread::scope` y `thread::spawn(move || trozo.iter().sum())` no?"
+  opciones={[
+    "Porque scope copia los datos a cada hilo",
+    "Porque scope garantiza que los hilos terminan antes de salir, así que el préstamo no puede quedar colgando",
+    "Porque los hilos con ámbito no corren en paralelo",
+    "Porque scope desactiva el borrow checker"
+  ]}
+  correcta={1}
+  explicacion="La exigencia baja de `'static` a `'scope`: basta con que el préstamo dure lo que dura el ámbito."
+  porque={["No copia nada: presta.", "Correcto.", "Corren en paralelo igual que los de spawn.", "Al contrario: el borrow checker sigue comprobando todo, incluidos los conflictos entre hilos."]}
+/>
+
+<Pregunta
+  pregunta="Dentro de un `scope`, dos hilos hacen `contador += 1` sobre la misma variable local `mut contador`. ¿Qué pasa?"
+  opciones={[
+    "Compila, y a veces el resultado es 1",
+    "Compila, y el resultado siempre es 2",
+    "No compila: dos préstamos exclusivos a la vez (E0499)",
+    "Entra en pánico al ejecutarse"
+  ]}
+  correcta={2}
+  explicacion="Cada closure necesita `&mut contador`, y no puede haber dos préstamos exclusivos vivos a la vez. Lo verás en detalle en la lección 5."
+  porque={["Eso sería una carrera de datos: justo lo que Rust no deja compilar.", "Para que funcione necesitas un Mutex o un atómico.", "Correcto.", "Ni siquiera llega a ejecutarse."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué lección de diseño dejó la leakpocalypse?"
+  opciones={[
+    "Que mem::forget debía ser unsafe",
+    "Que una API segura no puede depender de que se ejecute un destructor",
+    "Que los hilos no pueden tomar préstamos nunca",
+    "Que Rc no debe existir"
+  ]}
+  correcta={1}
+  explicacion="Filtrar es seguro, así que la seguridad no puede apoyarse en `Drop`. `thread::scope` usa un closure precisamente por eso."
+  porque={["Se decidió lo contrario: forget pasó a ser seguro.", "Correcto.", "Los hilos con ámbito sí los toman.", "Rc siguió existiendo; lo que cambió fue el principio de diseño."]}
+/>

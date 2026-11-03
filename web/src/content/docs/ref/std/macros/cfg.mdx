@@ -1,0 +1,33 @@
+---
+title: "cfg!"
+description: "Evalúa una condición de compilación (plataforma, perfil, features) como un bool, sin eliminar código."
+sidebar:
+  order: 21
+insignias: ["Desde 1.0", "core"]
+---
+
+**Ruta:** `std::cfg`
+
+## Sinopsis
+
+```rust
+cfg!(predicado) // -> bool, constante
+```
+
+## Qué hace
+
+Devuelve `true` o `false` según el mismo predicado que el atributo [`#[cfg]`](/ref/lenguaje/atributos/cfg/): `cfg!(windows)`, `cfg!(debug_assertions)`, `cfg!(feature = "x")`, `cfg!(all(unix, target_pointer_width = "64"))`.
+
+La diferencia con el atributo: `#[cfg]` **elimina** el código si la condición es falsa; con `cfg!`, el código de las dos ramas se compila (y tiene que ser válido en todas las plataformas). Como el resultado es una constante, el optimizador quita la rama que no se usa.
+
+```rust
+let separador = if cfg!(windows) { '\\' } else { '/' };
+```
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[`#[cfg]`](/ref/lenguaje/atributos/cfg/) · [Perfiles y cfg](/curso/12-modulos-crates-y-cargo/08-perfiles-y-cfg/)

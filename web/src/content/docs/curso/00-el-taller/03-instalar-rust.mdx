@@ -1,0 +1,100 @@
+---
+title: "Instalar Rust con rustup"
+description: "rustup instala y actualiza Rust: el compilador rustc, Cargo y la biblioteca estándar. Cómo instalarlo en Windows 11 y comprobar que funciona."
+sidebar:
+  order: 3
+duracion: 12
+requiere: ["00-el-taller/02-la-terminal"]
+tarjetas:
+  - p: "¿Qué es `rustup`?"
+    r: "El instalador y gestor de versiones de Rust: instala, actualiza y cambia entre toolchains (stable, nightly…) y componentes."
+  - p: "¿Qué es una toolchain?"
+    r: "Un juego completo de herramientas de una versión de Rust: `rustc`, `cargo`, la biblioteca estándar, etc. Por ejemplo `stable-x86_64-pc-windows-msvc`."
+  - p: "¿Cómo compruebas que Rust está instalado?"
+    r: "`rustc --version` y `cargo --version` en una terminal nueva."
+  - p: "¿Cómo actualizas Rust?"
+    r: "`rustup update`. Sale una versión estable nueva cada 6 semanas."
+  - p: "¿Qué significa `x86_64-pc-windows-msvc`?"
+    r: "Es la plataforma (target): procesador x86-64, sistema Windows, y programas enlazados con las herramientas de Microsoft (MSVC)."
+---
+
+import { Pregunta, Trampa } from '~/components';
+
+Vas a instalar Rust en tu PC. Son unos minutos, pero conviene entender **qué** instalas, porque la próxima lección depende de ello.
+
+## La idea
+
+Rust no se instala como un programa normal, sino con **rustup**, un gestor que instala y mantiene al día todas las herramientas:
+
+| Herramienta | Qué hace |
+|---|---|
+| `rustc` | el **compilador**: convierte tu código en un programa ejecutable |
+| `cargo` | el **gestor de proyectos**: crea proyectos, compila, ejecuta, prueba, descarga bibliotecas |
+| la biblioteca estándar (`std`) | el código que viene con Rust: textos, listas, archivos… |
+| `rustfmt`, `clippy` | el formateador y el revisor de estilo (mundo 16) |
+
+Un juego completo de estas herramientas, de una versión concreta, se llama **toolchain**. La que instalarás se llama `stable-x86_64-pc-windows-msvc`:
+
+- `stable`: la versión estable (sale una nueva cada 6 semanas; en este curso, la **1.99**).
+- `x86_64-pc-windows`: para procesadores de 64 bits con Windows.
+- `msvc`: los programas se **enlazan** con las herramientas de Microsoft. Esto es importante en la lección siguiente.
+
+## Instálalo
+
+1. Abre **Terminal** (PowerShell) y escribe:
+
+   ```powershell
+   winget install --id Rustlang.Rustup
+   ```
+
+   Si no tienes `winget`, descarga `rustup-init.exe` desde la web oficial, **rustup.rs**, y ejecútalo.
+
+2. Si el instalador te ofrece instalar los requisitos de Visual Studio, **acepta**: es la solución de la próxima lección hecha por adelantado.
+
+3. Acepta las opciones por defecto.
+
+4. **Cierra la terminal y abre una nueva** (para que encuentre las órdenes nuevas) y comprueba:
+
+   ```powershell
+   rustc --version
+   cargo --version
+   rustup --version
+   ```
+
+   Deberías ver algo como `rustc 1.99.1 (… 2026-10-13)`. El número puede ser mayor si lees esto más tarde: no importa.
+
+## Mantenerlo
+
+```powershell
+rustup update           # actualiza a la última versión estable
+rustup show             # muestra qué toolchain usas
+rustup doc --book       # abre el libro oficial de Rust, sin conexión
+```
+
+`rustup doc` merece la pena: toda la documentación de la biblioteca estándar, en tu PC, aunque no tengas internet.
+
+<Trampa titulo="«rustc no se reconoce como un comando»">
+
+Si al escribir `rustc --version` aparece *«El término 'rustc' no se reconoce…»*, casi siempre es porque la terminal se abrió **antes** de instalar. El instalador añade `%USERPROFILE%\.cargo\bin` al PATH (la lista de carpetas donde Windows busca programas), pero las terminales ya abiertas no se enteran.
+
+✅ Cierra **todas** las terminales (y el editor, si tiene una dentro) y abre una nueva.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué herramienta usarás a diario para compilar y ejecutar tus proyectos?"
+  opciones={["`rustup`", "`rustc`", "`cargo`", "`rustfmt`"]}
+  correcta={2}
+  explicacion="Cargo organiza el proyecto y llama a `rustc` por ti con las opciones correctas. `rustup` solo se usa para instalar y actualizar."
+  porque={["Solo instala y actualiza herramientas.", "Es el compilador, pero lo usarás a través de Cargo.", "", "Solo da formato al código."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué indica `msvc` en `stable-x86_64-pc-windows-msvc`?"
+  opciones={["Que solo funciona con VS Code", "Que los programas se enlazan con las herramientas de Microsoft (MSVC)", "Que es una versión de prueba", "Que es de 32 bits"]}
+  correcta={1}
+  explicacion="MSVC es el conjunto de herramientas de compilación de Microsoft. Rust usa su enlazador para producir los `.exe`."
+  porque={["VS Code es un editor y no tiene nada que ver con MSVC.", "", "La versión es `stable`.", "`x86_64` es 64 bits."]}
+/>

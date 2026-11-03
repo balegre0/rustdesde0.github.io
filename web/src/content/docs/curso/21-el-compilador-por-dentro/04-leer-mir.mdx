@@ -1,0 +1,223 @@
+---
+title: "Leer MIR"
+description: "Genera el MIR de tus funciones con rustc estable y aprende a leer bloques básicos, locales, terminadores y aristas de unwind."
+sidebar:
+  order: 4
+duracion: 15
+desde: "1.12"
+requiere: ["21-el-compilador-por-dentro/03-hir-y-thir"]
+tarjetas:
+  - p: "¿Qué es un bloque básico en MIR?"
+    r: "Una lista de sentencias que se ejecutan siempre seguidas, terminada en un único terminador (`goto`, `switchInt`, `call`, `assert`, `drop`, `return`…) que decide a qué bloque se salta."
+  - p: "¿Qué significan `_0`, `_1`, `_2` en MIR?"
+    r: "Son locales: `_0` es el valor de retorno, `_1`… son los argumentos y después vienen las variables y los temporales."
+  - p: "¿Cómo aparece en MIR la comprobación de overflow de `n * 2` en debug?"
+    r: "Como `MulWithOverflow`, que da el resultado y un `bool`, seguido de un terminador `assert` que salta al pánico si el `bool` es verdadero."
+  - p: "¿Qué es un bloque `(cleanup)`?"
+    r: "Un bloque que solo se ejecuta durante el unwinding de un pánico: hace los `drop` pendientes y termina en `resume` para seguir desenrollando."
+  - p: "¿Cómo se genera el MIR con la toolchain estable?"
+    r: "`rustc --edition 2024 --emit=mir archivo.rs` (o `--crate-type lib` para una biblioteca)."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+El MIR es la representación donde Rust se vuelve **Rust de verdad**: aquí se comprueban los préstamos, se insertan los `drop`, se evalúan las constantes y se hacen las primeras optimizaciones. Y lo mejor: puedes generarlo con la toolchain estable. En esta lección aprendes a leerlo línea a línea.
+
+## Predice
+
+<Pregunta
+  pregunta="En el MIR de `doble` (lo tienes completo más abajo), el primer bloque termina en `switchInt(move _2) -> [0: bb2, 1: bb3, otherwise: bb1]`, donde `_2` es la etiqueta del `Option`. ¿Qué camino de bloques sigue `doble(None)`?"
+  opciones={["bb0 → bb3 → bb4 → bb5", "bb0 → bb2 → bb5", "bb0 → bb1", "bb0 → bb5"]}
+  correcta={1}
+  explicacion="`None` es la variante 0 de `Option`, así que `switchInt` salta a `bb2`, que pone `_0 = 0` y hace `goto -> bb5`, el bloque del `return`."
+  porque={["Ese es el camino de `Some(n)`: variante 1.", "", "`bb1` es `unreachable`: el discriminante de un `Option` solo puede valer 0 o 1.", "Siempre hay un bloque intermedio que da valor a `_0`."]}
+/>
+
+## La idea
+
+El MIR de una función es un **grafo de flujo de control** (*control-flow graph*, CFG). Tiene tres ingredientes:
+
+- **Locales**: casillas numeradas. `_0` es el valor que se devuelve; `_1`, `_2`… son los argumentos, y luego las variables y los temporales que el compilador necesita. Las líneas `debug x => _1;` dicen qué variable tuya corresponde a cada local.
+- **Bloques básicos** (`bb0`, `bb1`…): listas de **sentencias** simples (asignar, leer un campo, calcular) que se ejecutan siempre en orden.
+- **Terminadores**: la última línea de cada bloque, y la única que puede cambiar de camino: `goto -> bbN` (salto), `switchInt` (el `match`), `call` (llamada que vuelve a un bloque), `assert` (comprobación que puede entrar en pánico), `drop` (destruir un valor), `return` y `unreachable`.
+
+Además, los **operandos dicen cómo se usan los valores**: `copy _3` copia un valor `Copy`; `move _1` lo mueve (después `_1` ya no vale); `&_2` crea un préstamo compartido. Con esto el borrow checker tiene todo lo que necesita: quién se movió, quién está prestado y por qué caminos.
+
+## Pruébalo
+
+Esta es la función cuyo MIR vas a leer. La tercera llamada provoca overflow: en el perfil debug el `assert` del MIR entra en pánico; en release la comprobación no existe y el resultado da la vuelta.
+
+<Ejecutar ej="m21/mir-doble" />
+
+Genera tú el MIR (funciona con stable):
+
+```bash
+rustc --edition 2024 --crate-type lib --emit=mir -C opt-level=0 -o mir1.mir mir1.rs
+```
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Salida real de rustc 1.99.1 para `doble`. La propia cabecera avisa: es un formato para humanos que puede cambiar sin aviso.
+
+```text
+fn doble(_1: Option<u32>) -> u32 {
+    debug x => _1;
+    let mut _0: u32;
+    let mut _2: isize;
+    let _3: u32;
+    let mut _4: (u32, bool);
+    scope 1 {
+        debug n => _3;
+    }
+
+    bb0: {
+        _2 = discriminant(_1);
+        switchInt(move _2) -> [0: bb2, 1: bb3, otherwise: bb1];
+    }
+
+    bb1: {
+        unreachable;
+    }
+
+    bb2: {
+        _0 = const 0_u32;
+        goto -> bb5;
+    }
+
+    bb3: {
+        _3 = copy ((_1 as Some).0: u32);
+        _4 = MulWithOverflow(copy _3, const 2_u32);
+        assert(!move (_4.1: bool), "attempt to compute `{} * {}`, which would overflow", copy _3, const 2_u32) -> [success: bb4, unwind continue];
+    }
+
+    bb4: {
+        _0 = move (_4.0: u32);
+        goto -> bb5;
+    }
+
+    bb5: {
+        return;
+    }
+}
+```
+
+Léelo así: `discriminant(_1)` lee la **etiqueta** del enum; `switchInt` es el `match`. `(_1 as Some).0` es una **proyección**: «el campo 0 de `_1` vista como variante `Some`». La multiplicación con comprobación devuelve una tupla `(resultado, hubo_overflow)` y el `assert` tiene dos salidas: `success` y `unwind`, el camino que se sigue si hay pánico.
+
+Ahora una función que **posee** un `String`:
+
+```rust
+pub fn saluda(nombre: String) -> usize {
+    let s = nombre;
+    s.len()
+}
+```
+
+Su MIR real:
+
+```text
+fn saluda(_1: String) -> usize {
+    debug nombre => _1;
+    let mut _0: usize;
+    let _2: std::string::String;
+    let mut _3: &std::string::String;
+    scope 1 {
+        debug s => _2;
+    }
+
+    bb0: {
+        _2 = move _1;
+        _3 = &_2;
+        _0 = String::len(move _3) -> [return: bb1, unwind: bb3];
+    }
+
+    bb1: {
+        drop(_2) -> [return: bb2, unwind continue];
+    }
+
+    bb2: {
+        return;
+    }
+
+    bb3 (cleanup): {
+        drop(_2) -> [return: bb4, unwind terminate(cleanup)];
+    }
+
+    bb4 (cleanup): {
+        resume;
+    }
+}
+```
+
+Aquí ves la **propiedad** hecha código: `_2 = move _1` (mover), `&_2` (préstamo compartido para llamar a `len`, con el autoref ya explícito), y `drop(_2)` al final, que libera la memoria del `String`. Y fíjate: **no hay `drop(_1)`**, porque `_1` se movió. Así evita Rust la **doble liberación**. Si `len` entrara en pánico, se iría por `unwind: bb3`, un bloque `cleanup` que también hace `drop(_2)` (sin fugas de memoria) y termina en `resume` para seguir desenrollando.
+
+Con nightly puedes ver el MIR **en cada pasada** del compilador con `-Zdump-mir=doble` (escribe un archivo por pasada en la carpeta `mir_dump/`) o dibujarlo con `-Zdump-mir-graphviz`. El `--emit=mir` muestra la última versión, el MIR optimizado.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m21/sin-inicializar" explicacion="E0381 lo detecta un análisis de flujo sobre MIR: existe un camino (si `llueve` fuera `false`) que llega al uso de `x` sin pasar por ninguna asignación. El compilador no evalúa la condición; mira los caminos del grafo. Leer memoria sin inicializar sería comportamiento indefinido." />
+
+<Trampa titulo="Pensar que el compilador «ve» que una condición siempre es verdadera">
+
+❌ «`llueve` es `true`, así que `x` siempre tiene valor; el compilador debería saberlo.»
+
+✅ Los análisis del MIR razonan sobre **todos los caminos del grafo**, no sobre los valores. Es una aproximación segura: puede rechazar programas correctos, pero nunca acepta uno que lea memoria sin inicializar. El arreglo es que **cada** camino dé valor, por ejemplo con `if … { 1 } else { 0 }`.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={[
+    "bb0: { _2 = discriminant(_1); switchInt(move _2) -> [0: bb2, 1: bb3, otherwise: bb1]; }",
+    "bb3: { _3 = copy ((_1 as Some).0: u32); _4 = MulWithOverflow(copy _3, const 2_u32); assert(...) -> [success: bb4, unwind continue]; }",
+    "bb4: { _0 = move (_4.0: u32); goto -> bb5; }",
+    "bb5: { return; }"
+  ]}
+  distractores={["bb4: { drop(_1) -> bb5; }", "bb3: { _3 = move _1; }"]}
+  explicacion="Este es el camino de `doble(Some(21))`: leer la etiqueta, saltar a la rama `Some`, multiplicar comprobando overflow, guardar en `_0` y volver. `Option<u32>` es `Copy`, así que no hay ningún `drop` y el campo se lee con `copy`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En MIR, ¿qué local guarda el valor de retorno de una función?"
+  opciones={["`_1`", "`_0`", "el último local", "ninguno: se devuelve en un registro"]}
+  correcta={1}
+  explicacion="Por convenio, `_0` es siempre el lugar de retorno; `return` devuelve lo que haya en `_0`."
+  porque={["`_1` es el primer argumento.", "", "Los temporales van al final, pero el retorno es `_0`.", "Los registros aparecen mucho después, en el código máquina."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué en el MIR de `saluda` hay `drop(_2)` pero no `drop(_1)`?"
+  opciones={[
+    "Porque `_1` es un argumento y los argumentos nunca se destruyen",
+    "Porque `_1` se movió a `_2` (`_2 = move _1`): destruirlo también sería una doble liberación",
+    "Porque el compilador se olvidó",
+    "Porque `String` no necesita `drop`"
+  ]}
+  correcta={1}
+  explicacion="Tras un `move`, el origen ya no posee nada. El compilador solo inserta `drop` para quien es dueño al final de cada camino."
+  porque={["Un argumento que no se mueve sí se destruye al final de la función.", "", "Es exactamente lo que debe hacer: no hay olvido.", "`String` reserva memoria en el heap: necesita `drop` para liberarla."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace un bloque marcado `(cleanup)`?"
+  opciones={[
+    "Se ejecuta siempre al final de la función",
+    "Se ejecuta solo durante el unwinding de un pánico: hace los `drop` pendientes y continúa con `resume`",
+    "Libera la pila del hilo",
+    "Es código muerto que el optimizador quitará"
+  ]}
+  correcta={1}
+  explicacion="Los bloques `cleanup` son el camino del pánico. Gracias a ellos, los valores se destruyen aunque la función no termine normalmente."
+  porque={["El final normal es el camino de `return`, no el de `cleanup`.", "", "La pila se recupera sola al desenrollar; el bloque hace los `drop` de los valores.", "No es código muerto: se usa si hay un pánico (con `panic = \"unwind\"`)."]}
+/>
+
+## Para saber más
+
+- La lección siguiente: [el borrow checker trabaja sobre MIR](/curso/21-el-compilador-por-dentro/05-borrowck-en-mir/).
+- *rustc-dev-guide*, capítulo «The MIR (Mid-level IR)»: https://rustc-dev-guide.rust-lang.org/mir/index.html

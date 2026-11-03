@@ -1,0 +1,840 @@
+# Banco de preguntas del mundo 08 — Lifetimes (CONTENIDO.md §7.1).
+# Todo código citado está en ejemplos/m08/p-*.rs y se ha compilado/ejecutado con rustc 1.99.1, edición 2024.
+# Incluye los 10 malentendidos sobre lifetimes recogidos en investigacion/02 (bloque B).
+
+- id: m08-colgante-bloque
+  titulo: "La referencia que sobrevive"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m08/p-colgante-bloque
+  opciones:
+    - "`x` muere al cerrar el bloque, pero `r` se usa después: sería una referencia colgante (E0597)"
+    - "`r` se declara sin valor y eso no está permitido"
+    - "Un entero no se puede prestar"
+    - "`r` necesita `mut` para recibir el valor más tarde"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0597]: x does not live long enough`. El préstamo `&x` tendría que durar hasta el `println!`, pero `x` deja de existir antes. Leer `r` sería leer un trozo de pila que ya se reutiliza para otra cosa (uso tras liberar).
+    - Declarar sin valor y asignar después es válido (Rust comprueba que se asigna antes de usar).
+    - Se puede prestar cualquier valor.
+    - Asignar **una vez** a una variable sin valor no requiere `mut`.
+  etiquetas: ["E0597", "colgante"]
+
+- id: m08-sin-especificador
+  titulo: "¿De quién viene?"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila la **firma** de `mas_larga`?"
+  ej: m08/p-sin-especificador
+  opciones:
+    - "La salida es una referencia y hay dos entradas: la firma no dice si lo devuelto viene de `a` o de `b` (E0106)"
+    - "No se pueden comparar longitudes de `&str`"
+    - "Una función no puede recibir dos referencias"
+    - "Falta `return`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0106]: missing lifetime specifier`, con la ayuda «this function's return type contains a borrowed value, but the signature does not say whether it is borrowed from `a` or `b`». Quien llama necesita saberlo para comprobar que el resultado no sobrevive a lo que presta.
+    Arreglo verificado: `fn mas_larga<'a>(a: &'a str, b: &'a str) -> &'a str`, que imprime `adiós`.
+  etiquetas: ["E0106", "anotaciones"]
+
+- id: m08-devolver-local
+  titulo: "Devolver lo que muere"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `gritar` y cuál es el arreglo correcto?"
+  ej: m08/p-devolver-local
+  opciones:
+    - "`grande` es local y se libera al salir de la función; hay que devolver el `String` (la propiedad), no una referencia (E0515)"
+    - "Hay que añadir `'static` a la salida: `-> &'static str`"
+    - "`to_uppercase` no existe para `&str`"
+    - "Hay que escribir `return &grande;`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0515]: cannot return reference to local variable grande`. El marco de pila de `gritar` desaparece al volver, y con él `grande`. Ninguna anotación puede alargar esa vida: las lifetimes **describen**, no cambian nada.
+    Arreglo verificado: `fn gritar(s: &str) -> String { s.to_uppercase() }` imprime `HOLA`.
+    - `'static` no arregla nada: `grande` no vive para siempre.
+    - `return` explícito es lo mismo que la expresión final.
+  etiquetas: ["E0515", "colgante"]
+
+- id: m08-mas-larga-llamador
+  titulo: "La culpa es de quien llama"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "La firma de `mas_larga` ya está anotada. ¿Por qué falla `main`?"
+  ej: m08/p-mas-larga-llamador
+  opciones:
+    - "La firma dice que el resultado vive como mucho lo que la **más corta** de las dos entradas; `b` muere en el bloque y `r` se usa fuera (E0597)"
+    - "`a` es más larga, así que el resultado es `a` y debería compilar: es un fallo del compilador"
+    - "No se puede llamar a una función con anotaciones dentro de un bloque"
+    - "Falta `mut` en `r`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0597]: b does not live long enough`. El compilador no ejecuta el `if`: solo mira la firma, y la firma dice «el resultado puede venir de cualquiera de las dos». Así que debe valer mientras valgan **ambas**.
+    - Que ganara `a` no lo sabe el compilador; y con otros textos podría ganar `b`. La firma es un contrato para todas las llamadas.
+  etiquetas: ["E0597", "anotaciones", "llamador"]
+
+- id: m08-mas-larga-ok
+  titulo: "Dentro del bloque sí"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué pasa?"
+  ej: m08/p-mas-larga-ok
+  opciones:
+    - "Compila e imprime `luna`"
+    - "Compila e imprime `sol`"
+    - "No compila: E0597 por `b`"
+    - "No compila: E0106"
+  correcta: 0
+  solucion: |
+    Ahora `r` se usa **dentro** del bloque, mientras `a` y `b` siguen vivas: el contrato se cumple. `"luna"` (4 bytes) es más larga que `"sol"` (3).
+  etiquetas: ["anotaciones"]
+
+- id: m08-elision-una-entrada
+  titulo: "Sin anotaciones y compila"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: predice
+  enunciado: "`primera_palabra` devuelve una referencia sin ninguna `'a`. ¿Qué pasa?"
+  ej: m08/p-elision-una-entrada
+  opciones:
+    - "Compila e imprime `[hola]`"
+    - "No compila: falta una lifetime (E0106)"
+    - "Compila e imprime `[hola mundo]`"
+    - "Compila e imprime `[]`"
+  correcta: 0
+  solucion: |
+    Reglas de **elisión**: con una sola referencia de entrada, su lifetime se asigna a la salida. La firma completa sería `fn primera_palabra<'a>(s: &'a str) -> &'a str`. `find(' ')` da el índice del espacio (4) y `&s[..4]` es `"hola"`.
+  etiquetas: ["elisión", "slices"]
+
+- id: m08-elision-dos-entradas
+  titulo: "Dos entradas, cero pistas"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Qué regla de elisión no se puede aplicar aquí?"
+  ej: m08/p-elision-dos-entradas
+  opciones:
+    - "La 2ª («si hay exactamente una lifetime de entrada, va a la salida»): hay dos entradas y no hay `self`, así que la salida queda sin lifetime (E0106)"
+    - "La 1ª: dos referencias no pueden tener lifetimes distintas"
+    - "La 3ª: siempre hace falta `&self` para devolver referencias"
+    - "Ninguna: el error es por el `bool`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0106]: missing lifetime specifier`. Regla 1: cada referencia de entrada recibe su propia lifetime (`'a`, `'b`). Regla 2: si solo hay una, va a la salida. Regla 3: si hay `&self`/`&mut self`, la suya va a la salida. Aquí ninguna decide la salida.
+    - El `bool` no es una referencia: no cuenta.
+  etiquetas: ["E0106", "elisión"]
+
+- id: m08-elision-self
+  titulo: "La regla de self"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: predice
+  enunciado: "`inicio` tiene dos referencias de entrada (`&self` y `otro`) y no lleva anotaciones. ¿Qué pasa?"
+  ej: m08/p-elision-self
+  opciones:
+    - "Compila e imprime `abc`: por la regla 3, la salida toma la lifetime de `&self`"
+    - "No compila: E0106, hay dos entradas"
+    - "Compila e imprime `zzz`"
+    - "Compila e imprime `abcdef`"
+  correcta: 0
+  solucion: |
+    Con `&self`, la regla 3 asigna su lifetime a la salida, haya las entradas que haya. Devolvemos un trozo de `self.texto`, que vive al menos tanto como `self`: correcto. `&self.texto[..3]` es `"abc"`.
+  etiquetas: ["elisión", "impl", "self"]
+
+- id: m08-elision-self-mal
+  titulo: "La regla de self se equivoca"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "Ahora el método devuelve `otro`, no algo de `self`. ¿Por qué no compila?"
+  ej: m08/p-elision-self-mal
+  opciones:
+    - "La elisión ató la salida a `&self` (regla 3), pero devolvemos datos con la lifetime de `otro`: «lifetime may not live long enough». Hay que anotar `otro` y la salida con la misma `'b`"
+    - "Un método no puede devolver un parámetro"
+    - "`let _ = self.texto;` mueve el texto fuera de `self`"
+    - "Las referencias de un método siempre deben ser `'static`"
+  correcta: 0
+  solucion: |
+    rustc: `error: lifetime may not live long enough`, «method was supposed to return data with lifetime `'2` but it is returning data with lifetime `'1`», y sugiere `fn otro<'b>(&self, otro: &'b str) -> &'b str`.
+    La elisión es una **suposición** razonable, no magia: cuando no encaja con lo que haces, escribes la firma completa.
+    - `let _ = self.texto;` no mueve: `_` no enlaza nada (y `&str` es `Copy`).
+  etiquetas: ["elisión", "self"]
+
+- id: m08-struct-sin-lifetime
+  titulo: "Un struct con una referencia"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila la definición de `Extracto`?"
+  ej: m08/p-struct-sin-lifetime
+  opciones:
+    - "Un campo referencia necesita una lifetime declarada en el struct: `struct Extracto<'a> { parte: &'a str }` (E0106)"
+    - "Los structs no pueden tener campos `&str`"
+    - "Hay que poner `pub` en el campo"
+    - "Hay que usar `String` siempre"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0106]: missing lifetime specifier`. En los structs **no hay elisión**: si guardas un préstamo, el tipo debe decir que depende de algo que vive fuera (`Extracto<'a>` = «un extracto que no puede sobrevivir a `'a`»).
+    - Sí pueden; solo hay que declararlo.
+    - `String` es una opción (y la más sencilla para empezar), pero no la única.
+  etiquetas: ["E0106", "structs"]
+
+- id: m08-struct-sobrevive
+  titulo: "El extracto sin novela"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m08/p-struct-sobrevive
+  opciones:
+    - "`e` guarda un préstamo de `novela`, que muere al cerrar el bloque; `e` se usa después (E0597)"
+    - "`&novela[..11]` corta un carácter por la mitad"
+    - "Un struct no se puede crear dentro de un bloque"
+    - "`e` no tiene tipo"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0597]: novela does not live long enough`. Un struct con `'a` es un préstamo con forma de struct: hereda la misma restricción que una referencia suelta.
+    - `"Era una vez."` tiene 12 bytes; `[..11]` es `"Era una vez"`, todo ASCII: no corta nada.
+    - El tipo se infiere.
+  etiquetas: ["E0597", "structs"]
+
+- id: m08-static-string
+  titulo: "¿Un String es 'static?"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: predice
+  enunciado: "`guardar` exige `T: 'static`. ¿Qué pasa?"
+  ej: m08/p-static-string
+  opciones:
+    - "Compila e imprime `\"vivo poco\"`, `42` y `\"literal\"`"
+    - "No compila: `s` no vive todo el programa"
+    - "No compila: `42` no es `'static`"
+    - "Compila, pero `s` ya no se libera nunca"
+  correcta: 0
+  solucion: |
+    `T: 'static` **no** significa «vive todo el programa», sino «no contiene préstamos que puedan caducar»: el tipo *podría* guardarse tanto como quisieras. Un `String` es dueño de todo lo suyo, así que cumple, aunque se libere enseguida (al acabar `guardar`). `42` también; y un literal es `&'static str`.
+    Este es el malentendido nº 2 de la lista.
+  etiquetas: ["'static", "malentendidos"]
+
+- id: m08-static-ref-local
+  titulo: "Una referencia no es 'static"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Pasamos `&s` en vez de `s`. ¿Por qué ya no compila?"
+  ej: m08/p-static-ref-local
+  opciones:
+    - "`&s` es un préstamo de una variable local: solo cumpliría `'static` si `s` viviera para siempre («argument requires that `s` is borrowed for `'static`», E0597)"
+    - "No se pueden pasar referencias a funciones genéricas"
+    - "`Debug` no está implementado para `&String`"
+    - "Habría que pasar `&&s`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0597]: s does not live long enough`, con «argument requires that `s` is borrowed for `'static`» y una nota que señala el `'static` de la firma. Lo que hace `'static` a un tipo es no depender de préstamos cortos; `&String` local depende de uno.
+    - Las genéricas aceptan referencias (`T` puede ser `&U`), solo que este *bound* no.
+  etiquetas: ["E0597", "'static"]
+
+- id: m08-temporal
+  titulo: "Un temporal que se va"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m08/p-temporal
+  opciones:
+    - "`String::from(\"hola\")` es un valor temporal sin dueño: se libera al final de la sentencia, y `s` lo mira después (E0716)"
+    - "`as_str()` no existe"
+    - "No se puede anotar `&str` en un `let`"
+    - "Falta `mut`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0716]: temporary value dropped while borrowed`, «temporary value is freed at the end of this statement», y sugiere guardar el `String` en una variable (`let binding = String::from("hola");`). Un valor necesita dueño para vivir más allá de su sentencia.
+  etiquetas: ["E0716", "temporales"]
+
+- id: m08-anotacion-restrictiva
+  titulo: "Compilaba… hasta que lo usé"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "`primera` siempre devuelve `a` y su firma compila. ¿Por qué falla `main`?"
+  ej: m08/p-anotacion-restrictiva
+  opciones:
+    - "La firma ata **también** `b` a `'a`: el compilador cree que el resultado podría venir de `b`, que muere en el bloque (E0597). La firma es demasiado restrictiva"
+    - "`let _ = b;` mueve `b`"
+    - "Una función con lifetimes no se puede llamar dentro de un bloque"
+    - "El compilador ejecuta `primera` y ve que devuelve `b`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0597]: b does not live long enough`. Las anotaciones son un contrato y el llamador solo ve el contrato. Arreglo verificado: `fn primera<'a>(a: &'a str, b: &str) -> &'a str` (sin `'a` en `b`); imprime `hola`.
+    Es el malentendido nº 5: «si compila, mis anotaciones son correctas». Una firma puede compilar y ser demasiado estricta para quien la llama.
+  etiquetas: ["E0597", "anotaciones", "malentendidos"]
+
+- id: m08-box-dyn
+  titulo: "Una caja con lifetime escondida"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `en_caja`?"
+  ej: m08/p-box-dyn
+  opciones:
+    - "`Box<dyn Display>` significa en realidad `Box<dyn Display + 'static>`; `T` podría contener préstamos, así que no cumple (E0310)"
+    - "`Box::new` no acepta genéricos"
+    - "`Display` no se puede usar con `dyn`"
+    - "`5` no implementa `Display`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0310]: the parameter type T may not live long enough`, con «this `dyn Trait` has an implicit `'static` lifetime bound». Malentendido nº 6: «los trait objects en caja no tienen lifetimes». Sí la tienen, aunque no se vea.
+    Arreglos: `T: Display + 'static` (lo que sugiere rustc) o, más flexible, `fn en_caja<'a, T: Display + 'a>(t: T) -> Box<dyn Display + 'a>`.
+  etiquetas: ["E0310", "dyn", "'static", "malentendidos"]
+
+- id: m08-degradar-mut
+  titulo: "Lo exclusivo no se ablanda"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "`agregar_y_ver` devuelve un `&i32` (compartido). ¿Por qué no se puede crear otro `&v`?"
+  ej: m08/p-degradar-mut
+  opciones:
+    - "Por elisión, el `&i32` devuelto viene del `&mut v` y lo mantiene vivo: mientras se use `primero`, `v` sigue prestado **en exclusiva** (E0502)"
+    - "Dos préstamos compartidos no pueden convivir"
+    - "`v.push(0)` invalida `primero`"
+    - "La función debería devolver `&mut i32`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0502]: cannot borrow v as immutable because it is also borrowed as mutable`. Malentendido nº 9: «convertir un `&mut` en `&` libera el préstamo exclusivo». No: la referencia compartida que sale **deriva** del préstamo exclusivo y lo prolonga.
+    - Dos compartidos sí pueden convivir; el problema es que el primero es, en el fondo, exclusivo.
+    - El `push` ocurre dentro de la función, antes de crear la referencia: no invalida nada.
+  etiquetas: ["E0502", "&mut", "malentendidos"]
+
+- id: m08-closure-elision
+  titulo: "Las closures no eliden igual"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "`fn identidad(x: &i32) -> &i32 { x }` compila. ¿Por qué la closure no?"
+  ej: m08/p-closure-elision
+  opciones:
+    - "Las closures no aplican la regla 2 de elisión: entrada y salida reciben lifetimes distintas (`'1` y `'2`) y no se puede devolver `x` («lifetime may not live long enough»)"
+    - "Las closures no pueden recibir referencias"
+    - "Las closures no pueden declarar tipo de retorno"
+    - "`n` no vive lo suficiente"
+  correcta: 0
+  solucion: |
+    rustc: `error: lifetime may not live long enough`, «returning this value requires that `'1` must outlive `'2`». Malentendido nº 10: las closures **no** siguen las mismas reglas de elisión que las funciones. Arreglo práctico: usar una función con nombre.
+  etiquetas: ["closures", "elisión", "malentendidos"]
+
+- id: m08-rama-nunca
+  titulo: "Una rama que nunca se ejecuta"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "`a.len() > 100` es falso siempre aquí. ¿Por qué no compila?"
+  ej: m08/p-rama-nunca
+  opciones:
+    - "Las lifetimes se deciden **al compilar**, para todos los caminos posibles; en uno de ellos `r` apunta a `b`, que muere antes del `println!` (E0597)"
+    - "El compilador ejecuta el `if` y se equivoca"
+    - "No se puede reasignar una referencia"
+    - "`r` necesita una anotación de tipo"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0597]: b does not live long enough`. Malentendido nº 8: «las lifetimes pueden crecer o encogerse al ejecutar». No existen al ejecutar: son una comprobación estática, y el compilador no sabe qué rama se tomará.
+  etiquetas: ["E0597", "malentendidos"]
+
+- id: m08-varianza-mut
+  titulo: "Colar una referencia corta"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Qué fallo evita este error?"
+  ej: m08/p-varianza-mut
+  opciones:
+    - "Que `fijo`, declarada `&'static str`, acabe apuntando a `corta`, que muere en el bloque: una referencia colgante. `&mut T` es **invariante** en `T` y no deja «encoger» `'static` (E0597)"
+    - "Ninguno: el compilador es demasiado estricto aquí"
+    - "Una carrera de datos"
+    - "Una doble liberación de `corta`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0597]: corta does not live long enough`, con «type annotation requires that `corta` is borrowed for `'static`». A través de `&mut` se puede **escribir**: si Rust tratara `&mut &'static str` como `&mut &'a str`, `asignar` podría guardar un préstamo corto en un sitio que todo el mundo cree eterno. Por eso, detrás de `&mut`, el tipo debe coincidir exactamente.
+  etiquetas: ["varianza", "E0597", "&mut"]
+
+- id: m08-covarianza
+  titulo: "Un 'static se acorta solo"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: predice
+  enunciado: "`elige` pide dos `&'a str` con la misma `'a`. Pasamos un `&'static str` y un préstamo local. ¿Qué pasa?"
+  ej: m08/p-covarianza
+  opciones:
+    - "Compila e imprime `alfa`"
+    - "No compila: las dos lifetimes son distintas"
+    - "Compila e imprime `zeta`"
+    - "No compila: hay que convertir el literal en `String`"
+  correcta: 0
+  solucion: |
+    `&'static str` se puede usar donde se pide un `&'a str` más corto: una referencia que vale para siempre vale también un rato (subtipado por lifetimes, **covarianza**). `'a` se elige como la región del préstamo local. `"alfa" < "zeta"` en orden alfabético.
+  etiquetas: ["varianza", "'static"]
+
+- id: m08-t-puede-ser-ref
+  titulo: "T también puede ser una referencia"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué pasa?"
+  ej: m08/p-t-puede-ser-ref
+  opciones:
+    - "Compila e imprime `5`, `5`, `6`"
+    - "No compila: `T` solo puede ser un tipo con dueño"
+    - "Compila e imprime `5`, `&5`, `&mut 6`"
+    - "No compila: `&mut y` no implementa `Debug`"
+  correcta: 0
+  solucion: |
+    Malentendido nº 1: «`T` solo contiene tipos con dueño». Un genérico `T` puede ser `i32`, `&i32` o `&mut i32`. `Debug` de una referencia imprime lo apuntado, sin `&`.
+  etiquetas: ["genéricos", "malentendidos"]
+
+- id: m08-static-literal
+  titulo: "El texto que está en el programa"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué pasa?"
+  ej: m08/p-static-literal
+  opciones:
+    - "Compila e imprime `hola`"
+    - "No compila: el resultado muere al cerrar el bloque"
+    - "No compila: E0106"
+    - "No compila: E0515"
+  correcta: 0
+  solucion: |
+    Un literal de texto vive **dentro del ejecutable**: existe desde que arranca el programa hasta que termina, así que su tipo es `&'static str`. Da igual dónde guardes la referencia.
+  etiquetas: ["'static", "literales"]
+
+- id: m08-impl-lifetime
+  titulo: "Un cursor que no se ata a sí mismo"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: predice
+  enunciado: "`siguiente` recibe `&mut self` pero devuelve `Option<&'a str>`. ¿Qué imprime?"
+  ej: m08/p-impl-lifetime
+  opciones:
+    - "`Some(\"a\") Some(\"bb\") Some(\"ccc\") None`"
+    - "No compila: E0499, `x` mantiene prestado `c`"
+    - "`Some(\"a\") Some(\"a\") Some(\"a\") Some(\"a\")`"
+    - "`Some(\"a\") Some(\"bb\") Some(\"ccc\") Some(\"\")`"
+  correcta: 0
+  solucion: |
+    La salida usa `'a`, la lifetime del **texto** (`datos`), no la del `&mut self`. Así, los trozos devueltos no mantienen prestado el cursor y podemos seguir llamando a `siguiente` mientras `x` e `y` viven.
+    Si se escribe `-> Option<&str>`, la regla 3 ata la salida a `&mut self` y da `error[E0499]: cannot borrow c as mutable more than once at a time` (verificado en `m08/p-impl-lifetime-elidido`).
+  etiquetas: ["impl", "elisión", "structs"]
+
+- id: m08-impl-lifetime-elidido
+  titulo: "La elisión que sobrerrestringe"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "Mismo cursor, pero `fn siguiente(&mut self) -> Option<&str>`. ¿Por qué no compila `main`?"
+  ej: m08/p-impl-lifetime-elidido
+  opciones:
+    - "Por la regla 3, el `&str` devuelto queda atado al `&mut self`: mientras `x` viva, `c` sigue prestado en exclusiva y no se puede volver a llamar (E0499)"
+    - "Un método con `&mut self` no puede devolver referencias"
+    - "`Option<&str>` no implementa `Debug`"
+    - "El cursor se queda sin texto"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0499]: cannot borrow c as mutable more than once at a time`. El cuerpo es el mismo; solo cambia el contrato. Escribir `Option<&'a str>` dice la verdad: lo devuelto viene del texto, no del cursor.
+  etiquetas: ["E0499", "elisión", "impl"]
+
+- id: m08-crear-ref-local
+  titulo: "Crear y prestar"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da primero?"
+  ej: m08/p-referencia-a-local-colgante
+  opciones:
+    - "E0106: la salida es una referencia y no hay ninguna entrada de la que pueda venir"
+    - "E0515: devolver una referencia a una variable local"
+    - "E0597: `s` no vive lo suficiente"
+    - "Ninguno: compila e imprime `hola`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0106]: missing lifetime specifier`. Sin entradas, ninguna regla de elisión da lifetime a la salida. Es una pista enorme: si una función no recibe referencias, lo que devuelva **no puede** ser un préstamo de algo suyo (salvo `'static`). Lo correcto: devolver `String`.
+  etiquetas: ["E0106", "colgante"]
+
+- id: m08-no-alargan
+  titulo: "Anotar no alarga"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "`alargar` tiene una lifetime explícita `'a`. ¿Consigue que `s` viva más?"
+  ej: m08/p-lifetimes-no-alargan
+  opciones:
+    - "No: las anotaciones solo relacionan préstamos; `s` muere igual al cerrar el bloque y `r` se usa fuera (E0597)"
+    - "Sí: `'a` hace que `s` viva hasta el final de `main`"
+    - "Sí, pero solo en modo release"
+    - "No compila porque `alargar` no hace nada"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0597]: s does not live long enough`. Ninguna anotación cambia cuándo se libera un valor: eso lo decide su dueño. Las lifetimes son afirmaciones que el compilador **comprueba**.
+  etiquetas: ["E0597", "malentendidos"]
+
+- id: m08-struct-dos-lifetimes
+  titulo: "Dos lifetimes en un struct"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué pasa?"
+  ej: m08/p-struct-dos-lifetimes
+  opciones:
+    - "Compila: imprime `color = rojo` y después `color`"
+    - "No compila: `v` muere en el bloque y `c` se usa fuera"
+    - "No compila: un struct solo puede tener una lifetime"
+    - "Compila: imprime `color = rojo` y después `rojo`"
+  correcta: 0
+  solucion: |
+    Con dos lifetimes, `clave` puede devolver `&'a str` sin depender de `'b`. `c` viene de `k`, que vive en todo `main`, así que puede usarse fuera del bloque aunque `v` (y el propio `p`) ya no existan. Con una sola `'a` para ambos campos, `c` quedaría atada también a `v` y no compilaría.
+  etiquetas: ["structs", "anotaciones"]
+
+- id: m08-que-es-lifetime
+  titulo: "¿Qué es una lifetime?"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué es la lifetime de un préstamo?"
+  opciones:
+    - "La región del código en la que ese préstamo debe seguir siendo válido"
+    - "Cuántos segundos vive un valor"
+    - "Cuándo se libera el valor prestado"
+    - "Una etiqueta que el programa consulta al ejecutar"
+  correcta: 0
+  solucion: |
+    Es una zona del programa (unas líneas, unos caminos), calculada al compilar. No es tiempo de reloj ni existe al ejecutar. Cuándo se libera un valor lo decide su dueño; la lifetime de un préstamo tiene que caber **dentro** de esa vida.
+  etiquetas: ["concepto"]
+
+- id: m08-anotaciones-no-cambian
+  titulo: "¿Qué hace una anotación?"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué cambia en el programa compilado si añades `<'a>` y `&'a` a una firma?"
+  opciones:
+    - "Nada en ejecución: solo le dices al compilador cómo se relacionan los préstamos, y él lo comprueba"
+    - "Los valores prestados viven más"
+    - "El programa va más rápido"
+    - "Se añade un contador de referencias"
+  correcta: 0
+  solucion: |
+    Las anotaciones describen relaciones que ya existen («la salida viene de esta entrada»). El código máquina es el mismo con o sin ellas.
+  etiquetas: ["anotaciones", "malentendidos"]
+
+- id: m08-regla-1
+  titulo: "Regla de elisión 1"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cómo completa el compilador `fn f(a: &str, b: &[u8])` según la primera regla de elisión?"
+  opciones:
+    - "`fn f<'a, 'b>(a: &'a str, b: &'b [u8])`: cada referencia de entrada recibe su propia lifetime"
+    - "`fn f<'a>(a: &'a str, b: &'a [u8])`: todas la misma"
+    - "`fn f(a: &'static str, b: &'static [u8])`"
+    - "No la completa: hay que anotar siempre"
+  correcta: 0
+  solucion: |
+    Regla 1: una lifetime nueva y distinta por cada referencia de entrada. Es la opción más flexible para quien llama. Las reglas 2 y 3 solo deciden la salida.
+  etiquetas: ["elisión"]
+
+- id: m08-regla-2
+  titulo: "Regla de elisión 2"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué firma completa corresponde a `fn trozo(s: &str, n: usize) -> &str`?"
+  opciones:
+    - "`fn trozo<'a>(s: &'a str, n: usize) -> &'a str`"
+    - "`fn trozo<'a, 'b>(s: &'a str, n: usize) -> &'b str`"
+    - "`fn trozo(s: &str, n: usize) -> &'static str`"
+    - "No compila: hay dos parámetros"
+  correcta: 0
+  solucion: |
+    Solo cuentan las **referencias**: hay una (`s`), así que la regla 2 asigna su lifetime a la salida. `n` es un `usize`, no presta nada.
+  etiquetas: ["elisión"]
+
+- id: m08-regla-3
+  titulo: "Regla de elisión 3"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: opcion
+  enunciado: "En un método `fn f(&self, otra: &str) -> &str`, ¿de dónde supone el compilador que viene la salida?"
+  opciones:
+    - "De `self`"
+    - "De `otra`"
+    - "De la más corta de las dos"
+    - "De ninguna: da E0106"
+  correcta: 0
+  solucion: |
+    Regla 3: si hay `&self` o `&mut self`, su lifetime va a todas las salidas. Si en realidad devuelves `otra`, el compilador te avisa (mira `m08-elision-self-mal`) y tienes que anotar.
+  etiquetas: ["elisión", "self"]
+
+- id: m08-todo-tiene-lifetime
+  titulo: "«Mi código no tiene lifetimes»"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Un programa sin genéricos ni `'a` escritas, ¿tiene lifetimes?"
+  opciones:
+    - "Sí: toda referencia tiene una lifetime, aunque esté elidida o la infiera el compilador"
+    - "No: solo las tienen las funciones que las escriben"
+    - "Solo si usa structs"
+    - "Solo en modo debug"
+  correcta: 0
+  solucion: |
+    Malentendido nº 4. Cada `&` del programa tiene una región que el borrow checker calcula. Escribirlas solo hace falta cuando el compilador no puede deducir la relación.
+  etiquetas: ["malentendidos"]
+
+- id: m08-static-significa
+  titulo: "¿Qué promete T: 'static?"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué significa el bound `T: 'static`?"
+  opciones:
+    - "Que `T` no contiene préstamos de vida limitada: un valor de tipo `T` podría guardarse tanto como se quiera (aunque se libere antes)"
+    - "Que el valor vive hasta que termina el programa"
+    - "Que el valor está en la memoria estática del ejecutable"
+    - "Que `T` es una referencia `&'static`"
+  correcta: 0
+  solucion: |
+    Malentendido nº 2. `String`, `Vec<u8>`, `i32` o `&'static str` cumplen `T: 'static`; `&'a String` con `'a` corta no. Verificado en `m08/p-static-string` (un `String` recién creado pasa) y `m08/p-static-ref-local` (un `&String` local no).
+  etiquetas: ["'static", "malentendidos"]
+
+- id: m08-ref-a-vs-t-a
+  titulo: "&'a T frente a T: 'a"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Qué diferencia hay entre recibir `t: &'a T` y exigir `T: 'a`?"
+  opciones:
+    - "`&'a T` es un préstamo concreto; `T: 'a` es una condición sobre el tipo («todo lo que contenga vive al menos `'a`»), que cumplen tanto tipos con dueño como referencias largas. `T: 'a` es más general"
+    - "Son lo mismo escrito de dos formas"
+    - "`T: 'a` solo admite referencias"
+    - "`&'a T` es más general"
+  correcta: 0
+  solucion: |
+    Malentendido nº 3. Una función con `T: 'a` acepta un `String` (no contiene préstamos) o un `&'a str`; una que recibe `&'a T` solo acepta préstamos.
+  etiquetas: ["bounds", "malentendidos"]
+
+- id: m08-compila-correcto
+  titulo: "«Si compila, está bien»"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: opcion
+  enunciado: "Tu función con anotaciones compila. ¿Qué puedes asegurar?"
+  opciones:
+    - "Que el cuerpo cumple la firma; no que la firma sea la adecuada: puede ser demasiado estricta y fallar en quien la llama"
+    - "Que las anotaciones son las mejores posibles"
+    - "Que ninguna llamada a la función fallará al compilar"
+    - "Nada: el compilador no comprueba anotaciones"
+  correcta: 0
+  solucion: |
+    Malentendido nº 5. Ejemplo verificado: `m08/p-anotacion-restrictiva`, donde `primera` compila pero ata `b` sin necesidad y `main` falla con E0597.
+  etiquetas: ["anotaciones", "malentendidos"]
+
+- id: m08-compilador-arregla
+  titulo: "«El compilador me dirá cómo»"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: opcion
+  enunciado: "rustc sugiere añadir `+ 'static` en `m08/p-box-dyn`. ¿Es siempre lo mejor seguir la sugerencia?"
+  ej: m08/p-box-dyn
+  opciones:
+    - "No necesariamente: compila, pero prohíbe pasar tipos con préstamos. A veces lo adecuado es una lifetime con nombre (`T: 'a` y `Box<dyn Display + 'a>`)"
+    - "Sí: las sugerencias de rustc siempre son la solución óptima"
+    - "No: las sugerencias de rustc nunca compilan"
+    - "Sí, porque `'static` no tiene ningún coste"
+  correcta: 0
+  solucion: |
+    Malentendido nº 7. Las sugerencias son buenas pistas, pero el compilador no conoce tu intención. Añadir `'static` «porque lo dice el error» sobrerrestringe con frecuencia; piensa qué relación quieres expresar.
+  etiquetas: ["'static", "malentendidos", "diagnósticos"]
+
+- id: m08-static-no-arregla
+  titulo: "El parche de 'static"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: opcion
+  enunciado: "Tienes `struct Vista<'a> { texto: &'a str }` y un error de lifetimes. Alguien propone cambiar el campo a `&'static str`. ¿Qué pasa?"
+  opciones:
+    - "Solo podrás crear vistas de literales o datos que vivan siempre; ya no de un `String` leído del teclado. Casi nunca es lo que querías"
+    - "Arregla el error sin ningún efecto secundario"
+    - "Hace que los `String` vivan para siempre"
+    - "Hace el programa más rápido"
+  correcta: 0
+  solucion: |
+    `'static` en una referencia pide datos que existan durante todo el programa. No alarga la vida de nada: solo rechaza todo lo que no la cumpla. El arreglo mínimo suele ser una `'a` bien colocada o pasar a datos con dueño (`String`).
+  etiquetas: ["'static", "arreglo mínimo"]
+
+- id: m08-que-es-varianza
+  titulo: "Varianza en una frase"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Por qué `&'a T` permite usar un `&'static str` donde se pide un `&'a str`, pero `&mut T` no permite usar un `&mut &'static str` donde se pide un `&mut &'a str`?"
+  opciones:
+    - "`&T` solo deja leer, así que acortar la lifetime es seguro (covariante). Por `&mut T` se puede escribir, y escribir un préstamo corto donde se esperaba uno eterno crearía una referencia colgante (invariante)"
+    - "Es una limitación temporal que Polonius eliminará"
+    - "Porque `&mut` es más lento"
+    - "Las dos cosas están permitidas"
+  correcta: 0
+  solucion: |
+    Covarianza: «si `'largo` cubre `'corto`, un `&'largo T` vale como `&'corto T`». Invarianza: detrás de `&mut`, el tipo debe coincidir exactamente. Lo comprueban `m08/p-covarianza` (compila) y `m08/p-varianza-mut` (E0597).
+  etiquetas: ["varianza"]
+
+- id: m08-polonius-que-cambia
+  titulo: "¿Qué cambia Polonius?"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué hace Polonius, el borrow checker que se prueba en nightly en 2026?"
+  opciones:
+    - "Calcula los préstamos con más precisión, camino por camino, y acepta programas seguros que NLL rechaza (como «buscar o insertar» en un `HashMap`). No relaja la seguridad"
+    - "Desactiva la regla de préstamos en código complicado"
+    - "Hace que las lifetimes existan en tiempo de ejecución"
+    - "Sustituye las lifetimes por un recolector de basura"
+  correcta: 0
+  solucion: |
+    Todo programa que hoy compila seguirá siendo seguro; Polonius solo reduce los falsos positivos. Verificado: `m07/p-get-o-insertar` da E0502 en estable 1.99.1 y compila con rustc 1.101.0-nightly (2026-11-01).
+  etiquetas: ["Polonius", "NLL"]
+
+- id: m08-ub-colgante
+  titulo: "¿Qué evita E0597?"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Si Rust aceptara `m08/p-colgante-bloque`, ¿qué pasaría al imprimir `r`?"
+  ej: m08/p-colgante-bloque
+  opciones:
+    - "Leería una zona de memoria que ya no pertenece a `x` (referencia colgante): comportamiento indefinido"
+    - "Imprimiría siempre 5"
+    - "Haría pánico con un mensaje claro"
+    - "Imprimiría 0"
+  correcta: 0
+  solucion: |
+    Comportamiento indefinido significa que no hay garantía de nada: podría imprimir 5 por casualidad, basura u otra cosa. No hay pánico porque nadie comprueba nada al ejecutar; por eso Rust lo impide al compilar.
+  etiquetas: ["UB", "colgante"]
+
+- id: m08-llamar-no-es-ub
+  titulo: "¿Cuándo ocurre el fallo?"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Imagina un lenguaje sin borrow checker y una función que devuelve una referencia a su variable local. ¿En qué momento hay comportamiento indefinido?"
+  opciones:
+    - "Cuando se **usa** (lee o escribe) la referencia colgante, no al llamar a la función"
+    - "En cuanto se llama a la función"
+    - "Al compilar"
+    - "Nunca, si la función es corta"
+  correcta: 0
+  solucion: |
+    Una dirección que apunta a memoria liberada es inofensiva mientras nadie la use. El fallo está en el acceso. Rust rechaza la función entera porque no puede garantizar que nadie la use.
+  etiquetas: ["UB", "colgante"]
+
+- id: m08-structs-consejo
+  titulo: "Structs: ¿dueños o vistas?"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: opcion
+  enunciado: "Empiezas un programa que guarda datos de usuarios durante mucho rato. ¿Qué es más sensato para el campo `nombre`?"
+  opciones:
+    - "`String`: el struct es dueño y no arrastra restricciones de lifetime a quien lo usa"
+    - "`&'static str`, para que viva siempre"
+    - "`&'a str`, siempre que se pueda"
+    - "Da igual"
+  correcta: 0
+  solucion: |
+    Un struct con `'a` es un préstamo: no puede sobrevivir a lo que mira, y esa restricción se propaga. Regla para empezar: structs con datos con dueño; referencias solo en structs de vida corta (vistas, cursores, analizadores de texto).
+  etiquetas: ["structs", "diseño"]
+
+- id: m08-cuantas-reglas
+  titulo: "Reglas de elisión"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuántas reglas de elisión de lifetimes hay para funciones y métodos? Escribe el número."
+  respuestas: ["3", "tres"]
+  solucion: |
+    Tres: (1) cada referencia de entrada recibe su propia lifetime; (2) si hay exactamente una lifetime de entrada, va a todas las salidas; (3) si hay `&self` o `&mut self`, la suya va a las salidas.
+  etiquetas: ["elisión"]
+
+- id: m08-lifetime-literal
+  titulo: "La lifetime de un literal"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Qué lifetime tiene el tipo de `\"hola\"`? Escríbela con su apóstrofo."
+  respuestas: ["'static", "static"]
+  solucion: |
+    `&'static str`: el texto está dentro del ejecutable y existe durante todo el programa (`m08/p-static-literal`).
+  etiquetas: ["'static"]
+
+- id: m08-cursor-cuarto
+  titulo: "Cuando se acaba el texto"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: respuesta
+  enunciado: "En `m08/p-impl-lifetime`, ¿qué devuelve la cuarta llamada a `siguiente`? (tal como lo imprime `{:?}`)"
+  ej: m08/p-impl-lifetime
+  respuestas: ["None"]
+  solucion: |
+    `None`: tras «a», «bb» y «ccc» el resto está vacío. La salida completa es `Some("a") Some("bb") Some("ccc") None`.
+  etiquetas: ["impl", "Option"]

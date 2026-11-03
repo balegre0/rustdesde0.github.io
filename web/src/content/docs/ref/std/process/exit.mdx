@@ -1,0 +1,52 @@
+---
+title: "exit"
+description: "Termina el proceso inmediatamente con el código de salida dado, sin ejecutar destructores."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::process::exit`
+
+## Sinopsis
+
+```rust
+pub fn exit(code: i32) -> !
+```
+
+## Qué hace
+
+`process::exit(codigo)` termina **ya**. Su tipo de retorno es `!` («nunca vuelve»), así que el compilador sabe que lo que va detrás no se ejecuta. **No ejecuta los destructores** de los valores vivos (los búferes de archivos sin vaciar, por ejemplo); `stdout` sí se vacía.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/process-exit" />
+
+**Salida:**
+
+```text
+5
+```
+
+**Salida de error** (*stderr*):
+
+```text
+error: división por cero
+```
+
+El programa termina con el código de salida `2`.
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [ExitCode](/ref/std/process/)
+- [panic!](/ref/std/macros/panic/)
+
+## Aprende esto en
+
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)
+- [Mundo 10 · Errores](/curso/10-errores/)

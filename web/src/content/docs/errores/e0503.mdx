@@ -1,0 +1,79 @@
+---
+title: "E0503: usar un valor mientras está prestado en exclusiva"
+description: "Lees o usas un valor mientras un préstamo exclusivo (&mut) suyo sigue vivo."
+sidebar:
+  order: 41
+insignias: ["Préstamos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot use `valor` because it was mutably borrowed ``
+
+## Qué significa
+
+`exclusivo = &mut valor` da acceso exclusivo hasta su último uso (`*exclusivo += 1`). En medio, `valor + 1` lee `valor` directamente: eso viola la exclusividad, aunque solo sea una lectura.
+
+## Qué error evita
+
+Con un `&mut` activo, el compilador asume que nadie más ve el valor (y optimiza en consecuencia). Leerlo por otro camino podría ver un estado a medio modificar: **aliasing con mutación**.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0503" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0503]: cannot use `valor` because it was mutably borrowed
+ --> E0503.rs:4:17
+  |
+3 |     let exclusivo = &mut valor;
+  |                     ---------- `valor` is borrowed here
+4 |     let copia = valor + 1;
+  |                 ^^^^^ use of borrowed `valor`
+5 |     *exclusivo += 1;
+  |     --------------- borrow later used here
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Leer una variable entre que creas un `&mut` y lo usas por última vez.
+- Usar el dueño mientras un método guarda un `&mut` suyo.
+
+## Cómo arreglarlo
+
+Reordena: haz la lectura antes de crear el `&mut`, o después de su último uso. También puedes leer a través del propio préstamo (`*exclusivo + 1`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let mut valor = 10;
+    let copia = valor + 1;
+    let exclusivo = &mut valor;
+    *exclusivo += 1;
+    println!("{copia} {valor}");
+}
+```
+
+**Salida:**
+
+```text
+11 11
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0503` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0499](/errores/e0499/): dos préstamos exclusivos a la vez
+- [E0502](/errores/e0502/): préstamo exclusivo mientras hay uno compartido
+- [E0506](/errores/e0506/): asignar a un valor prestado
+
+## Aprende esto en
+
+- [Mundo 07 · Préstamos](/curso/07-prestamos/)

@@ -1,0 +1,44 @@
+---
+title: "Copy"
+description: "Tipos que se copian bit a bit al asignarlos, en lugar de moverse: números, bool, char, &T…"
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::marker::Copy` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub trait Copy: Clone { }
+```
+
+## Qué hace
+
+Si un tipo es `Copy`, `let b = a;` **copia** el valor y `a` sigue siendo válida. Lo son los números, `bool`, `char`, las referencias compartidas `&T` y las tuplas y arrays de tipos `Copy`. Un tipo solo puede ser `Copy` si todos sus campos lo son ([E0204](/errores/e0204/)) y si no tiene `Drop` ([E0184](/errores/e0184/)). `Copy` exige `Clone`: se derivan juntos, `#[derive(Clone, Copy)]`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/marker-copy" />
+
+**Salida:**
+
+```text
+Punto { x: 1, y: 2 } Punto { x: 1, y: 2 } 3
+Etiqueta { texto: "hola" } Etiqueta { texto: "hola" } 4
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [E0382 (sin Copy, se mueve)](/errores/e0382/)
+- [E0204](/errores/e0204/)
+
+## Aprende esto en
+
+- [Mundo 06 · Ownership](/curso/06-ownership/)

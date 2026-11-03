@@ -1,0 +1,108 @@
+---
+title: "Recursión, reglas internas y tt-munchers"
+description: "Haz que una macro se llame a sí misma para contar, invertir listas y entender un mini-lenguaje."
+sidebar:
+  order: 6
+duracion: 14
+desde: "1.0"
+requiere: ["19-macros/05-higiene"]
+tarjetas:
+  - p: "¿Qué es un tt-muncher?"
+    r: "Una macro recursiva que consume unos pocos tokens del principio de su entrada en cada paso y se llama a sí misma con el resto."
+  - p: "¿Para qué sirve empezar una regla con @nombre?"
+    r: "Para marcar reglas internas que el usuario no debería invocar; @ no puede empezar una expresión, así que no choca con entradas normales."
+  - p: "¿Cuál es el límite de recursión por defecto y cómo se cambia?"
+    r: "128 niveles; con #![recursion_limit = \"256\"] en la raíz de la crate."
+  - p: "¿Por qué el punto de entrada de un tt-muncher suele ir al final?"
+    r: "Porque suele aceptar cualquier cosa ($($t:tt)*) y, al probarse en orden, taparía las reglas internas."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a usar la técnica más potente de `macro_rules!`: macros que se invocan a sí mismas para procesar su entrada trozo a trozo.
+
+## Predice
+
+<Predice
+  ej="m19/contar"
+  opciones={["0 / 1 / 4 / arr tiene 3 elementos", "0 / 1 / 1 / arr tiene 1 elementos", "No compila: una macro no puede llamarse a sí misma", "1 / 1 / 4 / arr tiene 3 elementos"]}
+  correcta={0}
+  explicacion="`contar!(a b c d)` se expande a `1 + contar!(b c d)`, luego a `1 + 1 + contar!(c d)`… hasta `contar!()`, que es `0`. Al ser una expresión constante, sirve para el tamaño de un array."
+  porque={["Correcto.", "La regla recursiva cuenta 1 por la cabeza **más** lo que dé el resto.", "Las macros pueden ser recursivas: la expansión se repite hasta que no quedan macros.", "La lista vacía cae en la primera regla, que da 0."]}
+/>
+
+## La idea
+
+Una macro puede invocarse a sí misma en su plantilla. El compilador sigue expandiendo hasta que no queda ninguna invocación. Con eso se pueden hacer cosas que una repetición `$(...)*` no puede: **acumular un resultado**, **invertir el orden** o **leer un mini-lenguaje** con palabras clave propias.
+
+El patrón clásico es el **tt-muncher** («masticador de tokens»): cada regla reconoce unos pocos tokens del **principio** de la entrada, hace algo con ellos y se llama a sí misma con `$($resto:tt)*`. Cuando no queda nada, una regla final devuelve el resultado.
+
+Para guardar resultados parciales se usan **reglas internas**: reglas que empiezan con un marcador como `@acc`. El usuario llama a la regla pública y esta pasa a las internas añadiendo el acumulador.
+
+## Pruébalo
+
+<Ejecutar ej="m19/tt-muncher" titulo="Un mini-lenguaje: sube y baja" />
+
+1. La regla de entrada (`$($todo:tt)*`) mete un acumulador `0` y llama a las internas.
+2. Cada regla interna mastica dos tokens (`sube 3`, `baja 1`) y vuelve a llamarse con el resto.
+3. Cuando ya no queda nada, `(@acc $acc:expr;)` devuelve el acumulado.
+
+## Bajo el capó
+
+<BajoElCapo>
+La expansión real (Rust 1.99.1) muestra lo que se construyó paso a paso:
+
+```rust
+{ ::std::io::_print(format_args!("{0}\n", (((0 + 3) - 1) + 2))); };
+{ ::std::io::_print(format_args!("{0}\n", 0)); };
+{ ::std::io::_print(format_args!("{0}\n", (0 - 5))); };
+```
+
+El «programa» `sube 3 baja 1 sube 2` se tradujo en compilación a una expresión aritmética. El cálculo final lo hace luego el compilador como con cualquier constante.
+
+**Coste.** Cada paso de recursión es una expansión completa, y en cada una el compilador vuelve a comparar todos los tokens que quedan. Un tt-muncher sobre `n` tokens hace del orden de `n²` trabajo. Con entradas de cientos de tokens se nota en el tiempo de compilación.
+
+**Límite.** Para no colgarse con una macro que nunca termina, el compilador corta a los **128** niveles de anidamiento (valor por defecto). Se puede subir con `#![recursion_limit = "256"]` al principio de la crate, pero si lo necesitas a menudo, probablemente tu macro debería procesar varios elementos por paso o ser una función.
+
+**`@` como marcador.** Se usa `@` porque no puede empezar ninguna expresión ni ningún item: es imposible que una entrada normal del usuario encaje por error con una regla interna.
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m19/recursion-infinita" explicacion="La macro se llama a sí misma con una entrada que nunca se hace más pequeña: no hay ninguna regla de parada. El compilador se detiene al alcanzar el límite de recursión y sugiere subirlo, pero aquí subirlo no arreglaría nada. Toda macro recursiva necesita un caso base y que cada paso **consuma** entrada." />
+
+<Trampa titulo="El orden de las reglas en un tt-muncher">
+❌ Poner primero la regla de entrada `($($todo:tt)*)`: acepta cualquier cosa, incluidas las llamadas internas `@acc …`, y la macro se llamaría a sí misma sin fin.
+
+✅ Las reglas internas, que son más concretas, primero; la de entrada, la última.
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m19/reto-al-reves" enunciado="Escribe `al_reves![1, 2, 3]` para que dé el array [3, 2, 1]. Usa una regla interna con dos listas entre corchetes: los elementos pendientes y los ya invertidos. En cada paso, pasa el primer pendiente al principio de la lista invertida." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace imprescindible a una regla como `() => { 0 }` en `contar!`?"
+  opciones={["Nada, es opcional", "Es el caso base: sin ella la recursión nunca termina", "Sirve para contar el cero", "Hace que la macro sea más rápida"]}
+  correcta={1}
+  explicacion="Cuando ya no quedan tokens, la regla recursiva no encaja (necesita una cabeza). Sin caso base, `contar!()` no tendría regla y daría error."
+  porque={["Sin ella, la última llamada `contar!()` no encajaría con nada.", "Correcto.", "Cuenta tokens, no el número cero.", "No tiene que ver con la velocidad."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué un tt-muncher con miles de tokens puede ralentizar mucho la compilación?"
+  opciones={["Porque se ejecuta al arrancar el programa", "Porque cada paso vuelve a procesar todos los tokens que quedan, lo que da un coste que crece con el cuadrado", "Porque usa el heap", "No la ralentiza"]}
+  correcta={1}
+  explicacion="Cada expansión recorre la entrada restante. Con `n` pasos sobre entradas de tamaño `n`, `n-1`, … el total es del orden de `n²`."
+  porque={["Todo pasa en compilación; el programa no ve nada.", "Correcto.", "La expansión no reserva memoria en tu programa.", "Sí se nota con entradas largas."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué atributo sube el límite de recursión de las macros?"
+  opciones={["`#[macro_limit(256)]`", "`#![recursion_limit = \"256\"]`", "`#[inline(256)]`", "No se puede cambiar"]}
+  correcta={1}
+  explicacion="Es un atributo de crate (con `#!`) que se escribe al principio de `main.rs` o `lib.rs`. Su valor por defecto es 128."
+  porque={["No existe ese atributo.", "Correcto.", "`inline` es para funciones, no para macros.", "Sí se puede, aunque rara vez conviene."]}
+/>

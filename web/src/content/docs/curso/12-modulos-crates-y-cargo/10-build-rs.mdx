@@ -1,0 +1,94 @@
+---
+title: "build.rs: código antes de compilar"
+description: "Un script de construcción se compila y ejecuta antes que tu crate: genera código, compila bibliotecas de otros lenguajes o detecta el entorno, y habla con Cargo por su salida."
+sidebar:
+  order: 10
+duracion: 10
+desde: "1.0"
+requiere: ["12-modulos-crates-y-cargo/09-workspaces"]
+tarjetas:
+  - p: "¿Qué es `build.rs`?"
+    r: "Un programa de Rust en la raíz del paquete que Cargo compila y ejecuta ANTES de compilar el crate."
+  - p: "¿Cómo se comunica `build.rs` con Cargo?"
+    r: "Imprimiendo líneas especiales: `cargo::rustc-cfg=…`, `cargo::rustc-env=CLAVE=valor`, `cargo::rerun-if-changed=archivo`, `cargo::rustc-link-lib=…`."
+  - p: "¿Dónde debe escribir archivos `build.rs`?"
+    r: "En la carpeta que indica la variable de entorno `OUT_DIR`, nunca en `src`."
+  - p: "¿Qué riesgo tiene `build.rs` en una dependencia?"
+    r: "Que ejecuta código arbitrario en tu máquina al compilar. Revisa qué hace en crates poco conocidos."
+---
+
+import { Pregunta, BajoElCapo } from '~/components';
+
+A veces hace falta trabajo **antes** de compilar: generar código a partir de un archivo, compilar una biblioteca escrita en otro lenguaje, mirar qué versión del sistema hay. Para eso existe el **script de construcción**: `build.rs`.
+
+## La idea
+
+Si en la raíz del paquete (al lado de `Cargo.toml`, no en `src`) hay un archivo `build.rs`, Cargo:
+
+1. lo compila como un programa;
+2. lo **ejecuta**;
+3. lee lo que imprime;
+4. y después compila tu crate.
+
+Un ejemplo que guarda la fecha de compilación y genera código:
+
+```rust
+// build.rs
+use std::{env, fs, path::Path};
+
+fn main() {
+    // 1. Recompila solo si cambia este archivo de datos.
+    println!("cargo::rerun-if-changed=datos/palabras.txt");
+
+    // 2. Genera código Rust en OUT_DIR.
+    let texto = fs::read_to_string("datos/palabras.txt").unwrap();
+    let n = texto.lines().count();
+    let destino = Path::new(&env::var("OUT_DIR").unwrap()).join("generado.rs");
+    fs::write(destino, format!("pub const NUM_PALABRAS: usize = {n};")).unwrap();
+
+    // 3. Una variable de entorno para el crate.
+    println!("cargo::rustc-env=VERSION_DATOS=1");
+}
+```
+
+Y en tu código:
+
+```rust
+include!(concat!(env!("OUT_DIR"), "/generado.rs"));
+
+fn main() {
+    println!("{} palabras (datos v{})", NUM_PALABRAS, env!("VERSION_DATOS"));
+}
+```
+
+Las instrucciones `cargo::…` más usadas:
+
+| Línea | Efecto |
+|---|---|
+| `cargo::rerun-if-changed=RUTA` | solo vuelve a ejecutar `build.rs` si cambia ese archivo |
+| `cargo::rustc-env=CLAVE=VALOR` | define una variable para `env!` en el crate |
+| `cargo::rustc-cfg=NOMBRE` | activa un `cfg` propio (decláralo con `cargo::rustc-check-cfg`) |
+| `cargo::rustc-link-lib=NOMBRE` | enlaza con una biblioteca del sistema |
+| `cargo::warning=TEXTO` | muestra un aviso al compilar |
+
+Las dependencias que solo usa el script van en `[build-dependencies]`. La más común es `cc`, que compila código C para enlazarlo con tu crate (mundo 22).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Se compila para tu PC, no para el destino.** Si compilas para `wasm32-wasip1`, `build.rs` se compila igualmente para tu PC (`x86_64-pc-windows-msvc`), porque se ejecuta en tu PC. Por eso, en esta máquina sin el enlazador de MSVC, un paquete con `build.rs` no compila ni siquiera con `cargo check`: el script hay que enlazarlo para poder ejecutarlo.
+
+**Seguridad.** Un `build.rs` puede hacer cualquier cosa que puedas hacer tú: leer archivos, conectarse a internet, borrar carpetas. Lo mismo pasa con las macros procedurales (mundo 19). Es una de las razones para revisar las dependencias poco conocidas.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Dónde debe escribir `build.rs` el código que genera?"
+  opciones={["En `src/`", "En la carpeta de la variable `OUT_DIR`", "En la raíz del paquete", "En `target/release/`"]}
+  correcta={1}
+  explicacion="`OUT_DIR` es una carpeta dentro de `target` reservada para ese paquete. Escribir en `src` modificaría tu código fuente en cada compilación."
+  porque={["Ensuciaría tu código fuente y Git.", "", "Tampoco: esa carpeta es tuya, no de la compilación.", "Depende del perfil; `OUT_DIR` es la carpeta prevista."]}
+/>

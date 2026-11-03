@@ -1,0 +1,83 @@
+---
+title: "E0616: campo privado"
+description: "Lees o escribes un campo de un struct que no es pub desde fuera de su módulo."
+sidebar:
+  order: 63
+insignias: ["Nombres, módulos y visibilidad"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` field `saldo` of struct `Cuenta` is private ``
+
+## Qué significa
+
+Un struct `pub` puede tener campos privados: solo su módulo puede tocarlos. Así el módulo controla sus reglas (por ejemplo, que un saldo nunca sea inválido). Desde fuera, `c.saldo` no está permitido.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0616" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0616]: field `saldo` of struct `Cuenta` is private
+  --> E0616.rs:14:22
+   |
+14 |     println!("{}", c.saldo);
+   |                      ^^^^^ private field
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Acceder a un campo sin `pub` desde otro módulo.
+- Intentar construir con `Tipo { campo: ... }` un struct de otro módulo con campos privados.
+
+## Cómo arreglarlo
+
+Añade un método público de acceso (`pub fn saldo(&self) -> u32`), que es lo habitual, o marca el campo `pub` si de verdad puede cambiarlo cualquiera.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+mod cuenta {
+    pub struct Cuenta {
+        saldo: u32,
+    }
+    impl Cuenta {
+        pub fn nueva() -> Cuenta {
+            Cuenta { saldo: 0 }
+        }
+        pub fn saldo(&self) -> u32 { // acceso de solo lectura
+            self.saldo
+        }
+    }
+}
+
+fn main() {
+    let c = cuenta::Cuenta::nueva();
+    println!("{}", c.saldo());
+}
+```
+
+**Salida:**
+
+```text
+0
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0616` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0603](/errores/e0603/): elemento privado
+- [E0624](/errores/e0624/): método privado
+- [E0609](/errores/e0609/): el tipo no tiene ese campo
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

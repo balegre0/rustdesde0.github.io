@@ -1,0 +1,74 @@
+---
+title: "E0606: conversión con as inválida"
+description: "Usas as entre dos tipos primitivos que no se pueden convertir así (por ejemplo, &u8 a u32 o &str a i32)."
+sidebar:
+  order: 59
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` casting `&u8` as `u32` is invalid ``
+
+## Qué significa
+
+`x` es `&u8`, una **referencia**, no un número. `as` no lee a través de referencias: convertir una dirección en un `u32` no tiene sentido directo, así que se rechaza.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0606" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0606]: casting `&u8` as `u32` is invalid
+ --> E0606.rs:3:13
+  |
+3 |     let y = x as u32;
+  |             ^^^^^^^^
+  |
+help: dereference the expression
+  |
+3 |     let y = *x as u32;
+  |             +
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Convertir una referencia (`&u8`) en un número sin `*`.
+- Convertir un `&str` en un número con `as`.
+
+## Cómo arreglarlo
+
+Lee el valor con `*` antes de convertir (`*x as u32`), o usa `parse()` para texto.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let x = &7u8;
+    let y = *x as u32; // primero se lee el valor y luego se convierte
+    println!("{y}");
+}
+```
+
+**Salida:**
+
+```text
+7
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0606` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0605](/errores/e0605/): conversión con as no primitiva
+- [E0614](/errores/e0614/): no se puede desreferenciar ese tipo
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)
+- [Mundo 07 · Préstamos](/curso/07-prestamos/)

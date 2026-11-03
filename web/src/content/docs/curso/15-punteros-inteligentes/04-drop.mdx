@@ -1,0 +1,103 @@
+---
+title: "Drop: el código de despedida"
+description: "Escribes código que se ejecuta cuando un valor muere y predices el orden exacto en que Rust destruye las cosas."
+sidebar:
+  order: 4
+duracion: 10
+desde: "1.0"
+requiere: ["15-punteros-inteligentes/01-box"]
+tarjetas:
+  - p: "¿En qué orden se destruyen las variables locales al final de un bloque?"
+    r: "En orden inverso a su declaración: la última declarada es la primera en destruirse."
+  - p: "¿Por qué no puedes llamar a `x.drop()` a mano?"
+    r: "Porque luego Rust volvería a destruir `x` al final del ámbito: sería una doble liberación. Error E0040. Se usa `drop(x)`, que se queda con `x`."
+  - p: "¿Qué hace en realidad `std::mem::drop`?"
+    r: "Nada: es una función vacía que recibe el valor por valor. Al acabar la función, su parámetro sale de ámbito y se destruye."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir el código que un valor ejecuta justo antes de morir y a predecir, sin fallar, en qué orden muere cada cosa.
+
+## Predice
+
+<Predice
+  ej="m15/drop-orden"
+  pregunta="Cada `Ruidoso` imprime «adiós» al destruirse. ¿En qué orden se despiden `a` y `b` al final de `main`?"
+  opciones={["adiós, a y luego adiós, b", "adiós, b y luego adiós, a", "No se despiden: main termina el programa sin destruir nada", "En un orden que puede cambiar entre ejecuciones"]}
+  correcta={1}
+  explicacion="Las variables locales se destruyen en orden inverso a como se declararon, como una pila de platos: el último que pusiste es el primero que quitas."
+  porque={["Ese sería el orden de declaración; la destrucción va al revés.", "Correcto.", "Al salir de `main` se destruyen sus variables, como en cualquier función.", "El orden está definido y es siempre el mismo."]}
+/>
+
+## La idea
+
+El trait `Drop` tiene un solo método, `drop(&mut self)`, y Rust lo llama **automáticamente** cuando un valor sale de ámbito. Es el mecanismo detrás de que `Box`, `String` o `Vec` liberen su memoria sin que tú hagas nada, y sirve para cualquier recurso: cerrar un archivo, soltar un candado, imprimir un aviso. A esta idea de atar un recurso a la vida de un valor se le llama **RAII** (lo viste en el mundo 6).
+
+El **orden** está garantizado: las variables locales se destruyen en orden **inverso** a su declaración; los campos de un struct, en el orden en que están **declarados**; los elementos de un `Vec`, del primero al último. Un valor que se ha **movido** no se destruye en el sitio viejo: su destrucción viaja con él.
+
+A veces quieres destruir algo **antes**. No puedes llamar a `x.drop()` (lo verás en la trampa), pero sí a la función `drop(x)` del preludio: se queda con `x` por valor y, al terminar, lo destruye. Después, `x` está movido y el compilador no te dejará usarlo.
+
+## Pruébalo
+
+<Ejecutar ej="m15/drop-orden" />
+
+Fíjate en `c`: se despide al cerrar su bloque, antes que nadie. Y `d` lo hace en cuanto llamas a `drop(d)`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+El compilador lleva la cuenta, para cada variable, de si **sigue viva** en cada punto del programa. En el MIR (la representación intermedia del mundo 21) inserta instrucciones `drop(_n)` al final de cada ámbito, solo para las variables que no se han movido. Si una variable se mueve solo en una rama de un `if`, el compilador añade una **bandera de drop** (*drop flag*) oculta en la pila que recuerda en ejecución si hay que destruirla.
+
+`std::mem::drop` es literalmente esto (en la biblioteca estándar):
+
+```rust
+pub fn drop<T>(_x: T) {}
+```
+
+Una función vacía. El trabajo lo hace la regla general: `_x` es dueño del valor y sale de ámbito al terminar la función.
+
+Si un tipo implementa `Drop`, no puede implementar `Copy` (error E0184): si se copiara bit a bit, habría dos valores que liberarían lo mismo, una **doble liberación**.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m15/drop-llamada"
+  explicacion="Si pudieras llamar a `x.drop()`, Rust volvería a llamarlo al final de `main`: el recurso se liberaría dos veces. Por eso el método está prohibido (E0040) y la ayuda propone `drop(x)`, que mueve `x` y garantiza una sola destrucción."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m15/r-drop"
+  enunciado="Implementa `Drop` para `Vela` de forma que imprima `apagada la vela N`. Luego haz que la vela 2 se apague antes de `soplando...`. Salida esperada: la vela 2, `soplando...`, la vela 3 y la vela 1."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta={"`let v = vec![Ruidoso(\"x\"), Ruidoso(\"y\")];` ¿En qué orden se despiden al destruir `v`?"}
+  opciones={["x y luego y", "y y luego x", "Ninguno: un Vec no destruye sus elementos", "Solo x"]}
+  correcta={0}
+  explicacion="Los elementos de un `Vec` se destruyen del primero al último. El orden inverso es solo para variables locales."
+  porque={["Correcto.", "Ese orden es el de las variables locales, no el de los elementos.", "Sí los destruye: el Vec es su dueño.", "Se destruyen todos."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué un tipo con `Drop` no puede ser `Copy`?"
+  opciones={["Por rendimiento", "Porque dos copias bit a bit liberarían el mismo recurso dos veces", "Porque `Copy` solo es para números", "Sí puede, si se pide con `derive`"]}
+  correcta={1}
+  explicacion="`Copy` duplica los bits sin preguntar. Si el valor posee un recurso, las dos copias intentarían liberarlo: doble liberación. El compilador lo prohíbe con E0184."
+  porque={["No es cuestión de velocidad, sino de seguridad.", "Correcto.", "Cualquier tipo sin recursos propios puede ser `Copy`, como un struct de dos `f64`.", "`derive(Copy)` en un tipo con `Drop` da E0184."]}
+/>
+
+<Pregunta
+  pregunta={"Tras `drop(x);`, ¿qué pasa si escribes `println!(\"{}\", x.0);`?"}
+  opciones={["Imprime el valor viejo", "Imprime basura de memoria", "No compila: `x` se movió a `drop`", "Pánico en ejecución"]}
+  correcta={2}
+  explicacion="`drop` recibe `x` por valor, así que `x` queda movido. Usarlo es un uso tras mover (E0382): el compilador evita el uso tras liberar."
+  porque={["El valor ya no existe.", "En Rust seguro nunca lees memoria liberada: el compilador lo impide.", "Correcto.", "No llega a ejecutarse: falla al compilar."]}
+/>

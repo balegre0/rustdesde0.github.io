@@ -1,0 +1,29 @@
+---
+title: "Mundo 11 · Colecciones y texto"
+description: "Guarda muchos datos con Vec, HashMap y compañía, y domina el texto en Rust: String, &str y UTF-8 de verdad, con eñes."
+sidebar:
+  order: 0
+---
+
+Casi todos los programas manejan **muchos** datos (una lista de tareas, un diccionario de palabras, una cola de pedidos) y **texto**. En este mundo conoces las colecciones de la biblioteca estándar y, sobre todo, cómo están hechas por dentro, porque de eso depende qué te deja hacer el borrow checker y cuánto cuesta cada operación.
+
+El texto merece atención especial. De las preguntas sobre Rust más vistas en Stack Overflow, muchas son sobre `String` y `&str`: en qué se diferencian, cómo se concatenan, por qué `s[0]` no compila. Aquí lo verás todo con palabras en español, que es donde se nota: «año» tiene 3 letras pero ocupa 4 bytes.
+
+## Lo que vas a conseguir
+
+| # | Lección | Al terminar sabrás… |
+|---|---|---|
+| 1 | [`Vec`: listas que crecen](/curso/11-colecciones-y-texto/01-vec/) | crear, leer, añadir, quitar y ordenar |
+| 2 | [`Vec` por dentro](/curso/11-colecciones-y-texto/02-vec-por-dentro/) | puntero, capacidad y longitud; por qué `push` con un préstamo vivo no compila |
+| 3 | [Slices](/curso/11-colecciones-y-texto/03-slices/) | prestar un trozo con `&v[1..3]` y escribir funciones que aceptan cualquier lista |
+| 4 | [`String` y `&str`](/curso/11-colecciones-y-texto/04-string-y-str/) | la diferencia que más confunde, con un dibujo de memoria |
+| 5 | [UTF-8: `len`, `chars` y `bytes`](/curso/11-colecciones-y-texto/05-utf8-len-y-chars/) | por qué `len()` cuenta bytes y por qué `s[0]` no existe |
+| 6 | [Cortar y buscar en texto](/curso/11-colecciones-y-texto/06-cortar-texto/) | trozos por bytes sin pánicos, `split`, `trim`, `lines` |
+| 7 | [Construir texto](/curso/11-colecciones-y-texto/07-construir-texto/) | `push_str`, `+`, `format!`, `join` y bytes a texto |
+| 8 | [`HashMap` y la API `entry`](/curso/11-colecciones-y-texto/08-hashmap/) | contar, agrupar y buscar por clave |
+| 9 | [`BTreeMap`, `HashSet` y `BTreeSet`](/curso/11-colecciones-y-texto/09-btreemap-y-conjuntos/) | mapas ordenados y conjuntos sin repetidos |
+| 10 | [`VecDeque` y cómo elegir colección](/curso/11-colecciones-y-texto/10-vecdeque-y-elegir/) | colas por los dos extremos y una tabla para decidir |
+| 11 | [Recorrer colecciones](/curso/11-colecciones-y-texto/11-recorrer-colecciones/) | `iter`, `iter_mut` e `into_iter`, y qué hace `for` con cada uno |
+| 12 | [Jefe: el analizador de textos](/curso/11-colecciones-y-texto/12-jefe/) | contar palabras de verdad, con tildes y eñes |
+
+Requisitos: los mundos 6–9 (propiedad, préstamos, lifetimes y `Option`). Todos los tamaños de memoria están medidos en **wasm32**, la plataforma del navegador, donde un puntero mide 4 bytes; cuando se citan los de un PC de 64 bits, se dice.

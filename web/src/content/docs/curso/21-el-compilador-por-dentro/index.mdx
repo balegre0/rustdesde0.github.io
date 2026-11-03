@@ -1,0 +1,36 @@
+---
+title: "Mundo 21 · El compilador por dentro"
+description: "Abre rustc y sigue a tu programa en su viaje: de texto a tokens, árboles, MIR, código máquina y binario."
+sidebar:
+  order: 0
+---
+
+Llevas veinte mundos hablando *con* el compilador. En este hablas *de* él. Vas a seguir a un programa pequeño en su viaje completo por `rustc`: cómo se trocea en tokens, cómo se convierte en árbol, cómo se le quita el azúcar, cómo el borrow checker lo examina sobre un grafo, cómo se generan copias de tus genéricos y cómo acaba siendo instrucciones de la CPU.
+
+No vas a memorizar nombres internos. Vas a aprender a **mirar**: casi todo lo que hace el compilador se puede ver con una opción de la línea de órdenes, y en cada lección generarás tú mismo la salida real.
+
+Una advertencia que se repite en todo el mundo: **lo que ves por dentro no es una promesa**. El formato del MIR, el orden de los campos de un struct o el contenido de una vtable pueden cambiar entre versiones. Lo estable es el lenguaje; lo interno es el taller.
+
+## Lo que vas a conseguir
+
+| # | Lección | Al terminar sabrás… |
+|---|---|---|
+| 1 | El viaje de tu programa | las etapas de `rustc` y qué pregunta responde cada una |
+| 2 | Tokens, AST y macros | cómo un lexer y un parser convierten texto en árbol; expansión y resolución de nombres |
+| 3 | HIR y THIR: quitar el azúcar | qué queda de `for` y `?`; cómo la comprobación de tipos lo hace todo explícito |
+| 4 | Leer MIR | bloques básicos, locales, `switchInt`, `assert`, `drop` y aristas de unwind |
+| 5 | El borrow checker trabaja sobre MIR | NLL, two-phase borrows, el «problema 3» y Polonius |
+| 6 | El solver de traits | cómo se demuestra `T: Trait`; el solver antiguo y el de nueva generación |
+| 7 | Evaluación en compilación | `const fn`, el intérprete de MIR y el error E0080 |
+| 8 | Monomorfización | por qué los genéricos son rápidos y por qué engordan el binario |
+| 9 | Codegen: LLVM, `noalias` y otros backends | el LLVM IR real de tus `&mut` y qué son Cranelift y GCC |
+| 10 | Layout y nichos | cuánto ocupa cada tipo y dónde se esconde el `None` |
+| 11 | Vtables por dentro | cómo es un `dyn Trait` en memoria y en ensamblador |
+| 12 | Cómo se compila `async` | futuros como máquinas de estados y su tamaño |
+| 13 | Pánicos y unwinding | qué pasa entre `panic!` y el final del programa |
+| 14 | Queries, incremental y tiempos de compilación | por qué compila como compila y cómo medirlo |
+| 15 | Jefe: tu primer compilador y tu primera contribución | un compilador en miniatura y la escalera hasta un PR en rustc |
+
+Requisitos: los mundos 0–20. Sobre todo el 7 (préstamos), el 13 (traits y genéricos), el 18 (async) y el 20 (unsafe).
+
+Herramientas que usarás: `rustc` estable 1.99.1 para `--emit=mir,llvm-ir,asm` y una **nightly** (`rustup toolchain install nightly`) para las opciones `-Z` que enseñan los árboles internos. La nightly es para mirar, no para tus proyectos.

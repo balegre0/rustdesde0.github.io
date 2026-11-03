@@ -1,0 +1,81 @@
+---
+title: "Paralelismo de datos y Rayon"
+description: "Repartir un trabajo grande entre todos los núcleos: hacerlo a mano con thread::scope y chunks, y hacerlo con Rayon cambiando iter() por par_iter()."
+sidebar:
+  order: 11
+duracion: 12
+desde: "1.63"
+requiere: ["17-concurrencia/10-interbloqueos", "14-closures-e-iteradores"]
+tarjetas:
+  - p: "¿Qué es el paralelismo de datos?"
+    r: "Aplicar la misma operación a muchos datos repartiéndolos entre varios núcleos."
+  - p: "¿Cómo paralelizas un iterador con Rayon?"
+    r: "Cambiando iter() por par_iter() (o into_iter() por into_par_iter()), con use rayon::prelude::*."
+  - p: "¿Qué es el robo de trabajo (work stealing)?"
+    r: "Cada hilo tiene su cola de tareas; cuando un hilo se queda sin trabajo, roba tareas de la cola de otro. Así se reparte la carga sola."
+  - p: "¿Cuántos núcleos tiene la máquina, desde Rust?"
+    r: "std::thread::available_parallelism() devuelve el número de hilos que se pueden ejecutar en paralelo."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Hasta ahora has usado hilos para hacer cosas **distintas** a la vez. Muchas veces lo que quieres es hacer **lo mismo** con muchos datos: procesar un millón de fotos, sumar un vector enorme, buscar en mil archivos. Eso es **paralelismo de datos**.
+
+## La idea
+
+El esquema siempre es el mismo:
+
+1. Partir los datos en trozos (uno o varios por núcleo).
+2. Procesar cada trozo en un hilo.
+3. Juntar los resultados.
+
+Con `thread::scope` y `chunks` se hace a mano en una docena de líneas, y los hilos pueden **tomar prestados** los trozos sin copiarlos ni usar `Arc` (mundo 17, lección 3):
+
+<Ejecutar ej="m17/paralelo-a-mano" />
+
+Funciona, pero tiene problemas: si un trozo tarda mucho más que los otros, los demás núcleos esperan sin hacer nada; y escribirlo para cada operación cansa.
+
+**Rayon** (el crate de paralelismo de datos más usado) lo resuelve con una sola palabra:
+
+```rust
+use rayon::prelude::*;
+
+let total: u64 = numeros.par_iter().map(|x| x * x).sum();
+let mut v = datos.clone();
+v.par_sort();
+let mayores: Vec<_> = palabras.par_iter().filter(|p| p.len() > 5).collect();
+```
+
+Cambias `iter()` por `par_iter()` y Rayon reparte el trabajo. Y como el compilador sigue comprobando `Send` y `Sync`, **no puedes introducir una carrera de datos**: si la closure tocara algo compartido sin protección, no compilaría.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Robo de trabajo.** Rayon mantiene un grupo de hilos (uno por núcleo). Divide el trabajo en mitades recursivamente (`join`), y cada hilo tiene una cola. Cuando uno se queda sin tareas, **roba** de la cola de otro. Así, si un trozo resulta más lento, los demás le quitan trabajo y nadie se queda parado.
+
+**Cuándo no merece la pena.** Repartir y juntar tiene un coste. Para 100 sumas, un bucle normal es más rápido. Para operaciones que esperan (red, disco), lo indicado es `async` (mundo 18), no Rayon: Rayon es para trabajo de **CPU**.
+
+**Por qué es seguro.** `par_iter` exige que la closure sea `Fn + Sync + Send` y que los elementos sean `Send`. Es la misma comprobación de `thread::spawn`, aplicada automáticamente.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Esperar que el orden de los efectos se mantenga">
+
+❌ `v.par_iter().for_each(|x| println!("{x}"))` y esperar los números en orden. Cada hilo imprime cuando le toca.
+
+✅ Los **resultados** de `map(…).collect()` sí conservan el orden. Los **efectos** (imprimir, escribir en un archivo) no. Si el orden importa, calcula en paralelo y luego recorre el resultado en orden.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Para cuál de estas tareas es más adecuado Rayon?"
+  opciones={["Calcular el hash de 100 000 archivos ya cargados en memoria", "Atender 10 000 conexiones de red que pasan casi todo el tiempo esperando", "Sumar 10 números", "Leer una línea del teclado"]}
+  correcta={0}
+  explicacion="Mucho trabajo de CPU independiente: el caso ideal para repartir entre núcleos."
+  porque={["", "Para esperas masivas de E/S, async escala mejor.", "Repartir cuesta más que sumar.", "No hay nada que paralelizar."]}
+/>

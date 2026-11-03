@@ -1,0 +1,43 @@
+---
+title: "char"
+description: "Un valor escalar de Unicode (4 bytes). Clasificar (is_alphabetic, is_numeric…), cambiar mayúsculas, convertir a dígito y a número, y cuántos bytes ocupa en UTF-8."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** el tipo primitivo `char` y el módulo `std::char`
+
+## Sinopsis
+
+```rust
+fn is_alphabetic(self) -> bool;   fn is_numeric(self) -> bool;
+fn is_alphanumeric(self) -> bool; fn is_whitespace(self) -> bool;
+fn is_uppercase(self) -> bool;    fn is_ascii(&self) -> bool;
+fn to_uppercase(self) -> ToUppercase; // un iterador: puede dar varios caracteres
+fn to_digit(self, base: u32) -> Option<u32>;
+fn len_utf8(self) -> usize;
+char::from_digit(n: u32, base: u32) -> Option<char>;
+char::from_u32(n: u32) -> Option<char>;
+```
+
+## Qué hace
+
+Un `char` ocupa **4 bytes** y guarda un **valor escalar de Unicode**: cualquier número de `0` a `0x10FFFF` salvo el rango `0xD800`–`0xDFFF` (reservado para UTF-16). Por eso `char::from_u32` devuelve `Option`.
+
+Las funciones `is_*` siguen la tabla de Unicode, no solo el ASCII: la «Ñ» es alfabética y mayúscula. Las versiones `is_ascii_*` solo miran el ASCII y son más rápidas.
+
+`to_uppercase` devuelve un **iterador**, porque algunos caracteres se convierten en varios (la «ß» alemana pasa a «SS»).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/char-metodos" />
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[UTF-8](/curso/11-colecciones-y-texto/05-utf8-len-y-chars/) · [`str`](/ref/std/str/)

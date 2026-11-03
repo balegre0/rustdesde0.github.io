@@ -1,0 +1,67 @@
+---
+title: "Polimorfismo y parametricidad"
+description: "Hay tres clases de polimorfismo: paramétrico (genéricos), ad hoc (traits) y de subtipos (solo con lifetimes). Una firma genérica sin cotas limita muchísimo lo que la función puede hacer."
+sidebar:
+  order: 4
+duracion: 12
+requiere: ["24-teoria-y-diseno/03-vacio-y-curry-howard"]
+tarjetas:
+  - p: "Las tres clases de polimorfismo y cómo aparecen en Rust:"
+    r: "Paramétrico: genéricos (`fn f<T>`). Ad hoc: traits (comportamiento distinto por tipo). De subtipos: solo entre lifetimes (`&'static T` sirve como `&'a T`)."
+  - p: "¿Qué es la parametricidad?"
+    r: "La propiedad de que una función genérica se comporta de forma uniforme para cualquier tipo: como no puede mirar dentro de T, su firma limita lo que puede hacer."
+  - p: "¿Cuántas funciones totales hay con la firma `fn f<T>(x: T) -> T`?"
+    r: "Una: la identidad. Sin cotas, no hay otra forma de conseguir un T que devolver el que recibes."
+  - p: "¿Qué rompe la parametricidad en Rust?"
+    r: "Las cotas (`T: Debug` deja mirar), `TypeId`/`Any` (preguntar el tipo al ejecutar), `size_of::<T>()` y la especialización (inestable)."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+*Polimorfismo* significa «muchas formas»: un mismo código que funciona con muchos tipos. Hay tres maneras de conseguirlo, y Rust usa las tres de forma muy distinta.
+
+## La idea
+
+| Clase | Qué es | En Rust |
+|---|---|---|
+| **Paramétrico** | el mismo código para todos los tipos, sin mirar cuál es | genéricos: `fn invertir<T>(v: Vec<T>)` |
+| **Ad hoc** | un comportamiento distinto para cada tipo, bajo un mismo nombre | traits: `impl Display for Punto` |
+| **De subtipos** | un valor de un tipo «más específico» sirve donde se pide uno «más general» | solo entre lifetimes: `&'static str` donde se pide `&'a str` |
+
+Rust **no** tiene subtipos entre structs (no hay herencia). Su único subtipado es el de las lifetimes, con la varianza del mundo 08.
+
+**Parametricidad.** Una función genérica **sin cotas** no sabe nada de `T`: no puede crear un `T`, ni compararlo, ni imprimirlo. Eso limita tanto lo que puede hacer que **la firma casi dice el comportamiento**:
+
+- `fn f<T>(x: T) -> T` solo puede ser la identidad (o no terminar).
+- `fn f<T>(a: T, b: T) -> T` solo puede devolver `a` o `b`.
+- `fn f<T>(v: Vec<T>) -> Vec<T>` solo puede reordenar, repetir o quitar elementos, **sin mirarlos**. Por eso, para cualquier función `g`, da igual aplicar `g` antes o después.
+
+A estos resultados se les llama, con humor, **teoremas gratis** (*theorems for free*, Wadler 1989): se deducen de la firma, sin leer el cuerpo.
+
+## Pruébalo
+
+<Ejecutar ej="m24/parametricidad" />
+
+La última línea comprueba un teorema gratis: `invertir` y `map` conmutan.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Las cotas abren puertas.** `fn f<T: Debug>(x: T)` ya puede imprimir `x`; `T: Default` puede crear un `T`; `T: Ord` puede ordenarlos. Cada cota es una capacidad que pides y que el que llama tiene que proporcionar. Cuanto menos pidas, más cosas aceptas y más garantías da tu firma.
+
+**Fugas de la parametricidad en Rust.** Hay formas de «mirar» `T` sin cota: `size_of::<T>()` da su tamaño y `std::any::type_name::<T>()` su nombre; con `T: 'static`, `TypeId::of::<T>()` y `Any` permiten preguntar el tipo al ejecutar. Y la **especialización** (inestable) permitiría implementar un trait de forma distinta para un tipo concreto. Por eso la parametricidad en Rust es casi total, pero no absoluta.
+
+**Monomorfización.** El polimorfismo paramétrico de Rust se compila generando una copia del código para cada tipo usado (mundo 21). La teoría no cambia: todas las copias hacen lo mismo, porque el código no puede mirar `T`.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué puede hacer, como mucho, una función `fn f<T>(x: T, y: T) -> (T, T)`?"
+  opciones={["Devolver `(x, y)` o `(y, x)`", "Devolver `(x, x)`", "Sumar `x` e `y`", "Crear un T nuevo"]}
+  correcta={0}
+  explicacion="Sin cotas no puede copiar ni crear valores de T (`T` no es `Clone` ni `Default`). Solo puede colocar los dos que tiene, cada uno una vez."
+  porque={["", "Necesitaría copiar `x`, y sin `T: Clone` no puede.", "Necesitaría `T: Add`.", "Necesitaría algo como `T: Default`."]}
+/>

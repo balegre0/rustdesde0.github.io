@@ -1,0 +1,137 @@
+---
+title: "loop y break con valor"
+description: "Repite algo sin límite con loop, sal con break y haz que el bucle entregue el resultado que buscabas."
+sidebar:
+  order: 3
+duracion: 9
+desde: "1.0"
+requiere: ["04-expresiones-y-control/02-if-es-una-expresion"]
+tarjetas:
+  - p: "¿Cuándo termina un `loop`?"
+    r: "Solo cuando algo dentro hace `break` (o `return`, o el programa acaba). Por sí mismo repite para siempre."
+  - p: "¿Qué hace `break valor;` dentro de un `loop`?"
+    r: "Sale del bucle y hace que la expresión `loop { ... }` valga `valor`."
+  - p: "¿Qué hace `continue`?"
+    r: "Abandona la vuelta actual y salta al principio de la siguiente."
+---
+
+import { Ejecutar, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Vas a construir bucles que repiten algo **hasta encontrar un resultado** y te lo **devuelven**, sin variables extra.
+
+## Predice
+
+<Predice
+  ej="m04/loop-continue"
+  opciones={[
+    "`1 2 3 4 5 6 7 8 9 10`",
+    "`1 2 4 5 7 8 10`",
+    "`1 2 4 5 7 8 10 11`",
+    "Nunca termina: `loop` repite para siempre"
+  ]}
+  correcta={1}
+  explicacion="Los múltiplos de 3 se saltan con `continue` antes del `print!`. Cuando `n` llega a 11, `break` sale antes de imprimirlo."
+  porque={[
+    "El `continue` se salta 3, 6 y 9: no llegan al `print!`.",
+    "",
+    "Cuando `n` es 11, el `break` se ejecuta ANTES del `print!`.",
+    "`loop` repite hasta que se ejecuta un `break`, y aquí ocurre cuando `n > 10`."
+  ]}
+/>
+
+## La idea
+
+`loop { ... }` repite su bloque **para siempre**. Parece peligroso, pero es la forma más honesta de decir «repite hasta que yo diga basta». Para decir basta usas **`break`**, normalmente dentro de un `if`. Y para saltarte el resto de una vuelta y pasar a la siguiente, **`continue`**.
+
+Lo especial de Rust es que `loop` también es una expresión. Si escribes `break valor;`, el bucle termina y **todo el `loop` vale `valor`**. Así puedes escribir `let resultado = loop { ... break x; };` y guardar directamente lo que encontraste.
+
+Este patrón aparece mucho: reintentar algo hasta que salga bien, buscar el primer número que cumple una condición, o leer datos hasta que se acaben.
+
+## Pruébalo
+
+<Ejecutar ej="m04/loop-break-valor" />
+
+1. `potencia` empieza en 1 y se duplica en cada vuelta: 2, 4, 8... 512, 1024.
+2. Cuando supera 1000 (en la vuelta 10), `break potencia;` sale del bucle y entrega 1024.
+3. Ese 1024 queda guardado en `resultado`. No hizo falta una variable «encontrado» ni nada parecido.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Un `loop` es un salto hacia atrás.** El compilador pone una etiqueta al principio del cuerpo y, al final, una instrucción que vuelve a ella. `break` es un salto hacia **después** del bucle; `continue`, un salto hacia el **principio**.
+
+**El tipo de un `loop`.** Si todos los `break` llevan valor del mismo tipo, ese es el tipo del `loop`. Si los `break` no llevan valor, el `loop` vale `()`. ¿Y si no hay ningún `break`? Entonces el bucle nunca termina, y su tipo es `!`, el tipo «nunca» (*never*): una expresión que jamás produce un valor porque jamás acaba. Lo verás de nuevo con `panic!`.
+
+**Por qué el compilador se fía de `loop`.** El compilador sabe que solo se sale de un `loop` por un `break`. Por eso puede garantizar que, después del bucle, `resultado` tiene valor. Con `while` no puede (lo verás en la siguiente lección).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Olvidar avanzar">
+
+❌ Si nada dentro del `loop` cambia lo que compruebas, el `break` no llega nunca y el programa se queda colgado:
+
+```rust
+let mut n = 1;
+let r = loop {
+    if n > 1000 { break n; }
+    // olvidé n *= 2;
+};
+```
+
+✅ Antes de escribir el `break`, pregúntate: ¿qué cambia en cada vuelta para que algún día se cumpla la condición?
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena las líneas para encontrar el primer número mayor que 1 que es múltiplo de 6 y de 4, y guardarlo en `m` (debe imprimir `m = 12`)."
+  lineas={[
+    "let mut n = 1;",
+    "let m = loop {",
+    "    n += 1;",
+    "    if n % 6 == 0 && n % 4 == 0 {",
+    "        break n;",
+    "    }",
+    "};",
+    "println!(\"m = {m}\");"
+  ]}
+  distractores={["        continue n;"]}
+  explicacion="Primero se avanza `n`, luego se comprueba. `break n;` entrega el valor; `continue` no admite valor."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuánto vale `x`? `let mut i = 0; let x = loop { i += 3; if i > 10 { break i * 2; } };`"
+  opciones={["`12`", "`24`", "`22`", "`20`"]}
+  correcta={1}
+  explicacion="`i` va 3, 6, 9, 12. Con 12 se cumple `i > 10` y el bucle entrega `12 * 2 = 24`."
+  porque={[
+    "12 es el valor de `i`, pero el `break` entrega `i * 2`.",
+    "",
+    "`i` nunca vale 11: avanza de 3 en 3.",
+    "`i` nunca vale 10: pasa de 9 a 12."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Qué diferencia hay entre `break` y `continue`?"
+  opciones={[
+    "Ninguna, son sinónimos",
+    "`break` sale del bucle; `continue` termina solo la vuelta actual y sigue con la siguiente",
+    "`continue` sale del bucle; `break` reinicia la vuelta",
+    "`break` solo funciona en `while`"
+  ]}
+  correcta={1}
+  explicacion="`break` = se acabó el bucle. `continue` = se acabó esta vuelta; a por la siguiente."
+  porque={[
+    "Hacen cosas opuestas: uno termina el bucle, el otro lo continúa.",
+    "",
+    "Es al revés.",
+    "`break` funciona en `loop`, `while` y `for` (y con valor, solo en `loop`)."
+  ]}
+/>

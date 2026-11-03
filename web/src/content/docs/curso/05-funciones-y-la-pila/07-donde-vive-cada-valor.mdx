@@ -1,0 +1,155 @@
+---
+title: "¿Dónde vive cada valor?"
+description: "Distingue las tres casas de tus datos: la pila, el heap y el propio programa, con direcciones y tamaños reales, y descubre la pregunta que resuelve el ownership."
+sidebar:
+  order: 7
+duracion: 12
+desde: "1.0"
+requiere: ["05-funciones-y-la-pila/06-marcos-de-pila"]
+tarjetas:
+  - p: "¿Qué tres partes tiene la «ficha» de un `String` en la pila?"
+    r: "Un puntero a sus bytes en el heap, la capacidad (sitio reservado) y la longitud (bytes usados). En el navegador ocupa 3 × 4 = 12 bytes; en un PC de 64 bits, 3 × 8 = 24."
+  - p: "¿Dónde están los bytes de un literal como `\"hola\"`?"
+    r: "Grabados dentro del propio programa, en una zona de solo lectura que existe mientras dura el programa. El `&str` es un puntero + longitud que los señala."
+  - p: "¿Qué datos van al heap?"
+    r: "Los que no tienen un tamaño conocido al compilar o pueden crecer (como los bytes de un `String`), o los que deben vivir más que la función que los creó."
+  - p: "¿Qué pasa cuando un `String` crece y no cabe en su hueco del heap?"
+    r: "Se reserva un hueco nuevo más grande, se copian los bytes y se libera el antiguo: su puntero cambia."
+---
+
+import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer las **tres casas** donde viven los datos de un programa Rust y a ver, con direcciones reales, por qué un `String` vive repartido entre dos de ellas. Esta lección es la puerta del mundo 06.
+
+## Predice
+
+<Predice
+  ej="m05/donde-vive"
+  pregunta="El programa imprime el tamaño de la «ficha» de un `String` (lo que ocupa en la pila). En el navegador, un `usize` mide 4 bytes. ¿Cuánto crees que mide la ficha?"
+  opciones={[
+    "4 bytes: lo que mide el texto «hola»",
+    "12 bytes: tres números de 4 bytes",
+    "Depende de lo largo que sea el texto",
+    "0 bytes: un String vive entero en el heap"
+  ]}
+  correcta={1}
+  explicacion="La ficha de un `String` siempre tiene tres campos: puntero, capacidad y longitud, cada uno del tamaño de un `usize`. 3 × 4 = 12 bytes, aunque el texto mida 4 o 4 000. En un PC de 64 bits serían 3 × 8 = 24."
+  porque={[
+    "Los 4 bytes de «hola» están en el heap, no en la ficha.",
+    "",
+    "La ficha mide siempre lo mismo: por eso cabe en la pila. Lo que varía está en el heap.",
+    "La ficha vive en la pila; solo los bytes del texto están en el heap."
+  ]}
+/>
+
+## La idea
+
+Un programa en marcha guarda sus datos en tres sitios. **La pila** (*stack*): los marcos de las funciones, con sus variables locales. Es rapidísima y se libera sola al volver, pero exige que el tamaño de cada dato se conozca **al compilar**. **El propio programa**: los literales como `"hola"` quedan grabados en el archivo del programa y se cargan en memoria de **solo lectura**; existen mientras el programa funcione. **El heap** (montón, *heap*): una zona grande donde el programa puede pedir trozos de memoria del tamaño que necesite **mientras se ejecuta**, y devolverlos cuando ya no los necesita.
+
+¿Por qué hace falta el heap? Por dos motivos. Hay datos cuyo tamaño **no se sabe al compilar** o que **crecen**: un texto que escribe el usuario, una lista que va creciendo. Y hay datos que deben **sobrevivir a la función que los creó**, cuando su marco de pila ya no existe.
+
+Un `String` usa dos casas a la vez. En la pila tiene una **ficha** de tamaño fijo: un **puntero** (la dirección de sus bytes), su **capacidad** (cuántos bytes tiene reservados) y su **longitud** (cuántos usa). Los **bytes del texto** están en el heap. Un `&str` como `"hola"` es solo un puntero y una longitud que señalan bytes de otro sitio (aquí, del propio programa).
+
+## Pruébalo
+
+<Ejecutar ej="m05/donde-vive" />
+
+Con las direcciones reales, el mapa de memoria del navegador queda así:
+
+```text
+0x000000 ┌──────────────────────────────┐
+         │            PILA              │  crece hacia abajo desde 0x100000
+0xfffb0  │  edad: u32 = 30   (4 bytes)  │
+0xfffb4  │  literal: &str    (8 bytes)  │──┐ ptr + len = 4
+0xfffbc  │  texto: String   (12 bytes)  │──┼──┐ ptr + cap = 4 + len = 4
+0x100000 ├──────────────────────────────┤  │  │
+0x1009a8 │  PROGRAMA: 'h' 'o' 'l' 'a'   │◄─┘  │  solo lectura
+         ├──────────────────────────────┤     │
+0x102200 │  HEAP:     'h' 'o' 'l' 'a'   │◄────┘  reservado al ejecutar
+         └──────────────────────────────┘
+```
+
+Fíjate: `literal` empieza 4 bytes después de `edad` (que ocupa 4), y `texto` 8 bytes después de `literal` (que ocupa 8). Las variables están **pegadas** en el marco de `main`.
+
+Ahora mira qué pasa cuando un `String` **crece**:
+
+<Ejecutar ej="m05/string-crece" />
+
+Mientras cabe, los bytes se quedan en 0x102400. Pero al pasar de 11 a 22 bytes ya no caben en su hueco (el vecino está pegado detrás), así que el `String` **pide un hueco nuevo** (0x102830), copia sus bytes allí y **devuelve el hueco viejo**. La ficha en la pila se actualiza con el puntero nuevo.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El asignador.** Quien reparte trozos del heap se llama **asignador** (*allocator*). Pedir memoria es **reservar** (*allocate*); devolverla, **liberar** (*deallocate*). Es mucho más lento que la pila: tiene que buscar un hueco libre del tamaño pedido y llevar la cuenta de qué está ocupado.
+
+**La capacidad crece a saltos.** Cuando un `String` no cabe, pide al menos el doble de lo que tenía (o lo que necesite, si es más): 4 → 11 → 22 → 44 en el ejemplo. Así no tiene que mudarse en cada `push_str`.
+
+**Tamaños en 64 bits.** En un PC de 64 bits las direcciones miden 8 bytes: `usize` = 8, la ficha de un `String` = 24 bytes y un `&str` = 16. En el navegador, la mitad. El texto en el heap mide lo mismo en ambos: «hola» son 4 bytes, «año» son 4 (la ñ ocupa 2 en UTF-8).
+
+**La pregunta que lo cambia todo.** La pila se libera sola al volver. El programa no se libera nunca (dura lo que el programa). Pero el heap... ¿**quién** devuelve cada trozo, y **cuándo**? Si nadie lo devuelve, la memoria se acaba poco a poco (una **fuga**, *leak*). Si se devuelve dos veces, el asignador se corrompe (**doble liberación**, *double free*). Y si alguien sigue usando un trozo ya devuelto, lee basura o datos de otro (**uso tras liberar**, *use after free*). Las dos últimas son **comportamiento indefinido** (UB): el programa puede hacer cualquier cosa.
+
+Mira el ejemplo del `String` que crece: el hueco viejo, 0x102400, se devolvió. Si algo hubiera guardado esa dirección para leer el texto más tarde, estaría leyendo memoria liberada. Rust tiene una respuesta para todo esto, comprobada al compilar y sin coste al ejecutar: la **propiedad** (*ownership*). Es el mundo 06, y empieza en [¿Quién limpia?](/curso/06-ownership/01-quien-limpia/).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Un String vive en el heap» (a medias)">
+
+❌ «`let s = String::from("hola");` mete el `String` en el heap.» Solo es verdad para los **bytes**. La variable `s` es una ficha de 3 campos que vive en la pila, en el marco de la función.
+
+✅ Piensa siempre en dos cajas: **ficha en la pila** (puntero, capacidad, longitud) → **bytes en el heap**. Cuando en el mundo 06 «muevas» un `String`, verás que lo que se copia son los 3 campos de la ficha, no los bytes.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta={"¿Dónde están los bytes de `\"adiós\"` en `let saludo: &str = \"adiós\";`?"}
+  opciones={[
+    "En el heap",
+    "En la pila, dentro del marco",
+    "Grabados en el propio programa, en memoria de solo lectura",
+    "En un registro de la CPU"
+  ]}
+  correcta={2}
+  explicacion="Los literales de texto forman parte del programa. `saludo` (en la pila) es un puntero + longitud que los señala."
+  porque={[
+    "Un literal no se reserva al ejecutar: ya viene dentro del programa.",
+    "En la pila solo está `saludo`, la vista (puntero + longitud), no los bytes.",
+    "",
+    "Los registros son diminutos y temporales; el texto está en memoria."
+  ]}
+/>
+
+<Pregunta
+  pregunta="En un PC de 64 bits, ¿cuánto ocupa en la pila un `String` que contiene un libro entero de 2 MB?"
+  opciones={["2 MB", "24 bytes", "12 bytes", "8 bytes"]}
+  correcta={1}
+  explicacion="La ficha siempre tiene 3 campos de 8 bytes. Los 2 MB están en el heap."
+  porque={[
+    "Los 2 MB están en el heap; la pila no podría con ellos.",
+    "",
+    "12 bytes es lo que mide en el navegador (32 bits), no en un PC de 64 bits.",
+    "8 bytes sería solo el puntero; faltan la capacidad y la longitud."
+  ]}
+/>
+
+<Pregunta
+  pregunta="Un `String` crece y se muda a otro hueco del heap. ¿Qué pasa con el hueco antiguo?"
+  opciones={[
+    "Se queda reservado para siempre",
+    "Se devuelve al asignador: usarlo después sería un «uso tras liberar»",
+    "Pasa a la pila",
+    "Se borra el programa"
+  ]}
+  correcta={1}
+  explicacion="El `String` libera su hueco viejo al mudarse. Cualquier dirección guardada que apunte allí ya no es válida; el mundo 07 explica cómo Rust impide usarla."
+  porque={[
+    "Eso sería una fuga; el `String` lo devuelve.",
+    "",
+    "Pila y heap son zonas distintas; nada se mueve de una a otra.",
+    "Liberar memoria no afecta al código del programa."
+  ]}
+/>

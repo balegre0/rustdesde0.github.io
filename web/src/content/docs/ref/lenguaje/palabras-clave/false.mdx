@@ -1,0 +1,58 @@
+---
+title: "false"
+description: "Palabra clave estricta: el valor falso del tipo bool."
+sidebar:
+  order: 13
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`false` es uno de los dos valores del tipo `bool`; el otro es [`true`](/ref/lenguaje/palabras-clave/true/).
+
+## Sinopsis
+
+```text
+false : bool
+```
+
+## Qué hace
+
+- `bool` ocupa **1 byte**. En memoria, `false` es el byte `0` y `true` el byte `1`. Cualquier otro byte en un `bool` es un valor inválido: crearlo con `unsafe` es [comportamiento indefinido](/ref/ub/).
+- `false as u8` vale `0`.
+- Las condiciones de `if` y `while` exigen un `bool`: un número no sirve como condición.
+- `&&` y `||` hacen **cortocircuito**: en `false && x`, `x` ni se evalúa.
+- Como los valores 2…255 están prohibidos, el compilador los aprovecha como nichos: `Option<bool>` ocupa 1 byte.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-false" />
+
+Salida:
+
+```text
+true
+0 1
+1 byte
+false
+true
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-false-error" />
+
+`error[E0308]: mismatched types` con `expected bool, found integer`. Escribe la comparación explícita: `if n != 0`.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+- [`true`](/ref/lenguaje/palabras-clave/true/) · [`if`](/ref/lenguaje/palabras-clave/if/) · [Tipos](/ref/lenguaje/tipos/)
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)

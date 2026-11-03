@@ -1,0 +1,79 @@
+---
+title: "E0005: patrón refutable en un let"
+description: "Usas en un let un patrón que podría no encajar (como Some(n))."
+sidebar:
+  order: 2
+insignias: ["Patrones"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` refutable pattern in local binding ``
+
+## Qué significa
+
+Un `let` normal no tiene «plan B»: su patrón debe encajar **siempre** (ser *irrefutable*). `Some(n)` no encaja si el valor es `None`. Para patrones que pueden fallar existen `if let`, `let ... else` y `match`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0005" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0005]: refutable pattern in local binding
+ --> E0005.rs:3:9
+  |
+3 |     let Some(n) = quiza;
+  |         ^^^^^^^ pattern `None` not covered
+  |
+  = note: `let` bindings require an "irrefutable pattern", like a `struct` or an `enum` with only one variant
+  = note: for more information, visit https://doc.rust-lang.org/book/ch19-02-refutability.html
+  = note: the matched value is of type `Option<i32>`
+help: you might want to use `let...else` to handle the variant that isn't matched
+  |
+3 |     let Some(n) = quiza else { todo!() };
+  |                         ++++++++++++++++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- `let Some(x) = opcion;`
+- `let Ok(v) = resultado;`
+
+## Cómo arreglarlo
+
+Usa `let Some(n) = quiza else { ...; return; };` (el `else` debe salir: `return`, `break`, `continue` o pánico), `if let Some(n) = quiza { ... }`, o un `match`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let quiza: Option<i32> = Some(3);
+    let Some(n) = quiza else {
+        println!("no había nada");
+        return;
+    };
+    println!("{n}");
+}
+```
+
+**Salida:**
+
+```text
+3
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0005` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0004](/errores/e0004/): patrones no exhaustivos
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)
+- [Mundo 10 · Errores](/curso/10-errores/)

@@ -1,0 +1,9 @@
+---
+// <Ejecutar ej="m06/mover" titulo? playground? /> — CONTENIDO.md §4
+// playground: true (o ["mir","asm","miri","clippy"]) añade botones opt-in «Ver MIR / ensamblador / Miri / Clippy en el Playground».
+import Ejecutable from './interno/Ejecutable.astro';
+import type { Herramienta } from '../runtime/playground';
+interface Props { ej: string; titulo?: string; playground?: boolean | Herramienta[] }
+const { ej, titulo, playground } = Astro.props;
+---
+<Ejecutable ej={ej} titulo={titulo} componente="Ejecutar" playground={playground} />

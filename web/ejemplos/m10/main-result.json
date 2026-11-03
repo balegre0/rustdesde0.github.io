@@ -1,0 +1,1 @@
+{ "nota": "Si main devuelve Err, Rust imprime «Error: » seguido del Debug del error en stderr, y el programa termina con código 1." }

@@ -1,0 +1,83 @@
+---
+title: "E0716: un temporal se destruye mientras está prestado"
+description: "Tomas prestado un valor temporal (sin variable) y sigues usando el préstamo cuando el temporal ya no existe."
+sidebar:
+  order: 68
+insignias: ["Tiempos de vida"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` temporary value dropped while borrowed ``
+
+## Qué significa
+
+`String::from("uno dos")` crea un **valor temporal**: no tiene variable, así que se destruye al final de la sentencia. `split` y `collect` crean slices `&str` que apuntan dentro de ese temporal, y `palabras` los usa en la línea siguiente, cuando el `String` ya se ha liberado.
+
+## Qué error evita
+
+Los `&str` de `palabras` serían referencias colgantes a un `String` liberado.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0716" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0716]: temporary value dropped while borrowed
+ --> E0716.rs:2:31
+  |
+2 |     let palabras: Vec<&str> = String::from("uno dos").split(' ').collect();
+  |                               ^^^^^^^^^^^^^^^^^^^^^^^                     - temporary value is freed at the end of this statement
+  |                               |
+  |                               creates a temporary value which is freed while still in use
+3 |     println!("{palabras:?}");
+  |                -------- borrow later used here
+  |
+help: consider using a `let` binding to create a longer lived value
+  |
+2 ~     let binding = String::from("uno dos");
+3 ~     let palabras: Vec<&str> = binding.split(' ').collect();
+  |
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Encadenar métodos que devuelven referencias sobre un valor recién creado y guardar el resultado.
+- `let r = &funcion_que_devuelve_string().trim();` y usar `r` después.
+
+## Cómo arreglarlo
+
+Guarda primero el valor en una variable (`let texto = String::from(...);`) y toma prestado de ella. Así vive hasta el final del bloque. La ayuda de rustc lo sugiere: `consider using a let binding`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let texto = String::from("uno dos"); // el String vive en una variable
+    let palabras: Vec<&str> = texto.split(' ').collect();
+    println!("{palabras:?}");
+}
+```
+
+**Salida:**
+
+```text
+["uno", "dos"]
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0716` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0597](/errores/e0597/): un valor no vive lo suficiente
+- [E0515](/errores/e0515/): devolver una referencia a una variable local
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

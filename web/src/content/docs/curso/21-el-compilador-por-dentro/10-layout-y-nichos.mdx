@@ -1,0 +1,156 @@
+---
+title: "Layout y nichos"
+description: "Mide cuánto ocupa cada tipo en el navegador y en un PC de 64 bits, descubre por qué rustc reordena campos y dónde esconde el `None`."
+sidebar:
+  order: 10
+duracion: 14
+desde: "1.0"
+requiere: ["21-el-compilador-por-dentro/07-const-eval", "09-structs-enums-y-patrones"]
+tarjetas:
+  - p: "¿Qué garantiza el layout por defecto (`repr(Rust)`) de un struct?"
+    r: "Solo que cada campo está alineado, que no se solapan y que el alineamiento del struct es al menos el del campo más exigente. El orden de los campos NO está garantizado."
+  - p: "¿Por qué `Option<&u8>` ocupa lo mismo que `&u8`?"
+    r: "Porque una referencia nunca vale 0: rustc usa ese valor imposible (un nicho) para representar `None`, sin etiqueta extra."
+  - p: "¿Por qué `Option<*const u8>` ocupa el doble que `*const u8`?"
+    r: "Porque un puntero crudo puede ser nulo: no hay ningún valor imposible, así que hace falta una etiqueta aparte (más relleno)."
+  - p: "¿Cuántos nichos aporta un puntero `Box<T>`?"
+    r: "Uno solo, el 0. Por eso un enum con `Box` y otra variante sin datos ocupa 8 bytes, pero con dos variantes sin datos pasa a 16 (en x86-64)."
+  - p: "¿Cuánto ocupa `struct { a: u8, b: u32, c: u16 }` con y sin `#[repr(C)]` en x86-64?"
+    r: "8 bytes sin `repr(C)` (rustc reordena: b, c, a + 1 de relleno) y 12 bytes con `repr(C)` (orden de declaración con relleno)."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+El compilador decide cuántos bytes ocupa cada tipo y dónde va cada campo: el **layout**. Esa decisión tiene trucos muy finos, como guardar el `None` de un `Option` dentro de un valor imposible. Hoy vas a medirlo todo.
+
+## Predice
+
+<Pregunta
+  pregunta="En un PC de 64 bits, `&u8` ocupa 8 bytes. ¿Cuánto ocupa `Option<&u8>`?"
+  opciones={["8 bytes", "9 bytes", "16 bytes", "1 byte"]}
+  correcta={0}
+  explicacion="Una referencia nunca es nula, así que el valor 0 está libre: rustc lo usa para `None`. Cero bytes extra. Este caso concreto está **garantizado** por la documentación de `Option`."
+  porque={["", "Los tamaños son múltiplos del alineamiento: 9 bytes con alineamiento 8 sería imposible; además no hace falta etiqueta.", "Eso pasaría si hubiera que añadir una etiqueta (y relleno). No hace falta.", "Un `Option<&u8>` tiene que poder guardar la dirección entera."]}
+/>
+
+## La idea
+
+Cada tipo tiene un **tamaño** y un **alineamiento** (la dirección donde empieza debe ser múltiplo de él). Un `u32` mide 4 y se alinea a 4. Un struct se construye colocando sus campos y añadiendo **relleno** (*padding*) donde haga falta para que cada campo quede alineado.
+
+Con el layout por defecto, `repr(Rust)`, el compilador puede **reordenar los campos** como quiera. Lo usa para ahorrar relleno: `struct { a: u8, b: u32, c: u16 }` en orden de declaración necesitaría 12 bytes, pero colocando primero `b`, luego `c` y luego `a`, caben en 8. Si necesitas un orden fijo (para hablar con el sistema operativo o con hardware), pides `#[repr(C)]`: orden de declaración con las reglas de relleno de la plataforma.
+
+Los enums necesitan saber **qué variante** contienen: una **etiqueta** (*discriminante*). Pero si alguna variante tiene un campo con **valores imposibles**, rustc puede guardar ahí la etiqueta. A esos valores se les llama **nichos** (*niches*): el 0 de una referencia o de un `Box`, los valores 2–255 de un `bool`, los números por encima de 0x10FFFF de un `char`, el 0 de un `NonZeroU32`. Así, `Option<bool>` cabe en 1 byte (`None` se guarda como, por ejemplo, el valor 2).
+
+## Pruébalo
+
+La tabla de tamaños en tu navegador. **Atención**: el navegador ejecuta Rust compilado para `wasm32`, donde `usize` y los punteros miden **4** bytes, no 8.
+
+<Ejecutar ej="m21/tamanos" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La misma tabla en x86-64.** La verificamos con rustc 1.99.1 en x86-64 Windows **sin ejecutar nada**: una aserción por tipo evaluada al compilar (lección 7). Si cualquier número fuera falso, la compilación fallaría con E0080.
+
+```rust
+macro_rules! chk { ($t:ty, $s:expr, $a:expr) => {
+    const _: () = assert!(size_of::<$t>() == $s && align_of::<$t>() == $a);
+} }
+chk!(Option<&u8>, 8, 8);  // y así con cada fila
+```
+
+| Tipo | wasm32 (navegador) | x86-64 |
+|---|---|---|
+| `bool` / `char` | 1 / 4 | 1 / 4 |
+| `u128` | 16 (alineamiento 16) | 16 (alineamiento 16) |
+| `usize`, `&u8`, `Option<&u8>` | 4 | 8 |
+| `Option<*const u8>` | 8 | **16** |
+| `Option<u32>` | 8 | 8 |
+| `Option<NonZeroU32>` | 4 | 4 |
+| `Option<bool>`, `Option<Option<bool>>` | 1 | 1 |
+| `Option<char>` | 4 | 4 |
+| `struct { a: u8, b: u32, c: u16 }` | 8 | 8 |
+| ídem con `#[repr(C)]` | 12 | 12 |
+| `enum { A(Box<u64>), B }` | 4 | 8 |
+| `enum { A(Box<u64>), B, C }` | 8 | **16** |
+| `Vec<u8>`, `Option<Vec<u8>>` | 12 | 24 |
+| `&str`, `&dyn Debug` | 8 | 16 |
+
+Cosas que leer en la tabla:
+
+- **Un puntero aporta un solo nicho.** `Box<u64>` está alineado a 8, así que sus 3 bits bajos siempre son 0; aun así rustc solo usa el valor 0 como nicho. Con una variante sin datos (`B`) basta; con dos (`B`, `C`) ya no, y el enum crece con una etiqueta aparte.
+- `Option<Vec<u8>>` no crece: el puntero interno de `Vec` nunca es nulo y la capacidad nunca supera `isize::MAX`, así que sobran valores imposibles.
+- `Option<u32>` sí crece: todos los patrones de 32 bits son un `u32` válido. Por eso existe `NonZeroU32`.
+
+**Ver el orden real.** Con nightly, `-Zprint-type-sizes` muestra cómo quedó cada tipo. Para el struct de tres campos imprime `b` (4 bytes), `c` (2), `a` (1) y 1 byte de relleno final: el orden lo ha cambiado el compilador.
+
+**Qué está garantizado y qué no.** La Reference solo garantiza para `repr(Rust)` lo dicho arriba (alineado, sin solapes, alineamiento mínimo). Los tamaños de esta tabla son **lo que hace rustc 1.99.1**, no promesas, salvo casos documentados como el nicho de `Option<&T>`, `Option<Box<T>>`, `Option<NonZero*>` o los tipos `repr(C)`. Si tu código `unsafe` depende de un layout, usa `repr(C)` o `repr(transparent)`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Suponer el orden de los campos en `unsafe`">
+
+❌ Convertir un `*const MiStruct` en `*const u8`, sumar 1 y «leer el segundo campo», porque es el segundo en el código.
+
+✅ Con `repr(Rust)` el segundo campo declarado puede estar en cualquier sitio. Usa `std::mem::offset_of!(MiStruct, campo)` para saber dónde está, o declara `#[repr(C)]` si el orden forma parte del contrato.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="En x86-64, ¿cuánto ocupa `enum Forma { Nada, Circulo(Box<f64>) }`?"
+  opciones={["8 bytes", "9 bytes", "16 bytes", "24 bytes"]}
+  correcta={0}
+  explicacion="Hay una sola variante sin datos (`Nada`) y el `Box` aporta un nicho (el 0): `Nada` se guarda como puntero nulo. Igual que `Option<Box<f64>>`."
+  porque={["", "Ningún tamaño puede romper el alineamiento de 8.", "Eso pasaría con dos variantes sin datos, porque un puntero aporta un solo nicho.", "Un `Box` es un solo puntero, no tres palabras como `Vec`."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué en el navegador `&str` mide 8 bytes y en tu PC 16?"
+  opciones={[
+    "Porque en el navegador los textos se comprimen",
+    "Porque `&str` son dos palabras (puntero + longitud) y en wasm32 una palabra mide 4 bytes, mientras que en x86-64 mide 8",
+    "Porque wasm no admite UTF-8",
+    "Porque el navegador usa una versión antigua de Rust"
+  ]}
+  correcta={1}
+  explicacion="Los punteros gordos son dos `usize`. El tamaño de `usize` depende de la arquitectura de destino."
+  porque={["No hay compresión: es el tamaño de la palabra.", "", "Los `&str` son UTF-8 en todas las plataformas.", "Se compilan con el mismo rustc 1.99.1; lo que cambia es el target."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `Option<u32>` ocupa 8 bytes pero `Option<NonZeroU32>` solo 4?"
+  opciones={[
+    "Porque `NonZeroU32` es más pequeño que `u32`",
+    "Porque `u32` usa sus 2³² patrones y no deja nicho, mientras que `NonZeroU32` nunca vale 0 y ese valor guarda el `None`",
+    "Porque `NonZeroU32` se guarda en el heap",
+    "Es un error de medición"
+  ]}
+  correcta={1}
+  explicacion="Sin valores imposibles, hace falta una etiqueta, y con el alineamiento de 4 eso son 4 bytes más."
+  porque={["Los dos miden 4 bytes.", "", "Ninguno de los dos usa el heap.", "Está verificado con aserciones en compilación."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace `#[repr(C)]` en un struct?"
+  opciones={[
+    "Lo hace más pequeño",
+    "Fija el orden de los campos al de la declaración, con el relleno de la ABI de la plataforma",
+    "Lo convierte en código de otro lenguaje",
+    "Elimina el relleno"
+  ]}
+  correcta={1}
+  explicacion="Garantiza un layout predecible, necesario para compartir datos con el sistema operativo, el hardware o bibliotecas externas. Suele ocupar igual o más, nunca menos."
+  porque={["Al contrario: puede ocupar más (12 frente a 8 en el ejemplo).", "", "Es un atributo de layout; el código sigue siendo Rust.", "Para quitar el relleno existe `repr(packed)`, con sus propios riesgos."]}
+/>
+
+## Para saber más
+
+- Mundo 9, lección de layout de enums, y [Vtables por dentro](/curso/21-el-compilador-por-dentro/11-vtables/).
+- The Rust Reference, «Type layout»: https://doc.rust-lang.org/reference/type-layout.html

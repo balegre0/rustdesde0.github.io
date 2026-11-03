@@ -1,0 +1,95 @@
+---
+title: "Dónde vive una macro"
+description: "Ámbito textual, importar macros con use y publicarlas con #[macro_export]."
+sidebar:
+  order: 7
+duracion: 11
+desde: "1.0"
+requiere: ["19-macros/06-recursion"]
+tarjetas:
+  - p: "¿Puedes usar una macro_rules! en una línea anterior a su definición (en el mismo archivo y sin importarla)?"
+    r: "No: el ámbito textual empieza donde se define la macro y sigue hacia abajo."
+  - p: "¿Cómo se hace que una macro definida en un módulo se pueda importar por ruta dentro de la crate?"
+    r: "Reexportándola con pub(crate) use nombre_macro; justo después de definirla."
+  - p: "¿Dónde coloca #[macro_export] la macro?"
+    r: "En la raíz de la crate (crate::nombre!), sea cual sea el módulo donde se escribió, y la hace pública para otras crates."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a aprender las reglas de visibilidad de las macros, que son distintas de las de funciones y structs, y cómo publicarlas para que otros las usen.
+
+## Predice
+
+<NoCompila ej="m19/orden-textual" explicacion="Con una función daría igual el orden, pero una `macro_rules!` solo existe desde la línea donde se define hacia abajo. El compilador incluso te dice que hay una macro con ese nombre más abajo." />
+
+¿Por qué una función se puede usar antes de definirla y una macro no?
+
+## La idea
+
+Las macros se expanden **antes** de que el compilador conozca la lista completa de items de la crate. Por eso `macro_rules!` usa, de entrada, un **ámbito textual** (*textual scope*): la macro existe desde su definición hasta el final del módulo que la contiene, incluidos los módulos hijos que aparezcan **después** en el texto.
+
+Además existe el **ámbito por ruta** (*path-based scope*), el mismo que usan las funciones. Para que una `macro_rules!` entre en él hay dos caminos:
+
+1. **`pub(crate) use nombre;`** justo después de definirla: la macro pasa a ser un item normal del módulo y se importa con `use crate::modulo::nombre;`.
+2. **`#[macro_export]`**: la coloca en la **raíz** de la crate y la hace visible para otras crates como `tu_crate::nombre!`.
+
+## Pruébalo
+
+<Ejecutar ej="m19/macro-en-modulo" titulo="Importar una macro por ruta" />
+
+1. `grita!` se define dentro de `utilidades`.
+2. `pub(crate) use grita;` la convierte en un item del módulo.
+3. Desde `saludos` se importa con `use`, igual que una función.
+
+<Ejecutar ej="m19/macro-export" titulo="#[macro_export]" />
+
+`version!` se escribió tres módulos más abajo, pero `#[macro_export]` la colocó en la raíz: se nombra `crate::version!`. En una biblioteca, los usuarios la llamarían `tu_biblioteca::version!()`.
+
+## Bajo el capó
+
+<BajoElCapo>
+El compilador mezcla expansión y resolución de nombres en un bucle: expande lo que puede, descubre los items nuevos que han aparecido (una macro puede generar módulos, `use` y otras macros) y vuelve a intentarlo con las invocaciones que antes no sabía resolver. El ámbito textual existe porque es lo único que se puede saber **antes** de ese bucle: basta con leer el archivo de arriba abajo.
+
+Con `#[macro_export]`, la macro se guarda en los metadatos de la crate compilada (el archivo `.rlib`/`.rmeta`) como texto de reglas. Cuando otra crate la usa, el compilador lee esas reglas y la expande **en la crate que la invoca**. Por eso son tan importantes `$crate` y las rutas absolutas (lección 5): el código generado vive en casa de otro.
+
+**Historia breve.** Antes de la edición 2018, para usar macros de otra crate había que escribir `#[macro_use] extern crate nombre;`. Desde 2018 basta con `use nombre::macro;` o con la ruta completa. `#[macro_use]` sobre un `mod` todavía existe: extiende el ámbito textual de las macros de ese módulo hasta después de su cierre.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Esperar que #[macro_export] respete los módulos">
+❌ Escribir `crate::interno::profundo::version!()` porque la macro está en ese módulo.
+
+✅ Con `#[macro_export]` siempre vive en la raíz: `crate::version!()`. Si quieres que la ruta refleje el módulo, usa `pub(crate) use` (dentro de la crate) o reexporta desde la raíz con un `pub use` documentado.
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m19/reto-modulo" enunciado="Haz que `area!` se pueda importar desde el módulo `figuras` y usar desde `main` como `crate::macros::area!`, sin moverla del módulo `macros`. Debe imprimir 12 y 10." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Defines `macro_rules! m` al final de `main.rs`, después de `fn main`, y la usas dentro de `main`. ¿Qué pasa?"
+  opciones={["Funciona, igual que con funciones", "Error: «cannot find macro `m` in this scope»", "Funciona solo en modo release", "Se expande vacía"]}
+  correcta={1}
+  explicacion="Sin `use` ni `#[macro_export]`, solo vale el ámbito textual, que empieza en la definición."
+  porque={["Las funciones usan ámbito por ruta; las macro_rules!, de entrada, ámbito textual.", "Correcto.", "El modo de compilación no influye en la expansión.", "No hay ninguna macro visible que expandir."]}
+/>
+
+<Pregunta
+  pregunta="Con `#[macro_export]` en `mod a { mod b { macro_rules! m ... } }`, ¿cómo la llama otra crate llamada `bib`?"
+  opciones={["`bib::a::b::m!()`", "`bib::m!()`", "`bib::macros::m!()`", "No puede: hace falta `pub` en los módulos"]}
+  correcta={1}
+  explicacion="`#[macro_export]` coloca la macro en la raíz de la crate y la hace pública, sin importar en qué módulo se escribió ni si esos módulos son privados."
+  porque={["La ruta de módulos no se conserva.", "Correcto.", "No existe ese módulo automático.", "La macro exportada ignora la privacidad de los módulos donde se escribió."]}
+/>
+
+<Pregunta
+  pregunta="¿Para qué sirve `pub(crate) use mi_macro;` justo después de una `macro_rules!`?"
+  opciones={["Para exportarla a otras crates", "Para que se pueda importar por ruta en toda la crate, como un item normal", "Para que sea higiénica", "Para que se ejecute antes"]}
+  correcta={1}
+  explicacion="Convierte la macro en un item del módulo con visibilidad `pub(crate)`. Para otras crates haría falta `#[macro_export]`."
+  porque={["Con `pub(crate)` no sale de la crate.", "Correcto.", "La higiene no depende de la visibilidad.", "El orden de expansión no cambia."]}
+/>

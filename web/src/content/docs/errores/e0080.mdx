@@ -1,0 +1,68 @@
+---
+title: "E0080: error al evaluar una constante"
+description: "Al calcular una constante en tiempo de compilación ocurre un error (desbordamiento, división por cero, pánico…)."
+sidebar:
+  order: 14
+insignias: ["Constantes, unsafe, async y otros"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` attempt to compute `200_u8 + 100_u8`, which would overflow ``
+
+## Qué significa
+
+El compilador calcula las `const` mientras compila. Si el cálculo falla, por ejemplo porque `200 + 100` no cabe en un `u8` (máximo 255), no hay programa que generar: el error aparece **al compilar**, no al ejecutar.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0080" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0080]: attempt to compute `200_u8 + 100_u8`, which would overflow
+ --> E0080.rs:1:20
+  |
+1 | const TAMANO: u8 = 200 + 100;
+  |                    ^^^^^^^^^ evaluation of `TAMANO` failed here
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Desbordamiento aritmético en una `const`.
+- Dividir por cero o indexar fuera de rango en una `const`.
+- Un `panic!` o `assert!` que falla dentro de un bloque `const`.
+
+## Cómo arreglarlo
+
+Usa un tipo más grande (`u16`), corrige el cálculo, o usa aritmética explícita (`wrapping_add`, `checked_add`) si el desbordamiento es intencionado.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+const TAMANO: u16 = 200 + 100;
+
+fn main() {
+    println!("{TAMANO}");
+}
+```
+
+**Salida:**
+
+```text
+300
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0080` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0015](/errores/e0015/): llamada a función no const en una constante
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)

@@ -1,0 +1,94 @@
+---
+title: "cargo new y cargo run"
+description: "Crea tu primer proyecto con cargo new, entiende cada archivo que genera y ejecútalo con cargo run."
+sidebar:
+  order: 6
+duracion: 10
+requiere: ["00-el-taller/05-el-editor"]
+tarjetas:
+  - p: "¿Qué crea `cargo new hola`?"
+    r: "Una carpeta `hola` con `Cargo.toml` (el manifiesto), `src/main.rs` (el código, con un «Hello, world!») y un repositorio Git con su `.gitignore`."
+  - p: "¿Qué hace `cargo run`?"
+    r: "Compila el proyecto (si ha cambiado algo) y ejecuta el programa resultante."
+  - p: "¿Dónde deja Cargo el ejecutable?"
+    r: "En `target\\debug\\` (o `target\\release\\` con `--release`), por ejemplo `target\\debug\\hola.exe`."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Trampa } from '~/components';
+
+Ya tienes el taller montado. Vas a crear tu primer proyecto de Rust, ver qué hay dentro y ejecutarlo.
+
+## La idea
+
+**Cargo** crea y gestiona proyectos. Un proyecto de Cargo se llama **paquete** (*package*) y es una carpeta con una estructura fija. Para crear uno:
+
+```powershell
+cd C:\dev
+cargo new hola
+cd hola
+```
+
+Cargo crea esto:
+
+```text
+hola\
+├── Cargo.toml      ← el manifiesto: nombre, versión, edición, dependencias
+├── .gitignore      ← le dice a Git que ignore la carpeta target
+└── src\
+    └── main.rs     ← tu código
+```
+
+Y `src\main.rs` ya trae un programa:
+
+<Ejecutar ej="m00/hola" />
+
+Para compilarlo y ejecutarlo:
+
+```powershell
+cargo run
+```
+
+```text
+   Compiling hola v0.1.0 (C:\dev\hola)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.61s
+     Running `target\debug\hola.exe`
+Hello, world!
+```
+
+Las tres primeras líneas son de Cargo: compiló el paquete, en el perfil `dev`, y ejecutó `target\debug\hola.exe`. La cuarta es **tu programa**. Si vuelves a ejecutar `cargo run` sin cambiar nada, no recompila: va directo a ejecutar.
+
+## Pruébalo
+
+Cambia el texto de `main.rs` y vuelve a ejecutar. Y luego equivócate a propósito, para ver cómo te ayuda el compilador:
+
+<NoCompila ej="m00/printn" explicacion="`printn!` no existe. El compilador no solo te lo dice: te sugiere el nombre que probablemente querías (`println!`). Lee siempre el `help:`." />
+
+## Qué es cada cosa
+
+En el mundo 02 verás `fn main` y `println!` con detalle. De momento:
+
+- `fn main() { … }` es el punto de entrada: el programa empieza aquí.
+- `println!("…")` imprime un texto y salta de línea. El `!` indica que es una **macro**, no una función normal (mundo 02).
+- Cada instrucción termina en `;`.
+
+<Trampa titulo="Ejecutar cargo run en la carpeta equivocada">
+
+```text
+error: could not find `Cargo.toml` in `C:\dev` or any parent directory
+```
+
+Estás en `C:\dev`, no dentro del proyecto. Cargo busca `Cargo.toml` en la carpeta actual y en las de arriba, nunca en las de abajo.
+
+✅ `cd hola` y vuelve a probar.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿En qué archivo escribes el código del programa en un proyecto recién creado con `cargo new`?"
+  opciones={["`Cargo.toml`", "`src\\main.rs`", "`target\\debug\\hola.exe`", "`.gitignore`"]}
+  correcta={1}
+  explicacion="El código va en `src\\main.rs`. `Cargo.toml` describe el proyecto y `target` lo genera Cargo."
+  porque={["Es el manifiesto, no el código.", "", "Es el ejecutable que genera Cargo.", "Es la lista de cosas que Git ignora."]}
+/>

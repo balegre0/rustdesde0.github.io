@@ -1,0 +1,63 @@
+---
+title: "else"
+description: "Palabra clave estricta: la rama alternativa de if, if let y let ... else."
+sidebar:
+  order: 10
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`else` introduce lo que pasa **si no** se cumple la condición (o el patrón).
+
+## Sinopsis
+
+```text
+if condición { … } else { … }
+if c1 { … } else if c2 { … } else { … }
+if let patrón = expr { … } else { … }
+let patrón = expr else { …debe salir… };      // let-else
+```
+
+## Qué hace
+
+### Uso 1 · Rama alternativa de `if` e `if let`
+
+Como `if` es una expresión, `if … else …` da un valor y **las dos ramas deben tener el mismo tipo**. Un `if` sin `else` vale `()`.
+
+### Uso 2 · `let … else`
+
+`let PATRÓN = valor else { … };` intenta encajar el patrón. Si encaja, las variables quedan disponibles **después** de la sentencia. Si no, se ejecuta el bloque `else`, que **tiene que salir** (*divergir*): `return`, `break`, `continue` o `panic!`. Es decir, su tipo debe ser `!`.
+
+Sirve para el estilo «comprueba y sal pronto» sin anidar.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-else" />
+
+Salida:
+
+```text
+chaqueta
+no hay valor
+n + 1 = 43
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-else-error" />
+
+`error[E0308]: else clause of let...else does not diverge`: el bloque terminó normalmente (tipo `()`) en lugar de salir.
+
+## Desde
+
+Rust 1.0. `let … else`: 1.65.
+
+## Ver también
+
+- [`if`](/ref/lenguaje/palabras-clave/if/) · [`let`](/ref/lenguaje/palabras-clave/let/) · [Patrones](/ref/lenguaje/patrones/)
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/)

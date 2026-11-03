@@ -1,0 +1,82 @@
+---
+title: "for"
+description: "Palabra clave estricta: el bucle que recorre un iterador, y los límites de orden superior for<'a>."
+sidebar:
+  order: 15
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`for` recorre, uno a uno, los elementos de cualquier cosa que se pueda convertir en iterador.
+
+## Sinopsis
+
+```text
+'etiqueta: for patrón in expresión { cuerpo }     // bucle (la etiqueta es opcional)
+for<'a> F: Fn(&'a T)                             // límite de orden superior (HRTB)
+impl Trait for Tipo                              // en implementaciones de traits (ver impl)
+```
+
+## Qué hace
+
+### Uso 1 · Bucle `for`
+
+`for x in e { … }` equivale, más o menos, a:
+
+```text
+let mut it = IntoIterator::into_iter(e);
+loop {
+    match it.next() {
+        Some(x) => { … }
+        None => break,
+    }
+}
+```
+
+Consecuencias:
+
+- `for x in v` **mueve** `v` (llama a `into_iter`, que se queda con la propiedad).
+- `for x in &v` presta `v`: los elementos son `&T`. `for x in &mut v` da `&mut T`.
+- La parte entre `for` e `in` es un **patrón irrefutable**: `for (i, x) in …` desestructura.
+- Un `for` siempre vale `()`; `break` no puede llevar valor dentro de él.
+
+### Uso 2 · `for<'a>`: límites de orden superior
+
+`for<'a>` dice «para **todo** tiempo de vida `'a`». `F: for<'a> Fn(&'a str) -> usize` exige una closure que acepte referencias de cualquier duración. Casi siempre el compilador lo deduce solo.
+
+### Uso 3 · `impl Trait for Tipo`
+
+Ver [`impl`](/ref/lenguaje/palabras-clave/impl/).
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-for" />
+
+Salida:
+
+```text
+0 1 2
+0:a 1:b 2:c
+1x 2y
+4
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-for-error" />
+
+`error[E0382]: borrow of moved value: v`. La nota explica que el `for` se transforma en una llamada a `IntoIterator::into_iter`, que se queda con `v`. La ayuda propone `for x in &v`. Este error te protege de un **uso tras liberar**: el bucle destruyó el vector al terminar.
+
+## Desde
+
+Rust 1.0. `for` sobre arrays por valor (que dé `T` en vez de `&T`): edición 2021.
+
+## Ver también
+
+- [`in`](/ref/lenguaje/palabras-clave/in/) · [`while`](/ref/lenguaje/palabras-clave/while/) · [`loop`](/ref/lenguaje/palabras-clave/loop/) · [`break`](/ref/lenguaje/palabras-clave/break/) · [Patrones](/ref/lenguaje/patrones/)
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/) · [Mundo 14 · Closures e iteradores](/curso/14-closures-e-iteradores/)

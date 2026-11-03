@@ -1,0 +1,188 @@
+---
+title: "Tu primer test"
+description: "Escribe funciones que comprueban tu código solas y aprende a leer lo que responde cargo test."
+sidebar:
+  order: 1
+duracion: 12
+desde: "1.0"
+requiere: ["10-errores", "12-modulos-crates-y-cargo"]
+tarjetas:
+  - p: "¿Qué convierte una función normal en una prueba?"
+    r: "El atributo `#[test]` encima de ella. `cargo test` la encuentra, la ejecuta y la da por superada si termina sin entrar en pánico."
+  - p: "¿Qué diferencia hay entre `assert!` y `assert_eq!`?"
+    r: "`assert!(cond)` comprueba que una condición es `true`. `assert_eq!(a, b)` comprueba que `a == b` y, si falla, muestra los dos valores (`left` y `right`)."
+  - p: "¿Qué necesita un tipo para usarlo dentro de `assert_eq!`?"
+    r: "Implementar `PartialEq` (para comparar con `==`) y `Debug` (para imprimir los dos valores si falla). Normalmente basta con `#[derive(Debug, PartialEq)]`."
+  - p: "¿Cuándo se considera fallida una prueba?"
+    r: "Cuando entra en pánico (por un `assert!` que no se cumple, un `unwrap` sobre `None`, un índice fuera de rango…) o cuando devuelve un `Err`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir tu primera **prueba** (*test*): una función cuyo único trabajo es comprobar que otra hace lo que debe. La escribes una vez y la máquina la repite cada vez que cambies algo.
+
+## Predice
+
+Una prueba no es más que código que **entra en pánico si algo está mal**. La herramienta básica es `assert_eq!(a, b)`: si `a` y `b` son distintos, pánico. Este programa lo usa dentro de `main`:
+
+<Predice
+  ej="m16/assert-falla"
+  opciones={["Imprime `Comprobando suma...` y después `suma funciona`", "Imprime `Comprobando suma...` y entra en pánico mostrando `left: 0` y `right: 4`", "No compila: `assert_eq!` solo se puede usar dentro de un test", "Imprime `Comprobando suma...` y después `false`"]}
+  correcta={1}
+  explicacion="`suma(2, 2)` devuelve `2 - 2 = 0`. `assert_eq!` compara `0` con `4`, no coinciden, y entra en pánico enseñando los dos lados: `left` (el primero que escribiste) y `right` (el segundo). La línea `suma funciona` nunca llega."
+  porque={["La función está mal: resta en vez de sumar, así que la comprobación no pasa.", "Correcto: el pánico de `assert_eq!` enseña los dos valores para que veas en qué se diferencian.", "`assert_eq!` es una macro normal y se puede usar en cualquier sitio; en las pruebas es donde más se usa.", "`assert_eq!` no devuelve nada que imprimir: o no hace nada, o entra en pánico."]}
+/>
+
+## La idea
+
+Hasta ahora comprobabas tu código **mirando** la salida. El problema es que mirar no escala: con veinte funciones y cien casos, nadie revisa todo después de cada cambio. Una prueba automatiza esa mirada. Escribes lo que *esperas* y el ordenador lo compara con lo que *pasa*.
+
+En Rust, una prueba es una función normal con el atributo **`#[test]`** encima. Dentro llamas a tu código y compruebas el resultado con tres macros:
+
+| Macro | Pasa si… | Si falla, muestra… |
+|---|---|---|
+| `assert!(cond)` | `cond` es `true` | la condición tal cual la escribiste |
+| `assert_eq!(a, b)` | `a == b` | los dos valores, `left` y `right` |
+| `assert_ne!(a, b)` | `a != b` | los dos valores |
+
+Las tres aceptan además un **mensaje** con el mismo formato que `println!`: `assert!(x > 0, "x vale {x}")`. Una prueba **pasa** si termina sin pánico y **falla** si entra en pánico. No hay más magia: cualquier pánico cuenta, también un `unwrap()` sobre `None` o un índice fuera de rango.
+
+## Pruébalo
+
+Antes de llevarlas a un proyecto, mira las tres macros en un programa normal. Si todo se cumple, no dicen nada: solo hablan cuando algo va mal.
+
+<Ejecutar ej="m16/asserts" />
+
+Ahora, la forma de verdad. Cuando creas una biblioteca con `cargo new --lib calculo`, Cargo ya te escribe una prueba de ejemplo en `src/lib.rs`. La hemos traducido:
+
+```rust title="src/lib.rs"
+pub fn suma(a: u64, b: u64) -> u64 {
+    a + b
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn suma_basica() {
+        let resultado = suma(2, 2);
+        assert_eq!(resultado, 4);
+    }
+}
+```
+
+Y en la terminal, `cargo test`. Esta es una salida real de un proyecto parecido, con seis pruebas (cuatro pasan, dos están marcadas para no ejecutarse; las verás en la lección siguiente):
+
+```text title="cargo test (salida real, recortada)"
+     Running unittests src\lib.rs (target\wasm32-wasip1\debug\deps\notas-084254e7a6508a54.wasm)
+
+running 6 tests
+test tests::cinco_aprueba ... ok
+test tests::media_de_dos ... ok
+test tests::media_vacia_es_none ... ok
+test tests::muchas_notas ... ignored, lento: recorre un millón de notas
+test tests::nota_fuera_de_rango - should panic ... ignored
+test tests::parsear_bien ... ok
+
+test result: ok. 4 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+Léela de arriba abajo: qué programa se ejecuta (`Running unittests src\lib.rs`), cuántas pruebas hay, una línea por prueba con su nombre completo (`tests::media_de_dos`, porque vive en el módulo `tests`) y un resumen. En tu PC la ruta del ejecutable terminará en `.exe` en vez de `.wasm`; lo demás es igual.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`#[test]` no es una palabra mágica del lenguaje: es un atributo que el compilador solo tiene en cuenta cuando compila **en modo prueba** (`rustc --test`, que es lo que hace `cargo test`). En ese modo pasan dos cosas:
+
+1. Cada función `#[test]` se registra en una tabla estática con su nombre, su archivo, su línea y sus opciones (`ignore`, `should_panic`…).
+2. Rust **sustituye tu `main`** por uno generado que llama al **arnés de pruebas** (*test harness*) de la biblioteca `test`, que recorre esa tabla.
+
+Puedes verlo con la toolchain nightly y la opción `-Zunpretty=expanded`, que imprime el código después de expandir las macros. Para este archivo:
+
+```rust
+fn doble(x: i32) -> i32 { x * 2 }
+
+#[test]
+fn doble_de_dos() {
+    assert_eq!(doble(2), 4);
+}
+```
+
+`rustc +nightly --edition 2024 --test -Zunpretty=expanded` (nightly 1.101) produce, entre otras cosas:
+
+```rust title="expansión real (recortada)"
+extern crate test;
+#[rustc_test_marker = "doble_de_dos"]
+pub static doble_de_dos: test::TestDescAndFn =
+    test::TestDescAndFn {
+        desc: test::TestDesc {
+            name: test::StaticTestName("doble_de_dos"),
+            ignore: false,
+            source_file: "exp.rs",
+            start_line: 4usize,
+            should_panic: test::ShouldPanic::No,
+            // …más campos…
+        },
+        testfn: test::StaticTestFn(#[coverage(off)] ||
+                test::assert_test_result(doble_de_dos())),
+    };
+fn doble_de_dos() {
+    {
+        match (&doble(2), &4) {
+            (left_val, right_val) => {
+                if !(*left_val == *right_val) {
+                    let kind = ::core::panicking::AssertKind::Eq;
+                    ::core::panicking::assert_failed(kind, &*left_val,
+                        &*right_val, ::core::option::Option::None);
+                }
+            }
+        }
+    };
+}
+#[rustc_main]
+pub fn main() -> test::ExitCode { test::test_main_env_args(&[&doble_de_dos]) }
+```
+
+Fíjate en tres detalles. `assert_eq!` toma **préstamos compartidos** de los dos lados (`&doble(2)`, `&4`): comparar no consume tus valores. Compara con `==`, así que el tipo necesita `PartialEq`. Y si falla, pasa los dos valores a `assert_failed`, que los imprime con `{:?}`: por eso también necesita `Debug`.
+
+Si compilas el mismo archivo **sin** `--test`, la función `doble_de_dos` desaparece entera del programa: las pruebas no ocupan ni un byte en tu ejecutable final.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Comparar tus propios tipos con `assert_eq!` sin decirle a Rust cómo compararlos ni cómo imprimirlos:
+
+<NoCompila ej="m16/sin-partialeq" explicacion="`assert_eq!` usa `==` (necesita `PartialEq`) y, si falla, imprime los dos lados con `{:?}` (necesita `Debug`). El compilador te dice exactamente qué añadir: `#[derive(Debug, PartialEq)]` encima del struct." />
+
+## Tu turno
+
+<Reto ej="m16/reto-par" enunciado="Completa `es_par` para que **todas** las comprobaciones de `main` pasen. Fíjate en los casos con números negativos y con el cero." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una prueba `#[test]` no contiene ningún `assert!`, pero llama a `v[10]` sobre un vector de 3 elementos. ¿Qué dice `cargo test`?"
+  opciones={["Que pasa, porque no hay ningún `assert!` que falle", "Que falla, porque el índice fuera de rango entra en pánico y cualquier pánico hace fallar la prueba", "No compila: una prueba debe contener al menos un `assert!`", "Que se ignora, porque no comprueba nada"]}
+  correcta={1}
+  explicacion="Para el arnés de pruebas solo hay una regla: si la función entra en pánico, falla. Da igual de dónde venga el pánico."
+  porque={["Los `assert!` son una forma de provocar pánicos, pero no la única.", "Correcto.", "El compilador no exige nada sobre el contenido de una prueba.", "Solo se ignoran las marcadas con `#[ignore]`."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `assert_eq!(a, b)` es mejor que `assert!(a == b)` cuando compruebas dos valores?"
+  opciones={["Porque es más rápido al ejecutarse", "Porque si falla muestra los dos valores (`left` y `right`) y ves en qué se diferencian", "Porque `assert!` no acepta el operador `==`", "Porque `assert_eq!` también funciona con tipos sin `PartialEq`"]}
+  correcta={1}
+  explicacion="Las dos comprueban lo mismo, pero `assert!` solo puede decirte que la condición fue falsa. `assert_eq!` te enseña los dos valores, que es justo lo que necesitas para encontrar el fallo."
+  porque={["No hay diferencia de velocidad que importe.", "Correcto.", "`assert!` acepta cualquier expresión `bool`, incluida `a == b`.", "Al revés: `assert_eq!` exige `PartialEq` y además `Debug`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué pasa con tus funciones `#[test]` cuando compilas con `cargo build` (sin `test`)?"
+  opciones={["Se ejecutan antes de `main`", "Se compilan pero no se llaman nunca", "No se compilan: desaparecen del programa", "Dan un error de compilación"]}
+  correcta={2}
+  explicacion="Fuera del modo prueba, las funciones `#[test]` se eliminan antes de compilar. No ocupan espacio ni tiempo en tu programa final."
+  porque={["Rust no ejecuta nada antes de `main` por su cuenta.", "Ni siquiera llegan a compilarse.", "Correcto.", "No es un error tener pruebas: simplemente se descartan."]}
+/>

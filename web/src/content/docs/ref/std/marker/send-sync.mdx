@@ -1,0 +1,88 @@
+---
+title: "Send y Sync"
+description: "Los dos traits que impiden las carreras de datos: qué se puede enviar a otro hilo y qué se puede compartir."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar, NoCompila } from '~/components';
+
+**Ruta:** `std::marker::Send, std::marker::Sync` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub unsafe auto trait Send { }
+
+pub unsafe auto trait Sync { }
+```
+
+## Qué hace
+
+- **`Send`**: se puede **mover** a otro hilo. Casi todo lo es. `Rc` no, porque su contador no es atómico: dos hilos con clones del mismo `Rc` podrían corromperlo.
+- **`Sync`**: se puede **compartir** entre hilos con `&T`. Formalmente, `T` es `Sync` si `&T` es `Send`. `Cell` y `RefCell` no lo son (su modificación interior no está protegida); `Mutex<T>` sí.
+
+`thread::spawn` exige `Send` a lo que se lleva el hilo; así el compilador rechaza el programa antes de que la carrera pueda ocurrir.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/marker-comprobar" />
+
+**Salida:**
+
+```text
+todo comprobado al compilar
+```
+
+<NoCompila ej="ref-std/marker-send-no" />
+
+**Error real** (rustc 1.99.1):
+
+```text
+error[E0277]: `Rc<i32>` cannot be sent between threads safely
+   --> marker-send-no.rs:6:27
+    |
+  6 |     let h = thread::spawn(move || println!("{r}"));
+    |             ------------- -------^^^^^^^^^^^^^^^^
+    |             |             |
+    |             |             `Rc<i32>` cannot be sent between threads safely
+    |             |             within this `{closure@marker-send-no.rs:6:27: 6:34}`
+    |             required by a bound introduced by this call
+    |
+    = help: within `{closure@marker-send-no.rs:6:27: 6:34}`, the trait `Send` is not implemented for `Rc<i32>`
+note: required because it's used within this closure
+   --> marker-send-no.rs:6:27
+    |
+  6 |     let h = thread::spawn(move || println!("{r}"));
+    |                           ^^^^^^^
+note: required by a bound in `spawn`
+   --> /rustc/…/library/std/src/thread/functions.rs:128:8
+    |
+125 | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+    |        ----- required by a bound in this function
+...
+128 |     F: Send + 'static,
+    |        ^^^^ required by this bound in `spawn`
+```
+
+<Ejecutar ej="ref-std/marker-send-sync-hilos" />
+
+Este ejemplo crea **hilos**, y el navegador no puede ejecutarlos: el botón lo envía al Playground de Rust (play.rust-lang.org). Aquí se ha comprobado que compila; su salida no se reproduce en esta página porque solo la da una ejecución real.
+
+## Seguridad
+
+Son `unsafe trait`: escribir `unsafe impl Send for MiTipo {}` es prometer que tu tipo es seguro entre hilos. Solo es necesario con punteros crudos u otros tipos que no los implementan automáticamente.
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [Arc y Mutex](/ref/std/sync/)
+- [thread::spawn](/ref/std/thread/spawn/)
+- [E0277](/errores/e0277/)
+
+## Aprende esto en
+
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

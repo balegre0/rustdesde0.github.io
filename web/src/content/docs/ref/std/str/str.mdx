@@ -1,0 +1,227 @@
+---
+title: "str"
+description: "Métodos de &str: trim, split, find, contains, replace, chars, parse y más."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `str (tipo primitivo)`
+
+## Qué hace
+
+Estos métodos funcionan sobre cualquier `&str` y también sobre un `String` (gracias a `Deref`). Los que reciben un **patrón** (`P: Pattern`) aceptan un `char`, un `&str`, un array de `char` o una closure `|c: char| -> bool`.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`len`](#len) | Longitud en bytes. | 1.0 |
+| [`is_empty`](#is_empty) | `true` si no tiene ningún byte. | 1.0 |
+| [`trim`](#trim) | Quita los espacios (y saltos de línea) del principio y del final. | 1.0 |
+| [`starts_with`](#starts_with) | ¿Empieza por el patrón?. | 1.0 |
+| [`contains`](#contains) | ¿Contiene el patrón?. | 1.0 |
+| [`find`](#find) | Posición en bytes de la primera coincidencia, o `None`. | 1.0 |
+| [`split`](#split) | Divide por un patrón y devuelve un iterador de trozos. | 1.0 |
+| [`split_whitespace`](#split_whitespace) | Divide por cualquier cantidad de espacios en blanco. | 1.1 |
+| [`split_once`](#split_once) | Divide en dos por la primera coincidencia: `Some((antes, después))`. | 1.52 |
+| [`lines`](#lines) | Iterador de líneas (sin el `\n` final). | 1.0 |
+| [`chars`](#chars) | Iterador de caracteres `char` (no de bytes). | 1.0 |
+| [`char_indices`](#char_indices) | Iterador de `(posición en bytes, char)`. | 1.0 |
+| [`bytes`](#bytes) | Iterador de los bytes `u8`. | 1.0 |
+| [`to_uppercase`](#to_uppercase) | Crea un `String` en mayúsculas (sigue las reglas de Unicode). | 1.2 |
+| [`replace`](#replace) | Crea un `String` cambiando todas las coincidencias. | 1.0 |
+| [`parse`](#parse) | Convierte el texto en otro tipo que implemente `FromStr` (números, `bool`, `char`…). | 1.0 |
+| [`is_char_boundary`](#is_char_boundary) | ¿Es esa posición en bytes el inicio de un carácter? Útil antes de cortar. | 1.9 |
+
+### `len`
+
+```rust
+pub const fn len(&self) -> usize
+```
+
+Longitud en bytes.
+
+### `is_empty`
+
+```rust
+pub const fn is_empty(&self) -> bool
+```
+
+`true` si no tiene ningún byte.
+
+### `trim`
+
+```rust
+pub fn trim(&self) -> &str
+```
+
+Quita los espacios (y saltos de línea) del principio y del final. Devuelve un trozo del original.
+
+### `starts_with`
+
+```rust
+pub fn starts_with<P>(&self, pat: P) -> bool
+where
+    P: Pattern,
+```
+
+¿Empieza por el patrón?
+
+### `contains`
+
+```rust
+pub fn contains<P>(&self, pat: P) -> bool
+where
+    P: Pattern,
+```
+
+¿Contiene el patrón?
+
+### `find`
+
+```rust
+pub fn find<P>(&self, pat: P) -> Option<usize>
+where
+    P: Pattern,
+```
+
+Posición en bytes de la primera coincidencia, o `None`.
+
+### `split`
+
+```rust
+pub fn split<P>(&self, pat: P) -> Split<'_, P>
+where
+    P: Pattern,
+```
+
+Divide por un patrón y devuelve un iterador de trozos.
+
+### `split_whitespace`
+
+```rust
+pub fn split_whitespace(&self) -> SplitWhitespace<'_>
+```
+
+Divide por cualquier cantidad de espacios en blanco.
+
+### `split_once`
+
+```rust
+pub fn split_once<P>(&self, delimiter: P) -> Option<(&str, &str)>
+where
+    P: Pattern,
+```
+
+Divide en dos por la primera coincidencia: `Some((antes, después))`.
+
+### `lines`
+
+```rust
+pub fn lines(&self) -> Lines<'_>
+```
+
+Iterador de líneas (sin el `\n` final).
+
+### `chars`
+
+```rust
+pub fn chars(&self) -> Chars<'_>
+```
+
+Iterador de caracteres `char` (no de bytes).
+
+### `char_indices`
+
+```rust
+pub fn char_indices(&self) -> CharIndices<'_>
+```
+
+Iterador de `(posición en bytes, char)`.
+
+### `bytes`
+
+```rust
+pub fn bytes(&self) -> Bytes<'_>
+```
+
+Iterador de los bytes `u8`.
+
+### `to_uppercase`
+
+```rust
+pub fn to_uppercase(&self) -> String
+```
+
+Crea un `String` en mayúsculas (sigue las reglas de Unicode).
+
+### `replace`
+
+```rust
+pub fn replace<P>(&self, from: P, to: &str) -> String
+where
+    P: Pattern,
+```
+
+Crea un `String` cambiando todas las coincidencias.
+
+### `parse`
+
+```rust
+pub fn parse<F>(&self) -> Result<F, <F as FromStr>::Err>
+where
+    F: FromStr,
+```
+
+Convierte el texto en otro tipo que implemente `FromStr` (números, `bool`, `char`…). Devuelve `Result`.
+
+### `is_char_boundary`
+
+```rust
+pub const fn is_char_boundary(&self, index: usize) -> bool
+```
+
+¿Es esa posición en bytes el inicio de un carácter? Útil antes de cortar.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/str-metodos" />
+
+**Salida:**
+
+```text
+[Rust es rápido y seguro]
+true
+true
+Some(5)
+["Rust", "es", "rápido", "y", "seguro"]
+5
+Some(("clave", "valor"))
+RUST ES RÁPIDO Y SEGURO
+Rust es veloz y seguro
+"oña"
+[(0, 'a'), (1, 'ñ'), (3, 'o')]
+Ok(42)
+2
+```
+
+## Pánicos
+
+Cortar con `&texto[a..b]` en una posición que no es límite de carácter entra en pánico (ver la ficha de [`String`](/ref/std/string/string/#pánicos)). Los métodos que devuelven posiciones (`find`, `char_indices`) siempre dan límites válidos.
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `split_whitespace` (1.1), `split_once` (1.52), `to_uppercase` (1.2), `is_char_boundary` (1.9).
+
+## Ver también
+
+- [String](/ref/std/string/string/)
+- [Iteradores](/ref/std/iter/iterator/)
+- [std::num (errores de parse)](/ref/std/num/)
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

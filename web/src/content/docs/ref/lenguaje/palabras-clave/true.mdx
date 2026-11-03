@@ -1,0 +1,57 @@
+---
+title: "true"
+description: "Palabra clave estricta: el valor verdadero del tipo bool."
+sidebar:
+  order: 34
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar } from '~/components';
+
+`true` es uno de los dos valores del tipo `bool`; el otro es [`false`](/ref/lenguaje/palabras-clave/false/).
+
+## Sinopsis
+
+```text
+true : bool
+```
+
+## Qué hace
+
+- En memoria es el byte `1`; `true as i32` vale `1`.
+- `!true` es `false`.
+- `true || x` no evalúa `x` (cortocircuito).
+- `bool` está ordenado: `false < true`.
+- `cond.then_some(v)` da `Some(v)` si `cond` es `true`, y `None` si es `false`; `cond.then(|| …)` hace lo mismo calculando el valor solo cuando hace falta.
+- Desde Rust 1.88 también puedes escribir `cfg(true)` y `cfg(false)` en compilación condicional.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-true" />
+
+Salida:
+
+```text
+1
+false
+true
+true
+Some(1) None
+```
+
+## Errores
+
+Los mismos que [`false`](/ref/lenguaje/palabras-clave/false/): una condición tiene que ser `bool`, no un número.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+- [`false`](/ref/lenguaje/palabras-clave/false/) · [`if`](/ref/lenguaje/palabras-clave/if/) · [Tipos](/ref/lenguaje/tipos/) · [Atributos](/ref/lenguaje/atributos/): `cfg`.
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)

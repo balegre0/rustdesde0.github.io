@@ -1,0 +1,138 @@
+---
+title: "Dependencias seguras y Miri"
+description: "Vigila las vulnerabilidades de los crates que usas y caza el comportamiento indefinido que las pruebas normales no ven."
+sidebar:
+  order: 11
+duracion: 12
+desde: "1.0"
+requiere: ["16-pruebas-y-herramientas/10-fuzzing-y-propiedades"]
+tarjetas:
+  - p: "¿Qué comprueba `cargo audit`?"
+    r: "Compara las versiones exactas de tu `Cargo.lock` con la base de datos de avisos de seguridad RustSec y te dice qué dependencias tienen vulnerabilidades conocidas o están abandonadas."
+  - p: "¿Qué añade `cargo deny` a `cargo audit`?"
+    r: "Además de los avisos de seguridad, comprueba licencias permitidas, crates prohibidos o duplicados en varias versiones, y de qué fuentes (registros, repositorios) pueden venir tus dependencias. Se configura en `deny.toml`."
+  - p: "¿Qué es Miri?"
+    r: "Un intérprete de la representación intermedia de Rust (MIR) que ejecuta tu programa comprobando cada operación de memoria y detiene la ejecución si detecta comportamiento indefinido. Se usa con `cargo +nightly miri test` o desde el Playground."
+  - p: "¿Por qué una prueba que pasa no demuestra que no haya comportamiento indefinido?"
+    r: "Porque el UB puede «parecer funcionar»: leer memoria fuera de una asignación puede devolver un valor cualquiera sin fallar. Las pruebas comprueban resultados; Miri comprueba las reglas."
+---
+
+import { Ejecutar, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Tus pruebas comprueban **tu** código haciendo lo que esperas. Quedan dos huecos: el código de **otros** que usas (tus dependencias) y los errores que no se ven en la salida (el comportamiento indefinido en bloques `unsafe`). Vas a conocer las herramientas para los dos.
+
+## Predice
+
+```rust
+fn main() {
+    let v = vec![10, 20, 30];
+    let p = v.as_ptr();
+    // SAFETY: ninguna. Leemos una posición que no existe (índice 3).
+    let x = unsafe { *p.add(3) };
+    println!("{x}");
+}
+```
+
+<Pregunta
+  pregunta="Este programa usa `unsafe` para leer `*p.add(3)` en un vector de 3 elementos (índices 0, 1 y 2). ¿Qué hace el compilador?"
+  opciones={["Da un error: el índice está fuera de rango", "Lo compila sin errores; al ejecutarlo es comportamiento indefinido y puede imprimir cualquier cosa o romperse", "Lo compila y siempre imprime `0`", "Lo compila y siempre entra en pánico"]}
+  correcta={1}
+  explicacion="Dentro de `unsafe`, tú prometes que el puntero es válido. El compilador te cree y no comprueba nada. Leer fuera de la asignación es UB: el resultado no está definido, y que «funcione» hoy no dice nada de mañana."
+  porque={["Con punteros crudos no hay comprobación de límites; esa la hace `v[3]`, no `*p.add(3)`.", "Correcto.", "No hay ninguna garantía sobre el valor leído.", "Un puntero crudo no comprueba nada, así que tampoco hay pánico."]}
+/>
+
+## La idea
+
+**Dependencias.** Un proyecto real usa crates de crates.io, y esos crates usan otros. Cualquiera puede tener una vulnerabilidad descubierta después de que lo añadieras. La comunidad mantiene una base de datos pública, **RustSec**, con avisos de seguridad (*advisories*) sobre crates concretos y las versiones afectadas. Dos herramientas la usan:
+
+- **`cargo audit`** lee tu `Cargo.lock` (las versiones **exactas** que estás usando) y te dice cuáles tienen avisos.
+- **`cargo deny check`** hace eso y más: rechaza licencias que no quieres, crates repetidos en varias versiones, crates prohibidos o dependencias que vienen de fuentes no autorizadas. Se configura en un archivo `deny.toml`.
+
+Las dos se instalan aparte (`cargo install cargo-audit`, `cargo install cargo-deny`) y necesitan descargar la base de datos. **No están instaladas en el entorno de este curso, así que no te mostramos su salida.** Lo que sí puedes ver en cualquier sitio es tu árbol de dependencias, con `cargo tree`. Esta es la salida real de un proyecto `app` que depende de las bibliotecas `notas` y `clave` de este mundo (rutas acortadas):
+
+```text title="cargo tree (salida real)"
+app v0.1.0 (…\app)
+├── clave v0.1.0 (…\clave)
+└── notas v0.1.0 (…\notas)
+```
+
+`cargo tree -i notas` invierte el árbol: muestra **quién** depende de `notas`. Es lo que necesitas cuando `cargo audit` te avisa de un crate que no recuerdas haber añadido.
+
+**Comportamiento indefinido.** En el mundo 20 verás `unsafe` a fondo. Por ahora basta una idea: dentro de un bloque `unsafe`, tú garantizas ciertas reglas (punteros válidos, memoria inicializada, nada de préstamos exclusivos duplicados…) y el compilador deja de comprobarlas. Si te equivocas, el programa tiene **UB**: puede hacer cualquier cosa, incluso parecer correcto. **Miri** es la herramienta que lo detecta.
+
+## Pruébalo
+
+Primero, la buena noticia: en Rust **seguro** este problema no existe. Leer fuera de un vector, o te devuelve `None`, o entra en pánico de forma ruidosa. Nunca lee memoria ajena:
+
+<Ejecutar ej="m16/get-seguro" />
+
+Miri sirve para cuando **sí** usas `unsafe` (o una dependencia tuya lo usa). Se instala y se usa así (necesita la toolchain nightly):
+
+```text
+rustup +nightly component add miri
+cargo +nightly miri run      # ejecuta main bajo Miri
+cargo +nightly miri test     # ejecuta tus pruebas bajo Miri
+```
+
+Ante el programa del principio, Miri detiene la ejecución en la línea del `*p.add(3)` con un error de **UB** que explica que se ha accedido a memoria fuera de la asignación del vector. En el entorno de este curso Miri no puede preparar su biblioteca estándar (para eso necesita también el enlazador), así que **no te mostramos su salida aquí**. La forma más fácil de verlo tú: pega el programa en el **Rust Playground** (play.rust-lang.org) y elige *Tools → Miri*.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Recuerda el viaje de tu código por el compilador: texto → árbol de sintaxis → … → **MIR** (*Mid-level Intermediate Representation*, una versión simplificada de tu programa que usa el borrow checker) → LLVM → código máquina. **Miri es un intérprete de MIR**: en vez de convertir tu programa en instrucciones del procesador, lo ejecuta paso a paso dentro de una máquina virtual que **lleva la cuenta de todo**:
+
+- Cada asignación de memoria (cada `Box`, cada `Vec`) con su tamaño exacto, para detectar accesos fuera de límites o a memoria ya liberada (**uso tras liberar**).
+- Qué bytes están inicializados, para detectar lecturas de memoria sin inicializar.
+- De qué asignación «procede» cada puntero (su *provenance*), para detectar punteros que se salen de la suya aunque la dirección caiga en otra válida.
+- Los préstamos vivos de cada posición, con un modelo llamado **Stacked Borrows** (o **Tree Borrows**, con `MIRIFLAGS=-Zmiri-tree-borrows`), para detectar un `&mut` usado mientras otro préstamo al mismo dato sigue vivo: el **aliasing con mutación** que el borrow checker impide en Rust seguro.
+
+Como interpreta, Miri es **muchísimo más lento** que el programa compilado: se usa con pruebas pequeñas, no con el programa entero. Y solo detecta UB en los caminos que **se ejecutan**: si tu prueba no pasa por la línea problemática, Miri no la ve. Por eso se combina con buenas pruebas e incluso con fuzzing.
+
+Detecta también **fugas de memoria** (memoria reservada que nunca se libera) al final del programa y te avisa. Una fuga **no** es UB en Rust: `std::mem::forget` y `Box::leak` son funciones seguras. Es un error de recursos, no de seguridad de memoria.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Mis pruebas pasan, así que mi unsafe está bien»">
+
+❌ Una prueba llama a una función con `unsafe` dentro, comprueba el resultado y pasa. Pero el resultado puede ser correcto **por casualidad**: la memoria que leíste fuera de límites resultaba tener el valor esperado, o el optimizador aún no ha decidido aprovechar tu UB. Con otra versión del compilador, otro procesador u otra opción de optimización, deja de funcionar.
+
+✅ Todo crate con `unsafe` debería ejecutar sus pruebas también bajo Miri (`cargo +nightly miri test`), a menudo en la integración continua. Y cada bloque `unsafe` debería llevar un comentario `// SAFETY:` que explique por qué se cumplen las reglas: si no puedes escribirlo, probablemente no se cumplen.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["cargo fmt --check", "cargo clippy", "cargo test", "cargo +nightly miri test", "cargo audit"]}
+  distractores={["cargo miri build --release", "cargo audit --fix-ub"]}
+  explicacion="Una integración continua completa va de lo más barato a lo más caro: formato (instantáneo), Clippy (análisis), pruebas, pruebas bajo Miri (lento) y la auditoría de dependencias. Los distractores no son comandos reales."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué archivo lee `cargo audit` para saber qué versiones de tus dependencias usas?"
+  opciones={["`Cargo.toml`", "`Cargo.lock`", "`target/debug/deps`", "`deny.toml`"]}
+  correcta={1}
+  explicacion="`Cargo.toml` dice qué versiones **aceptas** (por ejemplo `1.2`, que admite 1.2.0, 1.2.5…). `Cargo.lock` registra la versión **exacta** que se usó, que es lo que hay que comparar con los avisos."
+  porque={["`Cargo.toml` contiene rangos, no versiones exactas.", "Correcto.", "Ahí están los archivos compilados, no la información de versiones.", "`deny.toml` es la configuración de cargo-deny."]}
+/>
+
+<Pregunta
+  pregunta="Ejecutas tus pruebas bajo Miri y no detecta nada. ¿Qué puedes concluir?"
+  opciones={["Que tu programa nunca tiene comportamiento indefinido", "Que no hay UB en los caminos que han ejecutado tus pruebas", "Que no usas `unsafe`", "Que tus dependencias no tienen vulnerabilidades"]}
+  correcta={1}
+  explicacion="Miri comprueba lo que ejecuta. Una rama que tus pruebas no recorren puede tener UB sin que Miri lo vea."
+  porque={["Solo vale para lo ejecutado.", "Correcto.", "Miri también ejecuta código sin `unsafe` (y el `unsafe` de la biblioteca estándar).", "Eso lo dice `cargo audit`, no Miri."]}
+/>
+
+<Pregunta
+  pregunta="¿Es comportamiento indefinido filtrar memoria con `Box::leak`?"
+  opciones={["Sí, por eso es `unsafe`", "No: es una función segura; la memoria simplemente no se libera nunca", "Solo en release", "Solo si el `Box` contiene un `String`"]}
+  correcta={1}
+  explicacion="En Rust, filtrar memoria es **seguro**: no rompe ninguna regla de memoria, solo desperdicia recursos. `Box::leak` y `mem::forget` se pueden llamar sin `unsafe`."
+  porque={["No es `unsafe`.", "Correcto.", "El perfil no cambia nada.", "El tipo de dentro no importa."]}
+/>

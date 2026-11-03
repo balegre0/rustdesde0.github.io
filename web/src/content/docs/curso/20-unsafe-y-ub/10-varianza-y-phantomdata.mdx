@@ -1,0 +1,125 @@
+---
+title: "Varianza y PhantomData"
+description: "Entiendes cuándo una vida larga puede usarse donde se pide una corta, por qué &mut T no lo permite, y cómo declararlo con PhantomData."
+sidebar:
+  order: 10
+duracion: 15
+desde: "1.0"
+requiere: ["20-unsafe-y-ub/04-abstracciones-seguras"]
+tarjetas:
+  - p: "¿Qué significa que `&'a T` sea covariante en `'a`?"
+    r: "Que si `'largo` vive más que `'corto`, un `&'largo T` sirve donde se pide un `&'corto T`."
+  - p: "¿Por qué `&mut T` es invariante en T?"
+    r: "Porque si no, podrías escribir un `&'corto str` dentro de un `&mut &'static str` y dejar una referencia colgante."
+  - p: "Tabla rápida de PhantomData"
+    r: "PhantomData<T>: covariante y «poseo un T»; PhantomData<*const T>: covariante sin poseer; PhantomData<fn(T)>: contravariante; PhantomData<*mut T> o <fn(T) -> T>: invariante."
+  - p: "¿Qué efecto tiene PhantomData<*const ()> en Send y Sync?"
+    r: "Los quita: el tipo deja de ser Send y Sync (los punteros crudos no lo son)."
+  - p: "¿Cuánto mide PhantomData<T>?"
+    r: "0 bytes, sea cual sea T."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a entender una regla que el compilador aplica en silencio cada vez que pasas referencias: la **varianza**. Y vas a aprender a declararla en tus propios tipos con `PhantomData`, algo imprescindible cuando envuelves punteros crudos.
+
+## Predice
+
+`meter` guarda `valor` dentro de `destino`. Parece inofensivo. ¿Por qué no compila?
+
+<NoCompila ej="m20/invarianza-mut" explicacion="`global` es `&'static str`, así que `&mut global` es `&mut &'static str`. Como `&mut T` es invariante en `T`, `'a` tiene que ser exactamente `'static`, y entonces `&corta` debería vivir para siempre. Si el compilador lo permitiera, tras el bloque `global` apuntaría a un String ya destruido." />
+
+## La idea
+
+Los tiempos de vida forman una jerarquía: `'static` vive más que cualquier otro. Cuando una función pide un `&'a str`, darle un `&'static str` es correcto: si algo vive más, también vive lo suficiente. Decimos que `&'a T` es **covariante**: el compilador puede **acortar** su vida.
+
+Pero hay posiciones donde acortar sería peligroso. Si tienes un `&mut &'static str`, alguien podría *escribir* a través de él. Si el compilador te dejara verlo como `&mut &'corto str`, podrías meter un `&'corto str` en una variable que todo el mundo cree `'static`: referencia colgante. Por eso `&mut T` es **invariante** en `T`: el tipo de dentro tiene que coincidir exactamente.
+
+Hay un tercer caso, raro: un parámetro de función `fn(T)` es **contravariante** (al revés: una función que acepta `&'a str` cualquiera sirve donde se pide una que acepte `&'static str`).
+
+## Pruébalo
+
+<Ejecutar ej="m20/covarianza" />
+
+(1) `fija` se acorta a la vida de `local`; (2) `Vec<&'static str>` pasa a `Vec<&str>` porque `Vec<T>` es covariante en `T`. El compilador calcula la varianza de cada tipo genérico **mirando sus campos**.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La tabla de varianza** (de la Reference):
+
+| Tipo | En `'a` | En `T` |
+|---|---|---|
+| `&'a T` | covariante | covariante |
+| `&'a mut T` | covariante | **invariante** |
+| `Box<T>`, `Vec<T>`, `*const T` | — | covariante |
+| `*mut T`, `Cell<T>`, `UnsafeCell<T>` | — | **invariante** |
+| `fn(T) -> U` | — | **contravariante** en `T`, covariante en `U` |
+
+**`PhantomData`: declarar lo que no guardas.** Si tu tipo envuelve un puntero crudo (`*const T` o una dirección `usize`), el compilador no sabe que «lógicamente» posees un `T`, ni qué varianza debería tener. `PhantomData<X>` es un campo de **tamaño cero** que hace que tu tipo se comporte, para varianza, auto traits y drop check, *como si* contuviera un `X`:
+
+| Escribes | Varianza en T | Efecto extra |
+|---|---|---|
+| `PhantomData<T>` | covariante | «poseo un T» (cuenta para el drop check) |
+| `PhantomData<&'a T>` | covariante | «tomo prestado un T durante 'a» |
+| `PhantomData<*const T>` | covariante | no posee; quita `Send` y `Sync` |
+| `PhantomData<fn(T)>` | contravariante | |
+| `PhantomData<*mut T>` o `PhantomData<fn(T) -> T>` | invariante | |
+
+Un uso seguro y muy común, sin punteros: **unidades y estados en el tipo**.
+
+<Ejecutar ej="m20/phantom-unidades" />
+
+`Cantidad<Metros>` y `Cantidad<Segundos>` son tipos distintos (no puedes sumarlos), y cada uno mide 8 bytes, lo mismo que el `f64`: `PhantomData` mide 0.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Olvidar que PhantomData también cambia Send y Sync">
+
+`PhantomData<*const ()>` es el truco habitual para atar un tipo a su hilo (por ejemplo, un recurso que solo puede usarse desde el hilo que lo creó). El compilador lo propaga: tu tipo deja de ser `Send`.
+
+<NoCompila ej="m20/phantom-no-send" explicacion="El error muestra la cadena: `*const ()` no es `Send`, aparece dentro de `PhantomData<*const ()>`, que aparece dentro de `SoloEsteHilo`. Los auto traits se calculan campo a campo." />
+
+❌ Al revés también pasa: si envuelves `*mut T` y luego escribes `unsafe impl<T> Send for MiTipo<T> {}` **sin** exigir `T: Send`, has creado un agujero: permites mandar a otro hilo un `T` que no debería salir del suyo. Es uno de los bugs de solidez más repetidos en el ecosistema.
+
+✅ `unsafe impl<T: Send> Send for MiTipo<T> {}`, y piensa cada método antes de escribirlo.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m20/id-tipado" enunciado="El código de partida no compila: el compilador dice que `T` no se usa (E0392) y sugiere `PhantomData`. Añade un campo `_tipo: PhantomData<T>` y complétalo en `new`. Debe imprimir `usuario #7` y `pedido 7 pesa 4 bytes`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estos tipos es **invariante** en `T`?"
+  opciones={["`Vec<T>`", "`&'a T`", "`Cell<T>`", "`Box<T>`"]}
+  correcta={2}
+  explicacion="`Cell<T>` permite escribir a través de `&Cell<T>`, así que acortar `T` sería tan peligroso como con `&mut T`. Por eso es invariante."
+  porque={["Vec<T> es covariante: es dueño, y para escribir necesitas `&mut Vec<T>`, que ya es invariante.", "&'a T es covariante: solo permite leer.", "Correcto.", "Box<T> es covariante, igual que Vec."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué pasaría si `&mut T` fuera covariante en `T`?"
+  opciones={["Nada importante", "Se podría guardar una referencia de vida corta donde se espera una `'static`, y acabaría colgando", "Los programas serían más lentos", "No se podría mutar nada"]}
+  correcta={1}
+  explicacion="Es exactamente el programa de *Predice*: la invarianza es lo que impide el uso tras liberar."
+  porque={["Abriría un agujero de seguridad de memoria.", "Correcto.", "La varianza no afecta al rendimiento.", "Se podría mutar; el problema es lo que se podría meter."]}
+/>
+
+<Pregunta
+  pregunta="Envuelves un `*const T` en `struct MiPuntero<T>`. ¿Para qué añadirías `PhantomData<T>`?"
+  opciones={["Para que ocupe más memoria", "Para declarar que el tipo posee lógicamente un `T` (varianza, auto traits y drop check como si lo contuviera)", "Para que sea Copy", "Es obligatorio en todos los structs genéricos"]}
+  correcta={1}
+  explicacion="El puntero crudo no comunica propiedad. `PhantomData<T>` lo hace sin ocupar espacio. (El compilador solo lo exige cuando `T` no aparece en ningún campo, como en el reto.)"
+  porque={["Mide 0 bytes.", "Correcto.", "No tiene que ver con Copy.", "Solo hace falta si `T` no aparece en ningún campo, o si quieres otra varianza o propiedad."]}
+/>
+
+## Para saber más
+
+- *The Rustonomicon*, «Subtyping and Variance» y «PhantomData» (en inglés).
+- En este curso: [mundo 08, tiempos de vida](../../08-lifetimes/).

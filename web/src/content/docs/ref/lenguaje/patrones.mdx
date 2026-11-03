@@ -1,0 +1,111 @@
+---
+title: "Patrones"
+description: "Todas las formas de patrón, refutabilidad, modos de enlace y exhaustividad."
+sidebar:
+  order: 111
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Un **patrón** describe la **forma** de un valor: sirve para comprobar si un valor encaja y, a la vez, para sacar sus partes en variables.
+
+## En una frase
+
+Los patrones aparecen en `let`, en los parámetros de funciones y closures, en `match`, `if let`, `while let` y `for`; los de `let`, parámetros y `for` deben ser **irrefutables** (no pueden fallar), y los de `match` e `if let` pueden ser **refutables**.
+
+## Todas las formas
+
+| Patrón | Ejemplo | Encaja con |
+|---|---|---|
+| literal | `0`, `'a'`, `"hola"`, `true`, `-1` | ese valor exacto |
+| identificador | `x`, `mut x`, `ref x`, `ref mut x` | cualquier valor; lo enlaza |
+| enlace con subpatrón | `x @ 1..=5`, `todo @ Some(_)` | lo que encaje el subpatrón; enlaza el valor entero |
+| comodín | `_` | cualquier cosa; no enlaza |
+| resto | `..` | el resto de campos o elementos |
+| rango | `1..=5`, `'a'..='z'`, `0..10`, `5..`, `..=9` | valores en el rango (enteros y `char`) |
+| referencia | `&x`, `&mut x` | una referencia; quita un nivel |
+| struct | `Punto { x, y: 0, .. }` | un struct con esos campos |
+| struct tupla | `Some(v)`, `Rect(a, ..)` | una variante o struct tupla |
+| tupla | `(a, _, c)`, `(primero, ..)` | una tupla |
+| slice / array | `[a, b]`, `[primero, .., ultimo]`, `[x, resto @ ..]` | arrays y slices por longitud |
+| ruta | `None`, `Color::Rojo`, `CONSTANTE` | una variante unidad o una constante |
+| alternativas | `1 \| 2 \| 3`, `Some(0 \| 1)` | cualquiera de ellas |
+| agrupación | `(p)` | lo mismo que `p` |
+| macro | `mi_macro!(…)` | lo que se expanda |
+
+Detalles:
+
+- En un patrón **struct**, `Punto { x, .. }` es atajo de `Punto { x: x, .. }`.
+- Los **rangos** en patrones admiten límites constantes; los exclusivos `a..b` existen desde 1.80.
+- Una **constante** usada como patrón debe tener un tipo con igualdad «estructural» (derivar `PartialEq`).
+- `x @ ..` dentro de un slice enlaza el sub-slice del medio.
+- `|` puede aparecer en cualquier nivel y también al principio de una rama.
+
+## Refutabilidad
+
+- **Irrefutable**: encaja siempre, como `x`, `(a, b)` o `Punto { x, y }`. Obligatorio en `let`, parámetros y `for`.
+- **Refutable**: puede no encajar, como `Some(x)` o `1..=5`. Se usa en `match`, `if let`, `while let` y `let … else`.
+
+Escribir un patrón irrefutable en un `if let` produce un aviso (`irrefutable_let_patterns`); uno refutable en un `let` normal, un error (E0005).
+
+## Modos de enlace y ergonomía de `match`
+
+Por defecto, un identificador en un patrón **mueve** (o copia) la parte del valor que le toca. Si el valor que se compara es una **referencia** y el patrón no empieza por `&`, el compilador cambia el **modo de enlace por defecto** a «por referencia»: los identificadores salen como `&T` (o `&mut T`). Así:
+
+```text
+let par = &(1, String::from("x"));
+let (n, s) = par;        // n: &i32, s: &String  (nada se mueve)
+```
+
+`ref` y `ref mut` fuerzan el modo «por referencia» a mano. En la **edición 2024**, no se puede escribir `ref`, `mut` ni `&` explícitos dentro de una parte del patrón cuyo modo por defecto ya no es «mover»: es un error para evitar confusiones. Ver [`ref`](/ref/lenguaje/palabras-clave/ref/).
+
+## Exhaustividad
+
+Un `match` debe cubrir **todos** los valores posibles (error E0004):
+
+- con enums, todas las variantes (con `#[non_exhaustive]` de otro crate, además `_`);
+- con enteros, todos los rangos: el compilador calcula los huecos, como `201_u8..=u8::MAX`. `usize` e `isize` necesitan un rango abierto o `_`, porque su tamaño depende de la plataforma;
+- las guardas `if` no cuentan;
+- un tipo **vacío** (`enum Nunca {}`, `Infallible`) no necesita ramas: desde 1.82, `Result<T, Infallible>` puede desestructurarse como `let Ok(x) = r;`.
+
+Una rama que nunca puede elegirse produce el aviso `unreachable_patterns`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/patrones-todos" />
+
+Salida:
+
+```text
+0: cero
+5: un dígito
+15: dos dígitos
+100: el límite
+-3: fuera
+círculo r=1
+rect ancho=2
+punto
+1 [2, 3] 4
+17: menor
+1=uno 2=dos 1=uno 2=dos
+7
+```
+
+## Errores típicos
+
+<NoCompila ej="ref-lenguaje/patrones-refutable-error" />
+
+`error[E0005]: refutable pattern in local binding` (`pattern None not covered`). La ayuda propone `let … else`.
+
+## Desde
+
+Rust 1.0. Ergonomía de `match`: 1.26. Alternativas anidadas: 1.53. Rangos `a..`: 1.55. Rangos exclusivos: 1.80. Restricciones de modos de enlace: edición 2024.
+
+## Ver también
+
+- [`match`](/ref/lenguaje/palabras-clave/match/) · [`let`](/ref/lenguaje/palabras-clave/let/) · [`if`](/ref/lenguaje/palabras-clave/if/) · [`ref`](/ref/lenguaje/palabras-clave/ref/) · [`_`](/ref/lenguaje/palabras-clave/guion-bajo/) · [Expresiones](/ref/lenguaje/expresiones/)
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

@@ -1,0 +1,127 @@
+---
+title: "Etiquetas: salir de varios bucles"
+description: "Pon nombre a un bucle o a un bloque para que break y continue sepan exactamente a cuál te refieres."
+sidebar:
+  order: 6
+duracion: 8
+desde: "1.65"
+requiere: ["04-expresiones-y-control/05-for-y-rangos"]
+tarjetas:
+  - p: "¿A qué bucle afecta un `break` sin etiqueta dentro de dos bucles anidados?"
+    r: "Solo al más interior, el que lo contiene directamente."
+  - p: "¿Cómo se escribe una etiqueta y cómo se usa?"
+    r: "Un apóstrofo y un nombre antes del bucle: `'fuera: for ...`. Luego `break 'fuera;` o `continue 'fuera;`."
+  - p: "¿Qué bloques pueden devolver un valor con `break`?"
+    r: "`loop` y los bloques etiquetados (`'b: { ... break 'b valor; ... }`, desde Rust 1.65)."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo } from '~/components';
+
+Vas a aprender a decir **de qué bucle** quieres salir cuando hay uno dentro de otro, y a usar un bloque con nombre como «salida rápida».
+
+## Predice
+
+<Predice
+  ej="m04/etiquetas"
+  opciones={[
+    "La primera línea es `primera pareja: (6, 7)`",
+    "La primera línea es `primera pareja: (7, 6)`",
+    "La primera línea es `primera pareja: (9, 9)`: el `break` solo sale del bucle interior",
+    "No compila: no se puede salir de dos bucles a la vez"
+  ]}
+  correcta={0}
+  explicacion="El bucle exterior va por `a` desde 1. La primera vez que `a * b == 42` es con `a = 6, b = 7`. `break 'filas` sale de los dos bucles a la vez, así que la búsqueda termina ahí."
+  porque={[
+    "",
+    "(7, 6) también da 42, pero se llega antes a `a = 6`.",
+    "El `break` lleva la etiqueta `'filas`, que es la del bucle EXTERIOR: salen los dos.",
+    "Para eso sirven precisamente las etiquetas."
+  ]}
+/>
+
+## La idea
+
+Cuando pones un bucle dentro de otro, un `break` normal solo sale del **más interior**. A veces eso no basta: si estás buscando algo en una tabla (filas y columnas) y lo encuentras, quieres dejar de buscar **del todo**.
+
+Para eso existen las **etiquetas** (*labels*): un nombre que empieza por apóstrofo, como `'filas`, escrito antes del bucle con dos puntos: `'filas: for a in 1..10 { ... }`. Desde dentro, `break 'filas;` sale de ese bucle (y de todos los que haya dentro), y `continue 'filas;` salta a la siguiente vuelta de ese bucle.
+
+Las etiquetas también sirven en un **bloque normal**: `'b: { ... break 'b valor; ... }`. Es una salida temprana: en cuanto sabes la respuesta, sales del bloque con ella. Si no se ejecuta ningún `break`, el bloque vale su última expresión, como cualquier bloque.
+
+## Pruébalo
+
+<Ejecutar ej="m04/etiquetas" />
+
+1. `break 'filas` corta la búsqueda en cuanto encuentra la pareja.
+2. `continue 'filas2` abandona el bucle interior y pasa al siguiente `a`: por eso solo se imprimen parejas con `b <= a`.
+3. El bloque `'clasificar` devuelve un texto en cuanto sabe cuál es, sin `if`/`else` anidados.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Una etiqueta es un nombre para un destino de salto.** Un `break 'x` se traduce en un salto al final del bucle o bloque etiquetado `'x`; `continue 'x`, en un salto a su principio. No cuesta nada extra.
+
+**El tipo de un bloque etiquetado.** Todos los `break 'b valor` y la expresión final del bloque deben tener el mismo tipo; ese es el tipo del bloque. Es la misma regla que en `if` y `loop`: **cada camino de salida tiene que dar un valor del mismo tipo**.
+
+**El apóstrofo te sonará.** Las etiquetas comparten la forma `'nombre` con los **tiempos de vida** (*lifetimes*), que verás en el mundo 08 (`'a`, `'static`). Son cosas distintas, pero el parecido no es casual: las dos ponen nombre a **una región del código**.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m04/etiqueta-inexistente"
+  explicacion="La etiqueta se llama `'fuera` pero el `break` usa `'afuera`. El compilador lo detecta y hasta sugiere el nombre parecido: «try using similarly named label: `'fuera`»."
+/>
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena las líneas para buscar el primer `x` del 1 al 20 cuyo cuadrado acabe en 6 y sea mayor que 50, y guardarlo con un bloque etiquetado (debe imprimir `encontrado: 14`)."
+  lineas={[
+    "let encontrado = 'buscar: {",
+    "    for x in 1..=20 {",
+    "        if x * x % 10 == 6 && x * x > 50 {",
+    "            break 'buscar x;",
+    "        }",
+    "    }",
+    "    0",
+    "};",
+    "println!(\"encontrado: {encontrado}\");"
+  ]}
+  distractores={["            break x;"]}
+  explicacion="Un `break` con valor dentro de un `for` no vale; hay que nombrar el bloque `'buscar`. Si no se encontrara nada, el bloque valdría su expresión final, `0`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Dentro de dos `for` anidados, sin etiquetas, ejecutas `break;` en el interior. ¿Qué pasa?"
+  opciones={[
+    "Terminan los dos bucles",
+    "Termina el interior y el exterior sigue con su siguiente vuelta",
+    "Termina el programa",
+    "Error de compilación: hay que poner etiqueta"
+  ]}
+  correcta={1}
+  explicacion="Un `break` sin etiqueta afecta solo al bucle más cercano que lo contiene."
+  porque={[
+    "Para eso necesitarías `break 'etiqueta_del_exterior;`.",
+    "",
+    "`break` sale de un bucle, no del programa.",
+    "Sin etiqueta es perfectamente válido; se refiere al bucle interior."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Cuánto vale `r`? `let r = 'b: { if 2 > 1 { break 'b 10; } 20 };`"
+  opciones={["`10`", "`20`", "`30`", "`()`"]}
+  correcta={0}
+  explicacion="La condición es verdadera, así que `break 'b 10` sale del bloque con 10. La expresión final `20` no se llega a evaluar."
+  porque={[
+    "",
+    "Solo valdría 20 si no se ejecutara ningún `break`.",
+    "Un bloque entrega un solo valor, no suma caminos.",
+    "Los dos caminos dan un número, así que el bloque es numérico."
+  ]}
+/>

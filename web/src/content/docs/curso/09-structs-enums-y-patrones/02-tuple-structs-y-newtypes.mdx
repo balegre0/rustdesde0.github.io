@@ -1,0 +1,88 @@
+---
+title: "Tuple structs, unit structs y newtypes"
+description: "Dale a un simple número un tipo propio para que el compilador no te deje mezclar metros con pies."
+sidebar:
+  order: 2
+duracion: 10
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones/01-structs"]
+tarjetas:
+  - p: "¿Cómo se accede a los campos de un tuple struct como `struct Color(u8, u8, u8)`?"
+    r: "Por posición: `c.0`, `c.1`, `c.2`. También se puede desmontar con un patrón: `let Color(r, g, b) = c;`."
+  - p: "¿Qué es un newtype y cuánto cuesta en memoria?"
+    r: "Un tuple struct de un solo campo (`struct Metros(f64);`) que crea un tipo distinto. Ocupa exactamente lo mismo que el campo: 0 bytes de coste."
+  - p: "¿Cuánto ocupa un unit struct como `struct Marca;`?"
+    r: "0 bytes. Es un tipo de tamaño cero (ZST): existe para el compilador, pero no ocupa memoria."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a ver las otras dos formas de struct y el truco más útil que sale de ellas: el **newtype**, que convierte errores de unidades en errores de compilación.
+
+## Predice
+
+<Predice
+  ej="m09/newtype-predice"
+  opciones={["`10.44 m/s` y luego `0 bytes`", "`10.44 m/s` y luego `1 bytes`", "No compila: no se puede dividir `Metros` entre `Segundos`", "`10.437 m/s` y luego `0 bytes`"]}
+  correcta={0}
+  explicacion="`let Metros(m) = d;` saca el `f64` de dentro; `t.0` lee el primer campo de `t`. Así dividimos dos `f64`, no dos tipos propios. `{:.2}` redondea a 2 decimales. Y `Vacio` no tiene campos: ocupa 0 bytes."
+  porque={["Correcto.", "Un struct sin campos no necesita ni un byte: es un tipo de tamaño cero.", "No dividimos los tipos propios, sino los `f64` que llevan dentro (`m` y `t.0`).", "`{:.2}` deja exactamente dos decimales."]}
+/>
+
+## La idea
+
+Hay tres sabores de struct:
+
+| Sabor | Ejemplo | Campos |
+|---|---|---|
+| Con nombre | `struct Punto { x: i32, y: i32 }` | se leen con `p.x` |
+| **Tuple struct** | `struct Punto(i32, i32);` | se leen por posición: `p.0`, `p.1` |
+| **Unit struct** | `struct Marca;` | ninguno |
+
+Un tuple struct de un solo campo tiene nombre propio: **newtype** («tipo nuevo»). `struct Metros(f64);` y `struct Pies(f64);` guardan lo mismo —un `f64`—, pero para el compilador son **tipos distintos**. Una función que pide `Metros` no acepta `Pies`. Ese despiste (mezclar unidades) deja de ser un fallo silencioso al ejecutar y se convierte en un error que ves antes de ejecutar.
+
+## Pruébalo
+
+<Ejecutar ej="m09/tuple-structs" />
+
+Fíjate en el paso 4: `Color(255, 165, 0)` y la tupla `(255, 165, 0)` guardan lo mismo, pero no son intercambiables. El nombre del tipo forma parte del tipo: por eso se dice que los structs son **nominales**.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un newtype **no cuesta nada**: `Celsius` ocupa 8 bytes, igual que el `f64` de dentro (lo has visto en la salida). El compilador borra la envoltura al generar código; la protección existe solo durante la compilación. A esto se le llama **abstracción de coste cero** (*zero-cost abstraction*).
+
+Un unit struct ocupa **0 bytes**: es un **tipo de tamaño cero** (*zero-sized type*, ZST). Puedes crear millones y no gastan memoria. Más adelante los usarás como «marcas» que solo existen para el sistema de tipos (por ejemplo, en el patrón *typestate* de la lección 11).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m09/mezclar-unidades"
+  explicacion="`Pies` y `Metros` llevan dentro un `f64`, pero son tipos distintos: E0308 (tipos que no coinciden). No es un estorbo, es exactamente lo que querías: la conversión tiene que ser explícita. El arreglo escribe la función `pies_a_metros`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m09/punto3d"
+  enunciado="Crea un tuple struct `Punto3(i32, i32, i32)`, crea el punto (2, -1, 7) y muestra `suma = 8` sumando sus tres coordenadas."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tienes `struct Euros(u32);` y `struct Dolares(u32);`. ¿Qué pasa si pasas un `Dolares` a una función que pide `Euros`?"
+  opciones={["Error E0308: son tipos distintos aunque lleven lo mismo dentro", "Compila: los dos son `u32` por dentro", "Compila con un aviso", "Se convierte solo, con pérdida de precisión"]}
+  correcta={0}
+  porque={["Correcto: los structs son nominales, cuenta el nombre.", "Lo de dentro no importa: el tipo es `Dolares`, no `u32`.", "No es un aviso: es un error que impide compilar.", "Rust nunca convierte tipos propios por su cuenta."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuántos bytes ocupa `struct Metros(f64);` en memoria?"
+  opciones={["8, igual que un `f64`", "16: 8 del `f64` y 8 de la etiqueta del tipo", "9", "Depende de cuántas funciones lo usen"]}
+  correcta={0}
+  porque={["Correcto: el newtype no añade nada.", "Los structs no guardan su tipo en memoria: el tipo solo existe al compilar.", "No hay ningún byte extra.", "El tamaño de un tipo es fijo."]}
+/>

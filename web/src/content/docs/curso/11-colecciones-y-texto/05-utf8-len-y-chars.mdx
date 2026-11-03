@@ -1,0 +1,112 @@
+---
+title: "UTF-8: len, chars y bytes"
+description: "Descubre por qué «año».len() vale 4, cómo recorrer el texto carácter a carácter y por qué s[0] no compila."
+sidebar:
+  order: 5
+duracion: 13
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/04-string-y-str"]
+tarjetas:
+  - p: "¿Qué cuenta `s.len()` en un `String` o `&str`?"
+    r: "BYTES, no caracteres. `\"año\".len()` es 4, porque la ñ ocupa 2 bytes en UTF-8."
+  - p: "¿Cómo cuentas los caracteres de un texto?"
+    r: "`s.chars().count()`. Recorre todo el texto (cuesta tiempo proporcional a su longitud)."
+  - p: "¿Por qué no compila `s[0]` con un `String`?"
+    r: "Porque un índice en bytes podría caer en mitad de un carácter, y «el carácter número 0» no se puede encontrar en tiempo constante. Rust no ofrece esa operación (E0277): usa `chars().next()` o `as_bytes()[0]`."
+  - p: "¿Cuánto ocupa un `char` en memoria y cuánto en UTF-8?"
+    r: "En memoria, siempre 4 bytes (un valor Unicode). En UTF-8, de 1 a 4 bytes (`c.len_utf8()`)."
+  - p: "¿Qué da `char_indices()`?"
+    r: "Cada carácter junto con el índice del BYTE donde empieza: «añil» → 0:a 1:ñ 3:i 4:l."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a entender cómo guarda Rust el texto por dentro. Con la «ñ» se ve enseguida.
+
+## Predice
+
+<Predice
+  ej="m11/utf8-predice"
+  opciones={["`4 3`", "`3 3`", "`3 4`", "`4 4`"]}
+  correcta={0}
+  explicacion="`len()` cuenta bytes: «a» (1) + «ñ» (2) + «o» (1) = 4. `chars().count()` cuenta caracteres: 3."
+  porque={["Correcto.", "La ñ no cabe en un byte en UTF-8.", "Hay tres letras, no cuatro.", "`chars().count()` cuenta letras, no bytes."]}
+/>
+
+## La idea
+
+Todo texto en Rust (`String` y `&str`) se guarda en **UTF-8**: cada carácter Unicode se codifica con **entre 1 y 4 bytes**.
+
+| Carácter | Bytes en UTF-8 |
+|---|---|
+| `a`, `7`, espacio (ASCII) | 1 |
+| `ñ`, `á`, `ü`, `Ñ` | 2 |
+| `€` | 3 |
+| `👋` | 4 |
+
+Consecuencias:
+
+1. **`len()` cuenta bytes.** Es lo que ocupa el texto, y saberlo es instantáneo (está guardado). Para contar caracteres, `chars().count()`, que tiene que recorrer el texto.
+2. **No existe `s[i]`.** «El carácter número 7» no está en el byte 7: hay que recorrer desde el principio para saber dónde empieza. Rust se niega a ofrecer una operación que parece instantánea y no lo es (o que daría medio carácter). Tienes tres vistas explícitas: `bytes()` (los `u8`), `chars()` (los `char`) y `char_indices()` (cada `char` con el byte donde empieza).
+
+Un aviso más: un `char` es un **valor Unicode**, no siempre una «letra» tal y como la ve una persona. Un emoji de familia o una letra con acento escrito como dos símbolos combinados son varios `char`. Para eso hay bibliotecas externas (grafemas); en este curso nos basta `chars()`.
+
+## Pruébalo
+
+<Ejecutar ej="m11/utf8" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+UTF-8 marca en cada byte qué papel tiene:
+
+```text
+1 byte:   0xxxxxxx                              a = 0x61
+2 bytes:  110xxxxx 10xxxxxx                     ñ = 0xC3 0xB1
+3 bytes:  1110xxxx 10xxxxxx 10xxxxxx            € = 0xE2 0x82 0xAC
+4 bytes:  11110xxx 10xxxxxx 10xxxxxx 10xxxxxx   👋
+```
+
+Los bytes que empiezan por `10` son **continuaciones**: nunca empiezan un carácter. Así es fácil saber si un índice es una **frontera** de carácter (`is_char_boundary`), y nunca se confunde un trozo de una letra con otra letra.
+
+`String` **garantiza** que su contenido es UTF-8 válido: todas sus operaciones seguras mantienen esa promesa, y por eso `from_utf8` comprueba los bytes (lección 7). Un `char` en memoria ocupa siempre **4 bytes** (guarda el número Unicode, hasta `0x10FFFF`); por eso un `Vec<char>` ocupa hasta 4 veces más que el `String` equivalente.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m11/indexar-str"
+  explicacion="E0277: un `str` no se puede indexar con un entero. El propio rustc dice que los índices de texto son rangos de bytes y sugiere `.chars().nth()` o `.bytes().nth()`. El arreglo usa `chars().next()` (el primer carácter, como `Option`) y `as_bytes()[0]` (el primer byte, un `u8`)."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m11/contar-vocales"
+  enunciado="Escribe `vocales(texto: &str) -> usize` que cuente las vocales minúsculas con o sin tilde (a, e, i, o, u, á, é, í, ó, ú), recorriendo con `chars()`. Debe imprimir `5` (murciélago) y `2` (ñandú)."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta={'¿Qué devuelve `"€5".len()`?'}
+  opciones={["4", "2", "5", "3"]}
+  correcta={0}
+  porque={["Correcto: € ocupa 3 bytes y 5 ocupa 1.", "Eso es `chars().count()`.", "No hay 5 bytes.", "Falta el byte del 5."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál es la forma correcta de obtener el primer carácter de `s: &str`?"
+  opciones={["`s.chars().next()`", "`s[0]`", "`s.as_bytes()[0] as char`", "`s.len()`"]}
+  correcta={0}
+  porque={["Correcto: devuelve `Option<char>` (vacío → `None`).", "No compila (E0277).", "Para «ñ» daría el byte 0xC3 convertido en «Ã»: un carácter equivocado.", "Eso da la longitud en bytes."]}
+/>
+
+<Pregunta
+  pregunta={'`"añil".char_indices()` da pares (byte, carácter). ¿En qué byte empieza la «i»?'}
+  opciones={["3", "2", "1", "4"]}
+  correcta={0}
+  porque={["Correcto: a ocupa el byte 0, ñ los bytes 1 y 2.", "El byte 2 es la segunda mitad de la ñ.", "Ahí empieza la ñ.", "Ahí empieza la «l»."]}
+/>

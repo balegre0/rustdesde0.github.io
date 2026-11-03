@@ -1,0 +1,43 @@
+---
+title: "Any, TypeId y type_name"
+description: "Preguntar el tipo de un valor al ejecutar: dyn Any y downcast_ref, el identificador TypeId y el nombre del tipo con type_name."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::any::{Any, TypeId, type_name}`
+
+## Sinopsis
+
+```rust
+pub trait Any: 'static { fn type_id(&self) -> TypeId; }
+impl dyn Any {
+    pub fn is<T: Any>(&self) -> bool;
+    pub fn downcast_ref<T: Any>(&self) -> Option<&T>;
+    pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T>;
+}
+impl Box<dyn Any> { pub fn downcast<T: Any>(self) -> Result<Box<T>, Box<dyn Any>>; }
+pub fn type_name<T: ?Sized>() -> &'static str;
+```
+
+## Qué hace
+
+Rust normalmente decide todo sobre los tipos al compilar. `Any` es la excepción: un `&dyn Any` guarda **qué tipo** hay detrás, y `downcast_ref::<T>()` devuelve `Some(&T)` si es ese tipo o `None` si no.
+
+Solo funciona con tipos `'static` (sin préstamos), porque `TypeId` no distingue lifetimes. `type_name` da un nombre legible del tipo, útil para depurar; su formato no está garantizado, así que no lo compares en el código.
+
+Úsalo poco: casi siempre un `enum` o un trait propio expresan mejor lo que quieres. Aparece en sistemas de plugins, en contenedores heterogéneos y en `std::panic` (la carga de un pánico es un `Box<dyn Any + Send>`).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/any-downcast" />
+
+## Desde
+
+Rust 1.0. `type_name`: 1.38.
+
+## Ver también
+
+[`dyn Trait`](/curso/13-traits-y-genericos/05-dyn-y-vtables/) · [Parametricidad](/curso/24-teoria-y-diseno/04-parametricidad/)

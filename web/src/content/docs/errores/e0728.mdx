@@ -1,0 +1,83 @@
+---
+title: "E0728: await fuera de async"
+description: "Usas .await en una función o bloque que no es async (por ejemplo, en main)."
+sidebar:
+  order: 69
+insignias: ["Constantes, unsafe, async y otros"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` `await` is only allowed inside `async` functions and blocks ``
+
+## Qué significa
+
+`.await` pausa la función actual hasta que el *future* termine. Solo una función o bloque `async` sabe pausarse y reanudarse (el compilador la convierte en una **máquina de estados**). `main` es una función normal: no puede pausarse.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0728" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0728]: `await` is only allowed inside `async` functions and blocks
+ --> E0728.rs:6:20
+  |
+5 | fn main() {
+  | --------- this is not `async`
+6 |     let n = dato().await;
+  |                    ^^^^^ only allowed inside `async` functions and blocks
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Usar `.await` en `main` o en una función sin `async`.
+- Usar `.await` dentro de una closure normal en código async.
+
+## Cómo arreglarlo
+
+Marca la función como `async`. Para arrancar desde `main` necesitas un **ejecutor** que sondee el future: normalmente uno de un crate (como el de Tokio, con `#[tokio::main]`); en el arreglo de esta ficha se usa uno mínimo de la biblioteca estándar con `Waker::noop()`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+use std::future::Future;
+use std::pin::pin;
+use std::task::{Context, Poll, Waker};
+
+async fn dato() -> u32 {
+    7
+}
+
+async fn programa() {
+    let n = dato().await; // `.await` dentro de una función async
+    println!("{n}");
+}
+
+fn main() {
+    // un ejecutor mínimo: sondea el future hasta que termina
+    let mut fut = pin!(programa());
+    let mut cx = Context::from_waker(Waker::noop());
+    while fut.as_mut().poll(&mut cx) == Poll::Pending {}
+}
+```
+
+**Salida:**
+
+```text
+7
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0728` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0277](/errores/e0277/): un tipo no implementa el trait que se necesita
+
+## Aprende esto en
+
+- [Mundo 18 · Async](/curso/18-async/)

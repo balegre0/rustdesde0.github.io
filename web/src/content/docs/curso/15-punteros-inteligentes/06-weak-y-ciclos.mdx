@@ -1,0 +1,116 @@
+---
+title: "Weak y los ciclos"
+description: "Ves cómo dos Rc que se apuntan nunca se liberan y rompes el ciclo con Weak, una referencia que no es dueña."
+sidebar:
+  order: 6
+duracion: 13
+desde: "1.4"
+requiere: ["15-punteros-inteligentes/05-rc"]
+tarjetas:
+  - p: "¿Por qué un ciclo de `Rc` nunca se libera?"
+    r: "Cada nodo mantiene al otro con el contador en 1 como mínimo. Cuando mueren las variables, los contadores bajan a 1, nunca a 0, y ningún `Drop` libera nada."
+  - p: "¿Qué diferencia hay entre `Rc` y `Weak`?"
+    r: "`Rc` es dueño (cuenta en `strong_count`); `Weak` no lo es (cuenta en `weak_count`) y no mantiene vivo el valor."
+  - p: "¿Qué devuelve `weak.upgrade()`?"
+    r: "`Some(Rc<T>)` si el valor sigue vivo, o `None` si ya se liberó. Así nunca puedes acceder a memoria liberada."
+  - p: "En un árbol con punteros hacia arriba y hacia abajo, ¿cuál debe ser `Weak`?"
+    r: "El que va hacia arriba (hijo → padre). Los padres son dueños de sus hijos; los hijos solo recuerdan a su padre."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a construir dos nodos que se apuntan entre sí, comprobar que **nunca** se liberan y arreglarlo con `Weak`.
+
+## Predice
+
+<Predice
+  ej="m15/ciclo-fuga"
+  pregunta="`a` apunta a `b` y `b` apunta a `a`. Cada nodo imprime «liberado» al destruirse. ¿Qué se imprime después de «fin de main»?"
+  opciones={["liberado b y luego liberado a", "liberado a y luego liberado b", "Nada: ninguno se libera", "Un pánico por ciclo detectado"]}
+  correcta={2}
+  explicacion="Al salir de `main` mueren las variables `a` y `b`, y cada contador baja de 2 a 1. Pero el 1 que queda es el del otro nodo, que tampoco se libera. Ningún contador llega a 0: es una fuga de memoria."
+  porque={["Para eso los contadores tendrían que llegar a 0.", "Tampoco en este orden: nadie llega a 0.", "Correcto.", "Rust no busca ciclos en ejecución: no hay recolector de basura."]}
+/>
+
+## La idea
+
+`Rc` libera cuando el contador llega a 0. Si dos valores se apuntan con `Rc`, cada uno mantiene vivo al otro: aunque desde tu programa ya no puedas llegar a ellos, sus contadores se quedan en 1 para siempre. Es una **fuga de memoria** (*memory leak*). No es un error de memoria peligroso (nadie lee memoria liberada; la lección siguiente explica por qué Rust la considera segura), pero ocupa memoria que no vuelve.
+
+La solución es `Weak<T>`, una **referencia débil**: apunta al mismo bloque que un `Rc`, pero **no es dueña**. Se crea con `Rc::downgrade(&rc)`, que suma 1 a `weak_count` en lugar de a `strong_count`. Como no cuenta como dueño, no impide que el valor se libere.
+
+Como el valor puede haber muerto, un `Weak` no te deja leerlo directamente. Tienes que pedirlo con `upgrade()`, que devuelve `Option<Rc<T>>`: `Some` si sigue vivo (y te da un `Rc` temporal que lo mantiene vivo mientras lo usas), `None` si ya no existe. Así, ni siquiera con referencias que sobreviven a su valor puede haber un **uso tras liberar**. La regla de diseño: los dueños apuntan **hacia abajo** con `Rc` (padre → hijos) y las referencias **hacia arriba** son `Weak` (hijo → padre).
+
+## Pruébalo
+
+<Ejecutar ej="m15/weak-arbol" />
+
+Fíjate en los números: la raíz tiene 1 fuerte (la variable `raiz`) y 1 débil (el padre de la hoja). La hoja tiene 2 fuertes: la variable `hoja` y el `Vec` de hijos de la raíz. Al cerrar el bloque, la raíz se libera aunque la hoja la recuerde, y `upgrade()` pasa a dar `None`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+El bloque de un `Rc` tiene **dos** contadores, y cada uno controla una cosa distinta:
+
+| Contador | Lo suben | Cuando llega a 0 |
+|---|---|---|
+| `strong` | `Rc::new`, `Rc::clone`, `upgrade()` con éxito | se **destruye el valor** (se ejecuta su `Drop`) |
+| `weak` | `Rc::downgrade`, `Weak::clone` (+1 implícito de los fuertes) | se **devuelve el bloque** al asignador |
+
+Por eso un `Weak` siempre puede comprobar si el valor vive: aunque el valor esté destruido, el **bloque** con los contadores sigue reservado mientras quede algún `Weak`. `upgrade()` lee `strong`; si es 0, devuelve `None`.
+
+En el ciclo de la predicción, el estado final es:
+
+```text
+  ┌─────────── a: strong = 1 ◄──────────┐
+  │                                     │
+  └──► b: strong = 1 ───────────────────┘
+  (ninguna variable apunta ya a ellos; nadie llega a 0)
+```
+
+Con un `Weak` en uno de los dos sentidos, el ciclo deja de contar: el lado fuerte llega a 0, se destruye, y su `Drop` suelta al otro.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Guardar el resultado de upgrade() para siempre">
+
+❌ Hacer `let padre: Rc<Nodo> = hoja.padre.borrow().upgrade().unwrap();` y guardar `padre` dentro de otra estructura. Ese `Rc` es fuerte: acabas de recrear el ciclo.
+
+✅ Usa `upgrade()` justo cuando lo necesites y suelta el `Rc` temporal al terminar (un `if let Some(p) = ... { ... }`). Y no uses `unwrap()`: el `None` es una posibilidad real, no un error raro.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m15/r-weak"
+  enunciado={"Crea un `Weak` a `jefe` con `Rc::downgrade` y suelta `jefe` con `drop`. La primera llamada a `upgrade()` debe dar `Some(\"Marta\")` y la segunda `None`."}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué cuenta `Rc::weak_count`?"
+  opciones={["Los `Rc` que hay en el programa", "Los `Weak` que apuntan al valor", "Los valores que se han fugado", "Los préstamos `&` activos"]}
+  correcta={1}
+  explicacion="Cuenta las referencias débiles creadas con `downgrade` (sin el 1 implícito interno, que no se muestra)."
+  porque={["Eso es `strong_count`.", "Correcto.", "Rust no lleva la cuenta de las fugas.", "Los préstamos los controla el compilador, no un contador."]}
+/>
+
+<Pregunta
+  pregunta="Un árbol: cada nodo guarda `hijos: Vec<Rc<Nodo>>` y `padre: Rc<Nodo>`. ¿Qué pasa al soltar la raíz?"
+  opciones={["Se libera todo el árbol", "No se libera nada: padre ↔ hijo forman ciclos", "Solo se libera la raíz", "No compila"]}
+  correcta={1}
+  explicacion="Cada hijo mantiene a su padre con un `Rc` fuerte y el padre mantiene al hijo: ciclos en cada arista. El puntero al padre debe ser `Weak`."
+  porque={["Haría falta que los contadores llegaran a 0.", "Correcto.", "La raíz tiene un `Rc` fuerte de cada hijo.", "Compila sin problemas: las fugas no son errores de compilación."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `Weak` no tiene un método para leer el valor directamente?"
+  opciones={["Por rendimiento", "Porque el valor puede haberse liberado; `upgrade` obliga a comprobarlo", "Porque `Weak` solo funciona con números", "Sí lo tiene: `weak.get()`"]}
+  correcta={1}
+  explicacion="Un `Weak` puede sobrevivir a su valor. `upgrade` devuelve `Option`, así que el compilador te obliga a tratar el caso `None`: no hay uso tras liberar posible."
+  porque={["Es una cuestión de seguridad, no de velocidad.", "Correcto.", "`Weak<T>` funciona con cualquier `T`.", "No existe ese método."]}
+/>

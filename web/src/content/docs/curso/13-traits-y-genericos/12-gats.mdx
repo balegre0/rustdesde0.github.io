@@ -1,0 +1,76 @@
+---
+title: "GATs: tipos asociados genéricos"
+description: "Un tipo asociado que tiene sus propios parámetros, como Item<'a>. Con él se escriben iteradores que prestan del propio iterador, algo imposible con Iterator."
+sidebar:
+  order: 12
+duracion: 13
+desde: "1.65"
+requiere: ["13-traits-y-genericos/11-compatibilidad-con-dyn", "08-lifetimes"]
+tarjetas:
+  - p: "¿Qué es un GAT?"
+    r: "Un tipo asociado genérico (generic associated type): un tipo asociado con parámetros propios, como `type Item<'a>`."
+  - p: "¿Por qué Iterator no puede devolver préstamos del propio iterador?"
+    r: "Porque Item no depende de la lifetime del préstamo de self en next(&mut self): todos los elementos tienen el mismo tipo, fijo para el iterador."
+  - p: "¿Por qué hace falta `where Self: 'a` en `type Item<'a>`?"
+    r: "Porque Item<'a> va a contener préstamos de Self de lifetime 'a, y eso solo tiene sentido si Self vive al menos 'a. El compilador lo exige."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo } from '~/components';
+
+Esta es una de las piezas más avanzadas del sistema de tipos, y llegó a Rust estable en 2022 (versión 1.65), tras años de trabajo. Sirve para un problema concreto que el trait `Iterator` no puede resolver.
+
+## La idea
+
+En `Iterator`, el tipo de los elementos es fijo:
+
+```rust
+trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+}
+```
+
+`Item` no puede depender del préstamo de `self` en `next`. Por eso un iterador **no puede devolver préstamos de sí mismo**: por ejemplo, ventanas `&mut` que se solapan sobre su propio búfer. (Las devuelve de los datos que tiene prestados, como el `Cursor<'a>` del mundo 08, que no es lo mismo.)
+
+Un **GAT** (*generic associated type*) es un tipo asociado con parámetros propios:
+
+```rust
+trait IteradorQuePresta {
+    type Item<'a> where Self: 'a;
+    fn siguiente(&mut self) -> Option<Self::Item<'_>>;
+}
+```
+
+Ahora cada llamada a `siguiente` devuelve un `Item` atado al préstamo de **esa** llamada. Como el resultado mantiene prestado el iterador, no puede haber dos elementos vivos a la vez, y por eso es seguro que se solapen.
+
+## Pruébalo
+
+Ventanas exclusivas de dos elementos que se solapan, sobre un slice:
+
+<Ejecutar ej="m13/gat-ventanas" />
+
+Cada ventana suma su primer elemento al segundo, y la siguiente ventana empieza donde estaba ese segundo: el resultado son las sumas acumuladas `[1, 3, 6, 10]`. Con `Iterator` sería imposible, porque devolver dos `&mut` solapados vivos a la vez violaría la regla de los préstamos.
+
+El `where Self: 'a` no es opcional:
+
+<NoCompila ej="m13/gat-sin-where" explicacion="Sin la cota, `Item<'a>` podría hablar de una lifetime `'a` más larga que el propio iterador. El compilador exige `where Self: 'a` para que la definición tenga sentido, y te dice exactamente qué añadir." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**No es `for` compatible.** El bucle `for` usa `Iterator`, así que un iterador con GAT se recorre con `while let Some(x) = it.siguiente()`. Tampoco tiene adaptadores (`map`, `filter`…) gratis: habría que escribirlos.
+
+**Otros usos.** Los GATs sirven también para abstraer sobre punteros (`type Puntero<T>: Deref<Target = T>`, para elegir entre `Rc` y `Arc`) y para traits asíncronos que devuelven futuros que prestan. Durante años, `async fn` en traits se emulaba con GATs, hasta que Rust 1.75 la estabilizó directamente.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué permite un GAT como `type Item<'a> where Self: 'a` que no permite `type Item`?"
+  opciones={["Que cada elemento devuelto preste del propio iterador, atado al préstamo de esa llamada", "Que el iterador sea más rápido", "Usar el iterador en un `for`", "Devolver elementos de varios tipos"]}
+  correcta={0}
+  explicacion="El tipo del elemento puede depender de la lifetime del préstamo de `self` en cada llamada."
+  porque={["", "No cambia el rendimiento.", "Al contrario: `for` necesita `Iterator`.", "Todos los elementos siguen siendo del mismo tipo (con distinta lifetime)."]}
+/>

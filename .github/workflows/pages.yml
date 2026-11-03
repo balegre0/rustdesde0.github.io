@@ -1,0 +1,77 @@
+# Publica la web en GitHub Pages cada vez que se sube algo a la rama main.
+# En GitHub: Settings → Pages → Source: «GitHub Actions».
+name: Publicar en GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      # La misma versión de Rust con la que se comprobaron todos los ejemplos del curso.
+      - name: Instalar Rust 1.99.1 (+ wasm32-wasip1)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.1
+          targets: wasm32-wasip1
+          components: rust-src
+
+      - name: Instalar Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      # Caché de los ejemplos ya compilados (se recompila solo lo que cambia).
+      - name: Caché de ejemplos
+        uses: actions/cache@v4
+        with:
+          path: web/node_modules/.cache/rdc-rustc
+          key: ejemplos-${{ runner.os }}-${{ hashFiles('web/ejemplos/**', 'web/scripts/compilar-ejemplos.ts') }}
+          restore-keys: ejemplos-${{ runner.os }}-
+
+      - name: Instalar dependencias
+        run: bun install --frozen-lockfile
+
+      - name: Compilar la web
+        env:
+          # «/nombre-del-repo/» (o «/» si el repositorio es usuario.github.io)
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+          SITE_URL: ${{ steps.pages.outputs.origin }}
+        run: bun run build
+
+      - name: Subir la web
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar
+        id: deployment
+        uses: actions/deploy-pages@v4

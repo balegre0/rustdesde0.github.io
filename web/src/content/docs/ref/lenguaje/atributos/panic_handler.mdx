@@ -1,0 +1,35 @@
+---
+title: "#[panic_handler]"
+description: "En un programa no_std, define la función que se ejecuta cuando hay un pánico. Debe devolver ! y existir exactamente una vez."
+sidebar:
+  order: 20
+insignias: ["Desde 1.30", "Runtime"]
+---
+import { Ejecutar } from '~/components';
+
+En `std`, un pánico imprime el mensaje y desenrolla la pila. Sin `std` no hay quien lo haga: tú decides qué pasa con `#[panic_handler]`.
+
+## Sinopsis
+
+```text
+#[panic_handler]
+fn nombre(info: &core::panic::PanicInfo) -> ! { … }
+```
+
+## Qué hace
+
+La función recibe la información del pánico (mensaje y posición) y **nunca vuelve** (`-> !`). En un microcontrolador suele parar la CPU, reiniciarla o enviar el mensaje por un puerto serie. Tiene que haber **exactamente una** en el programa final: crates como `panic-halt` o `panic-probe` la dan hecha.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-panic-handler" />
+
+Es una biblioteca `no_std` que solo se comprueba al compilar (con `-C panic=abort`, porque sin `std` no hay desenrollado).
+
+## Desde
+
+Rust 1.30.
+
+## Ver también
+
+[`#![no_std]`](/ref/lenguaje/atributos/no_std/) · [Pánicos y unwinding](/curso/21-el-compilador-por-dentro/13-panicos-y-unwinding/)

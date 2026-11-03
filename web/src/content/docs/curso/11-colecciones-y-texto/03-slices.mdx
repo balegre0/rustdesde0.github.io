@@ -1,0 +1,105 @@
+---
+title: "Slices: prestar un trozo"
+description: "Presta una parte de una lista con &v[a..b] y escribe funciones que aceptan Vec, arrays y trozos por igual."
+sidebar:
+  order: 3
+duracion: 11
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/02-vec-por-dentro"]
+tarjetas:
+  - p: "¿Qué es un slice `&[T]`?"
+    r: "Un préstamo de una secuencia de elementos contiguos: un puntero gordo con la dirección del primero y la cantidad de elementos."
+  - p: "¿Por qué es mejor recibir `&[T]` que `&Vec<T>`?"
+    r: "Porque `&[T]` acepta un `&Vec<T>` (por coerción), un array y cualquier trozo. `&Vec<T>` solo acepta Vecs, y no aporta nada para leer."
+  - p: "¿Qué incluye el rango `v[1..3]`?"
+    r: "Los elementos de índice 1 y 2: el inicio se incluye, el final no."
+  - p: "¿Cuánto ocupa `&[i32]` en wasm32?"
+    r: "8 bytes: puntero (4) + longitud (4). En un PC de 64 bits, 16."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a prestar **trozos** de listas y a escribir funciones que funcionan con cualquier secuencia de elementos.
+
+## Predice
+
+<Predice
+  ej="m11/slices-predice"
+  opciones={["`15 5 60`", "`15 9 60`", "No compila: `suma` pide un slice y recibe un Vec", "`15 5` y un error con el array"]}
+  correcta={0}
+  explicacion="`&v` se convierte en `&[i32]` solo; `&v[1..3]` es el trozo `[2, 3]` (el final no se incluye), que suma 5; el array también se convierte en slice."
+  porque={["Correcto.", "`1..3` no incluye el índice 3: son el 2 y el 3.", "Un `&Vec<i32>` se convierte en `&[i32]` automáticamente.", "Un `&[i32; 3]` también se convierte en `&[i32]`."]}
+/>
+
+## La idea
+
+Un **slice** (*rebanada*) `&[T]` es un **préstamo de una parte** de una secuencia: «estos `n` elementos seguidos, empezando aquí». No es dueño de nada; solo mira. Se crea con un rango:
+
+| Escribes | Obtienes |
+|---|---|
+| `&v[1..3]` | los índices 1 y 2 |
+| `&v[..2]` | desde el principio hasta el 1 |
+| `&v[3..]` | desde el 3 hasta el final |
+| `&v[..]` o `&v` | todo |
+
+La gran utilidad: una función que recibe `&[T]` acepta **un `Vec`, un array o un trozo de cualquiera de los dos**. Por eso la regla es: para **leer** una lista, pide `&[T]`, no `&Vec<T>`. (Para modificar sus elementos, `&mut [T]`; solo si necesitas añadir o quitar, `&mut Vec<T>`.)
+
+## Pruébalo
+
+<Ejecutar ej="m11/slices" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un `&[T]` es un **puntero gordo** (*fat pointer*): dos números en vez de uno.
+
+```text
+v: Vec<i32>  →  heap: [ 4 | 9 | 2 | 7 | 5 ]
+                              ▲
+&v[1..3]  =  ( puntero ───────┘ , longitud = 2 )
+```
+
+Por eso mide 8 bytes en wasm32 (el doble que `&i32`, que es un puntero normal): necesita saber **dónde empieza y cuántos hay**, porque el tipo `[T]` no dice el tamaño. Cada acceso `s[i]` comprueba `i < longitud`.
+
+Cuando pasas `&v` (un `&Vec<i32>`) a una función que pide `&[i32]`, el compilador aplica una **coerción por `Deref`**: `Vec<T>` sabe convertirse en `[T]` (lo verás en el mundo 13). Es gratuita: copia el puntero y la longitud del Vec.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m11/recibir-vec"
+  explicacion="La función pide `&Vec<f64>` y le pasamos un array: no encaja (E0308). Pedir `&Vec` es más restrictivo y no aporta nada para leer. El arreglo pide `&[f64]` y acepta las dos cosas."
+/>
+
+<Trampa titulo="Un rango fuera de la lista">
+
+<Ejecutar ej="m11/slice-fuera" titulo="Pánico: rango fuera" />
+
+Igual que con un índice: si el final del rango pasa de la longitud, hay pánico. Para no arriesgarte, `v.get(a..b)` devuelve `Option<&[T]>`.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m11/media"
+  enunciado="Escribe `media(datos: &[f64]) -> Option<f64>`: `None` si está vacío; si no, la media. Debe imprimir `Some(5.0)`, `Some(3.0)` y `None`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`let v = vec![10, 20, 30, 40];` ¿Qué contiene `&v[1..]`?"
+  opciones={["`[20, 30, 40]`", "`[10]`", "`[10, 20, 30, 40]`", "`[20]`"]}
+  correcta={0}
+  porque={["Correcto: desde el índice 1 hasta el final.", "Eso sería `&v[..1]`.", "Eso sería `&v[..]`.", "Eso sería `&v[1..2]`."]}
+/>
+
+<Pregunta
+  pregunta="Quieres una función que ponga a cero todos los elementos de una lista, sin cambiar su tamaño. ¿Qué parámetro pides?"
+  opciones={["`&mut [i32]`", "`&[i32]`", "`&mut Vec<i32>`", "`Vec<i32>`"]}
+  correcta={0}
+  porque={["Correcto: basta con poder cambiar elementos, y acepta Vecs, arrays y trozos.", "Un préstamo compartido no deja cambiar nada.", "Funciona, pero solo con Vecs; no hace falta poder añadir o quitar.", "Así la función se quedaría con el Vec."]}
+/>

@@ -1,0 +1,38 @@
+---
+title: "unimplemented!"
+description: "Marca algo que no está implementado (y quizá no lo estará). Entra en pánico con «not implemented». Diferencia con todo!."
+sidebar:
+  order: 12
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::unimplemented`
+
+## Sinopsis
+
+```rust
+unimplemented!()
+unimplemented!("mensaje {}", args)
+```
+
+## Qué hace
+
+Entra en pánico con `not implemented` (y el mensaje, si lo das). Como devuelve `!`, encaja en cualquier sitio donde se espera un valor, así que una función con `unimplemented!()` compila aunque su tipo de retorno sea cualquiera.
+
+**¿`todo!` o `unimplemented!`?** Hacen lo mismo; cambia la **intención**:
+
+- [`todo!`](/ref/std/macros/todo/): «lo voy a escribir» (trabajo pendiente).
+- `unimplemented!`: «no está implementado», a menudo a propósito (por ejemplo, un método de un trait que este tipo no soporta).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-unimplemented" />
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[`todo!`](/ref/std/macros/todo/) · [`unreachable!`](/ref/std/macros/unreachable/) · [`panic!`](/ref/std/macros/panic/)

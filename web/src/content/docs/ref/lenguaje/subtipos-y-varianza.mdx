@@ -1,0 +1,83 @@
+---
+title: "Subtipos y varianza"
+description: "Cuándo un tiempo de vida largo sirve donde se pide uno corto, y por qué &mut T no lo permite."
+sidebar:
+  order: 103
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+En Rust, el **subtipado** existe solo para los **tiempos de vida**: un préstamo que vive más sirve donde se pide uno que vive menos. La **varianza** dice cómo se propaga esa regla a los tipos que contienen préstamos.
+
+## En una frase
+
+`&'static str` es subtipo de `&'a str` (puedes pasar algo que dura siempre donde basta algo que dure `'a`), pero `&mut &'static str` **no** es subtipo de `&mut &'a str`: dejar que lo fuera permitiría guardar un préstamo corto donde se prometió uno eterno.
+
+## La regla, paso a paso
+
+### Subtipado
+
+Si `'largo: 'corto` (léase «`'largo` dura al menos tanto como `'corto`»), entonces `&'largo T` es **subtipo** de `&'corto T`. Un subtipo se puede usar en cualquier sitio donde se espera el supertipo.
+
+También hay subtipado entre tipos de **orden superior**: `for<'a> fn(&'a i32)` (acepta cualquier tiempo de vida) es subtipo de `fn(&'static i32)`.
+
+### Varianza
+
+Para un tipo genérico `F<T>`:
+
+- **covariante** en `T`: si `T` es subtipo de `U`, `F<T>` es subtipo de `F<U>` (la relación «pasa a través»);
+- **contravariante** en `T`: la relación se **invierte**;
+- **invariante** en `T`: no hay relación; el tipo de dentro tiene que coincidir exactamente.
+
+| Tipo | Varianza en `'a` | Varianza en `T` |
+|---|---|---|
+| `&'a T` | covariante | covariante |
+| `&'a mut T` | covariante | **invariante** |
+| `*const T` | | covariante |
+| `*mut T` | | invariante |
+| `[T]`, `[T; n]` | | covariante |
+| `fn() -> T` | | covariante |
+| `fn(T)` | | **contravariante** |
+| `UnsafeCell<T>` (y `Cell`, `RefCell`, `Mutex`…) | | invariante |
+| `PhantomData<T>` | | covariante |
+| `dyn Trait<T> + 'a` | covariante | invariante |
+
+Un `struct`, `enum` o `union` toma la varianza de sus campos. Si un parámetro aparece en posiciones con varianzas distintas, queda **invariante**. `PhantomData` sirve para elegir la varianza de un parámetro que no se usa en ningún campo (por ejemplo, `PhantomData<fn(T)>` lo hace contravariante).
+
+### Por qué `&mut T` es invariante
+
+Si `&mut &'static str` pudiera tratarse como `&mut &'a str`, la función que lo recibe podría **escribir** dentro un `&'a str` corto. Al volver, quien llamó seguiría creyendo que tiene un `&'static str`, y lo usaría cuando la memoria ya se hubiera liberado: **uso tras liberar**. Lo mismo vale para `Cell<T>` y demás tipos con mutabilidad interior.
+
+### Por qué `fn(T)` es contravariante
+
+Una función que acepta **cualquier** `&str` sirve donde se pide una que acepte solo `&'static str`: hace menos suposiciones. Al revés no: una función que exige `&'static str` no puede recibir un préstamo corto.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/varianza-covarianza" />
+
+Salida:
+
+```text
+una cadena local
+8
+```
+
+## Errores típicos
+
+<NoCompila ej="ref-lenguaje/varianza-error" />
+
+`error[E0597]: local does not live long enough`, con la nota `type annotation requires that local is borrowed for 'static`. Como `&mut T` es invariante, `'a` tiene que ser exactamente `'static`, y `local` no vive tanto. Es justo el caso que llevaría a un uso tras liberar.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+- [Coerciones](/ref/lenguaje/coerciones/) · [Elisión de lifetimes](/ref/lenguaje/elision-de-lifetimes/) · [`'static`](/ref/lenguaje/palabras-clave/static-lifetime/) · [`mut`](/ref/lenguaje/palabras-clave/mut/)
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/) · [Mundo 24 · Teoría y diseño](/curso/24-teoria-y-diseno/)

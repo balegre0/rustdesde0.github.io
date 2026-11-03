@@ -1,0 +1,124 @@
+---
+title: "while"
+description: "Repite mientras se cumpla una condición, y entiende por qué un while no puede entregar un valor con break."
+sidebar:
+  order: 4
+duracion: 9
+desde: "1.0"
+requiere: ["04-expresiones-y-control/03-loop-y-break-con-valor"]
+tarjetas:
+  - p: "¿Cuándo comprueba `while` su condición?"
+    r: "Antes de cada vuelta, incluida la primera. Si es falsa desde el principio, el cuerpo no se ejecuta nunca."
+  - p: "¿Por qué `break valor` no se permite en un `while` (E0571)?"
+    r: "Porque el `while` también puede terminar cuando la condición se vuelve falsa, y entonces no habría ningún valor que entregar."
+  - p: "¿Cuánto vale siempre un `while`?"
+    r: "`()`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a repetir algo **mientras** se cumpla una condición, que es la forma más natural de escribir muchas cuentas atrás, búsquedas y cálculos paso a paso.
+
+## Predice
+
+<Predice
+  ej="m04/while-cuenta"
+  opciones={[
+    "`3... 2... 1... ¡despegue!` y después «esto no se imprime» una vez",
+    "`3... 2... 1... ¡despegue!` y `vacio sigue valiendo 0`",
+    "`3... 2... 1... 0... ¡despegue!` y `vacio sigue valiendo 0`",
+    "`3... 2... 1... ¡despegue!` y `vacio sigue valiendo -1`"
+  ]}
+  correcta={1}
+  explicacion="La condición se comprueba antes de cada vuelta. Con `segundos = 0`, `0 > 0` es falso y el bucle acaba sin imprimir el 0. El segundo `while` empieza con la condición ya falsa: su cuerpo no se ejecuta ni una vez."
+  porque={[
+    "El cuerpo solo se ejecuta si la condición es verdadera ANTES de la vuelta. `0 > 0` es falso desde el principio.",
+    "",
+    "Cuando `segundos` vale 0, la condición `0 > 0` ya es falsa: el 0 no se imprime.",
+    "`vacio -= 1` está dentro del cuerpo, que nunca se ejecuta."
+  ]}
+/>
+
+## La idea
+
+`while condición { ... }` es como un `loop` con un `if` incorporado al principio: **antes de cada vuelta** comprueba la condición; si es verdadera, ejecuta el cuerpo y vuelve a empezar; si es falsa, sale. Si la condición ya es falsa la primera vez, el cuerpo **no se ejecuta nunca**.
+
+Úsalo cuando sabes **la condición para seguir**, pero no cuántas vueltas harán falta: «mientras queden cifras», «mientras no llegue a 1». En `while` también puedes usar `break` y `continue`, igual que en `loop`.
+
+Lo que **no** puedes es salir con `break valor`. ¿Por qué? Un `while` puede terminar de dos maneras: por un `break` o porque la condición se volvió falsa. En el segundo caso no hay ningún valor que entregar. Por eso un `while` siempre vale `()`, y Rust te avisa si intentas otra cosa.
+
+## Pruébalo
+
+<Ejecutar ej="m04/while-collatz" />
+
+Este es el famoso problema de Collatz: si el número es par, se divide entre 2; si es impar, se multiplica por 3 y se suma 1. Nadie ha demostrado que siempre se llegue a 1, pero con 27 se llega... tras un viaje sorprendente.
+
+1. La condición `n != 1` dice cuándo seguir.
+2. Dentro, un `if` como expresión calcula el siguiente `n`.
+3. `maximo` guarda el valor más alto visto. Usamos `u64` porque los números suben mucho más de lo que parece.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`while` es azúcar de `loop`.** Escribir `while c { cuerpo }` es equivalente a:
+
+```rust
+loop {
+    if !c { break; }
+    cuerpo
+}
+```
+
+Y de hecho el compilador lo traduce así internamente (lo puedes ver en la representación intermedia, MIR, que estudiarás en el mundo 21): una comprobación, un salto de salida y un salto de vuelta.
+
+**Por qué el compilador necesita saberlo.** Después de un `loop` con `break valor`, el compilador **sabe** que hay valor, porque solo se sale por ahí. Después de un `while`, existe un camino (la condición falsa) sin valor. Rust analiza **todos los caminos posibles** de tu programa, no solo los que crees que ocurrirán; este análisis de caminos volverá a ser clave en los mundos 06 y 07.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m04/while-break-valor"
+  explicacion="«can only break with a value inside `loop` or breakable block»: solo `loop` (y los bloques etiquetados, lección 6) pueden entregar un valor con `break`. El arreglo usa `loop`, que solo termina por el `break`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m04/digitos"
+  enunciado="Escribe el `while` que cuenta cuántas cifras tiene `numero` dividiéndolo entre 10 hasta que llegue a 0. Debe imprimir `90210 tiene 5 cifras`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta={"¿Cuántas veces se imprime «hola»? `let mut i = 10; while i < 5 { println!(\"hola\"); i += 1; }`"}
+  opciones={["5", "0", "Infinitas", "1"]}
+  correcta={1}
+  explicacion="`10 < 5` es falso desde el principio: el cuerpo no se ejecuta ni una vez."
+  porque={[
+    "Contaría 5 si `i` empezara en 0.",
+    "",
+    "Nunca entra en el bucle, así que no puede repetir para siempre.",
+    "`while` no ejecuta el cuerpo «al menos una vez»: comprueba antes."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué Rust rechaza `let r = while c { break 5; };`?"
+  opciones={[
+    "Porque `5` no es un `bool`",
+    "Porque el `while` podría terminar por la condición, y entonces `r` no tendría valor",
+    "Porque `break` no existe en `while`",
+    "Porque `c` no es `mut`"
+  ]}
+  correcta={1}
+  explicacion="Hay un camino de salida (condición falsa) que no da valor. Rust exige que todos los caminos den un valor del mismo tipo (error E0571)."
+  porque={[
+    "El `5` es el valor del `break`, no la condición.",
+    "",
+    "`break` sin valor sí se puede usar en `while`.",
+    "La mutabilidad de `c` no tiene relación con el error."
+  ]}
+/>

@@ -1,0 +1,131 @@
+---
+title: "Procesos"
+description: "Lanza otros programas con `std::process::Command`, recoge su salida y su código, y termina el tuyo con el código que elijas."
+sidebar:
+  order: 5
+duracion: 10
+desde: "1.61"
+requiere: ["22-sistemas-y-ffi/04-archivos-y-rutas"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre `Command::output()`, `status()` y `spawn()`?"
+    r: "`output()` espera y te devuelve stdout, stderr y el estado; `status()` espera y solo devuelve el estado (la salida va a tu terminal); `spawn()` arranca el proceso y vuelve enseguida con un `Child`."
+  - p: "¿Por qué `Command` es más seguro que construir una línea de órdenes como texto?"
+    r: "Porque cada `.arg()` se pasa como un argumento separado, sin interpretar espacios ni caracteres especiales: no hay inyección de órdenes."
+  - p: "¿Qué diferencia hay entre `process::exit(n)` y devolver `ExitCode` desde `main`?"
+    r: "`exit` termina en el acto sin ejecutar los `Drop` pendientes; devolver `ExitCode` deja que `main` termine normalmente y luego sale con ese código."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Un programa de sistemas a menudo **coordina** otros programas: un compilador que llama al enlazador, un script de build que ejecuta tests, un editor que lanza un formateador. `std::process` es la forma segura de hacerlo.
+
+## Predice
+
+<Pregunta
+  pregunta={"En el navegador no existen otros programas. ¿Qué crees que hará `Command::new(\"rustc\").arg(\"--version\").output()`?"}
+  opciones={[
+    "Entrar en pánico",
+    "Devolver un `Err` que el programa puede manejar",
+    "Devolver `Ok` con una salida vacía",
+    "No compilar para WebAssembly"
+  ]}
+  correcta={1}
+  explicacion="Lanzar un proceso puede fallar en cualquier sistema (el programa no existe, no hay permiso…), así que `output()` devuelve `io::Result`. En WASI el error es «operation not supported on this platform»."
+  porque={["No hay `unwrap`, así que no hay pánico.", "", "El sistema no puede inventarse una salida.", "Compila: el fallo es en tiempo de ejecución."]}
+/>
+
+<Ejecutar ej="m22/codigo-salida" />
+
+## La idea
+
+`std::process::Command` es un **constructor** (*builder*): `Command::new("programa")` y luego, encadenados, `.arg("…")` o `.args([...])`, `.env("CLAVE", "valor")`, `.current_dir(ruta)`, y cómo conectar su entrada y salida (`.stdin(Stdio::piped())`…). Al final, una de tres:
+
+- `.output()`: ejecuta, **espera** y te da un `Output` con `status`, `stdout` y `stderr` como `Vec<u8>`.
+- `.status()`: ejecuta y espera; la salida del hijo va directamente a tu terminal.
+- `.spawn()`: arranca el proceso y vuelve al momento con un `Child`, con el que puedes escribirle, leer de él o esperar con `.wait()`.
+
+Cada argumento viaja **por separado**: `.arg("mi archivo.txt")` es un solo argumento con un espacio dentro, nunca dos. No hay una terminal intermedia interpretando el texto, así que no hay inyección de órdenes.
+
+Para terminar **tu** programa con un código concreto, devuelve `std::process::ExitCode` desde `main` (`ExitCode::SUCCESS`, `ExitCode::FAILURE` o `ExitCode::from(n)`). Existe también `std::process::exit(n)`, pero corta en seco: los `Drop` pendientes **no se ejecutan** (un `BufWriter` sin vaciar perdería su contenido).
+
+## Pruébalo
+
+En tu PC, un ejemplo completo que sí funciona (verificado que compila con `rustc --emit=metadata`):
+
+```rust
+use std::process::Command;
+
+fn main() -> std::io::Result<()> {
+    let salida = Command::new("rustc").arg("--version").output()?;
+    println!("¿éxito? {}", salida.status.success());
+    println!("dice: {}", String::from_utf8_lossy(&salida.stdout).trim());
+    Ok(())
+}
+```
+
+Salida típica: `¿éxito? true` y la versión de tu `rustc`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Cómo se crea un proceso.** En Linux y macOS, `spawn` usa las llamadas `fork`/`exec` (o `posix_spawn` cuando puede): se crea un proceso hijo y se sustituye su programa por el nuevo. En Windows se usa `CreateProcessW`, que recibe **una sola cadena** con toda la línea de órdenes; la biblioteca estándar construye esa cadena **escapando** cada argumento con las reglas de Windows para que el hijo los separe igual que tú los diste.
+
+**El caso `.bat`.** Los archivos por lotes de Windows (`.bat`, `.cmd`) se ejecutan a través de `cmd.exe`, que tiene sus propias reglas de interpretación. En 2024 se publicó un aviso de seguridad (CVE-2024-24576) porque ciertos argumentos podían inyectar órdenes al lanzar un `.bat`; Rust 1.77.2 endureció el escapado y, si no puede pasarlos de forma segura, devuelve un error en vez de ejecutar.
+
+**Códigos de salida.** `ExitStatus::success()` es `true` si el código es 0. `status.code()` devuelve `Option<i32>`: en Unix, un proceso matado por una señal no tiene código, así que es `None`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Lanzar «una línea de órdenes» como un solo argumento">
+
+❌ `Command::new("git commit -m arreglo")` busca un programa que se llame literalmente `git commit -m arreglo`, y falla con `NotFound`.
+
+✅ El programa va en `new` y cada argumento en su `.arg`: `Command::new("git").args(["commit", "-m", "arreglo"])`. Si de verdad necesitas una terminal (tuberías, comodines), lánzala explícitamente y piensa en la seguridad de lo que le pasas.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Tu `main` crea un `BufWriter` sobre stdout, escribe 10 líneas y llama a `std::process::exit(0)` sin `flush`. ¿Qué se ve?"
+  opciones={[
+    "Las 10 líneas",
+    "Posiblemente nada: `exit` no ejecuta el `Drop` del `BufWriter`, así que su buffer no se vacía",
+    "Un error de compilación",
+    "Un pánico"
+  ]}
+  correcta={1}
+  explicacion="`exit` termina el proceso sin desenrollar la pila. Devuelve un `ExitCode` desde `main` o llama a `flush()` antes."
+  porque={["Las líneas siguen en el buffer de memoria cuando el proceso muere.", "", "Es código válido.", "`exit` no entra en pánico."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué método usarías para lanzar un proceso y seguir trabajando mientras se ejecuta?"
+  opciones={["`.output()`", "`.status()`", "`.spawn()`", "`.arg()`"]}
+  correcta={2}
+  explicacion="`spawn` devuelve un `Child` enseguida; más tarde llamas a `child.wait()` para recoger su estado."
+  porque={["`output` espera a que termine.", "`status` también espera.", "", "`arg` solo añade un argumento."]}
+/>
+
+<Pregunta
+  pregunta={"¿Por qué `.arg(\"a; borrar todo\")` no ejecuta una segunda orden?"}
+  opciones={[
+    "Porque Rust elimina los puntos y comas",
+    "Porque el texto llega al programa como **un** argumento literal; no hay ninguna terminal que interprete el `;`",
+    "Porque `arg` solo acepta letras",
+    "Sí la ejecuta"
+  ]}
+  correcta={1}
+  explicacion="`Command` habla directamente con el sistema operativo, sin pasar por una terminal."
+  porque={["No modifica tu texto.", "", "Acepta cualquier texto.", "Sin terminal intermedia, no hay segunda orden."]}
+/>
+
+## Para saber más
+
+- Documentación de `std::process`: https://doc.rust-lang.org/std/process/index.html
+- La lección siguiente: [Un servidor TCP](/curso/22-sistemas-y-ffi/06-un-servidor-tcp/).

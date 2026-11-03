@@ -1,0 +1,29 @@
+---
+title: "#[debugger_visualizer] y #[collapse_debuginfo]"
+description: "Atributos para la información de depuración: cómo debe mostrar el depurador un tipo, y cómo aparecen las líneas de las macros."
+sidebar:
+  order: 30
+insignias: ["Desde 1.71", "Depurador"]
+---
+
+## `#![debugger_visualizer]`
+
+```rust
+#![debugger_visualizer(natvis_file = "depurar/mi_tipo.natvis")]   // Visual Studio / WinDbg
+#![debugger_visualizer(gdb_script_file = "depurar/imprimir.py")]  // GDB
+```
+
+Incrusta en el binario un archivo que enseña al depurador a **mostrar** tus tipos: por ejemplo, ver un `MiVec<T>` como una lista de elementos en vez de un puntero y dos números. La biblioteca estándar ya trae visualizadores para `Vec`, `String`, `HashMap`… Va al nivel del crate. Desde Rust 1.71.
+
+## `#[collapse_debuginfo]`
+
+```rust
+#[collapse_debuginfo(yes)]   // también: no, external
+macro_rules! registrar { … }
+```
+
+Cuando el depurador para dentro del código que generó una macro, ¿qué línea muestra: la de dentro de la definición de la macro o la de la llamada? Con `yes`, todo el código de la macro se atribuye a la línea de la **llamada**; con `no`, a las líneas de la macro; `external` (por defecto) colapsa solo las macros de otros crates. Desde Rust 1.79.
+
+## Ver también
+
+[Mundo 16 · Herramientas](/curso/16-pruebas-y-herramientas/)

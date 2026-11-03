@@ -1,0 +1,78 @@
+---
+// /problemas/<slug>/ — enunciado a la izquierda, editor a la derecha, pruebas debajo (en móvil, apilado).
+import Practica from '../../components/paginas/Practica.astro';
+import { problemas, md, codigoHtml, DIFICULTAD, nombreMundo, nombreTema } from '../../lib/practica';
+import { mundos } from '../../lib/lecciones';
+
+export function getStaticPaths() {
+  return problemas.map((p) => ({ params: { slug: p.slug } }));
+}
+const { slug } = Astro.params;
+const i = problemas.findIndex((p) => p.slug === slug);
+const p = problemas[i];
+const anterior = problemas[i - 1], siguiente = problemas[i + 1];
+const titulos = new Map((await mundos()).map((m) => [m.slug, m.titulo]));
+const enunciado = await md(p.enunciado);
+const solucionHtml = await codigoHtml(p.solucion);
+const pruebasHtml = await codigoHtml(p.pruebas);
+const datos = { slug: p.slug, inicio: p.inicio, pruebas: p.pruebas };
+---
+<Practica titulo={p.titulo} descripcion={`Problema de Rust (${DIFICULTAD[p.dificultad].toLowerCase()}): ${p.enunciado.replace(/[`*#<>]/g, '').trim().slice(0, 140)}`} ancho="completo">
+  <nav class="rdc-migas" aria-label="Migas de pan"><a href="/problemas/">Problemas</a> {p.tema && <><span aria-hidden="true">/</span> <a href={`/problemas/?tema=${p.tema}`}>{nombreTema(p.tema)}</a></>}</nav>
+  <div class="rdc-problema" data-problema>
+    <section class="rdc-problema-enunciado" aria-labelledby="enun-t">
+      <h2 id="enun-t" class="rdc-sr">Enunciado</h2>
+      <div class="rdc-pregunta-meta">
+        <span class="rdc-dif" data-dif={p.dificultad}>{DIFICULTAD[p.dificultad]}</span>
+        {p.tema && <span class="rdc-chip">{nombreTema(p.tema)}</span>}
+        {p.mundo && <span class="rdc-chip">Mundo {nombreMundo(p.mundo, titulos)}</span>}
+        <span class="rdc-pregunta-estado" data-mi-estado hidden></span>
+      </div>
+      <div class="sl-markdown-content" set:html={enunciado} />
+      <details class="rdc-plegable">
+        <summary>Ver las pruebas (pruebas.rs)</summary>
+        <div class="rdc-shiki" set:html={pruebasHtml} />
+      </details>
+    </section>
+
+    <section class="rdc-problema-trabajo" aria-label="Tu solución">
+      <div class="rdc-problema-editor-cab">
+        <span class="rdc-mono">src/main.rs</span>
+        <button type="button" class="rdc-boton sutil pequeno" data-accion="reiniciar">Restablecer</button>
+      </div>
+      <div class="rdc-problema-editor" data-editor-problema>
+        <pre class="rdc-reto-previo" data-previo><code>{p.inicio}</code></pre>
+      </div>
+      <div class="rdc-barra">
+        <button type="button" class="rdc-boton" data-accion="ejecutar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15a1 1 0 0 0 1.5.86l12.2-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z" /></svg>
+          Ejecutar pruebas
+        </button>
+        <span class="rdc-plataforma"><kbd>Ctrl</kbd>+<kbd>Intro</kbd></span>
+        <span class="rdc-plataforma" data-intentos></span>
+      </div>
+      <p class="rdc-aviso-ext">Al ejecutar, <strong>tu código y las pruebas se envían a play.rust-lang.org</strong> (el Rust Playground oficial, un servicio externo). Tu código se guarda solo en este navegador.</p>
+
+      <div class="rdc-resultado" data-resultado hidden aria-live="polite">
+        <div class="rdc-resultado-cab"><span class="rdc-resultado-titulo" data-veredicto-titulo>Resultado</span><span class="rdc-plataforma" data-resumen-casos></span></div>
+        <ul class="rdc-casos" data-casos></ul>
+        <pre class="rdc-resultado-texto" data-salida tabindex="0" aria-label="Salida completa"></pre>
+      </div>
+      <details class="rdc-solucion" data-solucion hidden>
+        <summary>Ver solución</summary>
+        <div class="rdc-shiki" set:html={solucionHtml} />
+      </details>
+    </section>
+  </div>
+
+  <nav class="rdc-anterior-siguiente" aria-label="Más problemas">
+    {anterior ? <a href={`/problemas/${anterior.slug}/`} rel="prev"><span>← Anterior</span><strong>{anterior.titulo}</strong></a> : <span />}
+    {siguiente ? <a href={`/problemas/${siguiente.slug}/`} rel="next" class="sig"><span>Siguiente →</span><strong>{siguiente.titulo}</strong></a> : <span />}
+  </nav>
+  <script type="application/json" data-datos-problema set:html={JSON.stringify(datos).replace(/</g, '\\u003c')} />
+</Practica>
+
+<script>
+  import { iniciarProblema } from '../../runtime/problema-cliente';
+  iniciarProblema();
+</script>

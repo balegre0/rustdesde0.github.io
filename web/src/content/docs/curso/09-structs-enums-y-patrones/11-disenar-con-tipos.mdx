@@ -1,0 +1,88 @@
+---
+title: "Diseñar con tipos"
+description: "Haz que los estados imposibles no se puedan ni escribir: enums por estado, newtypes que validan y typestate."
+sidebar:
+  order: 11
+duracion: 13
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones/10-layout-y-nichos", "09-structs-enums-y-patrones/04-funciones-asociadas-y-self"]
+tarjetas:
+  - p: "¿Qué significa «haz que los estados imposibles no se puedan representar»?"
+    r: "Diseñar los tipos de modo que un valor absurdo (autenticado pero desconectado, nota 42 sobre 10) ni siquiera se pueda construir. Así no hace falta comprobarlo después."
+  - p: "¿Qué es el patrón typestate?"
+    r: "Representar cada estado con un tipo distinto y las transiciones con métodos que consumen `self` y devuelven el tipo del estado siguiente. Una operación en el estado equivocado no compila (E0599)."
+  - p: "¿Por qué los métodos de transición reciben `self` y no `&mut self`?"
+    r: "Para que el valor en el estado viejo quede movido y no se pueda volver a usar: el compilador impide seguir usando un `Borrador` ya publicado."
+  - p: "«Parsea, no valides»: ¿qué significa?"
+    r: "Convertir la entrada una sola vez en un tipo que solo puede existir si es válido (`Nota::new(v) -> Option<Nota>`), en vez de comprobar lo mismo en cada sitio."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a usar todo lo del mundo para diseñar como un experto: que el compilador rechace los programas que mezclan estados.
+
+## Predice
+
+<Predice
+  ej="m09/estados-predice"
+  opciones={["`«Hola, mundo» tiene 2 visitas`", "No compila: `b` se usa después de publicar", "`«Hola, mundo» tiene 0 visitas`", "No compila: `Borrador` no tiene `visitar`"]}
+  correcta={0}
+  explicacion="`publicar(self)` consume el borrador y devuelve un `Publicado`, que es el que sí tiene `visitar`. Llamamos a `visitar` sobre `p`, no sobre `b`."
+  porque={["Correcto.", "Después de `publicar` no volvemos a tocar `b`.", "`visitar` recibe `&mut self` y suma de verdad.", "Llamamos a `visitar` sobre `p`, que es un `Publicado`."]}
+/>
+
+## La idea
+
+Muchos fallos son **estados absurdos**: una conexión «autenticada» que no está «conectada», un pedido «enviado» que no se ha pagado, una nota de 42 sobre 10. Si tus tipos permiten escribirlos, tarde o temprano alguien los escribe. Tres técnicas, de menos a más estrictas:
+
+1. **Un enum por estado**, en vez de varias banderas `bool`. Cada variante lleva solo los datos que tienen sentido en ese estado (el `usuario` solo existe en `Autenticada`).
+2. **Newtypes que validan** al construirse: `Nota::new(v)` devuelve `Option<Nota>`, y cualquier `Nota` que veas ya es válida. Se dice «parsea, no valides» (*parse, don't validate*): compruebas una vez, en la frontera, y el tipo lleva la prueba consigo.
+3. **Typestate**: cada estado es un **tipo distinto** y las transiciones son métodos que consumen `self`. Un `PedidoPendiente` simplemente **no tiene** el método `enviar`.
+
+Un matiz honesto: para que nadie se salte `Nota::new` escribiendo `Nota(42)` directamente, el campo tiene que ser **privado**, y eso se hace con módulos (mundo 12). Dentro de un solo archivo, todo es visible.
+
+## Pruébalo
+
+<Ejecutar ej="m09/disenar-tipos" />
+
+Fíjate en `otra => otra`: un nombre como patrón recoge «cualquier otro estado» y lo devuelve sin cambios.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Estas técnicas **no cuestan nada al ejecutar**. Un newtype ocupa lo mismo que su campo; un unit struct, 0 bytes; un tipo de estado como `PedidoPagado { total: u32 }` es igual de grande que `PedidoPendiente`. Las comprobaciones de typestate ocurren **al compilar**: en el binario no queda ni rastro de «en qué estado está», porque el compilador ya lo sabía.
+
+Y los movimientos son la pieza clave: como `pagar(self)` se lleva el `PedidoPendiente`, el borrow checker te impide usar el pendiente después. Si `pagar` recibiera `&mut self`, tendrías dos objetos vivos que dicen cosas distintas sobre el mismo pedido.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m09/enviar-sin-pagar"
+  explicacion="Esto no es un fallo: es el diseño funcionando. `PedidoPendiente` no tiene `enviar` (E0599), así que enviar sin pagar es imposible de escribir. El arreglo pasa por `pagar()`, que devuelve el tipo que sí sabe enviarse."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m09/puerta"
+  enunciado="Escribe los `impl` de `PuertaCerrada::abrir(self) -> PuertaAbierta` (imprime `se abre`) y `PuertaAbierta::cerrar(self) -> PuertaCerrada` (imprime `se cierra`). Descomenta `main`: debe imprimir `se abre`, `se cierra`, `se abre`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Un `struct Usuario { conectado: bool, nombre: String }` usa `nombre` vacío cuando no está conectado. ¿Qué diseño evita ese valor de relleno?"
+  opciones={["`enum Usuario { Anonimo, Conectado { nombre: String } }`", "Añadir `nombre_valido: bool`", "Usar `nombre: Option<String>` y dejar el `bool`", "Comprobar `nombre.is_empty()` en cada función"]}
+  correcta={0}
+  porque={["Correcto: el nombre solo existe donde tiene sentido.", "Otra bandera más: ahora hay aún más combinaciones absurdas.", "Mejora, pero `conectado: false` con `Some(nombre)` sigue siendo posible.", "Es validar en todas partes: tarde o temprano se olvida una."]}
+/>
+
+<Pregunta
+  pregunta="En typestate, ¿qué pasa al llamar a un método de un estado sobre un valor de otro estado?"
+  opciones={["No compila (E0599: el método no existe para ese tipo)", "Da un pánico al ejecutar", "No hace nada", "Devuelve `None`"]}
+  correcta={0}
+  porque={["Correcto: el error llega antes de ejecutar.", "No llega a ejecutarse: no compila.", "No compila, así que no hay nada que «no hacer».", "No hay ningún `Option` de por medio."]}
+/>

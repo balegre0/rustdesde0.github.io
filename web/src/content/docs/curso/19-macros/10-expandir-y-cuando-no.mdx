@@ -1,0 +1,119 @@
+---
+title: "Ver la expansión y cuándo NO usar una macro"
+description: "Mira el código que genera una macro con cargo expand y aprende a elegir entre macro y función."
+sidebar:
+  order: 10
+duracion: 12
+desde: "1.0"
+requiere: ["19-macros/09-macros-procedurales"]
+tarjetas:
+  - p: "¿Cómo ves el código que generan las macros de tu crate?"
+    r: "Con cargo expand (herramienta aparte que usa nightly) o con el botón «Expand macros» del Rust Playground; por debajo es rustc -Zunpretty=expanded."
+  - p: "¿Qué problema tiene la macro cuadrado!($x) => { $x * $x } con cuadrado!(siguiente(&mut n))?"
+    r: "Evalúa el argumento dos veces: llama a siguiente dos veces."
+  - p: "¿Cuál es la regla general para elegir entre macro y función?"
+    r: "Primero una función (o un genérico, un trait o una closure); una macro solo si necesitas algo que una función no puede: sintaxis propia, número variable de argumentos, generar items o trabajar en compilación."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa, Ordena } from '~/components';
+
+Vas a aprender a mirar dentro de cualquier macro y, sobre todo, a decidir cuándo una macro no es la mejor herramienta.
+
+## Predice
+
+<Predice
+  ej="m19/doble-evaluacion"
+  opciones={["r = 1, n = 1", "r = 2, n = 2", "r = 4, n = 2", "r = 1, n = 2"]}
+  correcta={1}
+  explicacion="La macro pega `siguiente(&mut n)` **dos veces**: `siguiente(&mut n) * siguiente(&mut n)`. La primera llamada da 1, la segunda 2: `1 * 2 = 2`, y `n` termina en 2."
+  porque={["Eso pasaría con una función, que evalúa el argumento una sola vez.", "Correcto.", "Ninguna llamada devuelve 2 dos veces: cada una incrementa n.", "Si n vale 2 es que hubo dos llamadas, y el producto de 1 y 2 es 2."]}
+/>
+
+## La idea
+
+**Ver la expansión** es la mejor manera de entender (y depurar) una macro. Tienes tres formas:
+
+1. **`cargo expand`**: herramienta de la comunidad que se instala aparte (`cargo install cargo-expand`) y usa la toolchain nightly para imprimir tu crate con todas las macros expandidas.
+2. **El Rust Playground**: en el menú *Tools*, la opción *Expand macros*.
+3. **Directamente con `rustc`**: `-Zunpretty=expanded` es la opción (inestable, solo nightly) que usan las dos anteriores. Todas las expansiones que has visto en este mundo salen de ahí.
+
+**Cuándo no usar una macro.** Una macro es más difícil de leer, de documentar, de depurar y de entender para el editor (el autocompletado funciona peor dentro de sus argumentos). Sus errores son más confusos. Y, como acabas de ver, puede **evaluar un argumento varias veces**. La regla: si una función, un genérico, un trait o una closure resuelve el problema, usa eso. Reserva las macros para lo que solo ellas pueden hacer:
+
+- número variable de argumentos o sintaxis propia (`vec!`, `println!`, un mini-lenguaje);
+- generar items: structs, impls, funciones (repetir un `impl` para veinte tipos numéricos);
+- trabajar en compilación con el código fuente (`stringify!`, `concat!`, comprobaciones con `compile_error!`).
+
+## Pruébalo
+
+<Ejecutar ej="m19/funcion-mejor" titulo="La versión con función" />
+
+1. Como función genérica, el argumento se calcula **una vez**, antes de la llamada.
+2. Los genéricos con traits (`Mul + Copy`) aceptan varios tipos, que era la otra razón para usar una macro.
+
+## Bajo el capó
+
+<BajoElCapo>
+La expansión real de `doble-evaluacion.rs` (Rust 1.99.1) no deja lugar a dudas:
+
+```rust
+fn main() {
+    let mut n = 0;
+    let r = siguiente(&mut n) * siguiente(&mut n);
+    { ::std::io::_print(format_args!("r = {0}, n = {1}\n", r, n)); };
+}
+```
+
+La macro copió los tokens del argumento en cada aparición de `$x`. Si de verdad necesitas una macro aquí, la solución es evaluar una vez dentro de un bloque:
+
+<Ejecutar ej="m19/cuadrado-una-vez" titulo="Evaluar el argumento una sola vez" />
+
+(Gracias a la higiene, ese `v` no choca con ninguna variable del usuario.)
+
+**Herramientas de depuración en nightly.** `trace_macros!(true);` imprime cada paso de expansión y `log_syntax!` imprime los tokens que recibe; las dos son inestables. En estable, el truco es reducir la macro y mirar la expansión.
+
+**Rendimiento.** Una macro no hace tu programa más rápido que una función: el optimizador inserta (*inline*) las funciones pequeñas igualmente. Lo que sí hace es que se compile más código, porque cada invocación genera su propia copia.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Una macro para ahorrarte escribir una función">
+❌ `macro_rules! media { ($a:expr, $b:expr) => { ($a + $b) / 2.0 } }`: no aporta nada que no dé una función, evalúa cada argumento donde aparezca, no aparece bien en la documentación y sus errores apuntan dentro de la macro.
+
+✅ `fn media(a: f64, b: f64) -> f64 { (a + b) / 2.0 }`: tipos claros, documentación, un error claro si te equivocas al llamarla.
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m19/reto-sin-macro" enunciado="Sustituye la macro `media!` por una función `fn media(a: f64, b: f64) -> f64` y cambia las dos llamadas. La salida debe ser 3.5 y 4." />
+
+<Ordena
+  lineas={["macro_rules! cuadrado {", "    ($x:expr) => {{", "        let v = $x;", "        v * v", "    }};", "}"]}
+  distractores={["    ($x:expr) => { $x * $x };", "        let v = &mut $x;"]}
+  explicacion="Guardar el argumento en una variable dentro de un bloque garantiza que se evalúa una sola vez. Las llaves dobles hacen falta para que el bloque sea una expresión."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estos casos justifica usar una macro en lugar de una función?"
+  opciones={["Sumar dos números", "Generar el mismo `impl` de un trait para diez tipos numéricos", "Calcular el máximo de dos `i32`", "Formatear una fecha"]}
+  correcta={1}
+  explicacion="Generar items repetidos es algo que una función no puede hacer. El resto son funciones normales."
+  porque={["Una función lo hace mejor.", "Correcto.", "`std::cmp::max` ya es una función.", "Una función que devuelve `String` es lo adecuado."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué opción de `rustc` usan por debajo `cargo expand` y el Playground para expandir macros?"
+  opciones={["`--emit=asm`", "`-Zunpretty=expanded`", "`--explain`", "`-C opt-level=0`"]}
+  correcta={1}
+  explicacion="Es una opción `-Z`, así que solo existe en nightly. Por eso `cargo expand` necesita esa toolchain."
+  porque={["Eso emite ensamblador.", "Correcto.", "Eso explica un código de error.", "Eso controla la optimización."]}
+/>
+
+<Pregunta
+  pregunta="¿Es más rápido en ejecución `cuadrado!(x)` que `cuadrado(x)` con una función genérica pequeña?"
+  opciones={["Sí, siempre: la macro no tiene coste de llamada", "En general no: el optimizador inserta las funciones pequeñas y el resultado es el mismo", "No, la macro es más lenta al ejecutar", "Depende del número de tokens"]}
+  correcta={1}
+  explicacion="Con optimizaciones, una función pequeña se *inlinea*. La diferencia real está en la compilación y en la claridad, no en la velocidad."
+  porque={["El inlining elimina ese coste en la función.", "Correcto.", "La macro desaparece al compilar: no puede ser más lenta por ser macro.", "Los tokens no existen al ejecutar."]}
+/>

@@ -1,0 +1,154 @@
+---
+title: "La pila y el heap"
+description: "Conoce las dos zonas de memoria donde vive cada dato de tu programa y mira la ficha de un String: una parte en la pila y otra en el heap."
+sidebar:
+  order: 11
+duracion: 15
+desde: "1.0"
+requiere: ["01-la-maquina/10-texto-en-bytes-utf8"]
+tarjetas:
+  - p: "¿Qué datos van en la pila?"
+    r: "Los de tamaño conocido al compilar, como un `u32`, un `bool` o la ficha de un `String`. Se colocan al entrar en una función y se quitan al salir, automáticamente."
+  - p: "¿Qué datos van en el heap?"
+    r: "Los que pueden crecer o cuyo tamaño no se conoce al compilar, como las letras de un `String`. Hay que pedir el espacio al asignador y devolverlo después."
+  - p: "¿Qué tres piezas tiene la ficha de un `String`?"
+    r: "Un puntero a los bytes en el heap, la longitud (bytes en uso) y la capacidad (bytes reservados)."
+  - p: "¿Cuánto mide `size_of::<String>()`?"
+    r: "Tres veces un `usize`: 12 bytes en el navegador (wasm32) y 24 en un PC de 64 bits. Mida lo que mida el texto."
+---
+
+import { Ejecutar, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer las dos zonas de memoria de un programa. Es la base de la idea más famosa de Rust, la propiedad, que empieza en la lección siguiente.
+
+## Predice
+
+Un `String` es un texto que puede crecer. ¿Cuántos bytes ocupa, según `size_of`, **en tu navegador**?
+
+<Predice
+  ej="m01/tamano-string"
+  opciones={["`12`", "`0`: depende del texto que guarde", "`24`", "`4`"]}
+  correcta={0}
+  explicacion="`size_of` mide la parte de **tamaño fijo** de un `String`: una ficha con tres números del tamaño de una dirección. En wasm32 son 3 × 4 = 12 bytes. En un PC de 64 bits, 3 × 8 = 24."
+  porque={["Correcto.", "`size_of` no mira ningún texto concreto: da el tamaño del tipo, que es siempre el mismo. Las letras se guardan en otro sitio.", "24 es en un PC de 64 bits. En el navegador las direcciones miden 4 bytes.", "4 es solo un `usize` en el navegador; la ficha tiene tres."]}
+/>
+
+## La idea
+
+Un programa usa dos zonas de memoria para sus datos.
+
+La **pila** (*stack*) es como una pila de platos. Cada vez que empieza una función, se pone encima un «plato» con sus datos: el **marco** (*stack frame*). Cuando la función termina, se quita su plato entero de golpe. Es rapidísima y automática, pero tiene una condición: el compilador tiene que saber **al compilar** cuánto ocupa cada dato. Un `u32` (4 bytes) o un `bool` (1 byte) van a la pila sin problema.
+
+El **heap** (*heap*, a veces llamado *montón*) es para lo que **no** se sabe al compilar o puede crecer: un texto que escribe el usuario, una lista que se va llenando. El programa le pide espacio a una pieza llamada **asignador** (*allocator*): «necesito 18 bytes». El asignador busca un hueco libre y devuelve su dirección. Ese espacio queda ocupado **hasta que alguien lo devuelva**.
+
+Un `String` usa las dos zonas. En la pila hay una **ficha** de tamaño fijo con tres números: dónde están las letras (un **puntero**, *pointer*), cuántos bytes se usan (la **longitud**, *length*) y cuántos hay reservados (la **capacidad**, *capacity*). Las letras están en el heap.
+
+```text
+       PILA                         HEAP
+  nombre: String              ┌───┬───┬───┐
+  ┌───────────────┐   ┌──────▶│ A │ n │ a │
+  │ puntero  ─────┼───┘       └───┴───┴───┘
+  │ longitud  3   │
+  │ capacidad 3   │
+  └───────────────┘
+```
+
+## Pruébalo
+
+<Ejecutar ej="m01/pila-y-heap" />
+
+Salida real (las direcciones pueden ser otras en tu ejecución):
+
+```text
+edad ocupa 4 bytes; vive en 0xfffb8
+la ficha de nombre ocupa 12 bytes; vive en 0xfffbc
+las letras viven en 0x1026d0
+longitud 3, capacidad 3
+longitud 18, capacidad 18
+la ficha sigue ocupando 12 bytes
+```
+
+Las direcciones de `edad` y de la ficha están muy cerca: las dos están en la pila. Las letras están en otra zona, el heap. Al añadir texto con `push_str`, las letras crecen en el heap (de 3 a 18 bytes), pero la ficha de la pila sigue midiendo 12. No mires el valor exacto de las direcciones; mira cuáles están cerca de cuáles.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+La ficha de un `String` son tres valores del tamaño de un `usize`. Y un `Box<u32>`, que guarda un solo `u32` en el heap, tiene en la pila solo el puntero:
+
+<Ejecutar ej="m01/ficha-string" />
+
+Salida real (las direcciones pueden variar):
+
+```text
+usize:  4 bytes
+String: 12 bytes = 3 x 4
+puntero:   0x102550
+longitud:  4
+capacidad: 4
+Box<u32>: 4 bytes en la pila; el 7 vive en 0x102560
+```
+
+En un PC de 64 bits la ficha mide **24 bytes**. Este archivo lo comprueba **al compilar**: si `String` no midiera 24 bytes, no compilaría.
+
+<Ejecutar ej="m01/string-24-en-pc" titulo="Comprobación para un PC de 64 bits" />
+
+Con `rustc --edition 2024 --emit=metadata --target x86_64-pc-windows-msvc string-24-en-pc.rs`, compila sin ningún mensaje (las dos comprobaciones se cumplen). Para `wasm32-wasip1`, en cambio, falla con `error[E0080]: evaluation panicked: assertion failed: std::mem::size_of::<String>() == 24`, porque allí mide 12.
+
+Dos avisos de diseñador:
+
+- Rust **no garantiza** en qué orden están el puntero, la longitud y la capacidad dentro de la ficha. Sí está fijado que son esas tres piezas, y su tamaño total lo puedes medir con `size_of`.
+- La capacidad puede ser **mayor** que la longitud: el `String` reserva espacio de sobra para crecer sin pedir memoria nueva cada vez. Cuando se le acaba, pide al asignador más espacio: a veces el hueco se puede ampliar ahí mismo, y si no, el asignador da uno nuevo, se copian las letras y el antiguo se devuelve. Por eso el puntero de la ficha puede cambiar cuando el texto crece.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«La pila es para lo pequeño y el heap para lo grande»">
+
+❌ Decidir pila o heap por el tamaño del dato.
+
+✅ Lo que decide es si el tamaño **se conoce al compilar** y no cambia. Un array de 1000 `u32` va en la pila (4000 bytes, conocidos de antemano). Un `String` con una sola letra tiene sus letras en el heap, porque podría crecer. Eso sí: la pila es limitada, y algo **enorme** (millones de bytes) mejor ponerlo en el heap.
+
+</Trampa>
+
+## Tu turno
+
+Ordena las líneas para crear un `String`, hacerlo crecer y mostrar su longitud en bytes. Sobra una. (`mut` le dice a Rust que la variable puede cambiar; lo verás en el Mundo 3.)
+
+<Ordena
+  lineas={["fn main() {", '    let mut s = String::from("hola");', '    s.push_str(" mundo");', '    println!("{}", s.len());', "}"]}
+  distractores={['    let s = String::from("hola");']}
+  explicacion="Para que un `String` crezca, la variable tiene que ser `mut`: `push_str` cambia la ficha (la longitud, y quizá el puntero y la capacidad). La longitud final es 10 bytes: «hola mundo» solo tiene caracteres de 1 byte."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Dónde están las letras de un `String`?"
+  opciones={["En el heap", "En la pila, dentro de la ficha", "En los registros de la CPU", "Dentro del archivo del programa, siempre"]}
+  correcta={0}
+  porque={["Correcto: la ficha está en la pila y apunta a ellas.", "La ficha solo tiene tres números: puntero, longitud y capacidad.", "Los registros son pocos y se usan para operar, no para guardar textos.", "Un texto escrito entre comillas en el código sí vive en el programa, pero un `String` copia sus letras al heap para poder cambiarlas."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuánto mide `size_of::<String>()` en un PC de 64 bits?"
+  opciones={["24", "12", "8", "Depende del texto"]}
+  correcta={0}
+  explicacion="Tres números de 8 bytes: 3 × 8 = 24."
+  porque={["Correcto.", "12 es en el navegador (wasm32), donde un `usize` mide 4.", "8 es un solo `usize`.", "`size_of` mide el tipo, no un texto concreto."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué diferencia hay entre la longitud y la capacidad de un `String`?"
+  opciones={["La longitud son los bytes en uso; la capacidad, los reservados en el heap", "Son lo mismo con dos nombres", "La longitud cuenta caracteres y la capacidad bytes", "La capacidad es el máximo que podrá tener nunca"]}
+  correcta={0}
+  porque={["Correcto: capacidad ≥ longitud.", "Pueden coincidir, pero la capacidad suele ser mayor para crecer sin pedir memoria cada vez.", "Las dos cuentan bytes.", "Si hace falta más, el `String` pide un hueco nuevo y la capacidad aumenta."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace falta para que un dato pueda ir en la pila?"
+  opciones={["Que su tamaño se conozca al compilar", "Que ocupe menos de 8 bytes", "Que sea un número", "Nada: todo puede ir en la pila"]}
+  correcta={0}
+  porque={["Correcto.", "Un array de 4000 bytes puede ir en la pila; el tamaño exacto no importa, importa conocerlo.", "La ficha de un `String` o un array de `bool` también van en la pila.", "Un texto que crece no puede: su tamaño cambia mientras el programa corre."]}
+/>

@@ -1,0 +1,116 @@
+---
+title: "Cow y Pin"
+description: "Devuelves un préstamo o un valor propio según haga falta con Cow, y das un primer paso con Pin, la promesa de no mover un valor."
+sidebar:
+  order: 11
+duracion: 14
+desde: "1.33"
+requiere: ["15-punteros-inteligentes/03-deref", "15-punteros-inteligentes/01-box"]
+tarjetas:
+  - p: "¿Qué dos variantes tiene `Cow<'a, str>`?"
+    r: "`Cow::Borrowed(&'a str)`, un préstamo sin reservar memoria, y `Cow::Owned(String)`, un valor propio."
+  - p: "¿Cuándo conviene devolver `Cow` en vez de `String`?"
+    r: "Cuando la mayoría de las veces no hay que cambiar nada: devuelves el préstamo gratis y solo reservas memoria en los casos que la necesitan."
+  - p: "¿Qué promete `Pin<P>`?"
+    r: "Que el valor al que apunta `P` no se moverá de su sitio en memoria hasta que se destruya (salvo que su tipo sea `Unpin`)."
+  - p: "¿Qué significa que un tipo sea `Unpin`?"
+    r: "Que moverlo es inofensivo aunque esté fijado. Casi todos los tipos lo son (números, `String`, `Vec`…); `Pin` solo restringe a los que no lo son."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Dos punteros con una idea muy concreta cada uno: `Cow` evita reservar memoria cuando no hace falta, y `Pin` garantiza que un valor no cambia de dirección.
+
+## Predice
+
+<Predice
+  ej="m15/cow"
+  pregunta="`sin_espacios` cambia los espacios por guiones bajos. Si no hay espacios, devuelve un préstamo. ¿Qué dice para «año_nuevo»?"
+  opciones={["año_nuevo -> año_nuevo (propio, 9 letras)", "año_nuevo -> año_nuevo (prestado, 9 letras)", "año_nuevo -> año_nuevo (prestado, 10 letras)", "año_nuevo -> año__nuevo (propio, 10 letras)"]}
+  correcta={1}
+  explicacion="«año_nuevo» no tiene espacios: se devuelve `Cow::Borrowed`, sin reservar memoria. Tiene 9 letras; la «ñ» ocupa 2 bytes pero es un solo carácter, y `chars().count()` cuenta caracteres."
+  porque={["Solo se crea un `String` propio cuando hay que cambiar algo.", "Correcto.", "Serían 10 *bytes*, no 10 caracteres: la «ñ» mide 2 bytes en UTF-8.", "El guion bajo ya estaba; no se añade nada."]}
+/>
+
+## La idea
+
+### Cow: prestar o poseer, según toque
+
+Imagina una función que limpia textos y, casi siempre, el texto ya está limpio. Si devuelve `String`, tiene que reservar memoria y copiar **siempre**, incluso cuando no cambia nada. Si devuelve `&str`, no puede devolver un texto nuevo. `Cow` (*clone on write*, «copia al escribir») es un `enum` con las dos opciones: `Cow::Borrowed(&str)` cuando basta con prestar lo que te dieron, y `Cow::Owned(String)` cuando has tenido que crear algo nuevo. Quien lo recibe lo usa como un `&str` gracias a `Deref`, sin preocuparse de cuál es.
+
+Funciona con cualquier par prestado/propio: `Cow<[T]>` (con `Vec<T>`), `Cow<Path>` (con `PathBuf`)… Y su método `to_mut()` convierte un `Borrowed` en `Owned` solo la primera vez que necesitas modificarlo: de ahí el nombre.
+
+### Pin: no te muevas de ahí
+
+En Rust, **mover** un valor puede cambiarlo de dirección: los bytes se copian a otro sitio de la pila o del heap. Para casi todos los tipos da igual. Pero hay tipos que guardan **punteros a sí mismos** (los verás en el mundo 18: los `Future` de `async` son el caso principal); si se movieran, esos punteros apuntarían a la dirección vieja. `Pin<P>` envuelve un puntero `P` (como `Box<T>` o `&mut T`) y **promete** que el valor apuntado no se moverá hasta que se destruya.
+
+Para no estorbar, existe el trait automático `Unpin`: «aunque me fijes, moverme no rompe nada». Casi todos los tipos son `Unpin`, y para ellos `Pin` no restringe nada (`Pin::new` funciona y puedes desfijar con `Pin::into_inner`). Solo los tipos que se declaran **no** `Unpin` (con `PhantomPinned`, o los futures que genera el compilador) necesitan fijarse de verdad, normalmente con `Box::pin` o la macro `pin!`.
+
+## Pruébalo
+
+<Ejecutar ej="m15/cow" />
+
+Y `Pin` con tipos `Unpin`: se comporta casi como un puntero normal.
+
+<Ejecutar ej="m15/pin" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`Cow` es un `enum` normal de la biblioteca estándar (la firma real pone el bound `ToOwned` en un `where`):
+
+```rust
+pub enum Cow<'a, B: ?Sized + ToOwned + 'a> {
+    Borrowed(&'a B),
+    Owned(<B as ToOwned>::Owned),
+}
+```
+
+`Cow<str>` mide **24 bytes** en x86-64, igual que un `String` (comprobado con `size_of`): la variante `Borrowed` cabe en el mismo espacio, y la etiqueta se esconde en un valor imposible de la capacidad del `String` (un nicho). En el navegador mide 12.
+
+`Pin<P>` no añade nada en memoria: `Pin<Box<i32>>` mide 8 bytes, lo mismo que `Box<i32>`. Toda la garantía está en el **sistema de tipos**: `Pin` no te da `&mut T` del valor (con el que podrías moverlo con `mem::swap`) salvo que `T: Unpin`. El compilador lo comprueba al compilar y no hay coste en ejecución.
+
+¿Por qué `Pin::new` exige `Unpin`? Porque con un `&mut` en la pila, al terminar el `Pin` el valor podría volver a moverse. Para tipos que no son `Unpin`, hay que fijar en un sitio del que no salgan: el heap con `Box::pin`, o la pila con `pin!`, que oculta la variable original para que no la puedas tocar.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m15/pin-no-unpin"
+  explicacion="`Fijo` contiene un `PhantomPinned`, que lo marca como no `Unpin`. `Pin::new` solo acepta punteros a tipos `Unpin`, porque con un `&mut` en la pila no puede garantizar que el valor no se mueva después. El propio error sugiere la solución: `Box::pin` (o la macro `pin!`)."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m15/r-cow"
+  enunciado={"Completa `con_punto`: si la frase ya termina en `'.'`, devuelve `Cow::Borrowed(frase)`; si no, `Cow::Owned(format!(\"{frase}.\"))`. Debe imprimir `Hola. (prestado)` y `Adiós. (propio)`."}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una función normaliza nombres de archivo y el 95 % ya vienen bien. ¿Qué tipo de retorno evita más reservas de memoria?"
+  opciones={["`String`", "`&str`", "`Cow<'_, str>`", "`Box<str>`"]}
+  correcta={2}
+  explicacion="Con `Cow` el 95 % de los casos devuelven un préstamo sin reservar nada, y solo el 5 % crea un `String`."
+  porque={["Reservaría y copiaría siempre.", "No puede devolver un texto nuevo cuando hay que cambiarlo.", "Correcto.", "También reservaría siempre."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué restringe `Pin<Box<String>>`?"
+  opciones={["No puedes leer el String", "En la práctica nada: `String` es `Unpin`", "No puedes destruir el String", "El String se copia al fijarlo"]}
+  correcta={1}
+  explicacion="`Pin` solo restringe a tipos que no son `Unpin`. `String` lo es: moverlo no rompe nada."
+  porque={["Se puede leer: `Pin` implementa `Deref`.", "Correcto.", "Se destruye normalmente al salir de ámbito.", "Fijar no copia nada: solo envuelve el puntero."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuánto ocupa `Pin<Box<i32>>` comparado con `Box<i32>`?"
+  opciones={["Lo mismo", "El doble", "8 bytes más", "Depende del valor"]}
+  correcta={0}
+  explicacion="`Pin` es una garantía del sistema de tipos, sin datos extra: 8 bytes ambos en x86-64."
+  porque={["Correcto.", "No guarda nada adicional.", "No hay ningún campo nuevo.", "El tamaño de un tipo es fijo."]}
+/>

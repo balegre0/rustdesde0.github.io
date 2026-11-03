@@ -1,0 +1,10 @@
+---
+// <Trampa titulo="…">…</Trampa> — error típico
+import { Icon } from '@astrojs/starlight/components';
+interface Props { titulo?: string }
+const { titulo } = Astro.props;
+---
+<aside class="rdc-trampa" aria-label={`Trampa típica${titulo ? ': ' + titulo : ''}`}>
+  <p class="rdc-caja-titulo"><Icon name="warning" /><span>Trampa típica{titulo && <>: {titulo}</>}</span></p>
+  <div class="rdc-caja-cuerpo"><slot /></div>
+</aside>

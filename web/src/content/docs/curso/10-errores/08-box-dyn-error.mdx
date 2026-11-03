@@ -1,0 +1,95 @@
+---
+title: "Box<dyn Error>: cualquier error"
+description: "Mezcla errores de cualquier tipo sin definir un enum, pregunta qué hay dentro con downcast_ref y recorre la cadena de causas."
+sidebar:
+  order: 8
+duracion: 12
+desde: "1.0"
+requiere: ["10-errores/07-from-y-conversion"]
+tarjetas:
+  - p: "¿Qué es `Box<dyn Error>`?"
+    r: "Una caja en el heap que contiene un error de cualquier tipo que implemente `Error`. `?` convierte en ella cualquier error, porque existe `From<E: Error> for Box<dyn Error>`."
+  - p: "¿Cómo creas un `Box<dyn Error>` a partir de un texto?"
+    r: "Con `.into()` (o `?` sobre `Err(\"…\")`): existen `From<&str>` y `From<String>` para `Box<dyn Error>`."
+  - p: "¿Qué pierdes al usar `Box<dyn Error>` en vez de un enum propio?"
+    r: "Quien llama ya no puede hacer `match` sobre los casos: solo mostrar el error o preguntar con `downcast_ref::<Tipo>()` si dentro hay un tipo concreto."
+  - p: "¿Para qué sirve `Error::source()`?"
+    r: "Para obtener el error que causó este, si lo hay. Llamándolo en bucle se recorre toda la cadena de causas."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a usar la «caja universal» de errores: perfecta para programas, peligrosa para bibliotecas.
+
+## Predice
+
+<Predice
+  ej="m10/box-dyn-predice"
+  opciones={["`3/4: 0.75`, y tres errores distintos: `falta la barra`, `invalid digit found in string`, `invalid float literal`", "Solo el primero funciona; los demás dan pánico", "No compila: hay tres tipos de error distintos en una función", "`3/4: 0.75` y tres veces el mismo mensaje"]}
+  correcta={0}
+  explicacion="La función devuelve `Box<dyn Error>`, así que `?` acepta un `&str` (de `ok_or`), un `ParseIntError` y un `ParseFloatError`: todos se meten en la caja. Al imprimir, cada uno muestra su propio `Display`."
+  porque={["Correcto.", "`?` no entra en pánico.", "Con `Box<dyn Error>` sí se pueden mezclar.", "Cada error conserva su tipo y su mensaje dentro de la caja."]}
+/>
+
+## La idea
+
+Definir un enum con un caso por cada error de fuera (lección 7) es lo correcto en una **biblioteca**, donde quien llama necesita distinguir los casos. Pero en un **programa** pequeño a menudo solo quieres «si algo falla, muéstralo y para». Para eso existe:
+
+```rust
+fn leer(…) -> Result<T, Box<dyn Error>>
+```
+
+`dyn Error` significa «algún tipo que implementa `Error`, no sé cuál»; `Box` lo guarda en el heap, porque cada tipo de error tiene un tamaño distinto. La biblioteca estándar trae la conversión `From<E> for Box<dyn Error>` para **todo** `E` que implemente `Error`, y también desde `&str` y `String`. Así, `?` mete en la caja lo que le eches.
+
+El precio: quien recibe el error ya **no puede hacer `match`** sobre él. Puede mostrarlo, o preguntar «¿eres de este tipo?» con `downcast_ref::<Tipo>()`, que devuelve `Option<&Tipo>`.
+
+## Pruébalo
+
+<Ejecutar ej="m10/box-dyn" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`Box<dyn Error>` es un **puntero gordo** (*fat pointer*): dos punteros. Uno apunta al error, que vive en el heap; el otro, a una **vtable**, una tabla con las funciones de ese tipo concreto (`fmt` de `Display`, `fmt` de `Debug`, `source`, su tamaño, cómo destruirlo…). Por eso ocupa 8 bytes en wasm32 (y 16 en un PC de 64 bits): cuando imprimes el error, el programa busca en la vtable qué `fmt` llamar. Lo estudiarás a fondo en el mundo 13 (`dyn Trait`).
+
+Coste real: crear el error **reserva memoria en el heap** (una vez, cuando falla) y cada llamada a sus métodos pasa por la vtable. En el camino de error, eso casi nunca importa.
+
+**La cadena de causas.** Un error puede decir qué otro error lo provocó con el método `source()`. Así, «valor inválido para «puerto»» puede guardar dentro el `ParseIntError` original:
+
+<Ejecutar ej="m10/cadena-source" titulo="Recorrer source()" />
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Box<dyn Error> en una biblioteca">
+
+❌ Si escribes una biblioteca y tus funciones devuelven `Box<dyn Error>`, quien la use no puede distinguir «el archivo no existe» de «el archivo está corrupto» sin adivinar tipos con `downcast_ref`. Y si cambias por dentro qué error devuelves, su código deja de funcionar sin que el compilador avise.
+
+✅ Regla práctica: **enum propio en bibliotecas; `Box<dyn Error>` en `main` y en programas**. Es lo que formalizan las bibliotecas thiserror y anyhow (lección 10).
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m10/box-dyn-unwrap"
+  enunciado={'Ahora mismo no compila: el `?` sobre `Err("vacío")` no puede convertir un `&str` en `ParseIntError`. Cambia la firma de `doble` para que devuelva `Result<i32, Box<dyn Error>>`. Debe imprimir `42`, `error: vacío` y `error: invalid digit found in string`.'}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `Box<dyn Error>` necesita la `Box`?"
+  opciones={["Porque cada tipo de error tiene un tamaño distinto, y el `Result` necesita un tamaño fijo: un puntero lo tiene", "Porque los errores deben vivir siempre en el heap", "Porque `dyn` solo funciona con números", "No la necesita: `Result<T, dyn Error>` también vale"]}
+  correcta={0}
+  porque={["Correcto.", "Un enum de error normal vive donde viva el `Result`, a menudo en la pila.", "`dyn` sirve para cualquier trait compatible.", "`dyn Error` no tiene tamaño conocido, así que no puede ir suelto en un `Result`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué devuelve `e.downcast_ref::<ParseIntError>()` si `e: Box<dyn Error>` contiene un `ParseFloatError`?"
+  opciones={["`None`", "Un pánico", "`Some` con el error convertido", "No compila"]}
+  correcta={0}
+  porque={["Correcto: no es de ese tipo.", "`downcast_ref` nunca entra en pánico.", "No convierte nada: solo pregunta por el tipo.", "Compila: el tipo se comprueba al ejecutar."]}
+/>

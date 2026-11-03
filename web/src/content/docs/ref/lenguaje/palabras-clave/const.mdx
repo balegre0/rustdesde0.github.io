@@ -1,0 +1,77 @@
+---
+title: "const"
+description: "Palabra clave estricta: constantes, funciones evaluables al compilar, genéricos constantes, bloques const y punteros *const."
+sidebar:
+  order: 6
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`const` marca cosas que se conocen **al compilar**. Tiene cinco usos.
+
+## Sinopsis
+
+```text
+const NOMBRE: Tipo = expresión;            // constante
+const fn f(…) -> T { … }                   // función evaluable al compilar
+fn f<const N: usize>(…)                    // parámetro genérico constante
+const { expresión }                        // bloque const (inline const)
+*const T                                   // puntero crudo de solo lectura
+&raw const lugar                           // crear un *const sin pasar por una referencia
+```
+
+## Qué hace
+
+### Uso 1 · Constantes
+
+`const N: u32 = 10;` define un valor que se calcula al compilar y se **copia** en cada sitio donde se usa. No tiene una dirección fija en memoria (para eso está `static`). El tipo es obligatorio. Por convención, el nombre va en MAYÚSCULAS.
+
+### Uso 2 · `const fn`
+
+Una `const fn` se puede llamar en un contexto constante (inicializar un `const`, la longitud de un array…) y también normalmente al ejecutar. Su cuerpo tiene límites: solo puede llamar a otras `const fn`, no puede reservar memoria en el montón, etc. Ver [Evaluación const](/ref/lenguaje/evaluacion-const/).
+
+### Uso 3 · Genéricos constantes
+
+`<const N: usize>` hace que un número forme parte del tipo, como la longitud de `[T; N]`. Hoy se admiten enteros, `bool` y `char`.
+
+### Uso 4 · Bloques `const`
+
+`const { … }` obliga a evaluar una expresión al compilar, en medio de código normal. Si la evaluación falla (por ejemplo, un `panic!`), el programa **no compila**.
+
+### Uso 5 · Punteros `*const T`
+
+El tipo de puntero crudo que no permite escribir a través de él. Leerlo con `*p` exige un bloque `unsafe`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-const" />
+
+Salida:
+
+```text
+86400
+144
+10
+128
+5
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-const-error" />
+
+`error[E0015]: cannot call non-const function leer_numero in constants`. La solución es declarar la función como `const fn` (si su cuerpo lo permite).
+
+## Desde
+
+Constantes y `*const`: Rust 1.0. `const fn`: 1.31 (ampliadas en muchas versiones posteriores). Genéricos constantes: 1.51. Bloques `const`: 1.79. `&raw const`: 1.82.
+
+## Ver también
+
+- [Evaluación const](/ref/lenguaje/evaluacion-const/) · [`static`](/ref/lenguaje/palabras-clave/static/) · [`raw`](/ref/lenguaje/palabras-clave/raw/)
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/) · [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

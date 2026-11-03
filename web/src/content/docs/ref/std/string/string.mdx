@@ -1,0 +1,203 @@
+---
+title: "String"
+description: "Texto UTF-8 que es dueño de sus bytes y puede crecer: crear, añadir, medir, convertir."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "alloc"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::string::String` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub struct String { /* private fields */ }
+```
+
+## Qué hace
+
+Crea un `String` con `String::new()`, `String::from("...")`, `"...".to_string()` o `format!`. Añade texto con `push_str` y `push` (o `+=`). Como implementa `Deref<Target = str>`, **todos los métodos de `str`** (`trim`, `split`, `contains`…) funcionan también sobre un `String`, y `&String` se convierte solo en `&str` al pasarlo a una función.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`new`](#new) | Crea un `String` vacío. | 1.0 |
+| [`with_capacity`](#with_capacity) | Crea un `String` vacío con espacio reservado para al menos esos bytes. | 1.0 |
+| [`from_utf8`](#from_utf8) | Convierte un `Vec<u8>` en `String` si los bytes son UTF-8 válido; si no, devuelve un error. | 1.0 |
+| [`from_utf8_lossy`](#from_utf8_lossy) | Convierte bytes en texto cambiando los inválidos por `�` (U+FFFD). | 1.0 |
+| [`push_str`](#push_str) | Añade un trozo de texto al final. | 1.0 |
+| [`push`](#push) | Añade un carácter al final. | 1.0 |
+| [`pop`](#pop) | Quita y devuelve el último carácter (`None` si está vacío). | 1.0 |
+| [`insert`](#insert) | Inserta un carácter en una posición en bytes. | 1.0 |
+| [`as_str`](#as_str) | Toma prestado el contenido como `&str`. | 1.7 |
+| [`len`](#len) | Longitud en **bytes** (no en caracteres). | 1.0 |
+| [`capacity`](#capacity) | Bytes reservados en el montón (siempre `>= len`). | 1.0 |
+| [`clear`](#clear) | Borra el contenido; la memoria reservada se conserva. | 1.0 |
+| [`into_bytes`](#into_bytes) | Convierte el `String` en su `Vec<u8>` sin copiar. | 1.0 |
+
+### `new`
+
+```rust
+pub const fn new() -> String
+```
+
+Crea un `String` vacío. No reserva memoria hasta que añades algo.
+
+### `with_capacity`
+
+```rust
+pub fn with_capacity(capacity: usize) -> String
+```
+
+Crea un `String` vacío con espacio reservado para al menos esos bytes.
+
+### `from_utf8`
+
+```rust
+pub fn from_utf8(vec: Vec<u8>) -> Result<String, FromUtf8Error>
+```
+
+Convierte un `Vec<u8>` en `String` si los bytes son UTF-8 válido; si no, devuelve un error.
+
+### `from_utf8_lossy`
+
+```rust
+pub fn from_utf8_lossy(v: &[u8]) -> Cow<'_, str>
+```
+
+Convierte bytes en texto cambiando los inválidos por `�` (U+FFFD).
+
+### `push_str`
+
+```rust
+pub fn push_str(&mut self, string: &str)
+```
+
+Añade un trozo de texto al final.
+
+### `push`
+
+```rust
+pub fn push(&mut self, ch: char)
+```
+
+Añade un carácter al final.
+
+### `pop`
+
+```rust
+pub fn pop(&mut self) -> Option<char>
+```
+
+Quita y devuelve el último carácter (`None` si está vacío).
+
+### `insert`
+
+```rust
+pub fn insert(&mut self, idx: usize, ch: char)
+```
+
+Inserta un carácter en una posición en bytes. Mueve todo lo que hay detrás.
+
+### `as_str`
+
+```rust
+pub const fn as_str(&self) -> &str
+```
+
+Toma prestado el contenido como `&str`.
+
+### `len`
+
+```rust
+pub const fn len(&self) -> usize
+```
+
+Longitud en **bytes** (no en caracteres).
+
+### `capacity`
+
+```rust
+pub const fn capacity(&self) -> usize
+```
+
+Bytes reservados en el montón (siempre `>= len`).
+
+### `clear`
+
+```rust
+pub fn clear(&mut self)
+```
+
+Borra el contenido; la memoria reservada se conserva.
+
+### `into_bytes`
+
+```rust
+pub const fn into_bytes(self) -> Vec<u8>
+```
+
+Convierte el `String` en su `Vec<u8>` sin copiar.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/string-basico" />
+
+**Salida:**
+
+```text
+¡Hola, mundo!
+bytes: 14, chars: 13
+len 4 cap 10
+¡Hola-2024
+hol Some('a')
+vacío: true
+```
+
+<Ejecutar ej="ref-std/string-utf8" />
+
+**Salida:**
+
+```text
+7
+[195, 177, 97, 110, 100, 195, 186]
+ñ
+false
+Ok("hola")
+true
+�a
+```
+
+## Pánicos
+
+Cortar con `&s[a..b]` fuera del límite de un carácter, o insertar en una posición que no es límite, entra en pánico:
+
+<Ejecutar ej="ref-std/string-corte-panico" />
+
+**Salida de error** (*stderr*):
+
+```text
+thread 'main' (1) panicked at string-corte-panico.rs:3:22:
+end byte index 1 is not a char boundary; it is inside 'ñ' (bytes 0..2 of string)
+```
+
+## Rendimiento
+
+`push_str` y `push` son O(1) amortizado: el `String` reserva más espacio del que necesita y solo copia sus bytes a un bloque más grande de vez en cuando. `insert` y `remove` en medio son O(n).
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `as_str` (1.7).
+
+## Ver también
+
+- [str](/ref/std/str/str/)
+- [Vec](/ref/std/vec/vec/)
+- [E0308 (String frente a &str)](/errores/e0308/)
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

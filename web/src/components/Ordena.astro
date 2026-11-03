@@ -1,0 +1,7 @@
+---
+// <Ordena lineas distractores? explicacion? /> — CONTENIDO.md §4 (problema de Parsons)
+import OrdenaIsla from './islas/Ordena';
+interface Props { lineas: string[]; distractores?: string[]; explicacion?: string; enunciado?: string }
+const { lineas, distractores, explicacion, enunciado } = Astro.props;
+---
+<OrdenaIsla client:visible lineas={lineas} distractores={distractores} explicacion={explicacion} enunciado={enunciado} />

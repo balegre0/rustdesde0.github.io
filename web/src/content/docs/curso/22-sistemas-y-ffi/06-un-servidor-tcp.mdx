@@ -1,0 +1,146 @@
+---
+title: "Un servidor TCP"
+description: "Escribe un servidor de eco con `TcpListener` y `TcpStream`, entiende qué es un socket y qué cambia para atender a muchos clientes a la vez."
+sidebar:
+  order: 6
+duracion: 12
+desde: "1.0"
+requiere: ["22-sistemas-y-ffi/05-procesos", "17-concurrencia"]
+tarjetas:
+  - p: "¿Qué hace `TcpListener::bind(\"127.0.0.1:7878\")`?"
+    r: "Reserva el puerto 7878 en la interfaz local y empieza a escuchar conexiones. Devuelve `io::Result` porque el puerto puede estar ocupado o prohibido."
+  - p: "¿Qué es un `TcpStream`?"
+    r: "Una conexión TCP abierta: un canal de bytes en los dos sentidos que implementa `Read` y `Write`."
+  - p: "¿Por qué el servidor de eco de la lección atiende a un solo cliente cada vez?"
+    r: "Porque `incoming()` y la lectura del cliente son bloqueantes y se hacen en el mismo hilo; para varios a la vez hace falta un hilo por cliente o async (Tokio)."
+  - p: "¿Qué diferencia hay entre `127.0.0.1` y `0.0.0.0` al hacer `bind`?"
+    r: "`127.0.0.1` solo acepta conexiones desde la propia máquina; `0.0.0.0` escucha en todas las interfaces de red."
+---
+
+import { Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Un servidor web, una base de datos o un juego en red empiezan igual: un programa que **escucha** en un puerto y conversa con quien se conecta. Con `std::net` puedes escribir uno en treinta líneas. Esta lección no tiene botón de ejecutar: el navegador no deja abrir puertos.
+
+## Predice
+
+<Pregunta
+  pregunta={"Dos copias de tu servidor intentan hacer `TcpListener::bind(\"127.0.0.1:7878\")` a la vez en la misma máquina. ¿Qué le pasa a la segunda?"}
+  opciones={[
+    "Comparte el puerto con la primera",
+    "`bind` devuelve un `Err` (dirección en uso)",
+    "Espera a que la primera termine",
+    "Entra en pánico automáticamente"
+  ]}
+  correcta={1}
+  explicacion="Un puerto TCP solo puede tener un oyente en la misma dirección. El sistema rechaza el segundo `bind` y Rust te lo da como `io::Error` con `ErrorKind::AddrInUse`."
+  porque={["Compartir requiere opciones especiales del sistema que `std` no activa.", "", "`bind` no espera: falla enseguida.", "Solo habría pánico si hicieras `unwrap()`."]}
+/>
+
+## La idea
+
+**TCP** es un protocolo que da a dos programas un **canal fiable de bytes**: lo que uno escribe llega al otro, en orden y sin huecos. Un servidor TCP funciona en tres pasos:
+
+1. `TcpListener::bind(dirección)` reserva un **puerto** (un número de 0 a 65535) en una dirección IP.
+2. `listener.incoming()` (o `accept()`) espera a que alguien se conecte y entrega un `TcpStream` por cada conexión.
+3. Con el `TcpStream`, que implementa `Read` y `Write`, conversas: lees con `BufReader` y respondes con `write!`. Cuando el `TcpStream` se destruye, la conexión se cierra (RAII otra vez).
+
+El cliente usa `TcpStream::connect("127.0.0.1:7878")` y obtiene el mismo tipo de canal. Todo lo de las lecciones 2 y 3 sobre leer y escribir vale tal cual: un socket es «otro sitio que implementa `Read` y `Write`».
+
+## Pruébalo
+
+Este es el servidor de eco (está en `ejemplos/m22/servidor-eco.rs`; verificado que compila con `rustc --emit=metadata`). Devuelve cada línea en mayúsculas:
+
+```rust
+use std::io::{BufRead, BufReader, Write};
+use std::net::{TcpListener, TcpStream};
+
+fn atender(flujo: TcpStream) -> std::io::Result<()> {
+    let quien = flujo.peer_addr()?;
+    println!("conexión de {quien}");
+    let mut escritor = flujo.try_clone()?;
+    for linea in BufReader::new(flujo).lines() {
+        let linea = linea?;
+        writeln!(escritor, "{}", linea.to_uppercase())?;
+    }
+    println!("{quien} se fue");
+    Ok(())
+}
+
+fn main() -> std::io::Result<()> {
+    let oyente = TcpListener::bind("127.0.0.1:7878")?;
+    println!("escuchando en {}", oyente.local_addr()?);
+    for flujo in oyente.incoming() {
+        if let Err(e) = atender(flujo?) {
+            eprintln!("error con un cliente: {e}");
+        }
+    }
+    Ok(())
+}
+```
+
+En tu PC: `cargo run` en una terminal y, en otra, conéctate con un cliente TCP. En PowerShell puedes escribir un cliente de diez líneas en Rust con `TcpStream::connect`, o usar `telnet 127.0.0.1 7878` si lo tienes activado. Salida típica en el servidor: una línea `escuchando en 127.0.0.1:7878` y, por cada cliente, `conexión de 127.0.0.1:<puerto del cliente>`.
+
+En el navegador, `TcpListener::bind` devuelve el error `operation not supported on this platform` (lo comprobamos con el runtime WASI del curso).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Un socket es un descriptor.** Igual que un `File`, un `TcpListener` y un `TcpStream` guardan el número que el sistema operativo usa para ese canal. `bind`, `listen`, `accept`, `connect`, `read` y `write` son llamadas al sistema; la biblioteca estándar las envuelve en tipos seguros cuyo `Drop` cierra el socket.
+
+**`try_clone`.** El servidor necesita leer y escribir a la vez sobre el mismo socket, pero `BufReader::new(flujo)` **toma propiedad** del `TcpStream`. `try_clone` pide al sistema un **segundo descriptor** para el mismo socket: uno se usa para leer y el otro para escribir, sin pelearse con el borrow checker.
+
+**Bloqueante.** `accept` y `read` **paran el hilo** hasta que pasa algo. Por eso este servidor atiende a un cliente detrás de otro. Las soluciones:
+
+- **Un hilo por cliente**: `std::thread::spawn(move || atender(flujo))`. El `move` traslada la propiedad del `TcpStream` al hilo; `TcpStream` es `Send`, así que el compilador lo permite. Sencillo, pero cada hilo cuesta memoria (su pila).
+- **Async** (mundo 18): un runtime como Tokio usa llamadas no bloqueantes del sistema (epoll en Linux, IOCP en Windows) para atender miles de conexiones con pocos hilos.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Escuchar en 0.0.0.0 sin pensarlo">
+
+❌ `TcpListener::bind("0.0.0.0:7878")` para «probar en local». Acabas de abrir el servidor a toda tu red (y quizá a internet).
+
+✅ Para desarrollo, `127.0.0.1`. Solo usa `0.0.0.0` cuando de verdad quieras que otras máquinas se conecten, y entonces piensa en autenticación y en el cortafuegos.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Para atender a varios clientes a la vez cambias el `if let Err(e) = atender(flujo?) { … }` del bucle por `std::thread::spawn(move || atender(flujo?));`. Compila (lo hemos comprobado). ¿Qué pasa ahora con los errores?"
+  opciones={[
+    "Se imprimen igual que antes con `eprintln!`",
+    "Se pierden en silencio: el `?` y el `Result` de `atender` ahora son el valor de retorno del hilo, y nadie lo recoge con `join`",
+    "Hacen que el servidor entero termine",
+    "Se convierten en pánicos"
+  ]}
+  correcta={1}
+  explicacion="Dentro de la closure, `?` devuelve desde la **closure**, no desde `main`. El `Result` queda guardado en el `JoinHandle`, que se descarta. Lo limpio: `let flujo = flujo?;` antes del `spawn` y, dentro del hilo, manejar el error de `atender` con `eprintln!`. `TcpStream` es `Send`, por eso se puede mover al hilo."
+  porque={["El `eprintln!` ya no está en el camino del error.", "", "Un error en un hilo no detiene a los demás ni a `main`.", "Un `Err` devuelto no es un pánico."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué traits implementa `TcpStream` que te permiten reutilizar `BufReader` y `writeln!`?"
+  opciones={["`Iterator` y `Display`", "`Read` y `Write`", "`Clone` y `Copy`", "`Send` y `Sync` solamente"]}
+  correcta={1}
+  explicacion="Un socket es una fuente y un destino de bytes. Todo el código genérico sobre `Read`/`Write` funciona con él."
+  porque={["Esos son de otros usos.", "", "No es `Clone` (para duplicarlo existe `try_clone`, que puede fallar) ni `Copy`.", "Es `Send` y `Sync`, pero lo que permite leer y escribir es `Read`/`Write`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué pasa con la conexión cuando el `TcpStream` sale de ámbito?"
+  opciones={["Sigue abierta hasta que el cliente la cierre", "Se cierra: su `Drop` libera el socket", "Se queda abierta hasta que termine el programa", "Hay que llamar a `close()` o se pierde memoria"]}
+  correcta={1}
+  explicacion="RAII: el recurso del sistema se libera al destruir el valor que lo posee."
+  porque={["Nuestro lado la cierra al destruirse.", "", "Se cierra al salir de ámbito, no al final del programa.", "`TcpStream` no tiene `close`: lo hace `Drop`."]}
+/>
+
+## Para saber más
+
+- Documentación de `std::net`: https://doc.rust-lang.org/std/net/index.html
+- Mundo 18 (async), para servidores con muchas conexiones.

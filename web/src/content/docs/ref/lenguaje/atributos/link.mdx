@@ -1,0 +1,46 @@
+---
+title: "#[link], #[link_name], #[link_ordinal] y #[no_link]"
+description: "Atributos para enlazar con bibliotecas nativas: qué biblioteca, con qué nombre de símbolo y, en Windows, por número de función."
+sidebar:
+  order: 22
+insignias: ["Desde 1.0", "ABI y enlazado"]
+---
+import { Ejecutar } from '~/components';
+
+Cuando llamas a código de otra biblioteca con un bloque `extern`, estos atributos le dicen al enlazador **dónde** y **cómo** encontrarlo.
+
+## Sinopsis
+
+```text
+#[link(name = "z")]                          // enlazar con libz / z.lib
+#[link(name = "z", kind = "static")]         // static | dylib | framework | raw-dylib
+#[link(name = "kernel32", kind = "raw-dylib")]
+unsafe extern "C" {
+    #[link_name = "nombre_real"] fn alias();  // otro nombre en Rust
+    #[link_ordinal(42)] fn por_numero();      // Windows, con raw-dylib
+}
+#[no_link] extern crate macros;              // solo sus macros, sin enlazar
+```
+
+## Qué hace
+
+- **`link(name, kind)`**: la biblioteca nativa que necesita el bloque `extern`. `kind = "raw-dylib"` (Windows, 1.71) genera la tabla de importación sin necesitar el archivo `.lib`.
+- **`link_name`**: el símbolo real cuando quieres otro nombre en Rust.
+- **`link_ordinal(n)`**: importa una función de una DLL por su número, con `raw-dylib`.
+- **`no_link`**: en un `extern crate`, usa sus macros pero no enlaza su código.
+
+Muchas veces la biblioteca se indica desde `build.rs` (`cargo::rustc-link-lib=z`) en vez de con `#[link]`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-link" />
+
+Solo funciona en Windows (llama a `kernel32.dll`), así que aquí no se ejecuta. El `safe fn` dentro del bloque `unsafe extern` (edición 2024) declara que llamarla no tiene requisitos de seguridad.
+
+## Desde
+
+Rust 1.0. `raw-dylib` y `link_ordinal`: 1.71 (x86_64), 1.76 (x86).
+
+## Ver también
+
+[Llamar a una biblioteca externa](/curso/22-sistemas-y-ffi/08-llamar-a-una-biblioteca-externa/) · [`extern`](/ref/lenguaje/palabras-clave/extern/)

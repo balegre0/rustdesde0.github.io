@@ -1,0 +1,3 @@
+{
+  "nota": "En el navegador (wasm32) usize, punteros y referencias miden 4 bytes; en un PC de 64 bits, 8."
+}

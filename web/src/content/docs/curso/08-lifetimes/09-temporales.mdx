@@ -1,0 +1,90 @@
+---
+title: "Temporales"
+description: "Un valor sin nombre vive hasta el final de la sentencia. Prestar de él y usarlo después da E0716, salvo cuando Rust alarga su vida en un let."
+sidebar:
+  order: 9
+duracion: 9
+desde: "1.0"
+requiere: ["08-lifetimes/08-static"]
+tarjetas:
+  - p: "¿Qué es un temporal?"
+    r: "Un valor que se crea en mitad de una expresión y no se guarda en ninguna variable, como el `String` de `String::from(\"hola\").as_str()`."
+  - p: "¿Hasta cuándo vive un temporal?"
+    r: "Normalmente hasta el final de la sentencia que lo crea (el `;`)."
+  - p: "¿Qué dice E0716?"
+    r: "Que un valor temporal se destruye mientras sigue prestado (*temporary value dropped while borrowed*)."
+  - p: "¿Por qué compila `let s = &String::from(\"hola\");`?"
+    r: "Por la extensión de vida de temporales: si el `&` se aplica directamente al temporal en un `let`, el temporal vive hasta el final del bloque."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+No todos los valores tienen nombre. Algunos se crean en mitad de una expresión y desaparecen enseguida. Si les pides prestado algo, tienes que saber **cuándo** desaparecen.
+
+## Predice
+
+<NoCompila ej="m08/p-temporal" explicacion={"`String::from(\"hola\")` crea un `String`, pero no se guarda en ninguna variable. ¿Quién es su dueño? ¿Cuándo se libera?"} />
+
+## La idea
+
+Un **temporal** es un valor que se crea dentro de una expresión sin guardarse en ninguna variable. Su dueño es la propia sentencia, y **muere al final de ella** (en el `;`).
+
+En `let s: &str = String::from("hola").as_str();`:
+
+1. Se crea un `String` temporal.
+2. `as_str()` devuelve una slice que apunta a su texto.
+3. Se llega al `;`: el temporal se libera.
+4. `s` apunta a texto liberado. El `println!` siguiente lo usaría: **E0716**.
+
+El arreglo es darle **un dueño con nombre**:
+
+```rust
+let dueno = String::from("hola");
+let s: &str = dueno.as_str();
+```
+
+## Pruébalo
+
+Hay una excepción útil. Si en un `let` el `&` se aplica **directamente** al temporal, Rust alarga su vida hasta el final del bloque. Se llama **extensión de vida de temporales** (*temporary lifetime extension*):
+
+<Ejecutar ej="m08/temporal-extendido" />
+
+El caso 1 compila por la extensión. El caso 3 compila porque el temporal se usa **dentro** de la misma sentencia. La regla no se aplica al resultado de un método (`String::from("x").as_str()`), porque el compilador no puede saber si ese método devuelve algo prestado del temporal.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Dónde se destruyen.** Cada sentencia tiene un *ámbito de temporales*. Al terminar la sentencia, el compilador inserta los `drop` de sus temporales, en orden inverso al de creación. En el MIR verás esos `drop` justo antes de la siguiente sentencia.
+
+**Cambio de la edición 2024.** Dos casos se ajustaron en la edición 2024: los temporales de la condición de un `if let` ahora se destruyen antes del `else`, y los del final de un bloque (la expresión sin `;`) se destruyen antes que las variables locales del bloque. Así se evitan algunos bloqueos de `Mutex` que duraban más de la cuenta (mundo 17). Si migras código de ediciones anteriores, `cargo fix --edition` te avisa.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Encadenar métodos sobre un temporal y guardar el final">
+
+❌ `let nombre = leer_linea().trim();`: `trim` devuelve una slice del `String` temporal que devuelve `leer_linea()`. E0716 en cuanto uses `nombre`.
+
+✅ Dos líneas: `let linea = leer_linea(); let nombre = linea.trim();`. O, si te basta con un valor propio, `let nombre = leer_linea().trim().to_string();`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál compila y deja `s` usable en las líneas siguientes?"
+  opciones={["`let s = String::from(\"a\").as_str();`", "`let s = &String::from(\"a\");`", "`let s = format!(\"a\").trim();`", "Ninguna"]}
+  correcta={1}
+  explicacion="En la segunda, el `&` se aplica directamente al temporal en un `let`: su vida se extiende hasta el final del bloque. En las otras dos, el resultado sale de un método sobre el temporal."
+  porque={["`as_str()` sobre un temporal: E0716 al usar `s`.", "", "`trim()` sobre un temporal: E0716 al usar `s`.", "La segunda compila."]}
+/>
+
+<Pregunta
+  pregunta="¿Hasta cuándo vive, en general, un temporal?"
+  opciones={["Hasta el final del programa", "Hasta el final de la función", "Hasta el final de la sentencia que lo crea", "Hasta su último uso"]}
+  correcta={2}
+  explicacion="Los temporales se destruyen al terminar la sentencia, salvo la extensión de vida en `let`."
+  porque={["Eso son los `'static`.", "Eso sería si tuviera nombre en el bloque principal.", "", "Eso es la vida de un **préstamo**, no de un valor."]}
+/>

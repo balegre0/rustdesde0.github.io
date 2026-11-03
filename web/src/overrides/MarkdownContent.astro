@@ -1,0 +1,12 @@
+---
+// En la portada de cada mundo (curso/<mundo>/index.mdx) la plataforma añade la lista de lecciones.
+import Default from '@astrojs/starlight/components/MarkdownContent.astro';
+import ListaLecciones from '../components/interno/ListaLecciones.astro';
+import { esMundoId } from '../lib/lecciones';
+const { id } = Astro.locals.starlightRoute;
+const mundo = esMundoId(id) ? id.replace(/^curso\//, '') : null;
+---
+<Default>
+  <slot />
+  {mundo && <ListaLecciones mundo={mundo} />}
+</Default>

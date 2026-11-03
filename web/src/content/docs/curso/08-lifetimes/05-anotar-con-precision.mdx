@@ -1,0 +1,87 @@
+---
+title: "Anotar con precisión"
+description: "Poner 'a en todas partes ata entre sí referencias que no tienen nada que ver y hace que tu código no compile. Ata solo lo que de verdad va junto."
+sidebar:
+  order: 5
+duracion: 11
+desde: "1.0"
+requiere: ["08-lifetimes/04-elision"]
+tarjetas:
+  - p: "Si una función solo devuelve algo sacado de `a`, ¿debe `b` llevar `'a`?"
+    r: "No. Ponerle `'a` a `b` obliga al que llama a mantener `b` viva tanto como el resultado, sin necesidad."
+  - p: "¿Qué pasa con `fn f(v: &mut Vec<i32>) -> &i32` cuando usas el resultado?"
+    r: "El resultado mantiene vivo el préstamo EXCLUSIVO de `v` (por elisión, comparten lifetime). Mientras uses el resultado, no puedes ni leer `v`."
+  - p: "Regla práctica para anotar lifetimes:"
+    r: "Usa la misma lifetime solo en las referencias de las que de verdad puede salir el resultado. Las demás, déjalas sin anotar o con otra letra."
+---
+
+import { NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Una vez que aprendes `'a`, la tentación es ponérselo a todo. Mala idea: cada `'a` repetido es una **restricción** más. Si atas referencias que no van juntas, el compilador te exigirá cosas que tu programa no necesita.
+
+## Predice
+
+<NoCompila ej="m08/p-anotacion-restrictiva" explicacion={"La función siempre devuelve `a`. Nunca devuelve `b`. Entonces, ¿por qué el compilador exige que `b` siga viva cuando se usa `r`? Mira la firma, no el cuerpo."} />
+
+## La idea
+
+La firma `fn primera<'a>(a: &'a str, b: &'a str) -> &'a str` le dice al que llama: «el resultado puede salir de `a` **o de `b`**». El que llama tiene que mantener vivas **las dos** mientras use el resultado. Aunque el cuerpo nunca devuelva `b`, la firma manda.
+
+El arreglo es **decir la verdad** en la firma: el resultado sale solo de `a`.
+
+```rust
+fn primera<'a>(a: &'a str, b: &str) -> &'a str
+```
+
+`b` queda con su propia lifetime (regla 1 de la elisión), sin relación con el resultado. Ahora `b` puede morir antes.
+
+**Regla práctica:** repite la misma lifetime solo entre la salida y **las entradas de las que de verdad puede salir**.
+
+## Pruébalo
+
+Hay un caso parecido que sorprende a casi todo el mundo, porque la elisión lo hace por ti:
+
+<NoCompila ej="m08/p-degradar-mut" explicacion="`agregar_y_ver(v: &mut Vec<i32>) -> &i32` se entiende como `<'a>(v: &'a mut Vec<i32>) -> &'a i32`. El resultado comparte lifetime con el **préstamo exclusivo**. Así que, mientras uses `primero`, `v` sigue prestada en exclusiva y no puedes ni leerla. El resultado es `&` (solo lectura), pero lo que mantiene vivo es un `&mut`." />
+
+Este caso no tiene una anotación que lo arregle: la referencia que devuelves **sale** del préstamo exclusivo, así que no puede durar más que él. Las salidas son:
+
+- Hacer la parte exclusiva y la de lectura en dos funciones distintas: `agregar(&mut v)` y luego `&v[0]`.
+- Devolver un valor en vez de una referencia (aquí, el `i32`, que es `Copy`).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Restricciones, otra vez.** Cada aparición de `'a` añade una restricción: «esta referencia vale al menos durante `'a`». Si `'a` aparece en dos entradas y en la salida, en cada llamada `'a` tiene que caber en la **intersección** de las dos entradas y contener todos los usos de la salida. Cuantas más apariciones, más pequeña es la intersección y más fácil es que no quepa.
+
+**Por qué `&mut` → `&` no «se degrada».** Podría parecer que, al convertir un `&mut` en `&`, la exclusividad debería terminar. Pero el tipo de la función solo dice que el resultado vive `'a`, y `'a` es la lifetime del `&mut`. El compilador no sabe que la función ya no va a escribir. Esta es una de las limitaciones conocidas que se discuten en la comunidad («*downgrading* de préstamos»).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Copiar firmas con 'a por todas partes">
+
+❌ `fn f<'a>(x: &'a str, y: &'a str, z: &'a str) -> &'a str` «por si acaso».
+
+✅ Empieza **sin** anotaciones. Si el compilador pide una (E0106), añade `'a` solo a la salida y a la entrada de la que sale. Si puede salir de varias, añádela a esas y solo a esas.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una función devuelve siempre un trozo de su primer argumento. ¿Qué firma es la más precisa?"
+  opciones={["`fn f<'a>(x: &'a str, y: &'a str) -> &'a str`", "`fn f<'a>(x: &'a str, y: &str) -> &'a str`", "`fn f(x: &str, y: &str) -> &str`", "`fn f(x: &'static str, y: &str) -> &'static str`"]}
+  correcta={1}
+  explicacion="La salida sale solo de `x`, así que solo `x` comparte lifetime con ella."
+  porque={["Compila, pero obliga a mantener `y` viva sin necesidad.", "", "E0106: con dos entradas, la elisión no sabe de cuál sale.", "Exigiría que `x` fuera `'static`: casi nadie podría llamarla."]}
+/>
+
+<Pregunta
+  pregunta="`fn ultimo(v: &mut Vec<i32>) -> &i32`. Tienes `let u = ultimo(&mut v);` y después usas `u`. ¿Qué puedes hacer con `v` mientras usas `u`?"
+  opciones={["Leerla", "Modificarla", "Nada", "Moverla"]}
+  correcta={2}
+  explicacion="El resultado comparte lifetime con el préstamo exclusivo de `v`. Mientras `u` se use, ese `&mut` sigue vivo, y con un exclusivo vivo la dueña no tiene permisos."
+  porque={["Ni leer: el préstamo vivo es exclusivo.", "Tampoco: habría dos escritores.", "", "Moverla con un préstamo vivo es E0505."]}
+/>

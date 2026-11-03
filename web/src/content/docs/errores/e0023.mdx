@@ -1,0 +1,81 @@
+---
+title: "E0023: número de campos incorrecto en un patrón"
+description: "Un patrón de tupla o de variante tiene más o menos campos de los que tiene el tipo."
+sidebar:
+  order: 4
+insignias: ["Patrones"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` this pattern has 1 field, but the corresponding tuple variant has 2 fields ``
+
+## Qué significa
+
+`Forma::Rect` lleva **dos** valores. El patrón `Forma::Rect(ancho)` solo nombra uno. Los patrones deben tener exactamente los mismos campos (aunque puedes ignorarlos).
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0023" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0023]: this pattern has 1 field, but the corresponding tuple variant has 2 fields
+ --> E0023.rs:8:21
+  |
+2 |     Rect(u32, u32),
+  |          ---  --- tuple variant has 2 fields
+...
+8 |         Forma::Rect(ancho) => println!("{ancho}"),
+  |                     ^^^^^ expected 2 fields, found 1
+  |
+help: use `_` to explicitly ignore each field
+  |
+8 |         Forma::Rect(ancho, _) => println!("{ancho}"),
+  |                          +++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Olvidar un campo en el patrón.
+- Cambiar una variante y no actualizar los `match`.
+
+## Cómo arreglarlo
+
+Nombra todos los campos, o ignora los que no necesites con `_` (uno) o `..` (el resto): `Forma::Rect(ancho, _)` o `Forma::Rect(ancho, ..)`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+enum Forma {
+    Rect(u32, u32),
+}
+
+fn main() {
+    let f = Forma::Rect(2, 3);
+    match f {
+        Forma::Rect(ancho, alto) => println!("{ancho} x {alto}"),
+    }
+}
+```
+
+**Salida:**
+
+```text
+2 x 3
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0023` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0004](/errores/e0004/): patrones no exhaustivos
+- [E0408](/errores/e0408/): variable no ligada en todas las alternativas
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

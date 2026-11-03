@@ -1,0 +1,132 @@
+---
+title: "Leer los errores del compilador"
+description: "Aprende la anatomía de un error de rustc —código, ubicación, marcas, help y note— y usa rustc --explain como diccionario."
+sidebar:
+  order: 7
+duracion: 14
+desde: "1.0"
+requiere: ["02-tu-primer-programa/06-el-viaje-de-rustc"]
+tarjetas:
+  - p: "¿Qué indica `--> src/main.rs:4:5` en un error?"
+    r: "El archivo, la línea (4) y la columna (5) donde el compilador sitúa el problema."
+  - p: "¿Qué comando muestra la explicación larga de un código de error como E0384?"
+    r: "`rustc --explain E0384`."
+  - p: "En un error, ¿qué diferencia hay entre las marcas `^^^` y `---`?"
+    r: "`^^^` señala el sitio principal del error; `---` señala sitios relacionados que ayudan a entenderlo."
+  - p: "¿Dónde suele estar el arreglo que propone el compilador?"
+    r: "En la sección `help:`, a menudo con el código ya corregido y marcas `+` donde hay que añadir algo."
+  - p: "¿Qué significa E0308?"
+    r: "«mismatched types»: el tipo de un valor no coincide con el que se esperaba en ese sitio."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Vas a ver muchos errores del compilador. Muchísimos. Es normal y no dice nada malo de ti: le pasa a todo el mundo que programa en Rust, todos los días. La buena noticia es que los mensajes de `rustc` están escritos para enseñar. Hoy aprendes a leerlos de arriba abajo, sin saltarte nada.
+
+## Predice
+
+<NoCompila ej="m02/asignar-inmutable" />
+
+<Pregunta
+  pregunta="El error marca con `^^^^^^^^^^^` la línea 4, `puntos = 20;`. ¿En qué línea hay que cambiar algo para arreglarlo?"
+  opciones={["En la 4: hay que borrar `puntos = 20;`", "En la 2: hay que escribir `let mut puntos = 10;`", "En la 3: el `println!` no puede usar `puntos`", "En la 5: falta un `;`"]}
+  correcta={1}
+  explicacion="El síntoma está en la línea 4 (se intenta cambiar el valor), pero la causa está en la 2: la variable se declaró sin `mut`, así que no se puede cambiar. El propio error lo dice: marca la línea 2 con `------ first assignment` y el `help:` propone añadir `mut` justo ahí."
+  porque={["Borrar la línea hace que compile, pero cambia lo que querías hacer: el programa ya no actualiza los puntos.", "", "Leer una variable inmutable está permitido; lo que no se permite es cambiarla.", "No falta ningún `;`: el error tiene código E0384, que trata de asignaciones, no de sintaxis."]}
+/>
+
+## La idea
+
+Un error de `rustc` siempre tiene la misma forma. Míralo en el error de arriba, línea a línea:
+
+1. **Cabecera**: ``error[E0384]: cannot assign twice to immutable variable `puntos` ``. El **nivel** (`error`), el **código** (`E0384`) y un resumen en una frase («no se puede asignar dos veces a la variable inmutable `puntos`»).
+2. **Ubicación**: `--> …/asignar-inmutable.rs:4:5`. Archivo, línea 4, columna 5.
+3. **El código, con marcas**. A la izquierda, un margen con los números de línea y una barra `|`. Debajo de cada línea, marcas: `^^^` es el **sitio principal** («cannot assign twice to immutable variable»), y `---` un **sitio relacionado** («first assignment to `puntos`», la primera asignación).
+4. **`help:`**: una propuesta de arreglo, muchas veces con el código ya corregido. Aquí: «consider making this binding mutable» (plantéate hacer mutable esta variable), con `+++` debajo del `mut` que falta.
+5. **`note:`** (si hay): información extra, como por qué una regla existe o qué opción la activa.
+6. **El final**: `error: aborting due to 1 previous error` (se aborta por 1 error) y ``For more information about this error, try `rustc --explain E0384`.``
+
+Esa última línea es una invitación: cada código `E` tiene una **ficha** con una explicación larga y ejemplos. Está dentro del propio compilador, así que funciona sin conexión.
+
+## Pruébalo
+
+Ejecuta en tu terminal `rustc --explain E0384`. Empieza así (salida real, en inglés):
+
+```text
+An immutable variable was reassigned.
+
+Erroneous code example:
+```
+
+«Se ha reasignado una variable inmutable», seguido de un ejemplo erróneo y de cómo arreglarlo con `mut`. Ahora, dos errores más que verás a menudo. Primero, un tipo equivocado:
+
+<NoCompila ej="m02/tipo-equivocado" explicacion="E0308, «mismatched types» (tipos que no coinciden). La marca `^^^^^^^^^` está bajo el valor: «expected `i32`, found `&str`» (se esperaba un número `i32` y se encontró un texto `&str`). La marca `---` bajo `i32` explica el porqué: «expected due to this», se esperaba por esto." />
+
+Y un nombre mal escrito:
+
+<NoCompila ej="m02/nombre-desconocido" explicacion="E0425, «cannot find value `nombe` in this scope» (no se encuentra el valor `nombe` aquí). El `help:` encuentra la variable parecida, «a local variable with a similar name exists», y marca con `+` la letra que falta." />
+
+Lee los tres con calma: código, frase, ubicación, marcas, `help:`. En los tres, el `help:` traía el arreglo exacto.
+
+## Bajo el capó
+
+<BajoElCapo titulo="El mismo error, para máquinas">
+Lo que ves en la terminal es una versión para personas. Con `rustc --error-format=json` el compilador emite el mismo error como datos estructurados, que es lo que leen los editores (rust-analyzer) y lo que usa este curso para mostrarte los errores reales en cada lección. Para el error E0308 de arriba, el JSON real incluye, entre otros, estos campos:
+
+- `"level": "error"` y `"code": {"code": "E0308", "explanation": "Expected type did not match the received type. …"}`: el código y **la ficha entera** de `--explain`.
+- `"message": "mismatched types"`.
+- `"spans"`: los trozos de código marcados, con `"line_start": 2`, `"column_start": 21` y la etiqueta ``"expected `i32`, found `&str`"``.
+- `"rendered"`: el texto ya dibujado, tal como sale en la terminal.
+
+Cada `^^^` o `---` de la terminal es un **span** (un tramo de código, de una columna a otra) con su etiqueta. Por eso tu editor puede subrayarte el sitio exacto.
+
+Y una advertencia honesta, que viene de la investigación sobre cómo aprende la gente Rust: los mensajes son muy buenos, pero **no siempre cuentan toda la historia**. En un estudio con 110 errores reales, en 51 el mensaje se quedaba corto para entender la causa. Ya lo viste en la lección de formato, con `{edad + 1}`: el compilador hablaba de una opción `+` mal colocada. Lee el mensaje, pero piensa también tú.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Aplicar el help: sin pensar">
+❌ Copiar el arreglo del `help:` en cuanto aparece. Suele acertar, pero el compilador solo ve el código, no tu intención. En el ejemplo de E0384, añadir `mut` es correcto **si** querías que los puntos cambiaran. Si no, el error de verdad es la línea 4, que no debería existir.
+
+✅ Antes de aplicar el `help:`, pregúntate: «¿qué quería hacer yo?». Si el arreglo coincide con tu intención, adelante. Si no, el error te está señalando un fallo de diseño, no de escritura.
+</Trampa>
+
+## Tu turno
+
+<Respuesta
+  pregunta="En el error `--> src/main.rs:12:9`, ¿en qué columna está el problema?"
+  respuestas={["9", "nueve"]}
+  explicacion="El formato es archivo:línea:columna. Línea 12, columna 9."
+/>
+
+<Respuesta
+  pregunta="¿Qué comando escribes para leer la ficha del error E0425?"
+  respuestas={["rustc --explain E0425", "rustc --explain e0425"]}
+  explicacion="`rustc --explain E0425`. La ficha empieza con «An unresolved name was used» (se usó un nombre sin resolver)."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué parte de un error de rustc te dice **dónde** está el problema?"
+  opciones={["La cabecera `error[E0xxx]`", "La línea `-->` con archivo:línea:columna, y las marcas `^^^`", "La línea `aborting due to…`", "El `note:`"]}
+  correcta={1}
+  explicacion="La línea `-->` da la ubicación exacta y el dibujo con `^^^` la señala dentro del código."
+  porque={["La cabecera dice **qué** pasa, no dónde.", "", "Esa línea solo cuenta cuántos errores hubo.", "`note:` añade contexto, pero no es lo que sitúa el error."]}
+/>
+
+<Pregunta
+  pregunta="El compilador te muestra 3 errores. ¿Qué haces primero?"
+  opciones={["Leer solo el último, que es el más reciente", "Leer el primero de arriba abajo, arreglarlo y volver a compilar", "Borrar las líneas marcadas", "Cambiar de edición de Rust"]}
+  correcta={1}
+  explicacion="El primero suele ser la causa de alguno de los siguientes. Arreglarlo y recompilar (con `cargo check`, que es rápido) muchas veces hace desaparecer otros."
+  porque={["Los errores no van en orden de «antigüedad»; van en el orden de las fases del compilador.", "", "Borrar código hace desaparecer el error y también lo que querías que hiciera el programa.", "La edición no tiene nada que ver con un error normal de tu código."]}
+/>
+
+<Pregunta
+  pregunta="El error dice «expected `i32`, found `&str`». ¿Qué ha pasado?"
+  opciones={["Has escrito un número donde iba un texto", "Has escrito un texto donde se esperaba un número `i32`", "Falta un `!`", "La variable no existe"]}
+  correcta={1}
+  explicacion="«Expected» es lo que el compilador esperaba (un número `i32`) y «found» lo que encontró (un texto, `&str`). Es el error E0308."
+  porque={["Es al revés: «expected» es lo que debía haber, «found» lo que hay.", "", "La falta del `!` da E0423, no E0308.", "Un nombre inexistente da E0425."]}
+/>

@@ -1,0 +1,142 @@
+---
+title: "Sentencias y expresiones"
+description: "Distingue para siempre una sentencia de una expresión y aprende a leer el error E0308 que provoca un punto y coma de más al final de una función."
+sidebar:
+  order: 4
+duracion: 10
+desde: "1.0"
+requiere: ["05-funciones-y-la-pila/03-devolver-valores"]
+tarjetas:
+  - p: "¿Por qué `fn cuadrado(x: i32) -> i32 { x * x; }` no compila?"
+    r: "El `;` convierte `x * x` en sentencia: el cuerpo no tiene expresión final y vale `()`, no `i32` (E0308, «remove this semicolon»)."
+  - p: "¿Es `let` una expresión?"
+    r: "No, es una sentencia: no produce valor. Por eso `let x = (let y = 5);` no compila."
+  - p: "¿Qué valor tiene una asignación como `c = 10`?"
+    r: "`()`. Asigna, pero no «devuelve» el 10."
+  - p: "¿Qué significa «implicitly returns `()`» en un error?"
+    r: "Que el cuerpo de la función no tiene expresión final ni `return`, así que devuelve `()` sin que lo hayas escrito."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a dominar la diferencia entre **sentencia** y **expresión** y a reconocer al instante el error más típico de quien empieza con funciones en Rust: el punto y coma que sobra.
+
+## Predice
+
+<NoCompila
+  ej="m05/punto-y-coma-final"
+  explicacion="La función promete devolver un `i32`, y calcula `x * x`... pero con `;`. ¿Qué valor queda al final del cuerpo? Ninguno: el cuerpo vale `()`. Lee el error: «implicitly returns `()` as its body has no tail or `return` expression» (devuelve `()` implícitamente porque su cuerpo no tiene expresión final ni `return`)."
+/>
+
+## La idea
+
+Repasemos con precisión, porque ahora importa:
+
+- Una **expresión** produce un valor: `5`, `x * x`, `cuadrado(3)`, `if a { 1 } else { 2 }`, un bloque `{ ... }`. Se pueden anidar unas dentro de otras.
+- Una **sentencia** es una orden completa que no produce valor útil. En Rust hay pocas: `let ...;`, las declaraciones como `fn`, y **cualquier expresión seguida de `;`**.
+
+La última regla es la clave. El `;` toma una expresión, la ejecuta y **tira su valor**. Dentro de una función con `-> i32`, si la última línea es `x * x;`, el cálculo se hace... y el resultado se tira. El cuerpo se queda sin expresión final, vale `()`, y `()` no es un `i32`. Rust te lo dice con el error **E0308** (tipos que no coinciden) y una pista de oro: «remove this semicolon to return this value» (quita este punto y coma para devolver este valor).
+
+Un truco para no fallar nunca: **la última línea de una función que devuelve algo no lleva `;`**. Todas las demás, sí.
+
+## Pruébalo
+
+<Ejecutar ej="m05/sentencias-y-expresiones" />
+
+1. `((a * a + b * b) as f64).sqrt()` es una expresión dentro de otra: suma, conversión a `f64` y raíz cuadrada. 3, 4, 5: el triángulo de siempre.
+2. El bloque que termina en una sentencia `let` vale `()`.
+3. Sorpresa: `c = 10` también es una expresión, pero vale `()`, no 10. Asignar cambia `c`, pero no «devuelve» nada útil.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Cómo lee el compilador un cuerpo.** El cuerpo de una función es un bloque: una lista de sentencias y, opcionalmente, una expresión final. El tipo del bloque es el de esa expresión final, o `()` si no la hay. Luego el compilador compara ese tipo con el de la firma (`-> i32`). Si no coinciden, error E0308. Nada más: no hay magia, es la regla de los bloques del mundo 04.
+
+**`let` no es una expresión.** Por eso no puedes escribir `let x = (let y = 5);`:
+
+<NoCompila ej="m05/let-no-es-expresion" explicacion="«expected expression, found `let` statement»: esperaba una expresión y encontró una sentencia `let`. La nota menciona que `let` sí puede aparecer directamente en las condiciones de `if` y `while` (`if let`, que verás en el mundo 09)." />
+
+**¿Por qué Rust lo diseñó así?** Hacer que casi todo sea una expresión permite escribir `let x = if ... { } else { };` o `let y = match ...` sin variables a medio inicializar. Y que el `;` descarte el valor te obliga a decidir: o quieres el valor (sin `;`) o no (con `;`). El compilador comprueba que tu decisión cuadre con la firma.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Añadir return en vez de quitar el ;">
+
+❌ Ante el error, mucha gente escribe `return x * x;`. Compila, pero no es lo habitual en Rust:
+
+```rust
+fn cuadrado(x: i32) -> i32 {
+    return x * x;
+}
+```
+
+✅ Basta con quitar el punto y coma. Reserva `return` para salir **antes** del final:
+
+```rust
+fn cuadrado(x: i32) -> i32 {
+    x * x
+}
+```
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m05/arregla-retornos"
+  enunciado="Este programa tiene dos errores E0308 causados por puntos y comas. Arréglalos **sin** añadir `return`. Debe imprimir `media = 5.5, ¿aprobado? true`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estas funciones compila?"
+  opciones={[
+    "`fn f() -> bool { true; }`",
+    "`fn f() -> bool { let b = true; }`",
+    "`fn f() -> bool { let b = true; b }`",
+    "`fn f() -> bool { b = true }`"
+  ]}
+  correcta={2}
+  explicacion="La última línea `b` (sin `;`) es la expresión final, de tipo `bool`."
+  porque={[
+    "El `;` tira el `true`: el cuerpo vale `()`.",
+    "Termina en una sentencia `let`: el cuerpo vale `()`.",
+    "",
+    "`b` no existe (no hay `let`), y además una asignación vale `()`, no `bool`."
+  ]}
+/>
+
+<Pregunta
+  pregunta="En el error E0308 de un `;` final, ¿qué significa «expected `i32`, found `()`»?"
+  opciones={[
+    "Que el parámetro debería ser `()`",
+    "Que la firma promete un `i32` pero el cuerpo produce `()`",
+    "Que `i32` no existe",
+    "Que hay que añadir `mut`"
+  ]}
+  correcta={1}
+  explicacion="«expected» (esperado) es lo que dice la firma; «found» (encontrado) es lo que produce el cuerpo. El `()` delata un `;` sobrante."
+  porque={[
+    "El error habla del tipo de retorno, no de los parámetros.",
+    "",
+    "`i32` es un tipo básico; el problema es que no coincide.",
+    "La mutabilidad no tiene nada que ver con los tipos de retorno."
+  ]}
+/>
+
+<Pregunta
+  pregunta={"¿Qué imprime `let a = 5; let b = { a * 2 }; let c = { a * 2; }; println!(\"{b} {c:?}\");`?"}
+  opciones={["`10 10`", "`10 ()`", "`() 10`", "No compila"]}
+  correcta={1}
+  explicacion="El primer bloque termina en expresión (vale 10); el segundo en sentencia (vale `()`). Se imprime `()` gracias a `:?`."
+  porque={[
+    "El `;` del segundo bloque tira el 10.",
+    "",
+    "Es al revés.",
+    "Compila: guardar `()` en una variable es válido (aunque el compilador avisa de que la operación no se usa)."
+  ]}
+/>

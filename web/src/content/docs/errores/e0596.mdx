@@ -1,0 +1,76 @@
+---
+title: "E0596: préstamo exclusivo de algo no mutable"
+description: "Llamas a algo que necesita &mut sobre una variable que no es mut (o a través de un &)."
+sidebar:
+  order: 52
+insignias: ["Préstamos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot borrow `lista` as mutable, as it is not declared as mutable ``
+
+## Qué significa
+
+`push` necesita un **préstamo exclusivo** (`&mut self`) porque modifica el vector. Solo se puede pedir `&mut` de una variable declarada `mut` (o de algo al que ya llegas con `&mut`).
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0596" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0596]: cannot borrow `lista` as mutable, as it is not declared as mutable
+ --> E0596.rs:3:5
+  |
+3 |     lista.push(1);
+  |     ^^^^^ cannot borrow as mutable
+  |
+help: consider changing this to be mutable
+  |
+2 |     let mut lista = Vec::new();
+  |         +++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Olvidar `mut` en `let lista = Vec::new();`.
+- Llamar a un método `&mut self` dentro de un método que solo recibe `&self`.
+- Intentar modificar a través de un préstamo compartido `&T`.
+
+## Cómo arreglarlo
+
+Declara la variable con `mut`, o cambia el parámetro o el método para que reciban `&mut`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let mut lista = Vec::new();
+    lista.push(1);
+    println!("{lista:?}");
+}
+```
+
+**Salida:**
+
+```text
+[1]
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0596` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0384](/errores/e0384/): asignar dos veces a una variable inmutable
+- [E0594](/errores/e0594/): asignar a través de un préstamo compartido
+- [E0502](/errores/e0502/): préstamo exclusivo mientras hay uno compartido
+
+## Aprende esto en
+
+- [Mundo 07 · Préstamos](/curso/07-prestamos/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

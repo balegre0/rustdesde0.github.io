@@ -1,0 +1,101 @@
+---
+title: "slices: [T] y &[T]"
+description: "Trozos de memoria contigua: len, get, first, split_at, chunks, windows, sort, binary_search, reverse, swap."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `[T] (tipo primitivo) y std::slice`
+
+## Para qué sirve
+
+Un **slice** `[T]` es una secuencia contigua de valores de tipo `T` cuyo tamaño no se conoce al compilar. Se usa siempre detrás de una referencia: `&[T]` (compartido) o `&mut [T]` (exclusivo), que guardan un puntero y una longitud. Arrays, `Vec` y `VecDeque` (con `make_contiguous`) se prestan como slices, así que estos métodos sirven para todos.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| `len, is_empty, first, last, get` | Leer sin entrar en pánico. | 1.0 |
+| `contains, binary_search` | Buscar (binary_search necesita el slice ordenado). | 1.0 |
+| `split_at, chunks, windows` | Trocear. | 1.0 |
+| `sort, sort_unstable, sort_by_key` | Ordenar en el sitio. | 1.0 |
+| `reverse, swap, fill` | Modificar en el sitio. | 1.0 |
+| `iter, iter_mut` | Recorrer. | 1.0 |
+
+**Ficha detallada:** [Métodos de las slices](/ref/std/slice/metodos/)
+
+## Conceptos clave
+
+- **Recibe `&[T]`** en tus funciones en lugar de `&Vec<T>`: aceptarás también arrays y trozos.
+- **`sort` es estable** (los iguales mantienen su orden) y `sort_unstable` no, pero es más rápido y no reserva memoria.
+- **`split_at_mut`** da dos préstamos exclusivos de partes que no se solapan: la solución a [E0499](/errores/e0499/) con elementos de un mismo vector.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/slice-metodos" />
+
+**Salida:**
+
+```text
+6 Some(5) Some(2) None
+[3, 8] true
+[5, 3] [8, 1, 9, 2]
+[5, 3, 8, 1] [9, 2] 
+[16, 12, 18, 12]
+[2, 9, 1, 8, 3, 5]
+[1, 2, 3, 5, 8, 9]
+Ok(4) Err(3)
+[1, 8, 5, 3, 2, 9]
+[0, 0, 0, 3, 2, 9]
+["Kiwi", "manzana", "pera"]
+```
+
+## Sinopsis
+
+```rust
+pub fn get<I>(&self, index: I) -> Option<&<I as SliceIndex<[T]>>::Output>
+where
+    I: SliceIndex<[T]>,
+
+pub const fn split_at(&self, mid: usize) -> (&[T], &[T])
+
+pub fn chunks(&self, chunk_size: usize) -> Chunks<'_, T>
+
+pub fn windows(&self, size: usize) -> Windows<'_, T>
+
+pub fn sort(&mut self)
+where
+    T: Ord,
+
+pub fn binary_search(&self, x: &T) -> Result<usize, usize>
+where
+    T: Ord,
+
+pub const fn swap(&mut self, a: usize, b: usize)
+```
+
+## Pánicos
+
+Indexar (`s[i]`) o cortar (`&s[a..b]`) fuera de rango entra en pánico; `get` devuelve `None` en su lugar. También entran en pánico `split_at` y `swap` con posiciones que no existen, y `chunks(0)`.
+
+<Ejecutar ej="ref-std/slice-indice-panico" />
+
+**Salida de error** (*stderr*):
+
+```text
+thread 'main' (1) panicked at slice-indice-panico.rs:4:19:
+range end index 4 out of range for slice of length 3
+```
+
+## Ver también
+
+- [Vec](/ref/std/vec/vec/)
+- [Iteradores](/ref/std/iter/)
+- [cmp](/ref/std/cmp/ord/)
+
+## Aprende esto en
+
+- [Mundo 07 · Préstamos](/curso/07-prestamos/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

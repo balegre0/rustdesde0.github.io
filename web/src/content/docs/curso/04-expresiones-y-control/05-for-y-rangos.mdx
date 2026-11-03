@@ -1,0 +1,149 @@
+---
+title: "for y los rangos"
+description: "Recorre rangos de números, arrays y textos con for, y aprende por qué es la forma más segura de repetir algo un número conocido de veces."
+sidebar:
+  order: 5
+duracion: 11
+desde: "1.0"
+requiere: ["04-expresiones-y-control/04-while"]
+tarjetas:
+  - p: "¿Qué números recorre `0..5`? ¿Y `0..=5`?"
+    r: "`0..5`: 0, 1, 2, 3, 4 (excluye el 5). `0..=5`: 0, 1, 2, 3, 4, 5 (lo incluye)."
+  - p: "¿Cómo recorres un rango al revés? ¿Y de 3 en 3?"
+    r: "`(1..=5).rev()` y `(0..10).step_by(3)`."
+  - p: "¿Qué pasa si indexas un array fuera de su tamaño (`notas[4]` con 4 elementos)?"
+    r: "Rust lo comprueba en tiempo de ejecución y entra en pánico: «index out of bounds». Nunca lee memoria ajena."
+  - p: "¿Por qué `for x in array` es mejor que recorrer con índices?"
+    r: "Porque no hay índice que pueda salirse: el `for` termina exactamente con el último elemento."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a repetir algo **un número conocido de veces** o **una vez por cada elemento** de una colección, con la herramienta que más usarás en Rust: `for`.
+
+## Predice
+
+<Predice
+  ej="m04/for-rangos"
+  opciones={[
+    "La primera línea es `0 1 2 3 4 5`",
+    "La primera línea es `0 1 2 3 4` y la segunda `1 2 3 4 5`",
+    "La primera línea es `1 2 3 4 5`",
+    "La última línea imprime `5`"
+  ]}
+  correcta={1}
+  explicacion="`a..b` excluye el final; `a..=b` lo incluye. Y `5..5` está vacío: no da ninguna vuelta."
+  porque={[
+    "`0..5` se detiene ANTES del 5.",
+    "",
+    "`0..5` empieza en 0, no en 1.",
+    "`5..5` empieza y termina en 5 sin incluirlo: está vacío."
+  ]}
+/>
+
+## La idea
+
+`for x in algo { ... }` ejecuta el cuerpo **una vez por cada elemento** de `algo`, y en cada vuelta `x` es el elemento de turno. Ese «algo» puede ser un **rango** de números, un array, un texto (con `.chars()`) y, más adelante, cualquier colección.
+
+Un **rango** (*range*) se escribe `inicio..fin` y contiene los números desde `inicio` hasta `fin` **sin incluirlo**. Si quieres incluir el final, usa `inicio..=fin`. ¿Por qué excluir el final por defecto? Porque así `0..n` da **exactamente n números**, y `0..array.len()` recorre justo las posiciones válidas de un array.
+
+Los rangos tienen trucos: `.rev()` los recorre al revés y `.step_by(k)` salta de k en k. Son **métodos** (funciones que se llaman con un punto); los verás con detalle en el mundo 14.
+
+## Pruébalo
+
+<Ejecutar ej="m04/for-array" />
+
+1. `for nota in notas` recorre los cuatro elementos. No hay ningún índice que gestionar ni que se pueda salir.
+2. Cuando también necesitas la posición, `.iter().enumerate()` te da parejas `(posición, elemento)`.
+3. `"año".chars()` recorre **caracteres**, no bytes: la «ñ» es un carácter aunque ocupe 2 bytes en UTF-8 (lo viste en el mundo 03).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`for` es azúcar de `loop` + iterador.** Un **iterador** (*iterator*) es algo que sabe dar «el siguiente elemento» o decir «ya no quedan». El compilador traduce `for x in algo { cuerpo }` a algo así:
+
+```rust
+let mut it = algo.into_iter();
+loop {
+    match it.next() {
+        Some(x) => { cuerpo }
+        None => break,
+    }
+}
+```
+
+No te preocupes por `Some`/`None` todavía (mundo 09): la idea es que **el bucle termina cuando el iterador dice que no quedan elementos**. Por eso un `for` nunca se pasa.
+
+**La comprobación de límites.** Cuando sí usas índices (`notas[i]`), Rust comprueba en cada acceso que `i` sea menor que la longitud. Si no lo es, **entra en pánico** (*panic*): detiene el programa con un mensaje claro en lugar de leer memoria que no pertenece al array. Leer fuera de un array es un clásico **comportamiento indefinido** (UB): el programa podría leer basura, datos secretos o romperse más tarde sin explicación. Rust lo convierte en un error inmediato y visible.
+
+**¿Y el coste?** Comprobar el límite es una comparación. Con `for x in notas` ni siquiera eso: el compilador sabe que el iterador nunca se sale y no comprueba nada.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="El rango que se pasa en uno">
+
+❌ `0..=notas.len()` incluye la longitud, que ya no es una posición válida:
+
+<Ejecutar ej="m04/for-fuera-de-rango" />
+
+El programa imprime las cuatro notas y en la quinta vuelta se detiene con «index out of bounds: the len is 4 but the index is 4» (fuera de límites: la longitud es 4 pero el índice es 4).
+
+✅ Usa `0..notas.len()` (sin `=`) o, mejor aún, `for nota in notas`.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m04/tabla"
+  enunciado="Imprime la tabla de multiplicar del 7, del 1 al 10 **incluidos**, con el formato `7 x 1 = 7`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántas vueltas da `for i in 3..8 { }`?"
+  opciones={["5", "6", "8", "3"]}
+  correcta={0}
+  explicacion="3, 4, 5, 6, 7: cinco números. En general, `a..b` da `b - a` vueltas."
+  porque={[
+    "",
+    "Serían 6 con `3..=8`.",
+    "8 es el final (excluido), no el número de vueltas.",
+    "3 es el inicio, no la cantidad."
+  ]}
+/>
+
+<Pregunta
+  pregunta={"¿Qué imprime `for c in \"ñu\".chars() { print!(\"{c}-\"); }`?"}
+  opciones={["`ñ-u-`", "Dos bytes raros y `u-`", "`ñu-`", "No compila: los textos no se recorren"]}
+  correcta={0}
+  explicacion="`.chars()` recorre caracteres Unicode: `ñ` y `u`. Cada uno va seguido de `-`."
+  porque={[
+    "",
+    "Eso pasaría si recorrieras bytes (`.bytes()`), no caracteres.",
+    "El cuerpo se ejecuta una vez POR CARÁCTER.",
+    "Se recorren con `.chars()` (caracteres) o `.bytes()` (bytes)."
+  ]}
+/>
+
+<Pregunta
+  pregunta="Accedes a `v[10]` en un array de 3 elementos. ¿Qué hace Rust?"
+  opciones={[
+    "Devuelve 0",
+    "Lee la memoria que haya detrás del array",
+    "Entra en pánico con «index out of bounds» (si el índice se conoce al compilar, ni siquiera compila)",
+    "Agranda el array"
+  ]}
+  correcta={2}
+  explicacion="Rust comprueba los límites. Leer fuera sería comportamiento indefinido, así que lo convierte en un pánico, o en un error de compilación si puede detectarlo antes."
+  porque={[
+    "Rust no se inventa valores.",
+    "Eso es exactamente el comportamiento indefinido que Rust impide.",
+    "",
+    "Un array tiene tamaño fijo; nunca crece."
+  ]}
+/>

@@ -1,0 +1,140 @@
+---
+title: "Jefe: tu primer compilador y tu primera contribución"
+description: "Junta todo el mundo en un compilador completo en miniatura y sube la escalera que lleva hasta tu primer PR en rustc."
+sidebar:
+  order: 15
+duracion: 15
+desde: "1.0"
+requiere: ["21-el-compilador-por-dentro/14-queries-y-tiempos"]
+tarjetas:
+  - p: "¿Cuáles son las etapas del mini-compilador del jefe?"
+    r: "Lexer (texto → tokens), parser con precedencias (tokens → AST), una pasada de optimización (plegado de constantes), generación de código para una máquina de pila y ejecución."
+  - p: "¿Qué orden se usa para construir y probar rustc desde el código fuente?"
+    r: "`./x setup`, `./x build --stage 1` (o `./x check` para ir rápido), `rustup toolchain link stage1 build/host/stage1` y `./x test tests/ui` para los tests de diagnósticos."
+  - p: "¿Qué tipo de primera contribución recomienda la comunidad de rustc?"
+    r: "Mejorar un diagnóstico (issues con etiquetas como `E-easy`, `E-mentor`, `A-diagnostics`), añadir un test UI, o empezar por una lint de Clippy."
+  - p: "¿Dónde se pide ayuda para contribuir al compilador?"
+    r: "En el Zulip del proyecto (rust-lang.zulipchat.com), canales como `#t-compiler/help`, y siguiendo la *rustc-dev-guide*."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa, Historia } from '~/components';
+
+Has seguido a un programa por todas las etapas de `rustc`. Ahora vas a **construir** las etapas tú: un compilador completo de expresiones aritméticas, de punta a punta, que genera código para una máquina y lo ejecuta. Y después, la escalera para pasar de entender el compilador a mejorarlo.
+
+## Predice
+
+<Pregunta
+  pregunta="El mini-compilador recibe `x * (2 + 3) - 4 * 1`. Tras la pasada de plegado de constantes, ¿qué árbol queda?"
+  opciones={[
+    "El mismo árbol: no se puede simplificar porque hay una `x`",
+    "`x * 5 - 4`: los subárboles sin `x` se calculan al compilar",
+    "Un solo número",
+    "`x * 2 + 3 - 4`"
+  ]}
+  correcta={1}
+  explicacion="`2 + 3` y `4 * 1` no dependen de `x`, así que se calculan al compilar (5 y 4). Lo que depende de `x` se queda. Es la misma idea que la propagación de constantes de las pasadas de MIR y de LLVM."
+  porque={["Las partes que no dependen de `x` sí se pueden calcular.", "", "Con `x` desconocida no puede quedar un solo número.", "Eso cambiaría el significado: los paréntesis ya están en la forma del árbol."]}
+/>
+
+## La idea
+
+El jefe es un compilador de verdad, solo que pequeño. Tiene las mismas piezas que has estudiado:
+
+1. **Lexer** (lección 2): caracteres → `Tok`.
+2. **Parser con precedencias** (lección 2): tokens → `Ast`.
+3. **Pasada de optimización** (lecciones 4 y 9): `plegar` calcula al compilar todo lo que no depende de la entrada.
+4. **Codegen** (lección 9): el árbol se convierte en instrucciones para una **máquina de pila**: `Empuja(5)`, `CargaX`, `Opera('*')`.
+5. **Ejecución**: un bucle que interpreta esas instrucciones, como hace una CPU con las suyas.
+
+Lee el programa de arriba abajo y busca cada etapa. Después, en el reto, escribirás tú una pasada de optimización nueva.
+
+## Pruébalo
+
+<Ejecutar ej="m21/mini-compilador" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La escalera hasta rustc.** Así se pasa, paso a paso, de este curso a contribuir al compilador:
+
+1. **Ver los bytes**: tablas de «predice el tamaño» con `const _: () = assert!(…)` (lección 10).
+2. **Ver el ensamblador**: compara un bucle `while`, un `for` y un `iter().sum()` con `--emit=asm` o en Compiler Explorer (godbolt.org); encuentra la comprobación de límites.
+3. **Ver HIR y MIR**: desazucara `for`, `?` y `match`, y dibuja el grafo de MIR a mano (lecciones 3 y 4).
+4. **Punteros gordos y vtables**: lee una vtable en el asm y escribe un `dyn` a mano (lección 11).
+5. **Async por dentro**: un `Future` a mano y un ejecutor mínimo; mide tamaños (lección 12).
+6. **Un asignador propio** con `GlobalAlloc` (mundo 22) y un **binario sin `std`** (mundo 23).
+7. **Compilar rustc**. Clona `rust-lang/rust` y, dentro:
+
+   ```bash
+   ./x setup                 # elige el perfil «compiler»
+   ./x check                 # comprobación rápida
+   ./x build --stage 1       # compila el compilador
+   rustup toolchain link stage1 build/host/stage1
+   rustc +stage1 --version   # ¡tu propio rustc!
+   ./x test tests/ui         # los tests de diagnósticos
+   ```
+
+   En Windows necesitas las herramientas de compilación de Visual Studio (la trampa del enlazador del mundo 0) y bastante disco y paciencia: la primera compilación tarda.
+8. **Primer PR**: en el repositorio, busca issues con etiquetas `E-easy`, `E-mentor` o `E-help-wanted`, y `A-diagnostics`. Mejorar un mensaje de error es la puerta de entrada clásica: tocas una etapa concreta, añades un **test UI** (un `.rs` con su salida esperada `.stderr`) y el cambio es fácil de revisar. **Clippy** (un repositorio aparte) es un sitio más amable aún para empezar: cada lint es pequeña y autocontenida.
+9. **Profundidad**: lee `rustc_borrowck`, `rustc_mir_transform` y `rustc_next_trait_solver`; sigue los objetivos del proyecto para 2026 (nuevo solver, Polonius, frontend paralelo, Cranelift) en https://rust-lang.github.io/rust-project-goals/.
+
+**Dónde pedir ayuda.** El Zulip del proyecto (rust-lang.zulipchat.com), canales `#t-compiler` y `#t-compiler/help`. La *rustc-dev-guide* (rustc-dev-guide.rust-lang.org) es la referencia para todo lo anterior. Antes de un cambio grande, pregunta: alguien puede estar trabajando en ello o conocer una trampa.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Empezar por la parte más difícil del compilador">
+
+❌ «Mi primera contribución será reescribir una parte del borrow checker.»
+
+✅ Empieza por algo que se pueda revisar en una tarde: un diagnóstico más claro, un test que falta, una lint. Aprenderás el flujo (compilar, probar, `./x test`, revisión, CI) con poco riesgo. La profundidad llega sola después de varios PR pequeños.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m21/optimizador"
+  enunciado="Escribe una pasada de optimización nueva: `simplificar` aplica dos reglas algebraicas, `e * 1 → e` y `e + 0 → e`. Simplifica primero los hijos (así las reglas se aplican de abajo arriba) y deja igual todo lo demás. Salida esperada: `Var` en la primera línea y `Bin('*', Var, Bin('*', Var, Num(2)))` en la segunda."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En la máquina de pila del jefe, ¿qué instrucciones genera `codegen` para el árbol `Bin('*', Var, Num(5))`?"
+  opciones={[
+    "`[Opera('*'), CargaX, Empuja(5)]`",
+    "`[CargaX, Empuja(5), Opera('*')]`",
+    "`[Empuja(5), Opera('*')]`",
+    "`[Opera('*')]`"
+  ]}
+  correcta={1}
+  explicacion="Primero se genera el código de los dos hijos (que dejan sus valores en la pila) y luego la operación, que saca dos y mete el resultado. Es un recorrido en postorden."
+  porque={["La operación necesita sus dos operandos ya en la pila.", "", "Falta cargar `x`.", "Sin operandos, `Opera` no tendría qué sacar de la pila."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué es un test UI en el repositorio de rustc?"
+  opciones={[
+    "Un test de la interfaz gráfica de rust-analyzer",
+    "Un programa `.rs` junto con la salida exacta que debe dar el compilador (`.stderr`), para comprobar diagnósticos",
+    "Una prueba de rendimiento",
+    "Un test que solo se ejecuta en Windows"
+  ]}
+  correcta={1}
+  explicacion="UI viene de «user interface»: la interfaz del compilador con las personas son sus mensajes. Si cambias un diagnóstico, actualizas el `.stderr` esperado."
+  porque={["rust-analyzer es otro proyecto.", "", "El rendimiento se mide aparte, en perf.rust-lang.org.", "Los tests UI se ejecutan en todas las plataformas que soporta la CI."]}
+/>
+
+<Historia titulo="Los mensajes de error como producto">
+
+Una parte enorme del trabajo en rustc no es hacer que acepte más programas, sino que **explique mejor** por qué rechaza los que rechaza. Las sugerencias `help:` con el arreglo exacto, las etiquetas que señalan el préstamo y el uso, el `rustc --explain E0502`… todo eso lo escribieron personas que empezaron, muchas veces, con un primer PR de diagnósticos.
+
+</Historia>
+
+## Para saber más
+
+- *rustc-dev-guide*, «Getting Started» y «How to build and run the compiler»: https://rustc-dev-guide.rust-lang.org/getting-started.html
+- Mundo 24, lección sobre cómo evoluciona Rust (RFC, equipos y gobernanza).

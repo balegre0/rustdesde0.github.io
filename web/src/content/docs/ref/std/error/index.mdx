@@ -1,0 +1,69 @@
+---
+title: "std::error"
+description: "El trait Error: tipos de error propios, la cadena de causas (source) y Box<dyn Error>."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::error`
+
+## Para qué sirve
+
+El trait `Error` es lo que tienen en común todos los errores: se pueden mostrar a una persona (`Display`), a quien programa (`Debug`) y pueden tener una **causa** (`source`). Implementarlo en tus tipos de error permite mezclarlos con los de la biblioteca y usar `Box<dyn Error>`.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| `Error` | El trait de los errores. | 1.0 |
+| `Box<dyn Error>` | Cualquier error en una caja: práctico para `main` y prototipos. | — |
+
+**Ficha detallada:** [El trait Error](/ref/std/error/error/)
+
+## Conceptos clave
+
+- **Patrón habitual**: un `enum` con una variante por tipo de fallo, `impl Display`, `impl Error` y un `impl From<OtroError>` por cada error que quieras convertir con `?`.
+- **`Box<dyn Error>`**: como `?` usa `From`, y existe `From<E> for Box<dyn Error>` para todo `E: Error`, una función que devuelve `Result<T, Box<dyn Error>>` puede usar `?` con cualquier error.
+- **`fn main() -> Result<(), Box<dyn Error>>`**: si devuelve `Err`, el programa muestra el error y sale con código 1.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/error-basico" />
+
+**Salida:**
+
+```text
+30: 30
+200: 200 no es una edad válida (causa: None)
+treinta: la edad no es un número (causa: Some("invalid digit found in string"))
+30
+principal falló: invalid digit found in string
+```
+
+## Sinopsis
+
+```rust
+pub trait Error: Debug + Display {
+    // ... y 4 métodos provistos (con implementación por defecto)
+}
+```
+
+## Métodos principales
+
+```rust
+fn source(&self) -> Option<&(dyn Error + 'static)>
+```
+
+Devuelve la causa del error, si la hay (por defecto, `None`). Recorriendo `source()` una y otra vez se obtiene la cadena completa de causas.
+
+## Ver también
+
+- [Result](/ref/std/result/result/)
+- [From](/ref/std/convert/from/)
+- [fmt::Display](/ref/std/fmt/display/)
+
+## Aprende esto en
+
+- [Mundo 10 · Errores](/curso/10-errores/)

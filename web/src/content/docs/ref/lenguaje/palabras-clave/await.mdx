@@ -1,0 +1,56 @@
+---
+title: "await"
+description: "Palabra clave estricta (desde la edición 2018): espera a que un futuro termine y entrega su valor."
+sidebar:
+  order: 4
+desde: "1.39"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`.await` se escribe **detrás** de un futuro y significa: «pausa esta función async hasta que ese futuro tenga su resultado, y dámelo».
+
+## Sinopsis
+
+```text
+expresión.await      // expresión: impl IntoFuture; resultado: su Output
+```
+
+## Qué hace
+
+`.await` es un operador **postfijo**: va detrás, como un acceso a campo. Así se pueden encadenar: `descargar().await?.texto().await`.
+
+1. Convierte la expresión en futuro con `IntoFuture::into_future`.
+2. La sondea. Si el resultado aún no está listo, la función async actual **cede el control** al ejecutor y se reanudará más tarde en ese mismo punto.
+3. Cuando el futuro termina, `.await` vale su `Output`.
+
+Solo se puede usar **dentro** de una `async fn`, un bloque `async` o una closure async. Las variables que siguen vivas al cruzar un `.await` se guardan dentro del futuro; por eso un futuro puede ocupar bastante memoria.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-await" />
+
+Salida:
+
+```text
+total = 30
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-await-error" />
+
+`error[E0728]: await is only allowed inside async functions and blocks`. `main` no es async; o se convierte esa parte en código async, o se le pasa el futuro a un ejecutor.
+
+## Desde
+
+Rust 1.39. Palabra clave estricta desde la edición 2018.
+
+## Ver también
+
+- [`async`](/ref/lenguaje/palabras-clave/async/) · [Expresiones](/ref/lenguaje/expresiones/): precedencia de `.await` (la misma que una llamada a método).
+
+## Aprende esto en
+
+- [Mundo 18 · Async](/curso/18-async/)

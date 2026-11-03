@@ -1,0 +1,127 @@
+---
+title: "Fuzzing y pruebas de propiedades"
+description: "Deja que la máquina invente las entradas: encuentra los casos raros que nunca se te habrían ocurrido."
+sidebar:
+  order: 10
+duracion: 13
+desde: "1.0"
+requiere: ["16-pruebas-y-herramientas/09-medir-el-rendimiento", "14-closures-e-iteradores"]
+tarjetas:
+  - p: "¿Qué es una prueba de propiedades?"
+    r: "Una prueba que, en vez de comprobar ejemplos concretos, comprueba algo que debe cumplirse **siempre** (por ejemplo, «ordenar dos veces da lo mismo que una») con cientos de entradas generadas al azar."
+  - p: "¿Qué es el fuzzing?"
+    r: "Lanzar contra tu código enormes cantidades de entradas generadas automáticamente, buscando pánicos, cuelgues o comportamiento indefinido. Los fuzzers guiados por cobertura mutan las entradas que llegan a código nuevo."
+  - p: "¿Por qué los generadores de las pruebas aleatorias deben usar una semilla fija o mostrarla?"
+    r: "Para que un fallo se pueda **reproducir**. Con la misma semilla, el generador produce la misma secuencia y el fallo vuelve a salir."
+  - p: "¿Qué herramienta del ecosistema se usa para fuzzing en Rust?"
+    r: "`cargo-fuzz`, que usa libFuzzer. Necesita la toolchain nightly y se escribe cada objetivo con la macro `fuzz_target!`."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Cuando escribes pruebas, eliges tú los ejemplos… y eliges los que se te ocurren, que son justo los que ya has pensado. Vas a dejar que la máquina invente entradas por ti.
+
+## Predice
+
+Esta función lee una hora como `"HH:MM"` y devuelve los minutos desde medianoche. Comprueba que la hora no pase de 23 ni los minutos de 59. Un «fuzzer» de juguete le lanza hasta 100 000 textos fabricados al azar con trozos como `"0"`, `"9"`, `":"`, `"+"` o `"-"`, y para en cuanto encuentra un texto que la función **acepta** pero que no es una hora bien escrita (más de 5 caracteres):
+
+<Predice
+  ej="m16/fuzz-casero"
+  opciones={["`Ningún fallo en 100 000 intentos`", "Encuentra un texto con un signo `+` o ceros de más que la función acepta como hora", "Entra en pánico porque `parse` falla", "Entra en pánico por desbordamiento al multiplicar"]}
+  correcta={1}
+  explicacion="En el intento 270 aparece `+0005:5`, y la función devuelve `Some(305)`. Resulta que `parse` acepta un signo `+` delante y ceros a la izquierda: `+0005` se lee como 5. ¿Lo habrías pensado al escribir tus pruebas a mano?"
+  porque={["Hay un caso raro, y aparece pronto.", "Correcto.", "Los fallos de `parse` se convierten en `None` con `.ok()?`; no hay pánico.", "Los números están limitados a 23 y 59 antes de multiplicar."]}
+/>
+
+## La idea
+
+Una prueba normal dice: «para **esta** entrada, espero **esta** salida». Hay dos formas de ir más allá:
+
+**Pruebas de propiedades** (*property-based testing*). Describes algo que debe ser cierto **para cualquier entrada** y lo compruebas con cientos de entradas aleatorias. Para una función que ordena listas: el resultado tiene los mismos elementos, cada uno es menor o igual que el siguiente, y ordenar algo ya ordenado no lo cambia. No tienes que saber cuál es la respuesta para cada lista: solo qué forma debe tener.
+
+**Fuzzing.** Lanzas contra tu código cantidades enormes de entradas (millones), muchas veces sin sentido, buscando cualquier cosa que lo rompa: un pánico, un cuelgue, un acceso a memoria inválido. Es especialmente útil para lo que lee datos de fuera: analizadores de formatos, protocolos de red, descompresores.
+
+La clave en los dos casos es que el generador sea **reproducible**: con una **semilla** (*seed*) fija, produce siempre la misma secuencia. Si aparece un fallo, puedes volver a provocarlo.
+
+## Pruébalo
+
+Una prueba de propiedades sin ningún crate: un generador de números pseudoaleatorios (*xorshift*, cuatro líneas), mil listas al azar y tres propiedades del ordenamiento:
+
+<Ejecutar ej="m16/propiedades" />
+
+En proyectos reales se usan crates como **proptest** o **quickcheck**, que generan datos de cualquier tipo y, cuando encuentran un fallo, hacen algo muy útil: lo **encogen** (*shrinking*). Prueban con versiones cada vez más pequeñas de la entrada que falló hasta dar con la mínima: en vez de una lista de 19 números, te dan `[1, 0]`. No están instalados en este entorno (se descargan de crates.io), así que aquí no ves su salida.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+El fuzzer de juguete del principio es **ciego**: fabrica textos al azar sin saber nada del código. Encontró el fallo porque la función es pequeña. En código grande, la probabilidad de acertar a ciegas con la combinación que llega a un `if` profundo es casi nula.
+
+Los fuzzers de verdad están **guiados por cobertura** (*coverage-guided*). El compilador inserta en tu programa contadores diminutos en cada rama (`if`, `match`, bucle). El fuzzer ejecuta una entrada, mira qué contadores se han movido y, si la entrada ha llegado a **código que nunca había visitado**, la guarda en su colección (*corpus*) y la usa como base para nuevas mutaciones: cambiar un byte, insertar, borrar, juntar dos entradas. Así va «excavando» hacia dentro del programa.
+
+En Rust, la herramienta habitual es **cargo-fuzz**, que usa **libFuzzer** (parte del proyecto LLVM). Un objetivo de fuzzing tiene esta forma:
+
+```rust title="fuzz/fuzz_targets/minutos.rs (esquema, no compilado aquí)"
+#![no_main]
+use libfuzzer_sys::fuzz_target;
+
+fuzz_target!(|datos: &[u8]| {
+    if let Ok(texto) = std::str::from_utf8(datos) {
+        let _ = mi_crate::minutos(texto); // si entra en pánico, el fuzzer lo guarda
+    }
+});
+```
+
+Se lanza con `cargo +nightly fuzz run minutos`: necesita la toolchain **nightly** porque activa opciones del compilador inestables (los contadores de cobertura y el *AddressSanitizer*, que detecta accesos a memoria inválidos en código `unsafe`). Su soporte en Windows es limitado. **No está instalado en este entorno**, así que aquí no ves su salida. Cuando encuentra un fallo, guarda la entrada exacta en un archivo para que la reproduzcas cuantas veces quieras.
+
+Rust te protege de la mayoría de errores de memoria en código seguro, así que el fuzzing en Rust suele encontrar **pánicos** (índices fuera de rango, `unwrap` sobre `None`, desbordamientos en debug) y **errores de lógica** detectables con aserciones, como el del principio.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Un fallo aleatorio que no puedes repetir">
+
+❌ Generas las entradas con una semilla distinta en cada ejecución (por ejemplo, la hora actual) y no la imprimes. Un día falla la prueba; vuelves a ejecutarla y pasa. Tienes la prueba de que hay un error y ninguna forma de verlo otra vez.
+
+✅ Usa una semilla fija (como `Azar(2024)` en el ejemplo) o, si la cambias en cada ejecución, **imprímela** en el mensaje del `assert!` para poder repetirla. Y cuando encuentres un caso que falla, **conviértelo en una prueba normal** con ese ejemplo concreto: así ese fallo no volverá nunca.
+
+```rust
+#[test]
+fn signo_mas_no_es_una_hora() {
+    // Encontrado por el fuzzer: «+0005:5» se aceptaba.
+    assert_eq!(minutos("+0005:5"), None);
+}
+```
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m16/reto-invertir" enunciado="Escribe `invertir`, que devuelve el texto al revés **carácter a carácter**. `main` la somete a 500 textos aleatorios con «ñ», tildes y espacios, y comprueba tres propiedades. Pista: un `String` no se puede invertir byte a byte sin romper los caracteres de más de un byte; recorre sus `chars()`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estas es una buena **propiedad** para probar una función `comprimir` con su `descomprimir`?"
+  opciones={["`comprimir(\"hola\")` da exactamente estos bytes concretos", "`descomprimir(comprimir(x)) == x` para cualquier `x`", "`comprimir` tarda menos de un segundo", "`comprimir` nunca devuelve una lista vacía"]}
+  correcta={1}
+  explicacion="La ida y vuelta (*round trip*) es la propiedad estrella: no necesitas saber qué bytes produce `comprimir`, solo que al deshacerlo recuperas el original. Se comprueba con miles de `x` aleatorios."
+  porque={["Eso es un ejemplo concreto, no una propiedad.", "Correcto.", "Eso es un requisito de rendimiento, y depende de la máquina.", "Comprimir un texto vacío podría dar algo vacío y ser correcto."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace un fuzzer «guiado por cobertura» que no hace uno ciego?"
+  opciones={["Genera entradas más largas", "Observa qué partes del código recorre cada entrada y muta preferentemente las que llegan a código nuevo", "Lee el código fuente para deducir las entradas correctas", "Ejecuta las pruebas unitarias antes de empezar"]}
+  correcta={1}
+  explicacion="Con contadores insertados por el compilador, el fuzzer sabe cuándo una entrada ha abierto un camino nuevo y la usa como punto de partida. Así llega a ramas profundas que al azar puro serían casi imposibles."
+  porque={["La longitud no es lo importante.", "Correcto.", "No analiza el código fuente; mira lo que ocurre al ejecutar.", "Son herramientas independientes."]}
+/>
+
+<Pregunta
+  pregunta="Tu fuzzer encuentra una entrada que hace entrar en pánico a tu función. ¿Qué es lo primero que conviene hacer después de arreglarla?"
+  opciones={["Borrar el fuzzer, que ya ha cumplido", "Añadir esa entrada como prueba normal con `#[test]`, para que el fallo no vuelva", "Cambiar la semilla", "Desactivar los pánicos con `panic = \"abort\"`"]}
+  correcta={1}
+  explicacion="Una prueba de regresión con el caso concreto se ejecuta en cada `cargo test`, en milisegundos, sin depender del azar."
+  porque={["El fuzzer puede seguir encontrando otros fallos.", "Correcto.", "Cambiar la semilla no protege contra que el fallo vuelva.", "Abortar no arregla nada: el programa seguiría cayéndose."]}
+/>

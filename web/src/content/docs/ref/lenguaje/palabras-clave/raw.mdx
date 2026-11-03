@@ -1,0 +1,61 @@
+---
+title: "raw"
+description: "Palabra clave débil: en &raw const y &raw mut, crea un puntero crudo sin pasar por una referencia."
+sidebar:
+  order: 72
+desde: "1.82"
+categoria: "debil"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`raw` solo es especial dentro de `&raw const lugar` y `&raw mut lugar`: crean un **puntero crudo** directamente, **sin** crear antes una referencia.
+
+## Sinopsis
+
+```text
+&raw const lugar     // tipo *const T
+&raw mut lugar       // tipo *mut T
+```
+
+## Qué hace
+
+`&x as *const T` crea primero una referencia `&x` y luego la convierte. Pero crear una referencia ya tiene requisitos: tiene que estar **alineada** y apuntar a un valor válido. Hay casos en los que esos requisitos no se cumplen y una referencia, aunque sea momentánea, sería comportamiento indefinido:
+
+- campos de un struct `#[repr(packed)]`, que pueden estar desalineados;
+- memoria todavía **sin inicializar**;
+- un `static mut`, donde una referencia podría solaparse con otros accesos.
+
+`&raw const` / `&raw mut` se saltan la referencia. Crear el puntero es seguro (salvo casos concretos); lo que exige `unsafe` es **usarlo**. Para un campo desalineado, se lee con `read_unaligned`.
+
+En cualquier otro sitio, `raw` es un identificador normal.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-raw" />
+
+Salida:
+
+```text
+tipo 1 largo 500
+1
+3
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-raw-error" />
+
+`error[E0793]: reference to field of packed struct is unaligned`. La nota recuerda que crear una referencia desalineada es comportamiento indefinido **aunque nunca se use**. El arreglo copia el campo con `{ c.largo }`.
+
+## Desde
+
+Rust 1.82. Sustituye a las macros `ptr::addr_of!` y `ptr::addr_of_mut!`. Sobre campos de `union` en código seguro: 1.92.
+
+## Ver también
+
+- [`const`](/ref/lenguaje/palabras-clave/const/) · [`mut`](/ref/lenguaje/palabras-clave/mut/) · [`static`](/ref/lenguaje/palabras-clave/static/) · [Layout de tipos](/ref/lenguaje/layout-de-tipos/): `repr(packed)`. · [Comportamiento indefinido](/ref/ub/)
+
+## Aprende esto en
+
+- [Mundo 20 · Unsafe y UB](/curso/20-unsafe-y-ub/)

@@ -1,0 +1,92 @@
+---
+title: "Referencias colgantes"
+description: "Una referencia que sobrevive a su dueña apunta a memoria liberada. Rust lo impide al compilar: E0597 dentro de una función y E0515 al devolver."
+sidebar:
+  order: 1
+duracion: 10
+desde: "1.0"
+requiere: ["07-prestamos/12-jefe"]
+tarjetas:
+  - p: "¿Qué es una referencia colgante?"
+    r: "Una referencia que sigue usándose cuando el valor al que apunta ya se liberó o salió de su ámbito."
+  - p: "¿Qué dice E0597?"
+    r: "Que un valor no vive lo suficiente (*does not live long enough*): se libera mientras una referencia suya todavía se va a usar."
+  - p: "¿Qué dice E0515?"
+    r: "Que intentas devolver una referencia a una variable local de la función (*cannot return reference to local variable*)."
+  - p: "¿Cómo se arregla casi siempre E0515?"
+    r: "Devolviendo el valor propio (por ejemplo `String` en vez de `&str`): la propiedad sale de la función y nada queda colgando."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Antes de aprender a escribir lifetimes, mira bien **qué** problema resuelven. Es uno solo, y lo conoces del mundo 06: usar algo que ya se liberó.
+
+## Predice
+
+<Predice
+  ej="m08/region-predice"
+  opciones={["`dentro: abc xy` y `fuera: abc`", "No compila: `r` se usa fuera del bloque", "No compila: `b` muere antes que `r`", "`dentro: abc xy` y luego un pánico"]}
+  correcta={0}
+  explicacion="`r` apunta a `a`, que vive hasta el final de `main`. Que `r` se declare fuera del bloque o que `b` muera dentro no importa: lo que cuenta es que **`a`** sigue viva cuando se usa `r`."
+  porque={["", "Usar una referencia fuera del bloque está bien si su dueña sigue viva.", "`r` no apunta a `b`, así que la muerte de `b` no le afecta.", "No hay nada que pueda fallar al ejecutar: todo se comprobó al compilar."]}
+/>
+
+## La idea
+
+Una referencia es una dirección. Si el valor de esa dirección **desaparece** mientras la referencia todavía se va a usar, tienes una **referencia colgante**. Leerla es un uso tras liberar: puede dar basura, romper el programa o funcionar «por casualidad» hasta el peor momento.
+
+Rust lo impide comprobando, al compilar, que **ningún uso de una referencia ocurre después de que muera su dueña**. Hay dos versiones del error.
+
+**Dentro de una función (E0597).** El valor muere en su `}`, pero la referencia se usa después:
+
+<NoCompila ej="m08/p-colgante-bloque" explicacion="`x` vive solo dentro del bloque. `r` se usa en el `println!`, fuera. En ese momento el marco donde estaba `x` ya se ha reutilizado. El arreglo mueve `x` fuera del bloque, para que viva tanto como su uso." />
+
+**Al devolver (E0515).** Las variables locales mueren al salir de la función. Una referencia a una de ellas no puede salir:
+
+<NoCompila ej="m08/p-devolver-local" explicacion="`grande` es un `String` local: al terminar `gritar`, se libera. Devolver `&grande` daría al que llama una dirección de memoria liberada. El arreglo devuelve el `String` mismo: la propiedad sale de la función y nadie libera nada antes de tiempo." />
+
+## Pruébalo
+
+No todo lo que devuelve una referencia es peligroso. Si la referencia apunta a algo que **vino de fuera**, puede salir sin problema:
+
+<Ejecutar ej="m08/colgante-funcion" />
+
+`mayor` devuelve una referencia **al interior de `v`**, que es de quien llama. La función no posee nada de lo que devuelve. El compilador lo deduce solo, como verás en la lección 4.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué la pila hace esto tan peligroso.** En el mundo 05 viste que cada llamada a función ocupa un **marco** en la pila y que, al volver, ese marco queda libre para la siguiente llamada. Una referencia a una variable local, devuelta, apunta a un marco que la próxima llamada **sobrescribirá**. El fallo no aparece al devolver, sino un rato después, en otro sitio del programa, lo que lo hace muy difícil de rastrear.
+
+**Lo que hace el compilador.** Para cada referencia calcula **dónde se usa** y para cada valor **dónde muere** (su `drop` o el final de su ámbito). Si algún uso cae después de la muerte, error. Lo hace sobre el MIR, el mismo grafo del mundo 07. No queda nada de esto en el programa final.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Intentar «alargar» la vida con una anotación">
+
+❌ Ver E0515 y pensar «le pongo `'static` y listo»: `fn gritar(s: &str) -> &'static str`. No compila igual, porque `grande` sigue muriendo al final de la función. **Una anotación no cambia cuánto vive un valor**: solo describe lo que ya pasa (lección 10).
+
+✅ Si la función **crea** el valor, devuélvelo **por valor** (`String`, `Vec<T>`). Si el valor viene de fuera, devuelve una referencia **a lo que vino de fuera**.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué función compila?"
+  opciones={["`fn f() -> &str { let s = String::from(\"x\"); &s }`", "`fn f(v: &Vec<String>) -> &String { &v[0] }`", "`fn f() -> &String { &String::from(\"x\") }`", "Ninguna"]}
+  correcta={1}
+  explicacion="La segunda devuelve una referencia al interior de algo que pertenece a quien llama. Las otras dos devuelven referencias a valores creados dentro, que mueren al salir."
+  porque={["`s` es local: muere al salir (y además falta la lifetime: E0106).", "", "El `String` temporal muere al terminar la función.", "La segunda es correcta."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué comprueba el compilador para dar E0597?"
+  opciones={["Que la referencia se declare después del valor", "Que algún uso de la referencia ocurra después de que muera el valor", "Que la referencia y el valor estén en el mismo bloque", "Que el valor sea `mut`"]}
+  correcta={1}
+  explicacion="Lo que importa son los **usos**: una referencia puede existir más allá de su dueña si ya no se va a usar."
+  porque={["El orden de las declaraciones no basta: importa cuándo se usa.", "", "Pueden estar en bloques distintos sin problema, como en el Predice.", "La mutabilidad no tiene nada que ver con la vida."]}
+/>

@@ -1,0 +1,128 @@
+---
+title: "Contar en binario"
+description: "Lee y escribe números con ceros y unos, y aprende a pedirle a Rust que te enseñe los bits de cualquier número."
+sidebar:
+  order: 4
+duracion: 12
+desde: "1.0"
+requiere: ["01-la-maquina/03-bits-y-bytes"]
+tarjetas:
+  - p: "¿Cuánto vale cada posición de un byte, de izquierda a derecha?"
+    r: "128, 64, 32, 16, 8, 4, 2, 1. Cada posición vale el doble que la de su derecha."
+  - p: "¿Qué hace `{:08b}` en un `println!`?"
+    r: "Escribe el número en binario con 8 cifras como mínimo, rellenando con ceros a la izquierda."
+  - p: "¿Cómo se escribe un número en binario dentro del código Rust?"
+    r: "Con el prefijo `0b`, por ejemplo `0b0010_1010`. Los `_` son separadores opcionales que no cambian el valor."
+  - p: "¿Cuánto vale `0b1010`?"
+    r: "10: 8 + 2."
+---
+
+import { Ejecutar, Predice, Pregunta, Respuesta, Reto, BajoElCapo, Trampa, Bits } from '~/components';
+
+Vas a aprender a contar como cuenta la máquina: solo con ceros y unos.
+
+## Predice
+
+`{:08b}` le pide a `println!` que escriba un número en **binario** (*binary*) con 8 cifras. ¿Qué imprime para el 5?
+
+<Predice
+  ej="m01/binario-predice"
+  opciones={["`00000101`", "`101`", "`00000005`", "`10100000`"]}
+  correcta={0}
+  explicacion="5 = 4 + 1. En binario, las posiciones del 4 y del 1 se encienden: `101`. Con `08`, Rust rellena con ceros a la izquierda hasta tener 8 cifras."
+  porque={["Correcto.", "`101` es el 5 en binario, pero el `08` pide 8 cifras rellenadas con ceros.", "La `b` pide binario: solo pueden salir ceros y unos, nunca un 5.", "Los ceros de relleno van a la **izquierda**, no a la derecha. `10100000` sería 160."]}
+/>
+
+## La idea
+
+Cuando cuentas en decimal, cada posición vale **diez veces** más que la de su derecha: unidades, decenas, centenas. En 305 hay 3 centenas, 0 decenas y 5 unidades.
+
+En binario es igual, pero cada posición vale **el doble** que la de su derecha, y en cada posición solo puede haber 0 o 1. Las ocho posiciones de un byte valen, de izquierda a derecha:
+
+| 128 | 64 | 32 | 16 | 8 | 4 | 2 | 1 |
+|---|---|---|---|---|---|---|---|
+| 0 | 0 | 1 | 0 | 1 | 0 | 1 | 0 |
+
+Para leer un número binario, **suma las posiciones que tienen un 1**. En la tabla: 32 + 8 + 2 = **42**. Para escribir un número en binario, haz lo contrario: busca la posición más grande que cabe, réstala y sigue con lo que queda. Para 13: cabe el 8 (quedan 5), cabe el 4 (queda 1), cabe el 1. Resultado: `00001101`.
+
+<Bits objetivo={100} />
+
+Forma el 100 con los interruptores. Pista: empieza por el 64.
+
+## Pruébalo
+
+<Ejecutar ej="m01/contar-en-binario" />
+
+Salida real:
+
+```text
+0 -> 00000000
+1 -> 00000001
+2 -> 00000010
+3 -> 00000011
+4 -> 00000100
+5 -> 00000101
+6 -> 00000110
+7 -> 00000111
+8 -> 00001000
+0b0000_1101 vale 13
+101
+```
+
+Mira la columna de la derecha: cada vez que sumas 1, el último bit cambia. Cuando un bit pasa de 1 a 0, «se lleva una» a la izquierda, igual que el 9 que pasa a 10 en decimal. Del 7 (`0111`) al 8 (`1000`) cambian cuatro bits a la vez.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+¿Por qué la máquina usa binario y no decimal? Porque es mucho más fácil construir un circuito que distinga **dos** estados (hay corriente o no la hay) que uno que distinga diez niveles distintos sin equivocarse. Con dos estados, el ruido eléctrico casi nunca convierte un 0 en un 1.
+
+Con N bits puedes escribir 2ᴺ números distintos: del 0 al 2ᴺ − 1. Con 8 bits, del 0 al 255. Cada bit que añades **duplica** la cantidad de números posibles. Por eso un `u16` (16 bits) llega a 65 535 y un `u32` pasa de cuatro mil millones.
+
+La posición de la derecha se llama **bit menos significativo** (*least significant bit*): es la que menos vale. La de la izquierda es el **bit más significativo** (*most significant bit*). Estos dos nombres volverán en las lecciones 7 y 9.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Los ceros que desaparecen">
+
+❌ `println!("{:b}", 5)` y esperar `00000101`. Sale `101`.
+
+✅ `{:b}` escribe solo las cifras necesarias, igual que nadie escribe «007» para decir siete. Si quieres ver el byte entero, pide el ancho: `{:08b}`. Para un `u16`, `{:016b}`.
+
+❌ Leer `101` como «ciento uno».
+
+✅ En el código Rust, un número sin prefijo es decimal. Para escribir binario, ponle `0b` delante: `0b101` vale 5.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m01/binario-reto"
+  enunciado="Cambia SOLO los ceros y unos del literal `0b0000_0000` para que el programa imprima exactamente `42 = 00101010`."
+/>
+
+## Comprueba
+
+<Respuesta
+  pregunta="¿Cuánto vale en decimal el número binario `1111`?"
+  respuestas={["15"]}
+  explicacion="8 + 4 + 2 + 1 = 15. Cuatro bits encendidos dan el valor más alto de 4 bits: 2⁴ − 1."
+/>
+
+<Pregunta
+  pregunta="¿Cómo se escribe el 6 con `{:08b}`?"
+  opciones={["`00000110`", "`00000011`", "`01100000`", "`00000006`"]}
+  correcta={0}
+  explicacion="6 = 4 + 2: se encienden las posiciones del 4 y del 2."
+  porque={["Correcto.", "`00000011` es el 3 (2 + 1).", "Los ceros de relleno van a la izquierda; `01100000` es 96.", "En binario solo hay ceros y unos."]}
+/>
+
+<Pregunta
+  pregunta="Añades un bit más a un número. ¿Qué pasa con la cantidad de valores que puedes escribir?"
+  opciones={["Se duplica", "Aumenta en 1", "Aumenta en 8", "No cambia"]}
+  correcta={0}
+  porque={["Correcto: con N bits hay 2ᴺ valores; con N + 1, el doble.", "Cada bit nuevo vale el doble que el anterior, así que no suma uno: multiplica por dos.", "8 sería si añadieras un byte entero… y aun así no se suma, se multiplica (por 256).", "Un bit más siempre da más combinaciones."]}
+/>

@@ -1,0 +1,113 @@
+---
+title: "Tipos recursivos"
+description: "Entiendes el error E0072 y construyes una lista y un árbol que se contienen a sí mismos gracias a Box."
+sidebar:
+  order: 2
+duracion: 10
+desde: "1.0"
+requiere: ["15-punteros-inteligentes/01-box"]
+tarjetas:
+  - p: "¿Por qué `enum Lista { Nodo(i32, Lista), Vacia }` no compila?"
+    r: "Su tamaño sería infinito: para saber cuánto mide una Lista hay que saber cuánto mide una Lista. Error E0072."
+  - p: "¿Qué hace falta para romper la recursión de un tipo?"
+    r: "Una indirección (un puntero de tamaño fijo): `Box`, `Rc`, `&` o un contenedor como `Vec` que guarda sus elementos en el heap."
+  - p: "¿Por qué `struct Arbol { hijos: Vec<Arbol> }` compila sin Box?"
+    r: "Porque un `Vec` ya guarda sus elementos en el heap; en la pila solo mide puntero, capacidad y longitud."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a descubrir por qué un tipo no puede contenerse a sí mismo directamente, y cómo `Box` lo hace posible.
+
+## Predice
+
+¿Por qué no compila esta lista? Piensa en cuánto mide.
+
+<NoCompila
+  ej="m15/lista-infinita"
+  explicacion="Para reservar una `Lista` en la pila, el compilador necesita su tamaño. Pero una `Lista` contiene un `i32` y otra `Lista` completa, que a su vez contiene otra… El tamaño no termina nunca. La ayuda del propio error ya te dice la solución: meter una indirección como `Box`."
+/>
+
+## La idea
+
+El compilador tiene que conocer el **tamaño** de cada tipo al compilar, porque reserva sitio en la pila para cada variable. Para un `enum`, el tamaño es el de su variante más grande (más la etiqueta). Si una variante contiene **el mismo tipo entero**, la cuenta se convierte en «tamaño de Lista = 4 + tamaño de Lista», que no tiene solución. Eso es el error **E0072**: *recursive type has infinite size*.
+
+La salida es la **indirección**: en lugar de guardar el siguiente nodo dentro, guardas **dónde está**. Una `Box<Lista>` siempre mide lo mismo (un puntero), da igual lo larga que sea la lista. Ahora la cuenta sí cierra: tamaño de Lista = `i32` + puntero (+ etiqueta, si hace falta).
+
+Este es el uso más característico de `Box`: tipos que se definen en términos de sí mismos, como listas, árboles o las expresiones de una calculadora (`Suma(Box<Expr>, Box<Expr>)`).
+
+## Pruébalo
+
+<Ejecutar ej="m15/lista-box" />
+
+En el navegador la lista mide 8 bytes (4 del `i32` y 4 del puntero). En x86-64 mide 16, comprobado con `size_of`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+La lista `1 → 2 → 3` queda así: solo el primer nodo vive en la pila; los demás, en el heap, cada uno apuntando al siguiente.
+
+```text
+PILA                         HEAP
+┌───────────────────┐        ┌───────────────────┐        ┌───────────────────┐        ┌────────┐
+│ l: Nodo(1, ●──────┼───────►│ Nodo(2, ●─────────┼───────►│ Nodo(3, ●─────────┼───────►│ Vacia  │
+└───────────────────┘        └───────────────────┘        └───────────────────┘        └────────┘
+```
+
+¿Dónde está la etiqueta que distingue `Nodo` de `Vacia`? En ningún sitio: `Vacia` no lleva datos, así que el compilador la representa con un puntero nulo, que una Box nunca puede ser (el **nicho** de la lección anterior). Por eso `Lista` mide exactamente `i32` + puntero, con relleno de alineación: 16 bytes en x86-64.
+
+La función `suma` es recursiva igual que el tipo: cada llamada ocupa un **marco de pila** (mundo 5). Una lista de millones de nodos podría desbordar la pila al recorrerla así; con un bucle `while let` no pasaría. Además, al liberar la lista, cada `Box` libera a la siguiente de forma recursiva: con listas enormes eso también puede agotar la pila.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Poner Box donde ya hay un contenedor">
+
+❌ Pensar que todo tipo recursivo necesita `Box`:
+
+```rust
+struct Arbol {
+    valor: i32,
+    hijos: Vec<Box<Arbol>>, // la Box sobra
+}
+```
+
+✅ Un `Vec` ya guarda sus elementos en el heap, así que rompe la recursión por sí solo:
+
+```rust
+struct Arbol {
+    valor: i32,
+    hijos: Vec<Arbol>, // compila: Arbol mide 32 bytes en x86-64
+}
+```
+
+La versión con `Box` funciona, pero añade una reserva y un salto por cada hijo sin ganar nada.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m15/r-arbol"
+  enunciado="Completa `suma` para que recorra un árbol binario cuyos hijos son `Option<Box<Arbol>>`. Con `match`: `Some(n)` suma `n.valor` más la suma de sus dos hijos; `None` vale 0. Debe imprimir `suma = 6`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estas definiciones compila?"
+  opciones={["`struct Nodo { siguiente: Nodo }`", "`struct Nodo { siguiente: Option<Nodo> }`", "`struct Nodo { siguiente: Option<Box<Nodo>> }`", "Ninguna: Rust no admite tipos recursivos"]}
+  correcta={2}
+  explicacion="Solo la tercera tiene una indirección. `Option<Nodo>` sigue conteniendo un Nodo entero."
+  porque={["Tamaño infinito: E0072.", "`Option` no es un puntero: guarda el valor dentro, así que el tamaño sigue siendo infinito.", "Correcto.", "Sí los admite, siempre que haya una indirección."]}
+/>
+
+<Pregunta
+  pregunta="En x86-64, ¿cuánto mide `Lista` con `Nodo(i32, Box<Lista>)` y `Vacia`?"
+  opciones={["12 bytes", "16 bytes", "Depende de cuántos nodos tenga", "24 bytes"]}
+  correcta={1}
+  explicacion="4 del `i32` + 8 del puntero = 12, redondeado a 16 por la alineación de 8 del puntero. `Vacia` usa el nicho del puntero nulo."
+  porque={["Falta el relleno: el tamaño debe ser múltiplo de la alineación (8).", "Correcto.", "El tamaño de un tipo es fijo; la longitud de la lista vive en el heap.", "No hace falta etiqueta aparte gracias al nicho."]}
+/>

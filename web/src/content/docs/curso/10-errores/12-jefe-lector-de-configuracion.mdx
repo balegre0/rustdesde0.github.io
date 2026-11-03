@@ -1,0 +1,91 @@
+---
+title: "Jefe: el lector de configuración"
+description: "Escribe un analizador de archivos de configuración con un error propio, números de línea, causas encadenadas y el operador ?."
+sidebar:
+  order: 12
+duracion: 15
+desde: "1.65"
+requiere: ["10-errores/11-disenar-errores"]
+tarjetas:
+  - p: "En el jefe, ¿por qué el error `Numero` guarda el `ParseIntError` y no un texto?"
+    r: "Para devolverlo en `source()`: quien llama puede ver la causa original sin que la repitamos en nuestro `Display`."
+  - p: "¿Qué hace `cfg.ancho.ok_or(ErrorConfig::Falta(\"ancho\"))?`?"
+    r: "Convierte el `Option<u32>` en `Result<u32, ErrorConfig>` y, si era `None`, sale de la función con `Err(Falta(\"ancho\"))`."
+  - p: "¿Por qué los números de línea se calculan con `i + 1`?"
+    r: "Porque `enumerate()` cuenta desde 0 y las personas cuentan las líneas desde 1."
+---
+
+import { Pregunta, Reto, BajoElCapo, Ordena } from '~/components';
+
+Último combate del mundo: un lector de archivos de configuración del estilo `clave = valor`, con errores que dicen la línea exacta y la causa.
+
+## Predice
+
+<Pregunta
+  pregunta="El archivo es `ancho = 800` (una sola línea). Las opciones `ancho` y `alto` son obligatorias. ¿Qué error debería salir?"
+  opciones={["`falta la opción obligatoria «alto»`", "`línea 1: falta el «=»`", "Ninguno: `alto` vale 0", "Un pánico"]}
+  correcta={0}
+  porque={["Correcto: la línea es válida, pero al final falta `alto`.", "La línea sí tiene `=`.", "No hay valores inventados: `None` se convierte en un error.", "Un archivo incompleto es un error normal, no un fallo del programa."]}
+/>
+
+## La idea
+
+El diseño, pieza a pieza:
+
+- `enum ErrorConfig` con un caso por forma de fallar, cada uno con la línea donde ocurrió (lección 6).
+- `Display` con el mensaje y `source()` que devuelve el `ParseIntError` original (lecciones 6 y 8).
+- `leer_linea` usa `let else` con `split_once('=')`, un `match` sobre la clave y `map_err` para envolver el error de número con su línea (lecciones 5 y 7).
+- `leer_config` recorre las líneas, propaga con `?` y convierte los `Option` en errores con `ok_or` (lecciones 4 y 5).
+
+## Pruébalo
+
+El `main` del reto prueba cinco archivos. La solución de referencia imprime exactamente:
+
+```text
+OK: 800×600 «Rust desde cero»
+Error: línea 2: falta el «=»
+Error: línea 2: no conozco la opción «profundidad»
+Error: línea 1: número inválido — causa: invalid digit found in string
+Error: falta la opción obligatoria «alto»
+```
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`ErrorConfig` guarda un `String` (en `ClaveDesconocida`) y un `ParseIntError`, que ocupa 1 byte; el enum entero cabe en unos pocos bytes más que un `String`. Devolver `Result<(), ErrorConfig>` no reserva memoria salvo cuando de verdad hay un error con texto.
+
+La closure `numero` de la solución captura `n` (el número de línea) y lo usa al construir el error: `|v: &str| v.parse::<u32>().map_err(|causa| ErrorConfig::Numero { linea: n, causa })`. Es la forma de no repetir el `map_err` en `ancho` y en `alto` (las closures, a fondo en el mundo 14).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Ordena
+  lineas={["let Some((clave, valor)) = linea.split_once('=') else {", "    return Err(ErrorConfig::SinIgual { linea: n });", "};", "let (clave, valor) = (clave.trim(), valor.trim());", "match clave {", "    \"ancho\" => cfg.ancho = Some(numero(valor)?),", "    otra => return Err(ErrorConfig::ClaveDesconocida { linea: n, clave: otra.to_string() }),", "}"]}
+  distractores={["let (clave, valor) = linea.split_once('=').unwrap();", "\"ancho\" => cfg.ancho = Some(valor.parse().unwrap()),"]}
+  explicacion="Las líneas de un archivo vienen de fuera: cualquier `unwrap` convertiría un archivo mal escrito en un pánico. Cada fallo se convierte en una variante de `ErrorConfig` con su número de línea."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m10/config"
+  enunciado="Completa `leer_linea` y el final de `leer_config`. Sin `=` → `SinIgual`; clave distinta de `ancho`, `alto`, `titulo` → `ClaveDesconocida`; número inválido → `Numero` (con `map_err`); al final, si falta `ancho` o `alto` → `Falta(…)` (con `ok_or`). El título por defecto es `sin título`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué el `Display` de `Numero` no incluye el texto del `ParseIntError`?"
+  opciones={["Porque ese error ya se devuelve en `source()`; incluirlo haría que la causa apareciera dos veces", "Porque `ParseIntError` no implementa `Display`", "Porque no cabe en el mensaje", "Porque los errores no pueden contener otros errores"]}
+  correcta={0}
+  porque={["Correcto: cada nivel dice lo suyo y la cadena se recorre con `source()`.", "Sí lo implementa: es el mensaje `invalid digit found in string`.", "Un mensaje puede ser tan largo como quieras.", "Pueden, y es lo recomendable: así funciona `source()`."]}
+/>
+
+<Pregunta
+  pregunta="Si quisieras que `leer_config` informara de **todos** los errores del archivo y no solo del primero, ¿qué cambiarías?"
+  opciones={["Recoger los errores en un `Vec<ErrorConfig>` en vez de salir con `?` al primero", "Usar `unwrap` en cada línea", "Devolver `Box<dyn Error>`", "Nada: `?` ya acumula todos los errores"]}
+  correcta={0}
+  porque={["Correcto: `?` sale en el primer error; para acumular hay que guardarlos tú.", "Eso entraría en pánico en el primer error.", "Cambia el tipo del error, no cuántos se informan.", "`?` devuelve en el primer `Err`."]}
+/>

@@ -1,0 +1,79 @@
+---
+title: "Debug"
+description: "El trait de {:?}: una representación para programadores. Se deriva con #[derive(Debug)]."
+sidebar:
+  order: 3
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::fmt::Debug`
+
+## Sinopsis
+
+```rust
+pub trait Debug {
+    // Required method
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error>;
+}
+```
+
+## Qué hace
+
+`Debug` muestra el valor «tal como es», pensando en quien programa: los textos salen entre comillas y los structs con sus campos. Casi siempre se **deriva** con `#[derive(Debug)]`. `{:#?}` lo muestra en varias líneas con sangría. Si quieres ocultar algo (una contraseña), impleméntalo a mano.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`fmt`](#fmt) | Escribe la representación de depuración. | 1.0 |
+| [`debug_struct`](#debug_struct) | Ayuda para implementarlo a mano con el mismo estilo que `derive`: `.field("x", &self.x).finish()`. | 1.2 |
+
+### `fmt`
+
+```rust
+fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error>
+```
+
+Escribe la representación de depuración.
+
+### `debug_struct`
+
+```rust
+pub fn debug_struct<'b>(&'b mut self, name: &str) -> DebugStruct<'b, 'a>
+```
+
+Ayuda para implementarlo a mano con el mismo estilo que `derive`: `.field("x", &self.x).finish()`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/fmt-debug" />
+
+**Salida:**
+
+```text
+Punto { x: 1, y: -2 }
+x + y = -1
+Punto {
+    x: 1,
+    y: -2,
+}
+Secreto(*** 9 letras)
+Circulo { radio: 1.5 } Vacia
+radio: 1.5
+("texto", 'c', [1.0, 2.5], Some(()), "con \"comillas\"")
+```
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `debug_struct` (1.2).
+
+## Ver también
+
+- [Display](/ref/std/fmt/display/)
+- [dbg!](/ref/std/macros/dbg/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

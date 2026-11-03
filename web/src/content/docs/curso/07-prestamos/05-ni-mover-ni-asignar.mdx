@@ -1,0 +1,93 @@
+---
+title: "Ni mover ni asignar lo prestado"
+description: "Mientras un valor está prestado, su dueña no puede moverlo (E0505) ni reasignarlo (E0506): el préstamo apuntaría a algo que ya no es lo que era."
+sidebar:
+  order: 5
+duracion: 9
+desde: "1.0"
+requiere: ["07-prestamos/04-la-regla"]
+tarjetas:
+  - p: "¿Qué dice E0505?"
+    r: "Que intentas mover un valor mientras hay un préstamo suyo vivo (*cannot move out of `s` because it is borrowed*)."
+  - p: "¿Qué dice E0506?"
+    r: "Que intentas asignar a una variable mientras está prestada (*cannot assign to `n` because it is borrowed*)."
+  - p: "¿Qué permiso pierde la dueña mientras hay un préstamo compartido vivo?"
+    r: "La O (propiedad): no puede moverse ni liberarse. Si era `mut`, pierde también la W."
+  - p: "¿Por qué reasignar un `String` prestado sería un uso tras liberar?"
+    r: "Porque asignar un valor nuevo libera el texto viejo, y el préstamo seguiría apuntando a él."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+La regla de la lección anterior habla de préstamos contra préstamos. Pero la dueña también tiene que respetar a quien le ha prestado. Mientras su valor está fuera, hay dos cosas que no puede hacer: **moverlo** y **sustituirlo**.
+
+## Predice
+
+<NoCompila ej="m07/p-mover-prestado" explicacion={"`r` es un préstamo de `s`. Luego `s` se mueve a `t`. Piensa: después de mover, ¿a qué apunta `r`? ¿Y si `t` se liberara antes que `r`?"} />
+
+## La idea
+
+Un préstamo vivo **le quita la O** a la dueña. Sin propiedad no se puede:
+
+- **Mover** el valor (E0505). La referencia apuntaría a una variable cuyo valor ya se ha ido a otra parte. Si la nueva dueña lo liberase, el préstamo leería memoria liberada.
+- **Asignarle otro valor** (E0506). Asignar a una variable que tiene un `String` primero **libera** el texto viejo. Quien lo estuviera leyendo se quedaría apuntando a memoria liberada. Con un `i32` no hay nada que liberar, pero la regla es la misma: quien lee a través de `r` cuenta con que el valor no cambie mientras lo mira.
+
+<NoCompila ej="m07/p-asignar-prestado" explicacion="`r` mira a `n`. Mientras `r` se use después, `n` no puede cambiar. Arreglo: usa `r` antes de asignar, o deja de necesitar `r`." />
+
+## Pruébalo
+
+La solución casi siempre es la misma: **termina con el préstamo antes** de mover o asignar.
+
+<Ejecutar ej="m07/mover-tras-prestamo" />
+
+<Prestamos lineas={[
+  { codigo: "let s = String::from(\"hola\");", permisos: { s: "R-O" } },
+  { codigo: "let r = &s;", permisos: { s: "R--", r: "R-O" }, nota: "Mientras r esté viva, s no puede moverse." },
+  { codigo: "println!(\"préstamo: {r}\");", permisos: { s: "R-O" }, nota: "Último uso de r: s recupera la O." },
+  { codigo: "let t = s;", permisos: { s: "---", t: "R-O" }, nota: "Ahora sí: mover necesita O, y s la tiene." },
+  { codigo: "println!(\"nueva dueña: {t}\");", permisos: { t: "R-O" } }
+]} />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El `drop` escondido de la asignación.** Cuando escribes `s = String::from("adiós");` y `s` ya tenía un texto, el compilador genera, en el MIR, primero un `drop` del valor viejo y luego la escritura del nuevo. Por eso E0506 no es un capricho: entre esas dos operaciones, cualquier referencia al texto viejo quedaría colgando.
+
+**Por qué el compilador no «actualiza» la referencia.** Podría parecer que, si `s` se mueve a `t`, la referencia podría pasar a apuntar a `t`. Pero una referencia es una dirección fija, y `t` está en otro sitio de la pila. Cambiar las direcciones al ejecutar costaría tiempo y memoria. Rust prefiere comprobarlo al compilar y no pagar nada al ejecutar.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Leer el error por la línea equivocada">
+
+E0505 y E0506 marcan **tres** sitios, como E0382:
+
+1. `borrow of s occurs here`: dónde empezó el préstamo.
+2. `move out of s occurs here` (o `assignment to n occurs here`): la línea que el compilador rechaza.
+3. `borrow later used here`: **por qué** el préstamo seguía vivo.
+
+❌ Tocar solo la línea 2.
+
+✅ Mira la 3. Casi siempre el arreglo consiste en mover ese uso antes, o en no necesitarlo.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta={"`let mut s = String::from(\"a\"); let r = &s; s = String::from(\"b\"); println!(\"{r}\");` ¿Qué error da?"}
+  opciones={["E0382", "E0499", "E0505", "E0506"]}
+  correcta={3}
+  explicacion="Es una asignación a una variable prestada: E0506. Si se permitiera, la asignación liberaría el texto `a` mientras `r` todavía lo mira."
+  porque={["No se usa nada movido.", "No hay dos `&mut`.", "No se mueve `s`: se le asigna un valor nuevo.", ""]}
+/>
+
+<Pregunta
+  pregunta="¿Qué permiso le quita a la dueña un préstamo compartido vivo, aunque la dueña no sea `mut`?"
+  opciones={["R", "W", "O", "Ninguno"]}
+  correcta={2}
+  explicacion="La O. Sin ella no puede moverse ni liberarse mientras alguien la está leyendo. (La W también la perdería, pero si no es `mut` no la tenía.)"
+  porque={["Leer sigue estando permitido: muchos lectores a la vez es correcto.", "Si no es `mut`, nunca tuvo W.", "", "Sin perder la O, podría moverse con el préstamo vivo: E0505 no existiría."]}
+/>

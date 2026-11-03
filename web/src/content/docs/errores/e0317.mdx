@@ -1,0 +1,70 @@
+---
+title: "E0317: un if sin else donde se espera un valor"
+description: "Usas un if como expresión con valor pero no tiene rama else: cuando la condición es falsa, no hay nada que devolver."
+sidebar:
+  order: 31
+insignias: ["Expresiones"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` `if` may be missing an `else` clause ``
+
+## Qué significa
+
+En Rust, `if` es una **expresión**: puede producir un valor. Pero si no tiene `else` y la condición es falsa, no se ejecuta ninguna rama, así que el valor es `()` (la tupla vacía). Si el resultado se usa como un `u32`, los tipos no encajan.
+
+## Qué error evita
+
+Que una variable quede **sin valor** en uno de los caminos del programa. Rust no tiene un «valor por defecto» invisible: o das un valor en todas las ramas o no hay valor.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0317" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0317]: `if` may be missing an `else` clause
+ --> E0317.rs:3:23
+  |
+3 |     let tarifa: u32 = if edad < 18 { 5 };
+  |         ------        ^^^^^^^^^^^^^^^^^^ expected `u32`, found `()`
+  |         |
+  |         expected because of this assignment
+  |
+  = note: `if` expressions without `else` evaluate to `()`
+  = help: consider adding an `else` block that evaluates to the expected type
+```
+
+## Causas típicas
+
+- Asignar el resultado de un `if` sin `else`.
+- Usar un `if` sin `else` como última expresión de una función que devuelve algo.
+
+## Cómo arreglarlo
+
+Añade la rama `else` con un valor del mismo tipo:
+
+```rust
+let tarifa: u32 = if edad < 18 { 5 } else { 8 };
+```
+
+**Salida:**
+
+```text
+8
+```
+
+Si en realidad «puede que no haya valor», el tipo correcto es `Option<u32>`: `if edad < 18 { Some(5) } else { None }`.
+
+## Más información
+
+En tu terminal, `rustc --explain E0317` muestra la explicación oficial (en inglés), sin conexión.
+
+## Errores parecidos
+
+- [E0308](/errores/e0308/): tipos que no coinciden
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/)

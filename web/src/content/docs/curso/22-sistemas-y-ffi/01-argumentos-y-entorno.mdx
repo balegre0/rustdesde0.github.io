@@ -1,0 +1,116 @@
+---
+title: "Argumentos y entorno"
+description: "Lee los argumentos de la línea de órdenes y las variables de entorno sin que tu programa entre en pánico cuando faltan."
+sidebar:
+  order: 1
+duracion: 9
+desde: "1.0"
+requiere: ["21-el-compilador-por-dentro"]
+tarjetas:
+  - p: "¿Qué hay en el primer elemento de `std::env::args()`?"
+    r: "Normalmente el nombre o la ruta del programa. Los argumentos de verdad empiezan en el segundo; por eso se suele hacer `.skip(1)`."
+  - p: "¿Qué devuelve `std::env::var(\"X\")` si la variable no existe?"
+    r: "`Err(VarError::NotPresent)`. También puede dar `Err(NotUnicode)` si el valor no es UTF-8 válido."
+  - p: "¿Cómo pasas argumentos a tu programa con cargo?"
+    r: "Después de `--`: `cargo run -- Ana 42`. Lo que va antes de `--` es para cargo."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Un programa de terminal recibe información de dos sitios antes de empezar: los **argumentos** que escribes tras su nombre (`grep hola notas.txt`) y las **variables de entorno** del sistema (`PATH`, `HOME`, `LANG`…). Aquí aprendes a leer las dos cosas de forma robusta.
+
+## Predice
+
+<Pregunta
+  pregunta="Ejecutas `cargo run -- Ana` y el programa hace `let nombre = std::env::args().nth(1).unwrap();`. ¿Qué vale `nombre`?"
+  opciones={["`\"Ana\"`", "La ruta del programa", "`\"--\"`", "Entra en pánico"]}
+  correcta={0}
+  explicacion="El elemento 0 es el programa; el 1 es el primer argumento real. El `--` lo consume cargo para separar sus opciones de las tuyas."
+  porque={["", "Ese es el elemento 0.", "cargo no se lo pasa a tu programa.", "Habría pánico si no pasaras ningún argumento: `nth(1)` daría `None`."]}
+/>
+
+## La idea
+
+`std::env::args()` devuelve un **iterador** de `String`. El primero suele ser el nombre del programa, así que lo normal es saltarlo con `.skip(1)`. Como es un iterador, puedes recogerlo en un `Vec`, buscar con `.nth(i)` o recorrerlo con `for`. Si un argumento puede no ser UTF-8 válido (rutas raras en algunos sistemas), existe `args_os()`, que da `OsString` (lección 7).
+
+Los argumentos **pueden faltar**: nunca hagas `.unwrap()` a ciegas en un programa que va a usar otra persona. Usa `Option` con un valor por defecto o un mensaje de uso. Para programas serios, el crate `clap` genera el análisis de argumentos, la ayuda (`--help`) y los errores.
+
+Las variables de entorno se leen con `std::env::var(nombre)`, que devuelve `Result<String, VarError>`. `env::vars()` las recorre todas. Puedes cambiar variables del **propio** proceso con `env::set_var`, pero en la edición 2024 esa función es `unsafe`: si otro hilo lee el entorno a la vez, el sistema operativo puede leer memoria ya liberada.
+
+## Pruébalo
+
+En el navegador el programa arranca **sin argumentos y sin variables de entorno**, así que verás los valores por defecto. En tu PC prueba `cargo run -- Ana` y, en PowerShell, `$env:IDIOMA = "es"; cargo run`.
+
+<Ejecutar ej="m22/argumentos" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**De dónde salen.** Cuando el sistema operativo arranca tu programa le entrega los argumentos y el entorno. En Linux llegan en la pila inicial del proceso; en Windows llegan como **una sola cadena** de línea de órdenes que el runtime de Rust trocea siguiendo las reglas de comillas de Windows. Todo eso ocurre en el `main` de verdad, el que genera rustc antes de llamar a tu `fn main` (lo verás en la lección 10 al quitarlo con `#![no_main]`).
+
+**En el navegador** el programa es WebAssembly con WASI: el «sistema operativo» es un pequeño entorno en JavaScript que le pasa una lista de argumentos y un entorno vacío. Por eso la salida dice `hay 0 variables de entorno`.
+
+**`set_var` es `unsafe` en 2024.** En la edición 2024, `std::env::set_var` y `remove_var` son funciones `unsafe`. El motivo es la seguridad de memoria, no el estilo: en varios sistemas, el entorno es una estructura global que otras funciones del sistema leen sin protección. Modificarla mientras otro hilo la lee es una **carrera de datos**.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="`args().nth(1).unwrap()` en un programa para otros">
+
+❌ `let archivo = std::env::args().nth(1).unwrap();` → si se ejecuta sin argumentos, el pánico dice `called Option::unwrap() on a None value`, que no ayuda a nadie.
+
+✅ Explica qué falta y sal con un código de error:
+
+```rust
+let Some(archivo) = std::env::args().nth(1) else {
+    eprintln!("uso: contar <archivo>");
+    std::process::exit(2);
+};
+```
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="¿Qué expresión da el **número de argumentos** que escribió la persona (sin contar el nombre del programa)?"
+  opciones={["`std::env::args().count()`", "`std::env::args().skip(1).count()`", "`std::env::args().len() + 1`", "`std::env::vars().count()`"]}
+  correcta={1}
+  explicacion="`skip(1)` quita el nombre del programa y `count()` consume el iterador contando."
+  porque={["Cuenta también el nombre del programa: uno de más.", "", "Sumar 1 empeora el error en vez de corregirlo.", "Eso cuenta variables de entorno, no argumentos."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `std::env::var` devuelve un `Result` y no directamente un `String`?"
+  opciones={[
+    "Porque leer el entorno es lento",
+    "Porque la variable puede no existir o no ser UTF-8 válido, y el programa debe decidir qué hacer",
+    "Porque las variables de entorno son números",
+    "Por compatibilidad con versiones antiguas"
+  ]}
+  correcta={1}
+  explicacion="`VarError` tiene dos casos: `NotPresent` y `NotUnicode`. Un `Result` te obliga a pensar en ambos."
+  porque={["La velocidad no tiene nada que ver con el tipo.", "", "Son texto (o bytes del sistema).", "Es así por diseño, desde Rust 1.0."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `std::env::set_var` es `unsafe` en la edición 2024?"
+  opciones={[
+    "Porque puede borrar archivos",
+    "Porque modificar el entorno mientras otro hilo lo lee puede provocar una carrera de datos en el sistema",
+    "Porque cambia las variables de todo el sistema operativo",
+    "Porque solo funciona en Linux"
+  ]}
+  correcta={1}
+  explicacion="El entorno del proceso es una estructura global que el sistema lee sin cerrojo. Rust no puede garantizar que nadie más la esté leyendo, así que la responsabilidad pasa a quien llama."
+  porque={["No toca archivos.", "", "Solo cambia el entorno del propio proceso (y de los hijos que lance después).", "Existe en todas las plataformas."]}
+/>
+
+## Para saber más
+
+- Documentación de `std::env`: https://doc.rust-lang.org/std/env/index.html
+- *Command Line Applications in Rust*: https://rust-cli.github.io/book/

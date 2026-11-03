@@ -1,0 +1,100 @@
+---
+title: "Write"
+description: "El trait de los destinos de bytes: write, write_all, flush y la macro write!."
+sidebar:
+  order: 4
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::io::Write`
+
+## Sinopsis
+
+```rust
+pub trait Write {
+    // Required methods
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Error>;
+    fn flush(&mut self) -> Result<(), Error>;
+
+    // ... y 6 métodos provistos (con implementación por defecto)
+}
+```
+
+## Qué hace
+
+`Write` tiene dos métodos obligatorios: `write` (escribe parte de un búfer) y `flush` (vacía lo pendiente). Lo implementan `File`, `Stdout`, `Stderr`, `Vec<u8>`, `TcpStream`… Con `write!` y `writeln!` escribes texto formateado en cualquiera de ellos.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`write`](#write) | Escribe **parte** del búfer y devuelve cuántos bytes escribió. | 1.0 |
+| [`write_all`](#write_all) | Escribe el búfer entero (repite `write` hasta terminar). | 1.0 |
+| [`flush`](#flush) | Asegura que todo lo escrito llega a su destino. | 1.0 |
+| [`write_fmt`](#write_fmt) | Lo que usan por dentro `write!` y `writeln!`. | 1.0 |
+
+### `write`
+
+```rust
+fn write(&mut self, buf: &[u8]) -> Result<usize, Error>
+```
+
+Escribe **parte** del búfer y devuelve cuántos bytes escribió.
+
+### `write_all`
+
+```rust
+fn write_all(&mut self, buf: &[u8]) -> Result<(), Error>
+```
+
+Escribe el búfer entero (repite `write` hasta terminar).
+
+### `flush`
+
+```rust
+fn flush(&mut self) -> Result<(), Error>
+```
+
+Asegura que todo lo escrito llega a su destino.
+
+### `write_fmt`
+
+```rust
+fn write_fmt(&mut self, args: Arguments<'_>) -> Result<(), Error>
+```
+
+Lo que usan por dentro `write!` y `writeln!`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/io-write" />
+
+**Salida:**
+
+```text
+línea con writeln!
+bytes sueltos
+[50, 43, 50, 61, 52] -> 2+2=4
+```
+
+**Salida de error** (*stderr*):
+
+```text
+esto va a la salida de errores
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [write!](/ref/std/macros/write/)
+- [stdout](/ref/std/io/stdout/)
+- [fmt::Write (para String)](/ref/std/fmt/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)

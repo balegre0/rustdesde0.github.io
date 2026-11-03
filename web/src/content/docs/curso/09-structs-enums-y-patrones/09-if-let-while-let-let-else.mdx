@@ -1,0 +1,91 @@
+---
+title: "if let, while let y let else"
+description: "Usa los atajos de patrones cuando solo te importa un caso, sin perder la seguridad."
+sidebar:
+  order: 9
+duracion: 12
+desde: "1.65"
+requiere: ["09-structs-enums-y-patrones/08-patrones-a-fondo", "09-structs-enums-y-patrones/06-option-sin-null"]
+tarjetas:
+  - p: "¿Cuándo usar `if let` en vez de `match`?"
+    r: "Cuando solo te interesa un patrón y el resto de casos se tratan igual (o no se tratan). `if let Some(x) = o { … } else { … }`."
+  - p: "¿Qué exige el bloque `else` de un `let else`?"
+    r: "Que diverja: que no termine normalmente (return, break, continue o un pánico). Si no, E0308: «else clause of let...else does not diverge»."
+  - p: "¿Por qué no compila `let Some(n) = quizas;`?"
+    r: "Porque `let` necesita un patrón irrefutable (que encaje siempre), y `Some(n)` no encaja con `None` (E0005). Usa `let else`, `if let` o `match`."
+  - p: "¿Qué hace `while let Some(x) = pila.pop()`?"
+    r: "Repite el bucle mientras `pop()` devuelva `Some`; cuando devuelve `None`, el bucle termina."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a escribir menos `match`: tres atajos para cuando solo te importa **un** caso.
+
+## Predice
+
+<Predice
+  ej="m09/if-let-predice"
+  opciones={["`3 2 1` y luego `no hay nada`", "`1 2 3` y luego `no hay nada`", "`3 2 1` y luego `hay 0`", "Se queda en un bucle infinito"]}
+  correcta={0}
+  explicacion="`pop` saca el último elemento: 3, luego 2, luego 1; después devuelve `None` y el `while let` termina. `quizas` es `None`, así que va al `else`."
+  porque={["Correcto.", "`pop` saca por el final, no por el principio.", "`None` no tiene ningún número dentro; se ejecuta el `else`.", "Cuando la pila se vacía, `pop()` da `None` y el patrón deja de encajar."]}
+/>
+
+## La idea
+
+Un `match` con un solo caso interesante y un `_ => {}` es mucho ruido. Para eso hay atajos:
+
+- **`if let PATRÓN = valor { … } else { … }`** — si encaja, entra y tienes las variables del patrón; si no, va al `else` (opcional). No hace falta cubrir todos los casos: el `else` es «todo lo demás».
+- **`while let PATRÓN = valor { … }`** — repite mientras encaje. Ideal para vaciar una pila o leer hasta que no quede nada.
+- **`let PATRÓN = valor else { …salir… };`** (estable desde Rust 1.65) — «sácame esto o me voy». Si encaja, las variables quedan disponibles **en el resto de la función**; si no, el `else` tiene que **salir**: `return`, `break`, `continue` o un pánico. Evita la «escalera» de `if let` anidados.
+
+Y en la edición 2024 hay **cadenas de let** (*let chains*, Rust 1.88): `if let Some(u) = a && let Some(p) = b && p > 100 { … }` junta varias condiciones en una.
+
+## Pruébalo
+
+<Ejecutar ej="m09/if-let" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Ninguno de estos atajos es magia: el compilador los traduce a un `match`. `if let P = v { A } else { B }` es `match v { P => A, _ => B }`. Por eso las reglas son las mismas (préstamos, movimientos y modos de enlace de la lección 8).
+
+`let` normal exige un patrón **irrefutable** (*irrefutable*): uno que encaje siempre, como `(a, b)` sobre una tupla o `Punto { x, y }` sobre un struct. Un patrón que puede fallar, como `Some(n)`, es **refutable**, y solo vale donde haya un camino para el fallo: `if let`, `while let`, `match` o `let else`. El tipo del bloque `else` de un `let else` es `!` (el tipo «nunca»: una expresión que no termina normalmente); por eso el compilador puede garantizar que después del `let else` la variable existe.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m09/let-else-sin-salir"
+  explicacion="El `else` imprime y… sigue. Pero entonces, ¿qué valdría `n` en la línea siguiente? No hay ninguno. Por eso el `else` tiene que divergir (el error dice que esperaba `!` y encontró `()`). El arreglo añade `return`."
+/>
+
+<NoCompila
+  ej="m09/let-refutable"
+  explicacion="E0005: `let` necesita un patrón que encaje siempre, y `Some(n)` no cubre `None`. rustc sugiere justo la herramienta de esta lección: `let ... else`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m09/primer-par"
+  enunciado="Completa `primer_par` con `let else`: si `buscar_par(v)` da `None`, devuelve `sin pares`; si da `Some(n)`, devuelve `primer par: n`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estos `let` compila?"
+  opciones={["`let (a, b) = (1, 2);`", "`let Some(x) = Some(5);`", "`let Ok(n) = \"7\".parse::<i32>();`", "`let 3 = 3;`"]}
+  correcta={0}
+  porque={["Correcto: una tupla siempre encaja con `(a, b)`.", "El tipo es `Option<i32>`, y el patrón `Some(x)` no cubre `None` aunque aquí sepamos que hay valor.", "`parse` puede fallar: el tipo `Result` incluye `Err`.", "Un literal es refutable: el tipo `i32` tiene más valores que 3."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué bloque `else` sirve en un `let Some(x) = o else { … };` dentro de un bucle?"
+  opciones={["`{ continue; }`", "`{ println!(\"nada\"); }`", "`{ x = 0; }`", "`{ None }`"]}
+  correcta={0}
+  porque={["Correcto: `continue` diverge (salta a la siguiente vuelta).", "Imprimir no diverge: después seguiría sin `x`.", "`x` todavía no existe en el `else`.", "Un valor no diverge; el `else` tiene que salir."]}
+/>

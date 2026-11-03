@@ -1,0 +1,62 @@
+---
+title: "TryFrom y TryInto"
+description: "Conversiones que pueden fallar: devuelven Result. Por ejemplo, de i32 a u8."
+sidebar:
+  order: 2
+insignias: ["Desde 1.85", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::convert::TryFrom, std::convert::TryInto` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub trait TryFrom<T>: Sized {
+    type Error;
+
+    // Required method
+    fn try_from(value: T) -> Result<Self, Self::Error>;
+}
+
+pub trait TryInto<T>: Sized {
+    type Error;
+
+    // Required method
+    fn try_into(self) -> Result<T, Self::Error>;
+}
+```
+
+## Qué hace
+
+`TryFrom<T> for U` es como `From`, pero devuelve `Result<U, Self::Error>`. La biblioteca la implementa entre todos los enteros: convertir `300i32` en `u8` da `Err(TryFromIntError)` en lugar de perder bits en silencio como `as`. Están en el preludio desde la edición 2021.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/convert-from" />
+
+**Salida:**
+
+```text
+Fahrenheit(212.0) Fahrenheit(32.0) 180
+hola 7 [97, 98, 99]
+Ok(Porcentaje(42))
+7%
+Err("130 no es un porcentaje")
+Err(TryFromIntError(PosOverflow))
+Ok(200)
+```
+
+## Desde
+
+Rust 1.85 (estable).
+
+## Ver también
+
+- [From e Into](/ref/std/convert/from/)
+- [std::num](/ref/std/num/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)
+- [Mundo 10 · Errores](/curso/10-errores/)

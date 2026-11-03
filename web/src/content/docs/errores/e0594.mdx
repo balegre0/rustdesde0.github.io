@@ -1,0 +1,79 @@
+---
+title: "E0594: asignar a través de un préstamo compartido"
+description: "Intentas modificar un valor al que solo llegas con & (o una variable o campo no mutable)."
+sidebar:
+  order: 51
+insignias: ["Préstamos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot assign to `*n`, which is behind a `&` reference ``
+
+## Qué significa
+
+`n: &i32` es un **préstamo compartido**: da permiso de lectura, no de escritura. `*n += 1` intenta escribir. Para modificar a través de una referencia necesitas `&mut i32`. El mismo error aparece si asignas a un campo de un struct cuya variable no es `mut`, o si una closure `Fn` intenta modificar algo capturado.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0594" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0594]: cannot assign to `*n`, which is behind a `&` reference
+ --> E0594.rs:2:5
+  |
+2 |     *n += 1;
+  |     ^^^^^^^ `n` is a `&` reference, so it cannot be written to
+  |
+help: consider changing this to be a mutable reference
+  |
+1 | fn subir(n: &mut i32) {
+  |              +++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Recibir `&T` en una función que quiere modificar el valor.
+- Asignar a `x.campo` cuando `x` no es `mut`.
+- Modificar una variable capturada dentro de una closure que debe ser `Fn`.
+
+## Cómo arreglarlo
+
+Cambia el tipo a `&mut T` y pasa `&mut x` al llamar (la variable original debe ser `mut`). Para structs, declara `let mut`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn subir(n: &mut i32) {
+    *n += 1;
+}
+
+fn main() {
+    let mut x = 1;
+    subir(&mut x);
+    println!("{x}");
+}
+```
+
+**Salida:**
+
+```text
+2
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0594` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0596](/errores/e0596/): préstamo exclusivo de algo no mutable
+- [E0384](/errores/e0384/): asignar dos veces a una variable inmutable
+
+## Aprende esto en
+
+- [Mundo 07 · Préstamos](/curso/07-prestamos/)
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

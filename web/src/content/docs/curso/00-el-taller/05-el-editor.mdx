@@ -1,0 +1,78 @@
+---
+title: "El editor y rust-analyzer"
+description: "Instala VS Code con rust-analyzer: errores mientras escribes, tipos visibles, autocompletado e ir a la definición. Y cómo usarlo sin depender de él."
+sidebar:
+  order: 5
+duracion: 10
+requiere: ["00-el-taller/04-la-trampa-de-link"]
+tarjetas:
+  - p: "¿Qué es rust-analyzer?"
+    r: "Un programa que analiza tu código Rust mientras escribes y le da al editor errores, tipos, autocompletado y navegación."
+  - p: "¿Qué son las *inlay hints* de rust-analyzer?"
+    r: "Las anotaciones grises que muestran el tipo que el compilador ha deducido, como `: i32` junto a `let x = 5`."
+  - p: "¿Cómo haces que rust-analyzer use Clippy al guardar?"
+    r: "Con el ajuste `\"rust-analyzer.check.command\": \"clippy\"` en VS Code."
+---
+
+import { Pregunta, Trampa } from '~/components';
+
+Podrías escribir Rust en el Bloc de notas, pero sería como hacer carpintería sin luz. Un buen editor te enseña errores **mientras escribes** y te muestra los tipos que el compilador deduce. Para un principiante, eso es un tutor gratis.
+
+## La idea
+
+Vas a usar **Visual Studio Code** (VS Code), un editor gratuito, con la extensión **rust-analyzer**. rust-analyzer es un programa que entiende Rust y le cuenta al editor:
+
+- **Errores y avisos** subrayados en rojo y amarillo, sin tener que compilar.
+- **Tipos deducidos** en gris (*inlay hints*): escribes `let x = 5;` y ves `x: i32`.
+- **Autocompletado**: escribe `texto.` y te muestra todos los métodos.
+- **Ir a la definición** (F12): salta al código de cualquier función, incluso de la biblioteca estándar.
+- **Documentación al pasar el ratón** por encima de cualquier nombre.
+
+## Instálalo
+
+1. En PowerShell:
+
+   ```powershell
+   winget install Microsoft.VisualStudioCode
+   ```
+
+2. Abre VS Code, ve a **Extensiones** (Ctrl+Mayús+X) e instala:
+   - **rust-analyzer** (autor: *The Rust Programming Language*). Es la imprescindible.
+   - **Even Better TOML**: colores y ayuda para `Cargo.toml`.
+   - **Error Lens** (opcional): muestra el texto del error al final de la línea.
+
+3. Abre la **carpeta** del proyecto, no un archivo suelto: *Archivo → Abrir carpeta…*. rust-analyzer necesita ver el proyecto entero (con su `Cargo.toml`) para funcionar.
+
+4. Un ajuste recomendado: abre la configuración en JSON (Ctrl+Mayús+P → «Preferences: Open User Settings (JSON)») y añade:
+
+   ```json
+   "rust-analyzer.check.command": "clippy"
+   ```
+
+   Así, al guardar, además de los errores verás los consejos de Clippy (mundo 16).
+
+La terminal integrada de VS Code (Ctrl+ñ o *Ver → Terminal*) es una PowerShell normal: puedes ejecutar `cargo run` sin salir del editor.
+
+<Trampa titulo="rust-analyzer no hace nada">
+
+Si no ves errores ni tipos, casi siempre es una de estas tres cosas:
+
+1. Abriste un **archivo**, no la **carpeta** del proyecto.
+2. No hay `Cargo.toml` en la carpeta abierta (estás una carpeta por encima o por debajo).
+3. Todavía está **indexando**: mira la barra de abajo. La primera vez tarda un poco, porque analiza también la biblioteca estándar.
+
+</Trampa>
+
+## Úsalo como tutor, no como muleta
+
+rust-analyzer a veces propone **arreglos automáticos** (la bombilla, Ctrl+.). Son útiles, pero mientras aprendes, haz esto: **lee el error, piensa el arreglo y, solo después, mira qué propone la bombilla**. Si aplicas arreglos sin entenderlos, el editor aprende Rust y tú no.
+
+## Comprueba
+
+<Pregunta
+  pregunta="Abres `main.rs` arrastrándolo a VS Code y rust-analyzer no muestra nada. ¿Qué es lo más probable?"
+  opciones={["Que Rust no está instalado", "Que abriste un archivo suelto y no la carpeta del proyecto", "Que el código no tiene errores", "Que falta el enlazador"]}
+  correcta={1}
+  explicacion="rust-analyzer necesita el proyecto entero (con `Cargo.toml`). Abre la carpeta con *Archivo → Abrir carpeta…*."
+  porque={["Puede ser, pero lo más común es lo otro.", "", "Aun sin errores, verías los tipos en gris.", "El enlazador no influye en rust-analyzer: nunca enlaza."]}
+/>

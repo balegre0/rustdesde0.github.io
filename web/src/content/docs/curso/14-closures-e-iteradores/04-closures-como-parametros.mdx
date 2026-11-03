@@ -1,0 +1,106 @@
+---
+title: "Closures como parámetros y como resultado"
+description: "Pasa closures a tus funciones, devuélvelos y guarda closures distintos en una misma lista."
+sidebar:
+  order: 4
+duracion: 14
+desde: "1.26"
+requiere: ["14-closures-e-iteradores/03-fn-fnmut-fnonce", "13-traits-y-genericos"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre `fn f<F: Fn(i32) -> i32>(g: F)` y `fn f(g: impl Fn(i32) -> i32)`?"
+    r: "Casi ninguna: `impl Fn` en un argumento es azúcar de un genérico anónimo. La única diferencia es que con `<F>` quien llama puede escribir el tipo con turbofish."
+  - p: "¿Cómo devuelves un closure de una función?"
+    r: "Con `-> impl Fn(i32) -> i32` (u otro trait de llamada) y normalmente `move`, para que el closure se lleve sus capturas."
+  - p: "¿Por qué no puedes meter dos closures distintos en un `Vec` sin más?"
+    r: "Porque cada closure tiene un tipo propio. Para mezclarlos hay que usar `Box<dyn Fn(…)>`: un puntero a datos más un puntero a vtable."
+  - p: "¿Qué dice el error E0373 al devolver `|x| x + n` sin `move`?"
+    r: "Que el closure puede vivir más que la función pero toma prestada `n`, que es local. Con `move` se lleva su propia copia."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir funciones que **reciben** closures (como hace la biblioteca estándar con `map` o `filter`) y funciones que los **fabrican** y los devuelven.
+
+## Predice
+
+<Predice
+  ej="m14/contador-fnmut"
+  opciones={["`a: 1 2 3` / `b: 1`", "`a: 1 2 3` / `b: 4`", "`a: 1 1 1` / `b: 1`", "No compila: `cuenta` es local y muere al salir de `nuevo_contador`"]}
+  correcta={0}
+  explicacion="Cada llamada a `nuevo_contador` crea un closure nuevo con **su propia** `cuenta`, movida dentro gracias a `move`. `a` y `b` no comparten nada."
+  porque={["Correcto.", "`b` tiene su propio contador, que empieza en 0.", "`cuenta` vive dentro del closure y conserva su valor entre llamadas.", "`move` se lleva `cuenta` dentro del closure: ya no es una variable local de la función."]}
+/>
+
+## La idea
+
+**Recibir un closure.** Como cada closure tiene un tipo único sin nombre, la función tiene que ser **genérica**: «acepto cualquier tipo `F` que se pueda llamar con un `i32` y devuelva un `i32`». Se escribe con un *bound* (mundo 13):
+
+```rust
+fn aplicar<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 { f(x) }
+fn aplicar(f: impl Fn(i32) -> i32, x: i32) -> i32 { f(x) }   // lo mismo, más corto
+```
+
+Las funciones normales también encajan: `aplicar(incrementar, 41)` funciona, porque una `fn` implementa los tres traits de llamada.
+
+**Devolver un closure.** No puedes escribir su tipo, así que dices qué trait cumple: `-> impl Fn(i32) -> i32`. Casi siempre con `move`, porque el closure va a vivir más que las variables locales de la función que lo crea.
+
+**Guardar closures distintos juntos.** Un `Vec` exige que todos sus elementos tengan el mismo tipo, y dos closures nunca lo tienen. La solución es borrar el tipo concreto: `Box<dyn Fn(i32) -> i32>`, un **trait object** (*objeto trait*, mundo 13) que guarda el closure en el montón y recuerda cómo llamarlo.
+
+## Pruébalo
+
+<Ejecutar ej="m14/aplicar" />
+
+<Ejecutar ej="m14/devolver-closure" titulo="Devolver closures y guardarlos en una lista" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`impl Fn` = monomorfización.** Por cada closure distinto que pasas a `aplicar`, el compilador genera una copia de `aplicar` especializada para ese tipo. Como sabe exactamente qué closure es, puede **meter su código dentro** (*inlining*): `aplicar(|n| n * 10, 4)` puede quedar en una simple multiplicación, sin llamada ninguna. Coste: más código en el ejecutable si hay muchos closures distintos.
+
+**`Box<dyn Fn>` = una sola copia y una llamada indirecta.** El `Box` es un **puntero gordo** (*fat pointer*): un puntero al closure (en el montón) y otro a su **vtable**, la tabla con la dirección de su código de llamada, su tamaño y cómo destruirlo. Mide dos punteros: lo comprobamos con una aserción al compilar, `size_of::<Box<dyn Fn()>>() == 16` en x86-64. Llamar a `op(7)` es: leer la dirección en la vtable y saltar allí. Es lo que viste en ensamblador en el mundo 13.
+
+Regla práctica: genérico (`impl Fn`) por defecto; `dyn Fn` cuando necesites mezclar closures distintos o guardarlos sin hacer genérico todo lo que los contiene.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m14/devolver-sin-move"
+  explicacion="Sin `move`, el closure toma **prestada** `n`. Pero `n` es un parámetro de `sumador` y se destruye al salir de ella: el closure devuelto apuntaría a memoria liberada (un uso tras liberar). Rust lo detecta (E0373) y propone justo el arreglo: `move |x| x + n`."
+/>
+
+<Trampa titulo="Dos closures idénticos no son del mismo tipo">
+
+<NoCompila
+  ej="m14/dos-closures-un-tipo"
+  explicacion="El `Vec` fija su tipo con el primer closure, y el segundo es «a different closure». La nota final del compilador lo resume: ni dos closures idénticos tienen el mismo tipo. Si los necesitas juntos, `Vec<Box<dyn Fn(i32) -> i32>>` como en el ejemplo de arriba."
+/>
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m14/componer"
+  enunciado="Escribe `componer(f, g)`: debe devolver un closure que, dado `x`, calcule `g(f(x))`. Salida esperada: `8`, `22` y `24`. Pista: el closure que devuelves tiene que **llevarse** `f` y `g`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué ganas al recibir `impl Fn(i32) -> i32` en lugar de `Box<dyn Fn(i32) -> i32>`?"
+  opciones={["Llamada directa que se puede inlinear, sin reservar memoria en el montón", "Nada: son lo mismo con distinta sintaxis", "Poder guardar closures distintos en un `Vec`", "Que el closure pueda capturar variables"]}
+  correcta={0}
+  explicacion="`impl Fn` es genérico: una copia especializada por closure. `dyn Fn` es una copia para todos con llamada indirecta por vtable."
+  porque={["Correcto.", "Son dos mecanismos distintos: estático frente a dinámico.", "Eso es justo lo que da `dyn`, no `impl`.", "Los dos admiten closures con capturas."]}
+/>
+
+<Pregunta
+  pregunta={'`fn hacer() -> impl Fn() -> usize { let s = String::from("hola"); || s.len() }` no compila. ¿Por qué?'}
+  opciones={["El closure toma prestada `s`, que se destruye al acabar `hacer`", "Falta `mut` en `s`", "Un closure no puede llamar métodos", "`impl Fn` no se puede usar en el tipo de retorno"]}
+  correcta={0}
+  explicacion="Sin `move`, el closure captura `&s`, y `s` muere al salir de la función (E0373). Con `move || s.len()` el closure se lleva la `String`."
+  porque={["Correcto.", "Solo se lee `s`: no hace falta `mut`.", "Sí puede: `s.len()` es lo normal.", "`-> impl Fn` es la forma habitual de devolver un closure."]}
+/>

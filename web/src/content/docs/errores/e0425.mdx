@@ -1,0 +1,77 @@
+---
+title: "E0425: nombre no encontrado"
+description: "Usas una variable, función o tipo que no existe en ese ámbito (a menudo, una errata)."
+sidebar:
+  order: 35
+insignias: ["Nombres, módulos y visibilidad"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot find value `puntuacoin` in this scope ``
+
+## Qué significa
+
+El compilador no encuentra ningún elemento con ese nombre **visible** en ese punto. Casi siempre es una errata, una variable declarada en otro bloque o algo que no has importado. En Rust 1.99, este código también cubre los **tipos** que no se encuentran (`cannot find type`).
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0425" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0425]: cannot find value `puntuacoin` in this scope
+ --> E0425.rs:3:20
+  |
+3 |     println!("{}", puntuacoin);
+  |                    ^^^^^^^^^^
+  |
+help: a local variable with a similar name exists
+  |
+3 -     println!("{}", puntuacoin);
+3 +     println!("{}", puntuacion);
+  |
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Errata en el nombre (`puntuacoin` en vez de `puntuacion`).
+- Usar una variable fuera del bloque donde se declaró.
+- Llamar a una función de otro módulo sin su ruta o sin `use`.
+- Usar un tipo que no has definido ni importado.
+
+## Cómo arreglarlo
+
+Revisa la ortografía (rustc suele proponer el nombre parecido). Si el elemento existe en otro módulo, impórtalo con `use` o escribe su ruta completa. Si es una variable de otro bloque, decláralo donde se necesite.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let puntuacion = 7;
+    println!("{}", puntuacion);
+}
+```
+
+**Salida:**
+
+```text
+7
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0425` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0433](/errores/e0433/): no se puede resolver la ruta
+- [E0432](/errores/e0432/): importación sin resolver
+- [E0423](/errores/e0423/): se esperaba un valor y hay un tipo
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

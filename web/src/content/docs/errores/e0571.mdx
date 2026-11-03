@@ -1,0 +1,75 @@
+---
+title: "E0571: break con valor en un while o un for"
+description: "Solo loop puede devolver un valor con break; while y for siempre valen ()."
+sidebar:
+  order: 32
+insignias: ["Expresiones"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` `break` with value from a `while` loop ``
+
+## Qué significa
+
+`break valor` sale de un bucle **y** hace que el bucle valga `valor`. Eso solo es posible con `loop`. Un `while` o un `for` pueden terminar sin pasar nunca por el `break` (porque la condición deja de cumplirse o se acaban los elementos), y en ese caso no habría valor que devolver.
+
+## Qué error evita
+
+Que el resultado del bucle quede sin valor en el camino en que el bucle termina «normalmente».
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0571" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0571]: `break` with value from a `while` loop
+ --> E0571.rs:6:13
+  |
+3 |     let r = while n < 10 {
+  |             ------------ you can't `break` with a value in a `while` loop
+...
+6 |             break n;
+  |             ^^^^^^^ can only break with a value inside `loop` or breakable block
+  |
+help: use `break` on its own without a value inside this `while` loop
+  |
+6 -             break n;
+6 +             break;
+  |
+```
+
+## Cómo arreglarlo
+
+Si el bucle tiene que devolver un valor, usa `loop` y pon tú la condición de salida:
+
+```rust
+let r = loop {
+    n += 3;
+    if n > 5 {
+        break n;
+    }
+};
+```
+
+**Salida:**
+
+```text
+6
+```
+
+Si el `while` puede terminar sin encontrar nada, guarda el resultado en una variable `Option` antes del bucle, o usa un iterador con `find` (mundo 14).
+
+## Más información
+
+En tu terminal, `rustc --explain E0571` muestra la explicación oficial (en inglés), sin conexión.
+
+## Errores parecidos
+
+- [E0308](/errores/e0308/): tipos que no coinciden
+- [E0317](/errores/e0317/): un `if` sin `else` donde se espera un valor
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/)

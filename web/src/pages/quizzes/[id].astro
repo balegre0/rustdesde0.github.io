@@ -1,0 +1,13 @@
+---
+import Practica from '../../components/paginas/Practica.astro';
+import Quiz from '../../components/islas/Quiz';
+import { quizzes, preguntaPorId, itemQuiz } from '../../lib/practica';
+export function getStaticPaths() { return quizzes.map((q) => ({ params: { id: q.id } })); }
+const q = quizzes.find((x) => x.id === Astro.params.id)!;
+const items = q.preguntas.map((id) => itemQuiz(preguntaPorId.get(id)!));
+---
+<Practica titulo={q.titulo} descripcion={q.descripcion || `Quiz cronometrado de Rust: ${q.titulo}`} ancho="normal">
+  <nav class="rdc-migas" aria-label="Migas de pan"><a href="/quizzes/">Quizzes</a></nav>
+  {q.descripcion && <p class="rdc-lead">{q.descripcion}</p>}
+  <Quiz client:load id={q.id} titulo={q.titulo} tiempo={q.tiempo} items={items} />
+</Practica>

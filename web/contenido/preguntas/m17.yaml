@@ -1,0 +1,465 @@
+# Banco de preguntas del mundo 17 — Concurrencia (CONTENIDO.md §7.1).
+# Los ejemplos con hilos son de plataforma "playground" (en wasm no hay hilos): se citan solo los que compilan
+# o fallan al compilar, comprobados con rustc 1.99.1; las salidas citadas son de los ejemplos sin hilos.
+
+- id: m17-sin-move
+  titulo: "Un hilo que presta"
+  mundo: 17-concurrencia
+  tema: hilos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m17/sin-move
+  opciones:
+    - "La closure presta `nombre`, pero el hilo podría vivir más que `main`; hay que mover el valor al hilo con `move` (E0373)"
+    - "Porque `println!` no se puede usar en un hilo"
+    - "Porque falta `join`"
+    - "Porque `String` no es `Send`"
+  correcta: 0
+  solucion: |
+    `thread::spawn` exige una closure `'static`: no puede guardar préstamos de variables locales. Con `thread::spawn(move || …)`, el `String` pasa a ser del hilo. (`String` sí es `Send`.)
+  etiquetas: ["E0373", "move", "thread::spawn"]
+
+- id: m17-usar-tras-move
+  titulo: "Lo que se va al hilo"
+  mundo: 17-concurrencia
+  tema: hilos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da?"
+  ej: m17/usar-tras-move
+  opciones:
+    - "E0382: `datos` se movió a la closure del hilo y ya no se puede usar en `main`"
+    - "E0373: la closure presta `datos`"
+    - "E0499: dos préstamos exclusivos"
+    - "Ninguno"
+  correcta: 0
+  solucion: |
+    `move` mueve `datos` al hilo. Si `main` necesita los datos, clona antes (`let copia = datos.clone();`), compártelos con `Arc`, o haz que el hilo los devuelva por `join`.
+  etiquetas: ["E0382", "move"]
+
+- id: m17-spawn-prestamo
+  titulo: "Trozos prestados a hilos"
+  mundo: 17-concurrencia
+  tema: hilos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Qué herramienta permite que dos hilos lean las dos mitades de `notas` sin copiarlas?"
+  ej: m17/spawn-prestamo
+  opciones:
+    - "`thread::scope`: los hilos con ámbito terminan antes de que acabe el bloque, así que pueden tomar prestado lo local"
+    - "Poner `'static` en `notas`"
+    - "Usar `Rc`"
+    - "Llamar a `join` antes de `spawn`"
+  correcta: 0
+  solucion: |
+    Con `thread::spawn`, `a` y `b` son préstamos de `notas` y el hilo podría sobrevivirla (E0597). `thread::scope(|s| { s.spawn(…); s.spawn(…); })` garantiza que los hilos terminan dentro del ámbito.
+  etiquetas: ["E0597", "thread::scope"]
+
+- id: m17-rc-en-hilo
+  titulo: "Rc no viaja"
+  mundo: 17-concurrencia
+  tema: send-sync
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede mover un `Rc` a otro hilo?"
+  ej: m17/rc-en-hilo
+  opciones:
+    - "`Rc` no es `Send`: su contador no es atómico y dos hilos podrían corromperlo (E0277). La versión para hilos es `Arc`"
+    - "Porque `Rc` es más lento"
+    - "Porque los números no se pueden compartir"
+    - "Porque falta `.clone()`"
+  correcta: 0
+  solucion: |
+    Si dos hilos hicieran `clone` o `drop` de copias del mismo `Rc` a la vez, el contador podría perder actualizaciones y liberar el valor antes de tiempo. `Arc` usa operaciones atómicas.
+  etiquetas: ["E0277", "Send", "Rc", "Arc"]
+
+- id: m17-cell-compartida
+  titulo: "Cell entre hilos"
+  mundo: 17-concurrencia
+  tema: send-sync
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Qué trait le falta a `Cell<i32>` para que dos hilos puedan usar `&visitas` a la vez?"
+  ej: m17/cell-compartida
+  opciones:
+    - "`Sync`: `Cell` permite modificar a través de `&` sin sincronización, así que compartirla entre hilos sería una carrera de datos (E0277)"
+    - "`Send`"
+    - "`Copy`"
+    - "`Clone`"
+  correcta: 0
+  solucion: |
+    `T: Sync` significa «`&T` se puede compartir entre hilos». Para un contador compartido: `AtomicI32` o `Mutex<i32>`.
+  etiquetas: ["E0277", "Sync", "Cell"]
+
+- id: m17-contador-mut
+  titulo: "Dos hilos, un contador"
+  mundo: 17-concurrencia
+  tema: carreras
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da y qué evita?"
+  ej: m17/contador-mut-dos-hilos
+  opciones:
+    - "E0499: dos préstamos exclusivos de `contador` a la vez. Evita una carrera de datos en `contador += 1`"
+    - "E0373: falta `move`"
+    - "E0277: `i32` no es `Send`"
+    - "No da ningún error: el resultado es 2"
+  correcta: 0
+  solucion: |
+    Es la regla de los préstamos del mundo 07 aplicada a hilos. `contador += 1` es leer, sumar y escribir: si dos hilos lo hacen a la vez, se puede perder una suma.
+  etiquetas: ["E0499", "carrera de datos"]
+
+- id: m17-scope-conflicto
+  titulo: "Escribir y leer en paralelo"
+  mundo: 17-concurrencia
+  tema: carreras
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m17/scope-mut-conflicto
+  opciones:
+    - "Un hilo necesita `&mut puntos` (push) y el otro `&puntos` a la vez: E0502. `push` podría reubicar el vector mientras el otro lo lee"
+    - "Porque `thread::scope` no admite dos hilos"
+    - "Porque falta `move`"
+    - "Porque `Vec` no es `Sync`"
+  correcta: 0
+  solucion: |
+    Dentro de un `scope`, los préstamos siguen las mismas reglas que en un solo hilo: muchos lectores o un escritor. Para leer y escribir a la vez hace falta un `Mutex` o un `RwLock`.
+  etiquetas: ["E0502", "thread::scope"]
+
+- id: m17-guard-no-send
+  titulo: "Un candado no viaja"
+  mundo: 17-concurrencia
+  tema: send-sync
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede mover un `MutexGuard` a otro hilo?"
+  ej: m17/guard-no-send
+  opciones:
+    - "`MutexGuard` no es `Send`: en muchos sistemas, un candado tiene que liberarlo el mismo hilo que lo tomó (E0277)"
+    - "Porque el `Mutex` ya está bloqueado"
+    - "Porque `drop` no se puede llamar en un hilo"
+    - "Porque `i32` no es `Send`"
+  correcta: 0
+  solucion: |
+    Algunos sistemas operativos tienen un comportamiento indefinido si otro hilo libera el mutex. Rust lo impide en los tipos: el guard es `!Send`.
+  etiquetas: ["E0277", "MutexGuard", "Send"]
+
+- id: m17-rx-clone
+  titulo: "¿Dos receptores?"
+  mundo: 17-concurrencia
+  tema: canales
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede clonar un `Receiver` de `std::sync::mpsc`?"
+  ej: m17/rx-clone
+  opciones:
+    - "Porque es *mpsc*: varios productores, **un** consumidor. `Sender` es `Clone`, `Receiver` no (E0599)"
+    - "Porque el canal está vacío"
+    - "Porque falta `use std::clone::Clone`"
+    - "Porque `i32` no es `Clone`"
+  correcta: 0
+  solucion: |
+    Para varios consumidores, comparte el receptor con `Arc<Mutex<Receiver<T>>>` (un pool de hilos lo hace así) o usa un canal *mpmc* como el de `crossbeam`.
+  etiquetas: ["E0599", "mpsc"]
+
+- id: m17-mutex-guard
+  titulo: "Cuándo se suelta el candado"
+  mundo: 17-concurrencia
+  tema: mutex
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m17/mutex-un-hilo
+  opciones:
+    - "`dentro: 70`, `¿libre? false`, `¿libre ahora? true`, `final: 70`"
+    - "`dentro: 70`, `¿libre? true`, `¿libre ahora? true`, `final: 70`"
+    - "`dentro: 70`, `¿libre? false`, `¿libre ahora? false`, `final: 100`"
+    - "Se queda bloqueado para siempre"
+  correcta: 0
+  solucion: |
+    `lock()` devuelve un guard; mientras vive, el mutex está tomado y `try_lock` falla. Al cerrar el bloque, el `drop` del guard lo libera. `into_inner` consume el mutex y devuelve el valor.
+  etiquetas: ["Mutex", "RAII"]
+
+- id: m17-rwlock
+  titulo: "Leer y escribir con RwLock"
+  mundo: 17-concurrencia
+  tema: mutex
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m17/reto-rwlock
+  opciones:
+    - "`suma = 60` y `[20, 40, 60]`"
+    - "`suma = 120` y `[20, 40, 60]`"
+    - "`suma = 60` y `[10, 20, 30]`"
+    - "Se bloquea: el `read` sigue activo cuando se pide `write`"
+  correcta: 0
+  solucion: |
+    El guard de lectura es un temporal de la primera sentencia: se suelta al llegar al `;`. Por eso el `write` posterior no se bloquea.
+  etiquetas: ["RwLock"]
+
+- id: m17-canal-cierre
+  titulo: "Cuándo termina un for sobre un canal"
+  mundo: 17-concurrencia
+  tema: canales
+  dificultad: media
+  tipo: opcion
+  enunciado: "En `m17/canal-un-hilo`, ¿qué pasaría si se quitara `drop(tx)`?"
+  codigo: |
+    let (tx, rx) = mpsc::channel();
+    tx.send(String::from("uno")).unwrap();
+    // …
+    drop(tx);
+    for msg in rx.iter() { println!("recibido: {msg}"); }
+    println!("canal cerrado");
+  opciones:
+    - "El `for` recibiría los tres mensajes y luego se quedaría esperando para siempre: el canal no se cierra mientras exista algún `Sender`"
+    - "Nada: el `for` termina igual"
+    - "No compilaría"
+    - "Se perderían los mensajes"
+  correcta: 0
+  solucion: |
+    `rx.iter()` termina cuando todos los emisores se han destruido. Mientras `tx` exista, podría llegar otro mensaje.
+  etiquetas: ["mpsc", "drop"]
+
+- id: m17-canal-acotado
+  titulo: "Un canal con sitio para dos"
+  mundo: 17-concurrencia
+  tema: canales
+  dificultad: media
+  tipo: opcion
+  enunciado: "Con `mpsc::sync_channel(2)` y nadie recibiendo, ¿qué pasa al intentar `try_send` de un tercer mensaje?"
+  opciones:
+    - "Devuelve `Err(TrySendError::Full(3))`: el canal está lleno. Con `send`, el emisor se bloquearía hasta que hubiera sitio"
+    - "Lo guarda igualmente"
+    - "Entra en pánico"
+    - "Borra el mensaje más antiguo"
+  correcta: 0
+  solucion: |
+    Un canal acotado limita la memoria y frena al productor si el consumidor va lento (*backpressure*). Salida real del ejemplo `m17/canal-acotado`: `enviado 1`, `enviado 2`, `lleno: no cabe 3`.
+  etiquetas: ["sync_channel", "backpressure"]
+
+- id: m17-atomico-orden
+  titulo: "Relaxed para un contador"
+  mundo: 17-concurrencia
+  tema: atomicos
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Varios hilos cuentan eventos con `contador.fetch_add(1, Ordering::Relaxed)` y al final, tras `join`, se lee el total. ¿Es correcto usar `Relaxed`?"
+  opciones:
+    - "Sí: `Relaxed` garantiza que cada suma es atómica y no se pierde; solo no ordena otros accesos a memoria, y aquí no hace falta. El `join` ya sincroniza la lectura final"
+    - "No: con `Relaxed` se pueden perder sumas"
+    - "No: hay que usar siempre `SeqCst`"
+    - "Solo en procesadores x86"
+  correcta: 0
+  solucion: |
+    El orden de memoria decide qué **otros** accesos se ven ordenados respecto a la operación atómica. Para publicar datos (escribir un búfer y luego una bandera) hace falta `Release`/`Acquire`.
+  etiquetas: ["atómicos", "Ordering"]
+
+- id: m17-acquire-release
+  titulo: "Publicar un dato"
+  mundo: 17-concurrencia
+  tema: atomicos
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Un hilo escribe un dato y después pone `LISTO.store(true, Release)`. Otro hace `while !LISTO.load(Acquire) {}` y luego lee el dato. ¿Qué garantiza el par Release/Acquire?"
+  opciones:
+    - "Que si el segundo hilo ve `true`, también ve todo lo que el primero escribió antes del `store`"
+    - "Que los dos hilos se ejecutan a la vez"
+    - "Que la bandera se escribe más rápido"
+    - "Nada más que con `Relaxed`"
+  correcta: 0
+  solucion: |
+    Es una relación *happens-before*. Con `Relaxed` en los dos lados, el segundo hilo podría ver `true` y aun así leer el dato antiguo (en procesadores como ARM ocurre de verdad).
+  etiquetas: ["Acquire", "Release", "modelo de memoria"]
+
+- id: m17-carrera-intercalaciones
+  titulo: "¿Cuántas veces sale mal?"
+  mundo: 17-concurrencia
+  tema: carreras
+  dificultad: media
+  tipo: opcion
+  enunciado: "Dos hilos hacen `x += 1` con tres pasos cada uno (leer, sumar, escribir). De las 20 intercalaciones posibles, ¿cuántas dan el resultado correcto, `x = 2`?"
+  opciones:
+    - "2: solo cuando un hilo termina sus tres pasos antes de que el otro lea"
+    - "20"
+    - "10"
+    - "Ninguna"
+  correcta: 0
+  solucion: |
+    El simulador `m17/simulador-carrera` las recorre todas: `x = 2 (correcto): 2`, `x = 1 (se pierde una suma): 18`. Por eso Rust prohíbe compartir datos mutables sin sincronizar.
+  etiquetas: ["carrera de datos"]
+
+- id: m17-send-sync-def
+  titulo: "Send y Sync"
+  mundo: 17-concurrencia
+  tema: send-sync
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué significa que un tipo `T` sea `Sync`?"
+  opciones:
+    - "Que `&T` es `Send`: varios hilos pueden tener una referencia compartida a la vez"
+    - "Que `T` se puede mover a otro hilo"
+    - "Que `T` tiene un mutex dentro"
+    - "Que `T` es `Copy`"
+  correcta: 0
+  solucion: |
+    `Send`: se puede **transferir** a otro hilo. `Sync`: se puede **compartir** por referencia. Los dos son *auto traits*: el compilador los deduce de los campos. `Mutex<T>` es `Sync` si `T: Send`.
+  etiquetas: ["Send", "Sync"]
+
+- id: m17-interbloqueo
+  titulo: "El abrazo mortal"
+  mundo: 17-concurrencia
+  tema: mutex
+  dificultad: media
+  tipo: opcion
+  enunciado: "El hilo 1 toma el candado A y luego pide B; el hilo 2 toma B y luego pide A. ¿Qué puede pasar y cómo se evita?"
+  opciones:
+    - "Un interbloqueo: cada uno espera al otro para siempre. Se evita tomando siempre los candados en el mismo orden"
+    - "Una carrera de datos: Rust no lo compila"
+    - "Un pánico"
+    - "Nada: los mutex lo resuelven solos"
+  correcta: 0
+  solucion: |
+    Rust impide las carreras de datos, pero **no** los interbloqueos: son un error de lógica que el compilador no puede ver. El orden global de adquisición es la solución clásica.
+  etiquetas: ["interbloqueo", "Mutex"]
+
+- id: m17-envenenado
+  titulo: "Un Mutex envenenado"
+  mundo: 17-concurrencia
+  tema: mutex
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué `lock()` devuelve un `Result`?"
+  opciones:
+    - "Porque si un hilo entró en pánico con el candado tomado, el mutex queda **envenenado** (los datos podrían estar a medias) y `lock` devuelve `Err`"
+    - "Porque puede fallar por falta de memoria"
+    - "Porque el mutex puede estar vacío"
+    - "Por compatibilidad: siempre devuelve `Ok`"
+  correcta: 0
+  solucion: |
+    El `Err(PoisonError)` lleva dentro el guard, por si sabes que los datos están bien: `lock().unwrap_or_else(|e| e.into_inner())`.
+  etiquetas: ["Mutex", "envenenamiento"]
+
+- id: m17-arc-mutex
+  titulo: "El patrón Arc<Mutex<T>>"
+  mundo: 17-concurrencia
+  tema: mutex
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué aporta cada pieza de `Arc<Mutex<Vec<String>>>` compartido por varios hilos?"
+  opciones:
+    - "`Arc`: varios dueños entre hilos (contador atómico). `Mutex`: acceso exclusivo para modificar"
+    - "`Arc`: acceso exclusivo. `Mutex`: varios dueños"
+    - "Los dos hacen lo mismo"
+    - "`Arc` copia el vector para cada hilo"
+  correcta: 0
+  solucion: |
+    `Arc` resuelve la **propiedad** (¿quién libera?); `Mutex`, la **mutación** (¿quién escribe ahora?). Con `thread::scope`, a veces basta `&Mutex<T>` sin `Arc`.
+  etiquetas: ["Arc", "Mutex"]
+
+- id: m17-wasm-hilos
+  titulo: "Hilos en el navegador"
+  mundo: 17-concurrencia
+  tema: hilos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Por qué los ejemplos con `thread::spawn` de este mundo no se ejecutan en el navegador?"
+  opciones:
+    - "Porque el target `wasm32-wasip1` no tiene hilos: `thread::spawn` entra en pánico con «failed to spawn thread … Unsupported»"
+    - "Porque Rust no tiene hilos"
+    - "Porque los hilos son inseguros"
+    - "Porque el navegador no tiene CPU"
+  correcta: 0
+  solucion: |
+    El ejemplo `m17/hilo-en-wasm` imprime `Antes de crear el hilo` y luego entra en pánico (`thread::Builder::spawn` devolvería el error como `Err`). Existe el target `wasm32-wasip1-threads`, pero el ejecutor del curso no lo usa. Por eso esos ejemplos usan el Playground.
+  etiquetas: ["wasm", "hilos"]
+
+- id: m17-lazylock
+  titulo: "Inicializar una vez"
+  mundo: 17-concurrencia
+  tema: sincronizacion
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Para qué sirve `static TABLA: LazyLock<HashMap<…>> = LazyLock::new(|| …);`?"
+  opciones:
+    - "Para una global que se construye la primera vez que se usa, una sola vez aunque varios hilos la pidan a la vez"
+    - "Para una global que se puede modificar sin `unsafe`"
+    - "Para que la tabla se construya al compilar"
+    - "Para bloquear la tabla"
+  correcta: 0
+  solucion: |
+    `LazyLock` (estable desde 1.80) sincroniza la inicialización; después, el acceso es una lectura normal. El ejemplo `m17/lazylock` muestra que el mensaje «construyendo la tabla» sale una sola vez.
+  etiquetas: ["LazyLock", "static"]
+
+- id: m17-condvar
+  titulo: "Esperar una condición"
+  mundo: 17-concurrencia
+  tema: sincronizacion
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Por qué se llama a `condvar.wait(guard)` dentro de un `while !listo { … }` y no en un `if`?"
+  opciones:
+    - "Porque puede haber despertares espurios (y otro hilo pudo cambiar la condición): al volver hay que comprobarla otra vez"
+    - "Porque `wait` solo funciona en bucles"
+    - "Por estilo"
+    - "Porque `if` no admite guards"
+  correcta: 0
+  solucion: |
+    `wait` suelta el mutex mientras duerme y lo vuelve a tomar al despertar, pero no garantiza que la condición se cumpla. También existe `wait_while(guard, |l| !*l)`, que hace el bucle por ti.
+  etiquetas: ["Condvar"]
+
+- id: m17-rayon
+  titulo: "Paralelizar un iterador"
+  mundo: 17-concurrencia
+  tema: paralelismo
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Con el crate Rayon, ¿qué cambias para sumar en paralelo los cuadrados de un `Vec<u64>`?"
+  codigo: |
+    let total: u64 = v.iter().map(|x| x * x).sum();
+  opciones:
+    - "`v.par_iter()` en vez de `v.iter()` (con `use rayon::prelude::*;`)"
+    - "Crear un hilo por elemento a mano"
+    - "Envolver `v` en un `Mutex`"
+    - "Nada: los iteradores ya son paralelos"
+  correcta: 0
+  solucion: |
+    Rayon reparte el trabajo entre un grupo de hilos con robo de trabajo (*work stealing*). Como la closure no comparte nada mutable, el compilador garantiza que no hay carreras.
+  etiquetas: ["Rayon", "paralelismo"]
+
+- id: m17-false-sharing
+  titulo: "Compartir línea de caché"
+  mundo: 17-concurrencia
+  tema: atomicos
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Dos hilos actualizan dos `AtomicU64` distintos que están uno al lado del otro en un struct, y va muy lento. ¿Por qué?"
+  opciones:
+    - "Comparten línea de caché (64 bytes): cada escritura invalida la caché del otro núcleo (*false sharing*). Se arregla separándolos, por ejemplo con `#[repr(align(64))]`"
+    - "Porque los atómicos son siempre lentos"
+    - "Porque hay una carrera de datos"
+    - "Porque falta un `Mutex`"
+  correcta: 0
+  solucion: |
+    No hay ningún error de corrección: es un problema de rendimiento del hardware. El crate `crossbeam` tiene `CachePadded<T>` para esto.
+  etiquetas: ["false sharing", "rendimiento"]
+
+- id: m17-join-panico
+  titulo: "Un hilo que entra en pánico"
+  mundo: 17-concurrencia
+  tema: hilos
+  dificultad: media
+  tipo: opcion
+  enunciado: "Un hilo creado con `thread::spawn` entra en pánico. ¿Qué devuelve su `join()`?"
+  opciones:
+    - "`Err` con la carga del pánico: el pánico de un hilo no tumba a los demás"
+    - "`Ok(())`"
+    - "El programa entero se detiene en ese momento"
+    - "`None`"
+  correcta: 0
+  solucion: |
+    El pánico desenrolla solo la pila de ese hilo. `main` decide qué hacer con el `Err` (el típico `join().unwrap()` lo propaga como otro pánico).
+  etiquetas: ["join", "pánico"]

@@ -1,0 +1,54 @@
+---
+title: "#[inline]"
+description: "Sugiere al compilador copiar el cuerpo de una función en cada llamada. Variantes inline(always) e inline(never), y cuándo sirven de verdad."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "Generación de código"]
+---
+import { Ejecutar } from '~/components';
+
+`#[inline]` sugiere que el cuerpo de la función se copie en el sitio de cada llamada (*inlining*), en vez de saltar a ella.
+
+## Sinopsis
+
+```text
+#[inline]          // sugerencia
+#[inline(always)]  // sugerencia fuerte
+#[inline(never)]   // prohibición (casi absoluta)
+```
+
+Se aplica a funciones y métodos (también en `impl` y en traits).
+
+## Qué hace
+
+Expandir una función en línea ahorra el coste de la llamada y, sobre todo, deja al optimizador ver el código junto con el de quien llama: puede propagar constantes, quitar comprobaciones y vectorizar. A cambio, el programa crece.
+
+- **Sin atributo**, el optimizador decide solo, y dentro del mismo crate suele acertar. Lo que **no** puede hacer es expandir funciones **no genéricas de otro crate**, porque solo tiene su código compilado.
+- **`#[inline]`** hace que el cuerpo de la función viaje en los metadatos del crate, para que otros crates **puedan** expandirla. Es su uso principal: funciones pequeñas y públicas de una biblioteca.
+- **`#[inline(always)]`** pide expandirla siempre que sea posible. Úsalo solo si has medido que mejora.
+- **`#[inline(never)]`** impide expandirla: útil para que una función aparezca en un perfilador o en el ensamblador, o para sacar código frío del camino caliente (junto con [`#[cold]`](/ref/lenguaje/atributos/cold/)).
+
+Las funciones **genéricas** y las `const fn` ya viajan siempre en los metadatos (se monomorfizan en el crate que las usa), así que `#[inline]` les aporta poco.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-inline" />
+
+La salida es la misma con o sin los atributos: **nunca cambian lo que hace el programa**, solo cómo se compila.
+
+## Bajo el capó
+
+`rustc` traduce `#[inline]` al atributo `inlinehint` de LLVM, `#[inline(always)]` a `alwaysinline` y `#[inline(never)]` a `noinline`. Con `opt-level = 0` (perfil `dev`) casi no se expande nada, salvo lo marcado `always`. Para ver el efecto, compila en release y mira el ensamblador (`cargo rustc --release -- --emit=asm`, o la herramienta `cargo-show-asm`).
+
+## Errores típicos
+
+- Poner `#[inline(always)]` en todas partes «para que vaya rápido»: hace el binario más grande, la compilación más lenta y, a menudo, el programa **más lento** (peor uso de la caché de instrucciones).
+- Esperar que `#[inline]` en una función privada no genérica cambie algo dentro del mismo crate: el optimizador ya la veía.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[`#[cold]`](/ref/lenguaje/atributos/cold/) · [`#[track_caller]`](/ref/lenguaje/atributos/track_caller/) · [Atributos](/ref/lenguaje/atributos/)

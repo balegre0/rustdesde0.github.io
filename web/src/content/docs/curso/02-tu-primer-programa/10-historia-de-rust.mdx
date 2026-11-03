@@ -1,0 +1,119 @@
+---
+title: "De un ascensor roto a Rust 1.0"
+description: "Conoce la historia de Rust, de 2006 a 2015 y hasta hoy, y el problema que nació para resolver."
+sidebar:
+  order: 10
+duracion: 10
+desde: "1.0"
+requiere: ["02-tu-primer-programa/09-ediciones"]
+tarjetas:
+  - p: "¿Quién empezó Rust y cuándo?"
+    r: "Graydon Hoare, programador de Mozilla, en 2006."
+  - p: "¿Qué suceso cuenta Hoare como origen de Rust?"
+    r: "El ascensor de su edificio (vivía en el piso 21) volvió a averiarse por un fallo de software."
+  - p: "¿Cuándo salió Rust 1.0?"
+    r: "El 15 de mayo de 2015."
+  - p: "¿De dónde viene el nombre «Rust»?"
+    r: "De los hongos de la roya (*rust fungi*), que Hoare describió como «sobrediseñados para sobrevivir»."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Antes de seguir escribiendo programas, una pausa para saber de dónde viene la herramienta que estás aprendiendo. Entender el **problema** que Rust quería resolver te ayudará a entender muchas de sus reglas, sobre todo las que más cuestan al principio.
+
+## Predice
+
+<Pregunta
+  pregunta="Según contó su creador, ¿qué le empujó a empezar a diseñar Rust en 2006?"
+  opciones={["Un encargo de su empresa para hacer un navegador nuevo", "Que el ascensor de su edificio se averió otra vez por un fallo de software", "Un concurso universitario de lenguajes", "Que quería un lenguaje para hacer videojuegos"]}
+  correcta={1}
+  explicacion="Graydon Hoare vivía en un piso 21 y el ascensor volvió a fallar por culpa del software. Molesto, empezó a pensar en un lenguaje con el que se pudiera escribir software rápido y pequeño **sin errores de memoria**."
+  porque={["Mozilla apoyó el proyecto después, en 2009, pero no lo encargó: empezó como algo personal de Hoare.", "", "No hubo ningún concurso: fue un proyecto personal.", "Hoy se hacen videojuegos con Rust, pero ese no fue el origen."]}
+/>
+
+## La idea
+
+<Historia titulo="El piso 21">
+Vancouver, 2006. Graydon Hoare, un programador de 29 años que trabajaba en Mozilla (la organización que hace el navegador Firefox), llega a casa y el ascensor está averiado. Otra vez. Y otra vez por un fallo de software. Vive en el piso 21. Molesto, empieza a diseñar un lenguaje con el que se pueda escribir software rápido y pequeño **sin errores de memoria**, una de las fuentes más comunes de fallos graves en los programas de sistemas.
+
+Lo llamó **Rust** por los hongos de la roya (en inglés, *rust fungi*), unos organismos que él describió como «sobrediseñados para sobrevivir».
+</Historia>
+
+Desde ahí, los hitos principales:
+
+- **2006**: Hoare empieza a diseñar Rust. Las primeras reacciones son mixtas; muchos creen que no funcionará.
+- **2009**: Mozilla patrocina el proyecto oficialmente y, durante la década siguiente, paga a más de una docena de ingenieros a tiempo completo.
+- **Hacia 2013**: se elimina el recolector de basura (*garbage collector*) que tenía entonces el lenguaje: la memoria pasa a gestionarse con las reglas de **propiedad** (*ownership*) que estudiarás en el mundo 6. Hoare deja el proyecto en manos de otros ingenieros.
+- **15 de mayo de 2015**: **Rust 1.0**, tras unos seis años de desarrollo patrocinado. Desde entonces, la promesa de que el código estable sigue compilando con cada versión nueva.
+- **2017**: Firefox incorpora un motor de estilos (CSS) escrito en Rust, nacido del proyecto experimental Servo.
+- **2023**: se crea el *Leadership Council*, el órgano que coordina hoy el proyecto, con un representante por cada equipo principal.
+- **2025**: la edición 2024 llega con Rust 1.85. **Hoy**, Rust 1.99.1, la versión de este curso.
+
+## Pruébalo
+
+Un programa que imprime la cronología en dos columnas, con lo que aprendiste en la lección de formato avanzado:
+
+<Ejecutar ej="m02/cronologia" />
+
+Salida real:
+
+```text
+Año   Suceso
+2006  Graydon Hoare empieza a diseñar Rust
+2009  Mozilla patrocina el proyecto
+2015  15 de mayo: Rust 1.0
+2025  Rust 1.85 estrena la edición 2024
+2026  Rust 1.99.1
+```
+
+`{:<6}` reserva 6 columnas alineadas a la izquierda para el año. Fíjate en que `Año` (3 caracteres, aunque la `ñ` ocupe 2 bytes) queda bien alineada con `2006`.
+
+## Bajo el capó
+
+<BajoElCapo titulo="De dónde vienen las ideas de Rust">
+Rust no inventó todas sus ideas: las tomó de lenguajes anteriores y las combinó. Esta es la única lección del curso en la que se nombran otros lenguajes, y solo como historia. La propia referencia oficial de Rust (*The Rust Reference*, sección «Influences») reconoce, entre otras, estas influencias:
+
+- De **ML y OCaml**: los tipos algebraicos (los `enum` con datos), `match` y la inferencia de tipos.
+- De **Haskell**: las clases de tipos, que inspiraron los traits.
+- De **C++**: la idea de liberar los recursos automáticamente al salir de un bloque y la de abstracciones que no cuestan nada en ejecución.
+- De **Cyclone**: las regiones de memoria, precursoras de los tiempos de vida (*lifetimes*).
+- De **Erlang**: el paso de mensajes entre tareas.
+
+En junio de 2023, Hoare escribió un artículo, «The Rust I Wanted Had No Future» (el Rust que yo quería no tenía futuro), sobre lo que él habría hecho de otra forma. Por ejemplo, habría preferido que los enteros, al desbordarse, se convirtieran en números de precisión ilimitada, en vez de detenerse o dar la vuelta (lo verás en el mundo 3), y habría cedido algo de rendimiento a cambio de un compilador más simple. Y se alegra de no haber sido el «dictador benevolente» del proyecto: el Rust que usas es obra de una comunidad enorme, no de una sola persona.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Rust es seguro, así que mi programa no puede fallar»">
+❌ Creer que la seguridad de Rust significa «programas sin errores». Un programa de Rust puede calcular mal, detenerse con un **pánico** (*panic*) o tener errores de lógica.
+
+✅ La promesa concreta es **seguridad de memoria**: en el Rust normal (sin `unsafe`, que verás en el mundo 20) el compilador impide los errores de memoria que inspiraron a Hoare, como usar memoria ya liberada o liberarla dos veces. Es mucho, pero no es todo. El resto sigue siendo trabajo tuyo, con la ayuda de los tipos y de las pruebas.
+</Trampa>
+
+## Tu turno
+
+Ordena los hitos de la historia de Rust, del más antiguo al más reciente.
+
+<Ordena
+  lineas={["Graydon Hoare empieza a diseñar Rust (2006)", "Mozilla patrocina el proyecto (2009)", "Se elimina el recolector de basura (hacia 2013)", "Sale Rust 1.0 (15 de mayo de 2015)", "Llega la edición 2024 con Rust 1.85 (2025)"]}
+  distractores={["Sale Rust 2.0 con la edición 2024"]}
+  explicacion="El orden es 2006 → 2009 → ~2013 → 2015 → 2025. No existe un «Rust 2.0»: las versiones siguen siendo 1.x gracias a la promesa de compatibilidad, y los cambios incompatibles van en las ediciones."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué problema quería resolver Rust desde el principio?"
+  opciones={["Que los programas fueran más fáciles de escribir que en cualquier otro lenguaje", "Escribir software rápido y pequeño sin errores de memoria", "Sustituir a todos los lenguajes de la web", "Que los programas no necesitaran compilarse"]}
+  correcta={1}
+  explicacion="Rapidez y seguridad de memoria a la vez: esa combinación explica las reglas de propiedad y préstamos que verás en los mundos 6 a 8."
+  porque={["La facilidad no era el objetivo principal: de hecho, Rust tiene fama de costar al principio.", "", "Rust se usa en la web (como en este curso, vía WebAssembly), pero ese no era su propósito.", "Rust es un lenguaje compilado; eso es parte de su velocidad."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué seguimos en Rust 1.x en lugar de tener un Rust 2.0?"
+  opciones={["Porque el lenguaje casi no ha cambiado desde 2015", "Porque la promesa de compatibilidad hace que el código estable siga compilando, y los cambios incompatibles se hacen con ediciones", "Porque Rust 2.0 está prohibido por la Fundación", "Por casualidad"]}
+  correcta={1}
+  explicacion="Cada versión 1.x mantiene compatible el código anterior. Cuando hace falta un cambio incompatible (como reservar `gen`), va en una edición nueva, que cada proyecto elige cuándo adoptar."
+  porque={["Ha cambiado muchísimo: casi cien versiones con novedades desde 1.0.", "", "No hay ninguna prohibición; es una decisión de diseño del proyecto.", "Es una decisión deliberada, explicada en la lección de ediciones."]}
+/>

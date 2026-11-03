@@ -1,0 +1,41 @@
+---
+title: "#[global_allocator]"
+description: "Sustituye el asignador de memoria de todo el programa por un static que implemente GlobalAlloc."
+sidebar:
+  order: 19
+insignias: ["Desde 1.28", "Runtime"]
+---
+import { Ejecutar } from '~/components';
+
+`#[global_allocator]` elige quién reserva y libera la memoria del heap para **todo** el programa: `Box`, `Vec`, `String`…
+
+## Sinopsis
+
+```text
+#[global_allocator]
+static NOMBRE: TipoQueImplementaGlobalAlloc = …;
+```
+
+## Qué hace
+
+El `static` tiene que implementar el trait `unsafe trait GlobalAlloc` (métodos `alloc`, `dealloc` y, opcionalmente, `alloc_zeroed` y `realloc`). Solo puede haber **uno** en todo el árbol de crates. Sin él, se usa `std::alloc::System` (el del sistema operativo).
+
+Usos: asignadores más rápidos (`mimalloc`, `jemalloc`), medir o limitar la memoria, y en `no_std` con `alloc` dar uno propio.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-global-allocator" />
+
+Dos reservas: una para el `Vec` (100 elementos de una vez, porque `collect` conoce el tamaño) y otra para el `String`.
+
+## Bajo el capó
+
+Implementar `GlobalAlloc` es `unsafe` porque el asignador tiene que cumplir un contrato que el compilador no puede comprobar: devolver memoria alineada según el `Layout`, no devolver el mismo bloque dos veces… Y **no puede reservar memoria a través de sí mismo** (por ejemplo, con `println!` dentro de `alloc`), porque entraría en bucle.
+
+## Desde
+
+Rust 1.28.
+
+## Ver también
+
+[`std::alloc`](/ref/std/) · [Mundo 22](/curso/22-sistemas-y-ffi/)

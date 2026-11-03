@@ -1,0 +1,47 @@
+---
+title: "forget"
+description: "Se lleva un valor sin destruirlo: su destructor nunca se ejecuta. Es seguro, pero puede fugar memoria."
+sidebar:
+  order: 3
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::mem::forget`
+
+## Sinopsis
+
+```rust
+pub const fn forget<T>(t: T)
+```
+
+## Qué hace
+
+`forget(x)` toma la propiedad de `x` y **no ejecuta su `Drop`**: la memoria o el recurso que tuviera no se liberan nunca. Es seguro (no es comportamiento indefinido), porque Rust no garantiza que los destructores se ejecuten siempre: también se «olvidan» valores con ciclos de `Rc` o con `Box::leak`. Se usa sobre todo con código `unsafe` y FFI, cuando otro código pasa a ser el dueño. Para destruir un valor ya, usa `drop`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/mem-forget-drop" />
+
+**Salida:**
+
+```text
+drop de a
+fin de main
+drop de c
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [Drop y drop](/ref/std/ops/drop/)
+- [Box::leak](/ref/std/boxed/box/)
+- [Rc y ciclos](/ref/std/rc/)
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)
+- [Mundo 20 · Unsafe y comportamiento indefinido](/curso/20-unsafe-y-ub/)

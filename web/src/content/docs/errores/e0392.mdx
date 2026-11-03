@@ -1,0 +1,77 @@
+---
+title: "E0392: parámetro genérico sin usar"
+description: "Declaras un parámetro de tipo o de tiempo de vida en un struct o enum y ningún campo lo usa."
+sidebar:
+  order: 31
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` type parameter `T` is never used ``
+
+## Qué significa
+
+Si `Id<T>` no guarda nada de tipo `T`, el compilador no sabe cómo se relaciona `Id<T>` con `T` (por ejemplo, si `Id<T>` debe ser `Send` cuando `T` lo es). Por eso exige que cada parámetro aparezca en algún campo.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0392" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0392]: type parameter `T` is never used
+ --> E0392.rs:1:11
+  |
+1 | struct Id<T> {
+  |           ^ unused type parameter
+  |
+  = help: consider removing `T`, referring to it in a field, or using a marker such as `PhantomData`
+  = help: if you intended `T` to be a const parameter, use `const T: /* Type */` instead
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Usar un parámetro de tipo solo como «etiqueta» para distinguir tipos (`Id<Usuario>` frente a `Id<Pedido>`).
+- Dejar un parámetro que ya no se usa tras un cambio.
+
+## Cómo arreglarlo
+
+Si el parámetro sobra, quítalo. Si es una etiqueta, añade un campo `PhantomData<T>`: ocupa **0 bytes** y le dice al compilador «actúa como si guardara un `T`».
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+use std::marker::PhantomData;
+
+struct Id<T> {
+    valor: u64,
+    _tipo: PhantomData<T>, // marca de tipo sin datos: ocupa 0 bytes
+}
+
+fn main() {
+    let id: Id<String> = Id { valor: 7, _tipo: PhantomData };
+    println!("{}", id.valor);
+}
+```
+
+**Salida:**
+
+```text
+7
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0392` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0282](/errores/e0282/): hacen falta anotaciones de tipo
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)
+- [Mundo 20 · Unsafe y comportamiento indefinido](/curso/20-unsafe-y-ub/)

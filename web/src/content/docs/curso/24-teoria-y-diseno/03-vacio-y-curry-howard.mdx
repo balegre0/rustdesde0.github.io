@@ -1,0 +1,86 @@
+---
+title: "El tipo vacío y Curry–Howard"
+description: "Un tipo sin valores (Infallible, !) representa lo imposible. Y si los tipos son proposiciones, los programas son demostraciones: la correspondencia de Curry–Howard."
+sidebar:
+  order: 3
+duracion: 12
+requiere: ["24-teoria-y-diseno/02-suma-y-producto"]
+tarjetas:
+  - p: "¿Qué es un tipo vacío?"
+    r: "Un tipo sin ningún valor, como `enum Vacio {}`, `std::convert::Infallible` o `!`. No se puede crear ningún valor suyo."
+  - p: "¿Por qué `fn absurdo<T>(x: Infallible) -> T { match x {} }` compila?"
+    r: "Porque un `match` sin brazos cubre todos los casos de un tipo sin valores. Y como nadie puede llamar a la función (no hay ningún `Infallible`), puede «devolver» cualquier tipo."
+  - p: "¿Qué dice la correspondencia de Curry–Howard?"
+    r: "Que los tipos se pueden leer como proposiciones lógicas y los programas como demostraciones: un valor de tipo T prueba T; una función A → B prueba «si A, entonces B»."
+  - p: "¿Cuánto ocupa `Result<u32, Infallible>`?"
+    r: "Lo mismo que un `u32`: la variante `Err` es imposible, así que no hace falta guardar cuál de las dos es."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+Si `()` tiene un valor, ¿hay un tipo con **cero**? Sí, y es sorprendentemente útil. Además, abre la puerta a una de las ideas más bonitas de la informática: **los programas son demostraciones**.
+
+## La idea
+
+Un **tipo vacío** no tiene ningún valor. En Rust:
+
+- `enum Vacio {}`: un enum sin variantes.
+- `std::convert::Infallible`: el tipo vacío de la biblioteca estándar, pensado para errores que no pueden ocurrir.
+- `!`, el tipo *never* («nunca»): el de las expresiones que no terminan, como `panic!()`, `loop {}` o `return`.
+
+Como no existe ningún valor suyo, un `match` **sin brazos** ya los cubre todos:
+
+```rust
+fn absurdo<T>(x: Infallible) -> T { match x {} }
+```
+
+Esta función devuelve **cualquier** tipo `T`. No es trampa: como nadie puede conseguir un `Infallible` para llamarla, nunca se ejecutará.
+
+**Curry–Howard.** Lee ahora los tipos como **proposiciones** y los valores como **pruebas**:
+
+| Tipo | Proposición |
+|---|---|
+| `A` | «A es cierto» (y un valor de `A` es la prueba) |
+| `(A, B)` | «A **y** B» |
+| `Result<A, B>` | «A **o** B» |
+| `fn(A) -> B` | «**si** A, **entonces** B» |
+| `()` | «verdadero» (siempre hay prueba) |
+| `Infallible` | «falso» (no hay prueba posible) |
+
+`fn absurdo<T>(x: Infallible) -> T` es entonces el principio lógico «de lo falso se deduce cualquier cosa». Y `modus_ponens`, en el ejemplo, es la regla de deducción del mismo nombre.
+
+## Pruébalo
+
+<Ejecutar ej="m24/vacio" />
+
+<Ejecutar ej="m24/curry-howard" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Tamaño y optimización.** El compilador sabe que la variante `Err(Infallible)` no puede existir, así que `Result<u32, Infallible>` ocupa lo mismo que `u32`. Y desde Rust 1.82, en un `let` o un `match` puedes omitir los patrones de variantes imposibles: `let Ok(n) = r;` compila si `r: Result<u32, Infallible>`.
+
+**`!` todavía no es un tipo de primera clase en estable.** Puedes usarlo como tipo de retorno (`fn salir() -> ! { std::process::exit(1) }`), pero no, por ejemplo, como parámetro genérico (`Result<T, !>`); para eso existe `Infallible`. Estabilizar `!` del todo lleva años en discusión, porque cambia cómo se deducen algunos tipos y podría romper código existente.
+
+**Hasta dónde llega Curry–Howard en Rust.** Es una correspondencia «ligera»: en Rust un programa puede entrar en pánico o no terminar, y eso «demuestra» cualquier cosa. Los lenguajes pensados para demostrar (Lean, Rocq, Agda) prohíben esas salidas, y por eso sus programas sí son demostraciones de verdad. En la lección 9 verás herramientas que traducen Rust a esos lenguajes.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta={"¿Qué tipo tiene la expresión `panic!(\"…\")`?"}
+  opciones={["`()`", "`!` (never)", "`String`", "`Result<(), String>`"]}
+  correcta={1}
+  explicacion="`panic!` nunca termina normalmente, así que su tipo es `!`. Por eso se puede usar en cualquier rama: `!` se convierte en el tipo que haga falta."
+  porque={["`()` es un valor real; `panic!` no produce ninguno.", "", "No devuelve nada.", "No devuelve: interrumpe el hilo."]}
+/>
+
+<Pregunta
+  pregunta="Leído con Curry–Howard, ¿qué «demuestra» una función `fn f<A, B>(par: (A, B)) -> A`?"
+  opciones={["Que A o B", "Que «A y B» implica A", "Que A implica B", "Nada"]}
+  correcta={1}
+  explicacion="La tupla es una conjunción (A y B); la función es una implicación. Tomar el primer elemento demuestra que de «A y B» se deduce A."
+  porque={["Eso sería un `Result`.", "", "Eso sería `fn(A) -> B`.", "Cualquier función total con esa firma es una demostración."]}
+/>

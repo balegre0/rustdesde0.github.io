@@ -1,0 +1,99 @@
+---
+title: "BufRead"
+description: "Lectores con búfer: read_line, lines y split. Lo implementan BufReader y StdinLock."
+sidebar:
+  order: 5
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::io::BufRead`
+
+## Sinopsis
+
+```rust
+pub trait BufRead: Read {
+    // Required methods
+    fn fill_buf(&mut self) -> Result<&[u8], Error>;
+    fn consume(&mut self, amount: usize);
+
+    // ... y 6 métodos provistos (con implementación por defecto)
+}
+```
+
+## Qué hace
+
+`BufRead` añade a un lector un búfer interno y, con él, operaciones que necesitan mirar por delante: leer hasta el fin de línea o hasta un byte. Envuelve cualquier `Read` en un `BufReader::new(...)` para tenerlo.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`read_line`](#read_line) | Lee hasta `\n` (incluido) y lo añade al `String`. | 1.0 |
+| [`lines`](#lines) | Iterador de líneas, cada una un `io::Result<String>` sin el salto de línea. | 1.0 |
+| [`read_until`](#read_until) | Lee hasta un byte dado y lo añade a un `Vec<u8>`. | 1.0 |
+| [`split`](#split) | Iterador de trozos separados por un byte. | 1.0 |
+
+### `read_line`
+
+```rust
+fn read_line(&mut self, buf: &mut String) -> Result<usize, Error>
+```
+
+Lee hasta `\n` (incluido) y lo añade al `String`.
+
+### `lines`
+
+```rust
+fn lines(self) -> Lines<Self>
+where
+    Self: Sized,
+```
+
+Iterador de líneas, cada una un `io::Result<String>` sin el salto de línea.
+
+### `read_until`
+
+```rust
+fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>) -> Result<usize, Error>
+```
+
+Lee hasta un byte dado y lo añade a un `Vec<u8>`.
+
+### `split`
+
+```rust
+fn split(self, byte: u8) -> Split<Self>
+where
+    Self: Sized,
+```
+
+Iterador de trozos separados por un byte.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/io-lineas" />
+
+**Salida:**
+
+```text
+1: uno
+2: dos
+3: tres
+10 letras
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [Read](/ref/std/io/read/)
+- [stdin](/ref/std/io/stdin/)
+- [File](/ref/std/fs/file/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)

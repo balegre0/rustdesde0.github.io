@@ -1,0 +1,51 @@
+---
+title: "Jefe: el taller de figuras"
+description: "Junta traits, métodos por defecto, dyn, genéricos, un newtype con operadores y Display, y derive, en un programa completo."
+sidebar:
+  order: 13
+duracion: 25
+desde: "1.0"
+requiere: ["13-traits-y-genericos/12-gats"]
+tarjetas:
+  - p: "¿Qué necesitas para sumar un Vec<Area> con `.sum()`?"
+    r: "Implementar std::iter::Sum para Area, o hacer un fold con Add y un valor inicial (por ejemplo, Area::default())."
+---
+
+import { Reto, Pregunta } from '~/components';
+
+El jefe del mundo junta casi todo: un **newtype** con **operadores** y **`Display`**, un **trait** con método por defecto, una lista de **`dyn`** y funciones **genéricas** con cotas.
+
+## El reto
+
+<Reto
+  ej="m13/jefe"
+  enunciado={"Completa el taller: implementa `Add` y `Display` para `Area` (formato `\"4.00 m²\"`), el trait `Figura` con el método por defecto `ficha`, las dos figuras, y las funciones que suman las áreas de un `Vec<Box<dyn Figura>>` y buscan la mayor. La salida debe coincidir con la de la solución: tres fichas, `Total: 7.39 m²`, el total de lados y `Mayor: 4.00 m²`."}
+/>
+
+## Repaso relámpago
+
+<Pregunta
+  pregunta="¿Por qué `Area` puede derivar `PartialOrd` pero no `Ord`?"
+  opciones={["Porque envuelve un `f64`, y `f64` no tiene un orden total (NaN no es comparable)", "Porque los newtypes no pueden ser `Ord`", "Porque falta `Eq`", "Sí puede"]}
+  correcta={0}
+  explicacion="`NaN` no es menor, ni mayor, ni igual que nada. Por eso los `f64` son `PartialOrd`, y un struct que los contiene también."
+  porque={["", "Un newtype de `i32` sí puede.", "Tampoco puede ser `Eq`, por el mismo motivo.", "No, por el `f64`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué gana `ficha` al ser un método por defecto del trait?"
+  opciones={["Cada figura la tiene sin escribirla, y puede sustituirla si quiere", "Es más rápida", "No se puede llamar a través de `dyn`", "Nada"]}
+  correcta={0}
+  explicacion="Los métodos por defecto se escriben una vez sobre los demás métodos del trait (`nombre` y `area`)."
+  porque={["", "No hay diferencia de rendimiento.", "Sí se puede: está en la vtable.", "Evita repetir código en cada figura."]}
+/>
+
+## Lo que te llevas del mundo 13
+
+- Traits: capacidades con nombre, con métodos por defecto y supertraits.
+- Genéricos con cotas, monomorfización y `impl Trait`.
+- `dyn Trait`, vtables y qué traits son compatibles.
+- Tipos asociados, GATs, coherencia y la regla huérfana.
+- `derive`, conversiones (`From`, `TryFrom`) y operadores.
+
+En el mundo 14 los traits `Fn` e `Iterator` te llevarán a las closures y los iteradores.

@@ -1,0 +1,65 @@
+---
+title: "Sin sistema operativo"
+description: "Con #![no_std], tu crate usa solo core (y alloc si quiere): sin archivos, hilos ni println!, pero con todo el lenguaje. Qué queda y qué hace falta añadir."
+sidebar:
+  order: 1
+duracion: 12
+requiere: ["22-sistemas-y-ffi"]
+tarjetas:
+  - p: "¿Qué tres capas tiene la biblioteca estándar de Rust?"
+    r: "`core` (sin sistema operativo ni memoria dinámica), `alloc` (lo que necesita un asignador: Vec, String, Box) y `std` (todo lo que necesita un sistema operativo: archivos, hilos, red)."
+  - p: "¿Qué pierde un crate `#![no_std]`?"
+    r: "Lo que depende del sistema operativo: `println!`, archivos, hilos, red, `HashMap` (necesita aleatoriedad del sistema). Conserva tipos, Option, Result, iteradores, slices, fmt, atómicos…"
+  - p: "¿Qué necesita un binario `no_std` que una biblioteca no necesita?"
+    r: "Un `#[panic_handler]` y un punto de entrada propio (`#![no_main]`). Si usa `alloc`, también un `#[global_allocator]`."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+Un microcontrolador no tiene sistema operativo: no hay nadie que abra archivos, cree hilos o imprima en una pantalla. Rust se adapta a eso con un solo atributo.
+
+## La idea
+
+La biblioteca estándar está hecha en **tres capas**:
+
+| Capa | Necesita | Contiene |
+|---|---|---|
+| `core` | nada | tipos primitivos, `Option`, `Result`, iteradores, slices, `str`, `fmt`, `mem`, `ptr`, atómicos, `cell` |
+| `alloc` | un asignador de memoria | `Box`, `Vec`, `String`, `Rc`, `Arc`, `BTreeMap` |
+| `std` | un sistema operativo | archivos, hilos, red, `println!`, `HashMap`, tiempo, entorno |
+
+`std` reexporta todo lo de `core` y `alloc`: por eso `std::option::Option` y `core::option::Option` son el mismo tipo.
+
+`#![no_std]` al principio del crate dice: «no enlaces `std`». El crate puede usar todo `core`, y `alloc` si añade `extern crate alloc;` y alguien proporciona un asignador. Todo el lenguaje sigue igual: ownership, préstamos, traits, genéricos, closures, `async`.
+
+## Pruébalo
+
+Una biblioteca `no_std` (aquí solo se comprueba que compila; no tiene `main`):
+
+<Ejecutar ej="m23/libre" />
+
+Fíjate en `a_texto`: sin `String`, escribe el número en un **búfer que le prestan**. Es el estilo típico sin asignador. La misma lógica en un programa normal:
+
+<Ejecutar ej="m23/libre-prueba" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué casi todo cabe en `core`.** Lo que hace seguro a Rust (ownership, préstamos, tipos) se comprueba **al compilar** y no necesita nada al ejecutar. Por eso puedes tener las mismas garantías en un chip con 16 KB de RAM. Lo único que falta sin sistema operativo es lo que el sistema daba: memoria dinámica, entrada y salida, hilos.
+
+**Los targets `none`.** Para microcontroladores se compila para targets como `thumbv7em-none-eabihf` (ARM Cortex-M4F) o `riscv32imc-unknown-none-elf`: el `none` del nombre es «sin sistema operativo». Esos targets solo traen `core` y `alloc` precompilados. Los enlaza `rust-lld`, el enlazador incluido en Rust, así que **no necesitan las Build Tools de Visual Studio**.
+
+**Pánicos sin `std`.** Sin sistema operativo no hay quien imprima el mensaje ni desenrolle la pila: tú das un [`#[panic_handler]`](/ref/lenguaje/atributos/panic_handler/) y normalmente compilas con `panic = "abort"`.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estos se puede usar en un crate `#![no_std]` sin `alloc`?"
+  opciones={["`Vec<u8>`", "`String`", "`Option<&str>`", "`println!`"]}
+  correcta={2}
+  explicacion="`Option` y `&str` están en `core`: no necesitan memoria dinámica ni sistema operativo."
+  porque={["`Vec` necesita un asignador (`alloc`).", "`String` también.", "", "`println!` necesita una salida estándar, que la da el sistema operativo."]}
+/>

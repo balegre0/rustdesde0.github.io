@@ -1,0 +1,11 @@
+---
+// Plantilla de las páginas de práctica: diseño de Starlight sin barra lateral y con contenido ancho.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+interface Props { titulo: string; descripcion: string; ancho?: 'normal' | 'ancho' | 'completo'; buscable?: boolean }
+const { titulo, descripcion, ancho = 'ancho', buscable = true } = Astro.props;
+---
+<StarlightPage frontmatter={{ title: titulo, description: descripcion, template: 'splash', tableOfContents: false, pagefind: buscable }}>
+  <div class="rdc-practica not-content" data-ancho={ancho}>
+    <slot />
+  </div>
+</StarlightPage>

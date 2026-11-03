@@ -1,0 +1,62 @@
+---
+title: "Del PAC al HAL: capas de abstracción"
+description: "Nadie escribe direcciones a mano: el PAC genera tipos seguros para cada registro, el HAL ofrece pines y periféricos, y embedded-hal 1.0 define traits para que los controladores funcionen en cualquier chip."
+sidebar:
+  order: 3
+duracion: 12
+requiere: ["23-embebido-y-tu-so/02-registros-y-volatile"]
+tarjetas:
+  - p: "¿Qué es un PAC?"
+    r: "*Peripheral Access Crate*: un crate generado (con svd2rust) a partir de la descripción del chip, con un tipo y métodos para cada registro y cada campo."
+  - p: "¿Qué es un HAL?"
+    r: "*Hardware Abstraction Layer*: un crate que ofrece una interfaz de alto nivel para un chip (pines, temporizadores, puerto serie) sobre su PAC."
+  - p: "¿Para qué sirve `embedded-hal`?"
+    r: "Define traits comunes (`OutputPin`, `I2c`, `SpiBus`, `DelayNs`…) que implementan los HAL. Un controlador escrito contra esos traits funciona en cualquier chip."
+  - p: "¿Qué gana un HAL con el patrón typestate en los pines?"
+    r: "Que un pin configurado como entrada no tenga método `set_high`: el error se detecta al compilar."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+Escribir direcciones y máscaras de bits a mano es frágil. El ecosistema embebido de Rust lo resuelve con **capas**, cada una más cómoda y segura que la anterior.
+
+## La idea
+
+| Capa | Qué es | Ejemplo |
+|---|---|---|
+| Registros | direcciones y bits | `0x5000_0504`, bit 13 |
+| **PAC** (*Peripheral Access Crate*) | un tipo por periférico y un método por registro y campo, generado desde el archivo SVD del fabricante | `p.P0.out.modify(\|_, w\| w.pin13().high())` |
+| **HAL** (*Hardware Abstraction Layer*) | pines, temporizadores, puertos serie… para un chip concreto | `let mut led = p0.p0_13.into_push_pull_output(Level::Low);` |
+| **`embedded-hal`** | **traits** comunes a todos los HAL | `led.set_high()` (trait `OutputPin`) |
+| Controladores (*drivers*) | código para un sensor o una pantalla, genérico sobre los traits | un controlador de un termómetro I2C que funciona en cualquier chip |
+| Placa (BSP) | nombres de la placa concreta | `board.display_pins` |
+
+**`embedded-hal` 1.0** (enero de 2024) es la pieza que lo une: traits como `OutputPin`, `InputPin`, `I2c`, `SpiBus` y `DelayNs`. Un controlador escrito una vez contra esos traits funciona en un chip de Nordic, de ST, de Raspberry Pi o de Espressif. También existe `embedded-hal-async`, con las mismas operaciones en `async`.
+
+## Pruébalo
+
+Un controlador genérico de LED sobre un trait parecido a `OutputPin`, con una «placa» simulada:
+
+<Ejecutar ej="m23/hal" />
+
+`Led<P>` no sabe nada de la placa: solo que `P` implementa `PinSalida`. En tu micro:bit, `P` sería el pin real del HAL.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Singletons: un periférico, un dueño.** El PAC entrega los periféricos con `Peripherals::take()`, que devuelve `Some` **solo la primera vez**. Después, el struct de periféricos se mueve a quien lo necesita. Así el **ownership** garantiza que dos partes del programa no configuren el mismo pin a la vez: es el mundo 06 aplicado al hardware.
+
+**Typestate en los pines.** Los HAL representan el modo del pin en su tipo: `Pin<Input>`, `Pin<Output<PushPull>>`. Convertir un pin (`into_push_pull_output`) lo consume y devuelve otro tipo. Un pin de entrada no tiene `set_high`, así que el error «escribir en un pin de entrada» no compila. Es el patrón del [mundo 24](/curso/24-teoria-y-diseno/12-disenar-con-tipos/), y no cuesta ni un byte.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Escribes un controlador para una pantalla I2C. ¿Contra qué lo escribes para que funcione en cualquier microcontrolador?"
+  opciones={["Contra el PAC de tu chip", "Contra los traits de `embedded-hal`", "Contra direcciones de registros", "Contra el BSP de tu placa"]}
+  correcta={1}
+  explicacion="Los traits (`I2c` en este caso) son la interfaz común. Cada HAL los implementa para su chip."
+  porque={["Funcionaría solo en tu chip.", "", "Todavía más específico.", "Funcionaría solo en tu placa."]}
+/>

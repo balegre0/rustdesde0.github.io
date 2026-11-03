@@ -1,0 +1,55 @@
+---
+title: "Regiones y permisos"
+description: "Los préstamos y lifetimes de Rust descienden de la gestión de memoria por regiones (Tofte y Talpin, Cyclone) y se entienden como permisos: leer, escribir y poseer."
+sidebar:
+  order: 7
+duracion: 11
+requiere: ["24-teoria-y-diseno/06-tipos-afines"]
+tarjetas:
+  - p: "¿Qué es la gestión de memoria por regiones?"
+    r: "Agrupar los valores en regiones con un tiempo de vida conocido y liberar cada región entera de una vez. El compilador comprueba que nada apunte a una región ya liberada."
+  - p: "¿Qué lenguaje llevó las regiones a un lenguaje de sistemas antes que Rust?"
+    r: "Cyclone (2002), un dialecto seguro de un lenguaje de sistemas, con punteros anotados con su región."
+  - p: "Ownership y préstamos como sistema de permisos:"
+    r: "Cada camino (variable, campo, `*r`) tiene permisos R (leer), W (escribir) y O (poseer). Prestar los reparte temporalmente; el comprobador verifica que cada operación tiene los que necesita."
+  - p: "¿Qué es Oxide?"
+    r: "Un cálculo formal (Weiss y otros, 2019) que modela el núcleo de Rust, con lifetimes vistas como conjuntos de préstamos («procedencias»)."
+---
+
+import { Pregunta, BajoElCapo } from '~/components';
+
+Las lifetimes del mundo 08 te parecieron nuevas, pero tienen treinta años de historia. Y las tablas de permisos R/W/O que has usado todo el curso no son solo un truco para aprender: son una forma rigurosa de entender el comprobador de préstamos.
+
+## La idea
+
+**Regiones.** En 1994, Mads Tofte y Jean-Pierre Talpin propusieron gestionar la memoria con **regiones**: zonas con un tiempo de vida conocido al compilar, que se liberan **enteras** de una vez. El sistema de tipos lleva la cuenta de en qué región vive cada valor y prohíbe que un puntero sobreviva a su región. Es exactamente la idea de lifetime: `&'a T` es «un puntero a algo que vive en la región `'a`».
+
+**Cyclone** (2002) llevó las regiones a un lenguaje de sistemas real: punteros anotados con su región, inferencia para no tener que escribirlas, y comprobación al compilar. Rust tomó la idea y la combinó con los tipos afines de la lección anterior.
+
+**Permisos.** Otra forma de ver lo mismo: cada **camino** del programa (una variable, un campo, `*r`) tiene **permisos**:
+
+- **R**: leer; **W**: escribir; **O**: poseer (mover o liberar).
+- Prestar `&x` reparte **R** y quita **W** y **O** a la dueña mientras dure; prestar `&mut x` lo cede todo (salvo **O**) en exclusiva.
+- Cada operación pide unos permisos; si no los hay, error.
+
+Es el modelo de las tablas `<Prestamos>` de este curso, y viene de la investigación de Will Crichton y otros (*A Grounded Conceptual Model for Ownership Types in Rust*, OOPSLA 2023): en sus experimentos, enseñar con permisos mejoró los resultados de quienes aprendían.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Lifetimes como conjuntos de préstamos.** El cálculo **Oxide** (Weiss, Gierczak, Patterson y Ahmed, 2019) modela el núcleo de Rust y reinterpreta las lifetimes: en vez de «trozos de programa», son **conjuntos de préstamos** de los que puede venir una referencia («procedencias», *provenances*). **Polonius**, el futuro comprobador de préstamos, sigue esa misma idea, y por eso acepta casos que el actual rechaza (mundo 07, lección 11).
+
+**Capacidades.** Ver los permisos como objetos que se pasan de mano en mano conecta Rust con los sistemas de **capacidades** (*capabilities*) de la seguridad informática: tener `&mut x` es tener la capacidad exclusiva de modificar `x`. Algunas bibliotecas lo llevan más lejos: *GhostCell* (ICFP 2021) separa los permisos de los datos para poder compartir estructuras con ciclos sin `unsafe` en el código del usuario.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En la gestión por regiones, ¿qué impide el sistema de tipos?"
+  opciones={["Que haya más de una región", "Que un puntero se use después de liberar la región a la que apunta", "Que se libere memoria", "Que haya punteros"]}
+  correcta={1}
+  explicacion="Es la misma garantía que dan las lifetimes de Rust: ninguna referencia vive más que lo que referencia."
+  porque={["Puede haber muchas, anidadas.", "", "Se libera, región a región.", "Los punteros son lo que se comprueba."]}
+/>

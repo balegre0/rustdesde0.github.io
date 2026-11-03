@@ -1,0 +1,124 @@
+---
+title: "Miri, el detector de UB"
+description: "Usas Miri para ejecutar tu código unsafe en una máquina abstracta que detecta comportamiento indefinido."
+sidebar:
+  order: 6
+duracion: 12
+desde: "1.0"
+requiere: ["20-unsafe-y-ub/05-aliasing-y-tree-borrows"]
+tarjetas:
+  - p: "¿Qué es Miri?"
+    r: "Un intérprete del MIR de Rust que ejecuta el programa sobre una máquina abstracta y se detiene al detectar UB: uso tras liberar, fuera de límites, memoria sin inicializar, aliasing, valores inválidos, carreras de datos…"
+  - p: "¿Cómo se ejecuta Miri en un proyecto?"
+    r: "`rustup +nightly component add miri` y luego `cargo +nightly miri test` (o `miri run`). En el Playground: Tools → Miri."
+  - p: "Si Miri no encuentra nada, ¿el programa no tiene UB?"
+    r: "No necesariamente: Miri solo ve los caminos que ejecuta, y casi no admite FFI. Es una red, no una demostración."
+  - p: "¿Qué hace la biblioteca estándar en debug con algunas precondiciones unsafe?"
+    r: "Las comprueba antes de que ocurra el UB y aborta con «unsafe precondition(s) violated». Es una ayuda opcional, no una garantía."
+---
+
+import { Ejecutar, Predice, Ordena, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer la herramienta número uno de quien escribe `unsafe`: **Miri**, un intérprete que ejecuta tu programa vigilando cada byte y se para en cuanto hay comportamiento indefinido.
+
+## Predice
+
+<Predice
+  ej="m20/precondicion-debug"
+  pregunta="Este programa llama a `copy_nonoverlapping` con dos rangos que **se solapan**, lo que viola su precondición. Compilado en modo debug, ¿qué pasa?"
+  opciones={["Copia los datos sin problema e imprime `después: [1, 1, 2, 3]`", "La biblioteca estándar detecta la precondición rota y aborta antes de copiar", "No compila", "Imprime basura"]}
+  correcta={1}
+  explicacion="Desde Rust 1.78, en debug muchas funciones unsafe de std comprueban sus precondiciones y abortan con «unsafe precondition(s) violated». Esa red solo existe con debug-assertions: en release la llamada sería UB sin aviso."
+  porque={["Con UB no hay salida «correcta», y además aquí la comprobación lo impide.", "Correcto: mira la salida real.", "Compila: el compilador no sabe si los punteros se solapan.", "No llega a copiar nada: aborta antes."]}
+/>
+
+## La idea
+
+El compilador no puede ver la mayoría del UB: punteros que cuelgan, accesos fuera de límites o alias prohibidos solo se notan **al ejecutar**. Pero ejecutar en tu procesador no sirve para detectarlos: la memoria liberada sigue «ahí» un rato, un byte de más se lee sin error… y el programa parece funcionar.
+
+**Miri** resuelve esto ejecutando el programa en una **máquina abstracta**: interpreta el MIR (la representación intermedia de `rustc`) y lleva la cuenta de todo lo que el hardware olvida: qué memoria está viva, qué bytes están inicializados, de qué asignación viene cada puntero, qué permisos de aliasing tiene, qué hilo accedió a qué. Cuando una operación incumple una regla, se detiene y señala la línea.
+
+Es lenta (cientos de veces más que el programa nativo) y casi no admite llamadas a bibliotecas de otros lenguajes, pero para tests de código con `unsafe` es imprescindible: la biblioteca estándar la pasa en su integración continua.
+
+## Pruébalo
+
+Dos programas con UB clásico. Ábrelos en el Playground y elige *Tools → Miri*:
+
+<Ejecutar ej="m20/miri-uso-tras-liberar" />
+
+Miri informa de un uso tras liberar (*use-after-free*): el puntero `p` apunta a una asignación que ya no existe.
+
+<Ejecutar ej="m20/miri-fuera-de-limites" />
+
+Aquí Miri señala la lectura en `i = 3`: el puntero se sale de la asignación de 3 bytes del array. Ejecutado de forma normal, este programa puede sumar «algo» sin quejarse; ese «algo» no significa nada.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Qué detecta Miri** (si el camino se ejecuta): accesos fuera de límites y uso tras liberar; lecturas de memoria sin inicializar; punteros desalineados; valores inválidos (`bool` = 2, `char` sustituto, referencias nulas…); violaciones de aliasing según Stacked Borrows (por defecto) o Tree Borrows (`-Zmiri-tree-borrows`); carreras de datos entre hilos; fugas de memoria al terminar; y uso incorrecto de provenance (`-Zmiri-strict-provenance`).
+
+**Cómo se usa en un proyecto:**
+
+```text
+rustup +nightly component add miri
+cargo +nightly miri test        # ejecuta los tests bajo Miri
+cargo +nightly miri run         # ejecuta main bajo Miri
+```
+
+Banderas útiles (en la variable `MIRIFLAGS`): `-Zmiri-tree-borrows`, `-Zmiri-strict-provenance`, `-Zmiri-many-seeds` (prueba muchas planificaciones de hilos y direcciones, porque Miri sigue **una** traza cada vez).
+
+**El límite:** Miri solo ve lo que ejecuta. Si un test no recorre el camino con UB, no lo encontrará. Por eso se combina con tests de propiedades y *fuzzing*.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Miri en Windows sin las Build Tools">
+
+❌ La primera vez, `cargo miri` prepara su propia biblioteca estándar, y para eso **compila y enlaza** pequeños programas auxiliares. En Windows sin las *Build Tools* de Visual Studio falla con un error de `link.exe`, y desde Git Bash el mensaje es aún más confuso (`link: extra operand …`), porque encuentra otro programa llamado `link`.
+
+✅ Instala las *Build Tools* con «Desarrollo para el escritorio con C++» y usa PowerShell, o usa WSL. Mientras tanto, el Playground tiene Miri en *Tools → Miri* y no necesita nada instalado.
+
+</Trampa>
+
+## Tu turno
+
+Ordena los pasos para pasar los tests de tu crate por Miri con el modelo Tree Borrows (en PowerShell):
+
+<Ordena
+  lineas={["rustup toolchain install nightly", "rustup +nightly component add miri", "$env:MIRIFLAGS = \"-Zmiri-tree-borrows\"", "cargo +nightly miri test"]}
+  distractores={["cargo build --release", "cargo miri test --stable"]}
+  explicacion="Miri es un componente de nightly; primero la toolchain, luego el componente, luego las banderas y por último los tests. No hace falta compilar en release ni existe un Miri estable."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tus tests pasan bajo Miri sin ningún error. ¿Qué puedes afirmar?"
+  opciones={["Que tu crate no tiene UB", "Que los caminos que ejecutaron los tests no tuvieron UB detectable por Miri", "Que el código es correcto", "Que no necesitas más pruebas"]}
+  correcta={1}
+  explicacion="Miri vigila lo que se ejecuta. Un camino no probado, una planificación de hilos distinta o una llamada a una biblioteca externa pueden esconder UB."
+  porque={["Miri no es una demostración: solo ve una ejecución.", "Correcto.", "Miri no comprueba que tu lógica sea la que querías.", "Conviene añadir fuzzing y tests de propiedades."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué el `aliasing-ub` de la lección anterior lo rechaza Miri pero no `rustc`?"
+  opciones={["Porque rustc no se ejecuta con optimizaciones", "Porque rustc solo analiza el código; Miri lleva la cuenta de los permisos de cada puntero mientras ejecuta", "Porque Miri usa otro compilador", "Porque es un error de sintaxis"]}
+  correcta={1}
+  explicacion="Dentro de unsafe, rustc confía en ti. Miri sigue el estado de cada préstamo en tiempo de ejecución (pila o árbol) y detecta el uso de uno ya invalidado."
+  porque={["Las optimizaciones no cambian lo que el análisis ve.", "Correcto.", "Miri interpreta el MIR que produce el propio rustc.", "Es un programa sintácticamente correcto."]}
+/>
+
+<Pregunta
+  pregunta="El mensaje «unsafe precondition(s) violated» en debug, ¿te protege en release?"
+  opciones={["Sí, siempre", "No: la comprobación solo existe con debug-assertions y la propia std avisa de que no se puede confiar en ella", "Solo en Windows", "Solo si usas Miri"]}
+  correcta={1}
+  explicacion="La salida real lo dice: el chequeo es opcional. En release la misma llamada es UB silencioso."
+  porque={["En release se elimina para no costar rendimiento.", "Correcto.", "No depende del sistema.", "Es una comprobación de std, independiente de Miri."]}
+/>
+
+## Para saber más
+
+- Ralf Jung y otros, «Miri: Practical Undefined Behavior Detection for Rust», POPL 2026 (en inglés).
+- Repositorio de Miri en GitHub: lista completa de banderas.

@@ -1,0 +1,44 @@
+---
+title: "El trait Error"
+description: "El trait que comparten todos los errores: Debug + Display y una causa opcional con source(). Así se encadenan errores y se meten en un Box<dyn Error>."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core (desde 1.81)"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::error::Error` (también `core::error::Error`)
+
+## Sinopsis
+
+```rust
+pub trait Error: Debug + Display {
+    fn source(&self) -> Option<&(dyn Error + 'static)> { None }
+}
+```
+
+## Qué hace
+
+Un tipo de error implementa `Error` para que cualquier código pueda tratarlo de forma uniforme:
+
+- **`Display`**: el mensaje para personas («configuración mal escrita en la línea 3»).
+- **`Debug`**: la representación para programadores (normalmente derivada).
+- **`source()`**: el error que lo **causó**, si lo hay. Así se forman cadenas de causas.
+
+Cualquier `E: Error` se convierte con `?` en un `Box<dyn Error>`, gracias a una implementación de `From` de la biblioteca estándar. Por eso `fn main() -> Result<(), Box<dyn Error>>` acepta errores de cualquier tipo.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/error-trait" />
+
+## Errores típicos
+
+- Repetir el mensaje de la causa en el propio `Display` **y** devolverla en `source`: al recorrer la cadena, el texto saldría dos veces. Elige una de las dos.
+
+## Desde
+
+Rust 1.0. En `core` (para `no_std`): 1.81.
+
+## Ver también
+
+[Errores propios](/curso/10-errores/) · [`Result`](/ref/std/result/)

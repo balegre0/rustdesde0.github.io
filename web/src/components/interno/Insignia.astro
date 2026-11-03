@@ -1,0 +1,7 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+interface Props { texto: string; tipo?: 'estandar' | 'cabecera' | 'inseguro' | 'obsolescente' | 'borrador' | 'otra'; titulo?: string }
+const { texto, tipo = 'estandar', titulo } = Astro.props;
+const icono = tipo === 'inseguro' ? 'warning' : tipo === 'obsolescente' ? 'information' : tipo === 'borrador' ? 'pencil' : null;
+---
+<span class="rdc-insignia" data-tipo={tipo} title={titulo}>{icono && <Icon name={icono as any} />}{texto}</span>

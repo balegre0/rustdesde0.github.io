@@ -1,0 +1,753 @@
+# Banco de preguntas del mundo 19 (Macros). Todo el código y las salidas/errores citados
+# se han compilado y ejecutado con rustc 1.99.1 (edición 2024), wasm32-wasip1.
+
+- id: m19-tokens-no-valores
+  titulo: "¿Qué recibe una macro?"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Cuando escribes `mi_macro!(1 + 2)`, ¿qué recibe la macro?"
+  opciones: ["El número 3", "Los tokens `1`, `+` y `2`", "Un `String` con el texto \"1 + 2\"", "Un puntero a la expresión"]
+  correcta: 1
+  solucion: |
+    Una macro trabaja **antes** de que se calcule nada: recibe una secuencia de tokens (árboles de tokens). Por eso puede, por ejemplo, convertirlos en texto con `stringify!` o meterlos en otra expresión.
+    - «3» sería el resultado de ejecutar la suma, y la macro se expande al compilar.
+    - No recibe texto: recibe tokens ya separados (los espacios no cuentan).
+    - No hay punteros: todo ocurre en el compilador.
+  etiquetas: ["tokens", "expansión"]
+
+- id: m19-cuando-se-expande
+  titulo: "El momento de la expansión"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿En qué orden ocurren estas fases del compilador?"
+  opciones: ["Comprobación de tipos → expansión de macros → borrow checker", "Expansión de macros → comprobación de tipos → borrow checker", "Borrow checker → expansión de macros → comprobación de tipos", "Las macros se expanden al ejecutar el programa"]
+  correcta: 1
+  solucion: |
+    Las macros se expanden muy pronto, justo después de analizar la sintaxis. Solo después se resuelven nombres, se comprueban tipos y actúa el borrow checker sobre el código **ya expandido**. Por eso una macro no conoce los tipos de lo que recibe.
+  etiquetas: ["expansión", "fases"]
+
+- id: m19-println-formato
+  titulo: "Faltan argumentos"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m19/formato-mal
+  opciones: ["Porque `nombre` no es un `String`", "Porque el texto tiene 2 huecos `{}` y solo hay 1 argumento, y `println!` lo comprueba al compilar", "Porque falta `use std::fmt`", "Porque `println!` no admite variables"]
+  correcta: 1
+  solucion: |
+    El error real es `2 positional arguments in format string, but there is 1 argument`. `println!` se apoya en `format_args!`, una macro integrada en el compilador que analiza el texto de formato en compilación y cuenta los huecos.
+    - Un `&str` se imprime perfectamente con `{}`.
+    - `println!` está en el preludio: no hace falta importar nada.
+  etiquetas: ["println!", "format_args!"]
+
+- id: m19-stringify
+  titulo: "stringify! no calcula"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m19/tokens
+  opciones: ["let x = 5; / a + b / hola mundo ñandú 42", "5 / a + b / error", "No compila: `hola mundo ñandú 42` no es Rust válido", "let x = 5; / a+b / hola mundo ñandú 42"]
+  correcta: 0
+  solucion: |
+    `stringify!` convierte los tokens en texto sin interpretarlos. Los saltos de línea y espacios extra no son tokens, así que `a +` en una línea y `b` en otra salen como `a + b`. Tampoco hace falta que los tokens formen Rust válido: `hola mundo ñandú 42` son cuatro tokens correctos.
+  etiquetas: ["stringify!", "tokens"]
+
+- id: m19-orden-brazos
+  titulo: "¿Qué brazo gana?"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m19/brazos-orden
+  opciones: ["el literal cero / otro literal / una expresión", "el literal cero / el literal cero / una expresión", "una expresión / una expresión / una expresión", "No compila: varias reglas encajan con `0`"]
+  correcta: 0
+  solucion: |
+    `macro_rules!` prueba las reglas **en orden** y usa la primera que encaja. `0` encaja con la regla literal `(0)`; `7` no, pero sí con `$x:literal`; `3 + 4` no es un literal y llega a `$x:expr`. Que varias reglas puedan encajar no es un error.
+  etiquetas: ["macro_rules!", "reglas"]
+
+- id: m19-no-rules-expected
+  titulo: "Una coma de más"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m19/sin-brazo
+  opciones: ["Porque las macros no aceptan cadenas", "Porque ninguna regla acepta dos expresiones separadas por coma", "Porque `saluda!` debe invocarse con corchetes", "Porque falta un punto y coma dentro de la macro"]
+  correcta: 1
+  solucion: |
+    El error real es `no rules expected ','`, con la nota `while trying to match meta-variable $nombre:expr`. La regla de una expresión lee `"Ana"` y se encuentra una coma que su patrón no prevé. Hay que añadir una regla `($a:expr, $b:expr) => {...}`. Los tres delimitadores `()`, `[]`, `{}` valen para invocar.
+  etiquetas: ["macro_rules!", "no rules expected"]
+
+- id: m19-precedencia
+  titulo: "¿5 u 8?"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: predice
+  enunciado: "La macro es `($x:expr) => { $x * 2 }`. ¿Qué imprime?"
+  ej: m19/precedencia
+  opciones: ["5", "8", "7", "6"]
+  correcta: 1
+  solucion: |
+    Un fragmento `expr` capturado es **opaco**: se inserta como un único nodo ya analizado, como si llevara paréntesis. La expansión real es `(3 + 1) * 2`, que da 8. Si la macro pegara texto, saldría `3 + 1 * 2 = 5`, pero las macros de Rust trabajan con árboles, no con texto.
+  etiquetas: ["expr", "precedencia"]
+
+- id: m19-follow-set-expr
+  titulo: "Dos expresiones pegadas"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila la definición de `junta!`?"
+  ej: m19/follow-set
+  opciones: ["Porque `$a` y `$b` deben tener tipos distintos", "Porque detrás de un fragmento `expr` solo pueden ir `=>`, `,` o `;`", "Porque una macro no puede sumar", "Porque `1 2` no es una invocación válida"]
+  correcta: 1
+  solucion: |
+    El error real: `` `$a:expr` is followed by `$b:expr`, which is not allowed for `expr` fragments `` con la nota `allowed there are: =>, , or ;`. Es la regla del *follow-set*: garantiza que tus macros sigan significando lo mismo aunque la sintaxis de las expresiones crezca en el futuro. El error está en la **definición**, antes de mirar ninguna invocación.
+  etiquetas: ["follow-set", "expr"]
+
+- id: m19-follow-set-ty
+  titulo: "¿Qué puede seguir a un tipo?"
+  mundo: 19-macros
+  tema: macros
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Cuál de estos patrones **no** compila?"
+  opciones: ["`($t:ty => $e:expr)`", "`($t:ty, $u:ty)`", "`($t:ty + $u:ty)`", "`($t:ty as $u:ty)`"]
+  correcta: 2
+  solucion: |
+    Comprobado con rustc 1.99.1: `$t:ty + $u:ty` da el error `` `$t:ty` is followed by `+`, which is not allowed for `ty` fragments `` y la lista de lo permitido: `{`, `[`, `=>`, `,`, `>`, `=`, `:`, `;`, `|`, `as` o `where`. El `+` está prohibido porque en un tipo puede formar parte de la sintaxis (por ejemplo `dyn A + B`).
+  etiquetas: ["follow-set", "ty"]
+
+- id: m19-expr-2024
+  titulo: "expr en la edición 2024"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime este programa (edición 2024)?"
+  ej: m19/expr-2024
+  opciones: ["expr / otra cosa / expr / otra cosa", "otra cosa / otra cosa / expr / expr", "expr / expr / expr / expr", "No compila: `_` no es una expresión"]
+  correcta: 0
+  solucion: |
+    En la edición 2024 el fragmento `expr` acepta también `_` y bloques `const { ... }`. `expr_2021` conserva el comportamiento anterior, en el que ninguno de los dos encaja, y por eso esas invocaciones caen en la regla `tt`.
+  etiquetas: ["expr_2021", "edición 2024"]
+
+- id: m19-literal-negativo
+  titulo: "¿Es -5 un literal?"
+  mundo: 19-macros
+  tema: macros
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m19/q-literal-negativo
+  opciones: ["literal / literal / literal / expresión", "literal / expresión / expresión / expresión", "literal / literal / expresión / expresión", "No compila"]
+  correcta: 0
+  solucion: |
+    El fragmento `literal` acepta un literal precedido opcionalmente de un signo menos, incluso con espacio (`- 5`). En cambio `2 - 5` empieza por `2` y luego viene `-`: no es un único literal, así que encaja `$e:expr`.
+  etiquetas: ["literal", "fragmentos"]
+
+- id: m19-fragmento-nombre
+  titulo: "Nombrar una función nueva"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Qué fragmento escribes en `$nombre:____` para que la macro pueda declarar `fn $nombre() {}`?"
+  respuestas: ["ident", "$nombre:ident"]
+  solucion: |
+    `ident` captura un identificador y, a diferencia de `expr`, se puede usar para **declarar** cosas: funciones, variables, campos.
+  etiquetas: ["ident", "fragmentos"]
+
+- id: m19-tt-cuenta
+  titulo: "Contar árboles de tokens"
+  mundo: 19-macros
+  tema: macros
+  dificultad: dificil
+  tipo: predice
+  enunciado: "`cuenta_tt!` suma 1 por cada `tt`. ¿Qué imprime?"
+  ej: m19/q-tt-grupo
+  opciones: ["3 / 3 / 4", "3 / 9 / 3", "3 / 3 / 3", "1 / 3 / 4"]
+  correcta: 0
+  solucion: |
+    Un `tt` es un token suelto **o** un grupo entre `()`, `[]` o `{}` con todo lo que contiene. `(a + b) [c d] {e}` son 3 árboles. En `x ==> y` el analizador léxico forma `==` y `>` (los operadores se agrupan de izquierda a derecha con el más largo posible), así que hay 4 tokens: `x`, `==`, `>`, `y`.
+  etiquetas: ["tt", "tokens"]
+
+- id: m19-sin-vuelta-atras
+  titulo: "La regla que nunca se prueba"
+  mundo: 19-macros
+  tema: macros
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "La segunda regla encajaría perfectamente con `a ! !`. ¿Por qué no compila?"
+  ej: m19/sin-vuelta-atras
+  opciones: ["Porque `!` no puede aparecer en un patrón", "Porque la primera regla empieza a leer una expresión, falla a mitad y `macro_rules!` no vuelve atrás para probar la siguiente", "Porque hay dos reglas con el mismo número de tokens", "Porque `a` no está declarada"]
+  correcta: 1
+  solucion: |
+    El error real: `expected one of (, [, or {, found !` con la nota `while parsing argument for this expr macro fragment`. El analizador de expresiones ve `a !` y cree que viene una macro `a!(...)`. Cuando un fragmento empieza a analizarse y falla, la macro entera da error: **no hay vuelta atrás**. Arreglo: pon la regla concreta antes que la de `expr`.
+  etiquetas: ["macro_rules!", "orden de reglas"]
+
+- id: m19-suma-rep
+  titulo: "Sumar una lista vacía"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m19/suma-rep
+  opciones: ["0 / 5 / 6 / 60", "No compila por `suma!()`", "0 / 5 / 6 / No compila por la coma final", "5 / 6 / 60"]
+  correcta: 0
+  solucion: |
+    `$($x:expr),*` acepta cero o más expresiones; la plantilla `0 $(+ $x)*` produce `0`, `0 + 5`, `0 + 1 + 2 + 3`… y `$(,)?` permite la coma final.
+  etiquetas: ["repeticiones"]
+
+- id: m19-operadores-repeticion
+  titulo: "Cero o una vez"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Qué operador de repetición significa «cero o una vez»? Escribe solo el símbolo."
+  respuestas: ["?"]
+  solucion: |
+    `*` = cero o más, `+` = una o más, `?` = cero o una. El uso típico de `?` es la coma final opcional: `$(,)?`.
+  etiquetas: ["repeticiones"]
+
+- id: m19-interrogacion-separador
+  titulo: "¿? con separador?"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué pasa con este patrón?"
+  codigo: |
+    macro_rules! q { ($($a:ident),?) => {}; }
+  opciones: ["Acepta cero o un identificador seguido de coma", "Error: el operador `?` no admite separador", "Acepta cualquier número de identificadores", "Compila pero nunca encaja"]
+  correcta: 1
+  solucion: |
+    Error real con rustc 1.99.1: ``the `?` macro repetition operator does not take a separator``. Tiene sentido: con como mucho una repetición nunca hay nada que separar. Para una coma opcional escribe `$(,)?`.
+  etiquetas: ["repeticiones", "?"]
+
+- id: m19-repeticiones-desiguales
+  titulo: "2 frente a 3"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m19/rep-mezcla
+  opciones: ["Porque no se pueden mezclar números y caracteres en una tupla", "Porque `$a` y `$b` se desenrollan juntas pero se capturaron 2 y 3 veces", "Porque falta la coma final", "Porque `;` no puede separar repeticiones"]
+  correcta: 1
+  solucion: |
+    El error real: ``meta-variable `a` repeats 2 times, but `b` repeats 3 times``. Las metavariables que se desenrollan en la misma repetición de la plantilla avanzan juntas y deben tener la misma longitud. Las tuplas `(i32, char)` son perfectamente válidas.
+  etiquetas: ["repeticiones"]
+
+- id: m19-llaves-dobles
+  titulo: "Una llave no basta"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `let nums = lista![1, 2];`?"
+  ej: m19/llaves-simples
+  opciones: ["Porque `Vec::new()` necesita un tipo", "Porque la plantilla genera sentencias sueltas (`let ...; ...; v`) y en esa posición hace falta una expresión: faltan unas llaves internas `{{ ... }}`", "Porque `push` no existe", "Porque `+` no admite separador"]
+  correcta: 1
+  solucion: |
+    Las llaves de la plantilla solo la delimitan; no forman parte de la expansión. Sin un bloque interno, la macro expande `let mut v = ...` donde se esperaba una expresión: error real ``expected expression, found `let` statement``. Con `{{ ... }}` el resultado es un bloque, que sí es una expresión.
+  etiquetas: ["plantilla", "bloques"]
+
+- id: m19-higiene-variables
+  titulo: "Dos x"
+  mundo: 19-macros
+  tema: higiene
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m19/higiene
+  opciones: ["r = 15, x sigue valiendo 2", "r = 30, x sigue valiendo 2", "r = 30, x sigue valiendo 5", "No compila"]
+  correcta: 0
+  solucion: |
+    Por la **higiene**, la `x` que declara la macro y la `x` de `main` son variables distintas. El argumento `x + 1` usa la de `main` (2 + 1 = 3) y el resultado es `5 * 3 = 15`. La `x` de main no cambia.
+  etiquetas: ["higiene"]
+
+- id: m19-higiene-no-ve
+  titulo: "La macro no ve tu y"
+  mundo: 19-macros
+  tema: higiene
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Hay una `y` justo antes de la invocación. ¿Por qué no compila?"
+  ej: m19/higiene-local
+  opciones: ["Porque `y` es inmutable", "Porque la `y` del cuerpo de la macro se busca donde se escribió la macro, y allí no existe", "Porque hay que escribir `$y`", "Porque las macros no pueden sumar"]
+  correcta: 1
+  solucion: |
+    Error real `E0425: cannot find value y in this scope`, con la ayuda `an identifier with the same name exists, but is not accessible due to macro hygiene`. Las variables locales de `macro_rules!` son higiénicas en los dos sentidos. Arreglo: pasa la variable como argumento con `$v:ident`. Escribir `$y` sin capturarla en el patrón no es válido.
+  etiquetas: ["higiene", "E0425"]
+
+- id: m19-higiene-no-escapa
+  titulo: "La variable que no sale"
+  mundo: 19-macros
+  tema: higiene
+  dificultad: media
+  tipo: no-compila
+  enunciado: "La macro declara `let fija = 7;`. ¿Por qué `main` no puede usar `fija`?"
+  ej: m19/q-define-fija-falla
+  opciones: ["Porque `fija` se destruye al salir de la macro", "Porque el nombre `fija` lo escribió la macro: tiene otro contexto de higiene y es invisible para `main`", "Porque las macros no pueden declarar variables", "Porque falta `pub`"]
+  correcta: 1
+  solucion: |
+    Error real `E0425`, con la ayuda `an identifier with the same name is defined here, but is not accessible due to macro hygiene`. La variable sí existe en el bloque de `main` (no hay ningún «ámbito de macro»), pero su nombre no se puede alcanzar desde código escrito fuera de la macro.
+  etiquetas: ["higiene", "E0425"]
+
+- id: m19-higiene-ident-pasado
+  titulo: "Si el nombre lo pones tú"
+  mundo: 19-macros
+  tema: higiene
+  dificultad: dificil
+  tipo: predice
+  enunciado: "La macro hace `let $nombre = 5;`. ¿Qué imprime?"
+  ej: m19/q-define-variable
+  opciones: ["6", "No compila: E0425", "5", "No compila: la macro no puede declarar variables"]
+  correcta: 0
+  solucion: |
+    Esta vez el identificador `x` lo escribió **quien invoca** y llegó a la macro como `$nombre:ident`. Conserva su contexto de higiene (el de `main`), así que `main` puede usarlo después. La higiene sigue al token, no al lugar donde acaba.
+  etiquetas: ["higiene", "ident"]
+
+- id: m19-items-no-higienicos
+  titulo: "Funciones creadas por macros"
+  mundo: 19-macros
+  tema: higiene
+  dificultad: media
+  tipo: opcion
+  enunciado: "Una `macro_rules!` genera `fn ayuda() {}`. ¿Puedes llamar a `ayuda()` desde el código que invocó la macro?"
+  opciones: ["No, por la higiene", "Sí: en macro_rules! la higiene es mixta y solo afecta a variables locales, etiquetas y `$crate`", "Solo con `#[macro_export]`", "Solo si la función es `pub`"]
+  correcta: 1
+  solucion: |
+    Comprobado en el ejemplo `items-visibles`: los items generados (funciones, structs, impls…) se resuelven en el sitio de la llamada. Si no fuera así, las macros que generan structs o impls serían inútiles.
+  etiquetas: ["higiene", "items"]
+
+- id: m19-dolar-crate
+  titulo: "crate:: frente a $crate::"
+  mundo: 19-macros
+  tema: higiene
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "La biblioteca `bib` exporta `macro_rules! m { () => { crate::util::f() } }`. Otra crate escribe `bib::m!()`. ¿Qué pasa?"
+  opciones: ["Funciona: `crate` es la crate de la macro", "Error: `crate` se resuelve en la crate que invoca, que no tiene `util` (E0433)", "Funciona solo en la edición 2024", "Error de enlazado"]
+  correcta: 1
+  solucion: |
+    Comprobado con dos crates: el error real es ``E0433: cannot find `util` in the crate root``. En la expansión, `crate` apunta a la crate del **usuario**. La forma correcta es `$crate::util::f()`, que siempre apunta a la crate que define la macro.
+  etiquetas: ["$crate", "E0433"]
+
+- id: m19-contar
+  titulo: "Contar recursivamente"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m19/contar
+  opciones: ["0 / 1 / 4 / arr tiene 3 elementos", "No compila: una macro no puede llamarse a sí misma", "0 / 1 / 1 / arr tiene 1 elementos", "No compila: el tamaño de un array no puede venir de una macro"]
+  correcta: 0
+  solucion: |
+    `contar!(a b c d)` → `1usize + contar!(b c d)` → … → `1usize + 1usize + 1usize + 1usize + 0usize`. Es una expresión constante, así que vale como tamaño de array.
+  etiquetas: ["recursión"]
+
+- id: m19-tt-muncher
+  titulo: "Sube y baja"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime este tt-muncher?"
+  ej: m19/tt-muncher
+  opciones: ["4 / 0 / -5", "6 / 0 / 5", "4 / error / -5", "No compila"]
+  correcta: 0
+  solucion: |
+    La expansión real es `(((0 + 3) - 1) + 2)`, `0` y `(0 - 5)`. La regla de entrada añade el acumulador `0` y cada regla interna mastica dos tokens.
+  etiquetas: ["tt-muncher", "recursión"]
+
+- id: m19-recursion-limite
+  titulo: "La macro eterna"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m19/recursion-infinita
+  opciones: ["Porque `$x + 1` desborda un entero", "Porque la macro se llama a sí misma sin caso base y se alcanza el límite de recursión", "Porque `eterna!` no está definida", "Porque las macros no pueden sumar"]
+  correcta: 1
+  solucion: |
+    Error real: ``recursion limit reached while expanding `eterna!` `` con la sugerencia de añadir `#![recursion_limit = "256"]`. Subir el límite no arreglaría nada: la entrada nunca se hace más pequeña. Nadie llega a calcular sumas: el problema está en la expansión.
+  etiquetas: ["recursión", "recursion_limit"]
+
+- id: m19-limite-por-defecto
+  titulo: "¿Cuántos niveles?"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: respuesta
+  enunciado: "¿Cuál es el límite de recursión de macros por defecto? Escribe el número."
+  respuestas: ["128"]
+  solucion: |
+    128. Comprobado: un contador recursivo con 127 tokens compila y con 128 ya alcanza el límite. Se cambia con `#![recursion_limit = "N"]` en la raíz de la crate.
+  etiquetas: ["recursion_limit"]
+
+- id: m19-orden-muncher
+  titulo: "La entrada, al final"
+  mundo: 19-macros
+  tema: macros
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué este tt-muncher no termina nunca?"
+  ej: m19/orden-muncher
+  opciones: ["Porque falta la regla de parada", "Porque la regla de entrada `$($todo:tt)*` va primero y también acepta las llamadas internas `@acc ...`", "Porque `@` no es un token válido", "Porque `pasos!()` no tiene argumentos"]
+  correcta: 1
+  solucion: |
+    La regla de parada existe, pero nunca se llega a probar: la primera regla acepta cualquier cosa, incluida `@acc 0;`, y vuelve a envolverla. Error real: ``recursion limit reached while expanding `pasos!` ``. En un tt-muncher, las reglas internas van antes que la de entrada.
+  etiquetas: ["tt-muncher", "orden de reglas"]
+
+- id: m19-arroba
+  titulo: "¿Por qué @?"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué las reglas internas de una macro suelen empezar con `@`?"
+  opciones: ["Porque `@` hace la regla privada", "Porque `@` no puede empezar ninguna expresión ni item, así que una entrada normal nunca encajará con esas reglas por accidente", "Porque el compilador las optimiza", "Es obligatorio en tt-munchers"]
+  correcta: 1
+  solucion: |
+    Es una convención, no una regla del lenguaje: `@` es solo un token que el usuario no escribiría al principio de una expresión. Las reglas «internas» siguen siendo invocables por cualquiera.
+  etiquetas: ["reglas internas"]
+
+- id: m19-orden-textual
+  titulo: "Usar antes de definir"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "Con una función esto funcionaría. ¿Por qué con una macro no?"
+  ej: m19/orden-textual
+  opciones: ["Porque `triple!` está mal escrita", "Porque `macro_rules!` usa ámbito textual: solo existe desde su definición hacia abajo", "Porque las macros solo se pueden usar dentro de `main`", "Porque falta `#[macro_export]`"]
+  correcta: 1
+  solucion: |
+    Error real: ``cannot find macro `triple` in this scope``, con la nota `a macro with the same name exists, but it appears later`. Las macros se expanden antes de conocer todos los items, así que su ámbito inicial es el orden del texto.
+  etiquetas: ["ámbito textual"]
+
+- id: m19-redefinir
+  titulo: "Dos macros con el mismo nombre"
+  mundo: 19-macros
+  tema: macros
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m19/q-redefinir
+  opciones: ["1 2", "2 2", "1 1", "No compila: `version` definida dos veces"]
+  correcta: 0
+  solucion: |
+    En el ámbito textual, una segunda `macro_rules!` con el mismo nombre **tapa** a la primera desde ese punto hacia abajo (como el shadowing de variables). `antes()` ve la primera; `despues()`, la segunda.
+  etiquetas: ["ámbito textual", "shadowing"]
+
+- id: m19-macro-export
+  titulo: "¿Dónde vive una macro exportada?"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: opcion
+  enunciado: "Escribes `#[macro_export] macro_rules! m` dentro de `mod a { mod b { ... } }` en la biblioteca `bib`. ¿Cómo la llama otra crate?"
+  opciones: ["`bib::a::b::m!()`", "`bib::m!()`", "No puede: los módulos `a` y `b` son privados", "`bib::macros::m!()`"]
+  correcta: 1
+  solucion: |
+    Comprobado con dos crates: `#[macro_export]` coloca la macro en la raíz de la crate y la hace pública, aunque los módulos donde se escribió sean privados.
+  etiquetas: ["#[macro_export]"]
+
+- id: m19-pub-crate-use
+  titulo: "Importar una macro por ruta"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué línea, justo después de `macro_rules! grita { ... }` dentro de `mod utilidades`, permite escribir `use crate::utilidades::grita;` en otro módulo?"
+  opciones: ["`pub macro grita;`", "`pub(crate) use grita;`", "`#[macro_use]`", "`export grita;`"]
+  correcta: 1
+  solucion: |
+    Reexportar la macro con `use` la convierte en un item normal del módulo, con su visibilidad. Es lo que hace el ejemplo `macro-en-modulo`. `pub macro` es sintaxis de las macros 2.0, inestable.
+  etiquetas: ["use", "visibilidad"]
+
+- id: m19-assert-eq
+  titulo: "assert_eq! en ejecución"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué ocurre al ejecutar este programa?"
+  ej: m19/assert-falla
+  opciones: ["Imprime «primer assert superado» y entra en pánico con `left: 4` y `right: 5`", "No compila porque 2 + 2 ≠ 5", "Imprime las dos líneas", "Entra en pánico en el primer assert"]
+  correcta: 0
+  solucion: |
+    El pánico real dice ``assertion `left == right` failed: el total no cuadra``, seguido de `left: 4` y `right: 5`. `assert_eq!` compara al ejecutar; el compilador no evalúa la condición.
+  etiquetas: ["assert_eq!", "pánico"]
+
+- id: m19-debug-assert
+  titulo: "Lo que desaparece en release"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál de estas macros no hace nada si se compila sin `debug_assertions` (el modo release por defecto)?"
+  opciones: ["`assert!`", "`debug_assert_eq!`", "`unreachable!`", "`assert_ne!`"]
+  correcta: 1
+  solucion: |
+    Solo la familia `debug_assert*` depende de `debug_assertions`. `assert!`, `assert_eq!` y `assert_ne!` se comprueban siempre; `unreachable!` siempre entra en pánico si se ejecuta.
+  etiquetas: ["debug_assert!", "release"]
+
+- id: m19-dbg-mueve
+  titulo: "dbg! se queda el valor"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m19/dbg-mueve
+  opciones: ["Porque `dbg!` no acepta `String`", "Porque `dbg!(s)` mueve `s` y luego se usa", "Porque `dbg!` devuelve `()`", "Porque `t` no tiene tipo"]
+  correcta: 1
+  solucion: |
+    Error real `E0382: borrow of moved value: s`. `dbg!` toma su argumento por valor y lo devuelve: `s` pasa a `t`. El propio compilador sugiere `dbg!(&s)`.
+  etiquetas: ["dbg!", "E0382"]
+
+- id: m19-todo-tipo
+  titulo: "todo!() encaja en todas partes"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué compila `Forma::Circulo(_) => todo!(\"...\")` en un `match` que debe devolver `f64`?"
+  opciones: ["Porque `todo!` devuelve `0.0`", "Porque `todo!` tiene tipo `!` (nunca devuelve), que encaja con cualquier tipo", "Porque el compilador no comprueba esa rama", "Porque `todo!` se elimina en release"]
+  correcta: 1
+  solucion: |
+    Al ejecutarse, entra en pánico con `not yet implemented: ...` (comprobado en el ejemplo `todo-macro`). Una expresión de tipo `!` nunca produce un valor, así que puede ocupar el lugar de cualquier tipo.
+  etiquetas: ["todo!", "never"]
+
+- id: m19-concat
+  titulo: "concat! con números"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m19/q-concat
+  opciones: ["v1.2-true / 9", "No compila: concat! solo acepta cadenas", "v1.2-1 / 7", "\"v\"1'.'2\"-\"true / 17"]
+  correcta: 0
+  solucion: |
+    `concat!` acepta literales de cualquier tipo simple (cadenas, números, caracteres, `bool`) y los pega como texto **al compilar**, produciendo un `&'static str`. `"v1.2-true"` tiene 9 bytes.
+  etiquetas: ["concat!"]
+
+- id: m19-matches
+  titulo: "matches! con guardas"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m19/q-matches
+  opciones: ["false / true / true", "true / true / true", "false / false / true", "No compila: matches! no admite `if`"]
+  correcta: 0
+  solucion: |
+    `matches!(v, patrón if guarda)` acepta lo mismo que un brazo de `match`. 5 no está en `1..=4 | 6`; sí en `1..=9` y es impar; `Some(3)` encaja y 3 > 2.
+  etiquetas: ["matches!", "patrones"]
+
+- id: m19-cfg-macro
+  titulo: "cfg! no borra código"
+  mundo: 19-macros
+  tema: macros
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Al compilar para `wasm32-wasip1`, ¿qué pasa con este programa?"
+  codigo: |
+    #[cfg(windows)] fn solo_win() {}
+    fn main() { if cfg!(windows) { solo_win(); } }
+  opciones: ["Compila; la rama no se ejecuta", "Error E0425: no encuentra `solo_win`, porque `cfg!` es solo un booleano y la rama se compila igualmente", "Error de enlazado", "Compila y entra en pánico"]
+  correcta: 1
+  solucion: |
+    Comprobado: ``E0425: cannot find function `solo_win` in this scope``. `#[cfg(windows)]` eliminó la función, pero `cfg!(windows)` solo se convierte en `false`: el cuerpo del `if` se sigue comprobando. Para quitar código, usa `#[cfg]` también en la sentencia.
+  etiquetas: ["cfg!", "#[cfg]"]
+
+- id: m19-include-str
+  titulo: "Un archivo dentro del binario"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuándo lee el archivo `include_str!(\"ayuda.txt\")`?"
+  opciones: ["Al compilar: el texto queda dentro del programa como `&'static str`", "Al ejecutar, cada vez que se llega a esa línea", "Al instalar el programa", "Nunca: es un comentario"]
+  correcta: 0
+  solucion: |
+    `include_str!` es una macro integrada en el compilador: lee el archivo (con ruta relativa al archivo fuente) al compilar. Si el archivo no existe, no compila. Para leerlo al ejecutar, `std::fs::read_to_string`.
+  etiquetas: ["include_str!"]
+
+- id: m19-compile-error
+  titulo: "Errores a medida"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Qué hace que este programa no compile?"
+  ej: m19/compile-error
+  opciones: ["`millas` no es un identificador", "La regla comodín usa `compile_error!` para rechazar unidades desconocidas con el mensaje «unidad desconocida: millas»", "`concat!` no puede usarse dentro de otra macro", "No se puede multiplicar por una macro"]
+  correcta: 1
+  solucion: |
+    Es un error intencionado y amable: el mensaje real es `unidad desconocida: millas`, montado con `concat!` y `stringify!`. `compile_error!` solo detiene la compilación si llega a expandirse.
+  etiquetas: ["compile_error!"]
+
+- id: m19-format-args
+  titulo: "La base del formato"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué macro usan por debajo `println!`, `format!`, `write!` y `panic!`?"
+  opciones: ["`stringify!`", "`format_args!`", "`concat!`", "`dbg!`"]
+  correcta: 1
+  solucion: |
+    `format_args!` analiza el texto de formato en compilación y produce un `fmt::Arguments` sin reservar memoria. La expansión real de `println!("v = {:?}", v)` es `::std::io::_print(format_args!("v = {0:?}\n", v))`.
+  etiquetas: ["format_args!", "println!"]
+
+- id: m19-doble-evaluacion
+  titulo: "El argumento que se ejecuta dos veces"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: predice
+  enunciado: "La macro es `($x:expr) => { $x * $x }`. ¿Qué imprime?"
+  ej: m19/doble-evaluacion
+  opciones: ["r = 2, n = 2", "r = 1, n = 1", "r = 4, n = 2", "r = 1, n = 2"]
+  correcta: 0
+  solucion: |
+    La expansión real es `siguiente(&mut n) * siguiente(&mut n)`: la primera llamada da 1, la segunda 2. Con una función (o con `{{ let v = $x; v * v }}`) el argumento se evaluaría una vez y saldría `r = 1, n = 1`.
+  etiquetas: ["doble evaluación", "cuándo no usar macros"]
+
+- id: m19-macro-o-funcion
+  titulo: "¿Macro o función?"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál de estas tareas justifica una macro en lugar de una función?"
+  opciones: ["Calcular la media de dos `f64`", "Generar `impl Mostrar for T` para quince tipos numéricos", "Comprobar si un número es par", "Convertir grados a radianes"]
+  correcta: 1
+  solucion: |
+    Generar items repetidos (impls, structs, funciones) es algo que una función no puede hacer. Las otras tres son funciones normales: más claras, con tipos y documentación, y sin el riesgo de evaluar argumentos varias veces.
+  etiquetas: ["cuándo no usar macros"]
+
+- id: m19-expandir
+  titulo: "Ver lo que genera una macro"
+  mundo: 19-macros
+  tema: macros
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué opción de `rustc` (solo nightly) imprime tu código con todas las macros expandidas, la que usa `cargo expand` por debajo?"
+  opciones: ["`--emit=mir`", "`-Zunpretty=expanded`", "`--explain`", "`-C debuginfo=2`"]
+  correcta: 1
+  solucion: |
+    `-Zunpretty=expanded`. Al ser una opción `-Z`, solo existe en nightly; por eso `cargo expand` necesita esa toolchain. El Rust Playground la ofrece en *Tools → Expand macros*.
+  etiquetas: ["cargo expand"]
+
+- id: m19-proc-tipos
+  titulo: "Tres sabores"
+  mundo: 19-macros
+  tema: macros-procedurales
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué tipo de macro procedural **sustituye** el item sobre el que se pone?"
+  opciones: ["derive", "de atributo (`#[proc_macro_attribute]`)", "tipo función (`#[proc_macro]`)", "Ninguna puede modificar un item"]
+  correcta: 1
+  solucion: |
+    Una macro de atributo recibe los argumentos y el item, y devuelve lo que lo reemplaza. Una derive solo **añade** items (el struct original queda intacto). Una tipo función sustituye la invocación `m!(...)`.
+  etiquetas: ["proc_macro", "derive", "atributo"]
+
+- id: m19-syn-quote
+  titulo: "syn y quote"
+  mundo: 19-macros
+  tema: macros-procedurales
+  dificultad: media
+  tipo: opcion
+  enunciado: "En una macro procedural, ¿qué papel tienen `syn` y `quote`?"
+  opciones: ["`syn` compila la macro y `quote` la ejecuta", "`syn` analiza el `TokenStream` y lo convierte en un árbol de sintaxis; `quote!` genera un `TokenStream` desde una plantilla con huecos `#var`", "Las dos formatean el código", "`quote` pone comillas a los strings"]
+  correcta: 1
+  solucion: |
+    Son crates del ecosistema (no de std). `syn::DeriveInput`, `syn::ItemFn`… son los árboles; `quote! { impl #nombre { ... } }` es la plantilla, equivalente al transcriber de `macro_rules!`.
+  etiquetas: ["syn", "quote"]
+
+- id: m19-derive-expansion
+  titulo: "Lo que escribe derive(Debug)"
+  mundo: 19-macros
+  tema: macros-procedurales
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "La expansión real de `#[derive(Debug)] struct Punto { x: i32, y: i32 }` empieza por `impl ::core::fmt::Debug for Punto`. ¿Por qué usa la ruta absoluta `::core::fmt::Debug`?"
+  opciones: ["Porque es más rápido", "Porque el código generado vive en tu crate y no puede depender de lo que hayas importado ni de nombres que puedas tapar", "Porque `std` no tiene `Debug`", "Es un error del compilador"]
+  correcta: 1
+  solucion: |
+    Igual que con `$crate` en `macro_rules!`: el código generado se compila en el contexto del usuario. Una ruta absoluta desde la raíz (`::core`) no depende de los `use` ni de los items locales.
+  etiquetas: ["derive", "rutas absolutas"]
+
+- id: m19-proc-seguridad
+  titulo: "Compilar es ejecutar"
+  mundo: 19-macros
+  tema: macros-procedurales
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué añadir una dependencia con macros procedurales es una decisión de seguridad?"
+  opciones: ["No lo es: solo genera código", "Porque su código se ejecuta en tu máquina al compilar, con tus permisos (igual que `build.rs`)", "Porque hace el binario más grande", "Porque desactiva el borrow checker"]
+  correcta: 1
+  solucion: |
+    Una macro procedural es un programa que el compilador carga y ejecuta. Puede leer archivos o usar la red durante `cargo build`. Defensa: crates conocidas, `Cargo.lock`, revisar dependencias nuevas y auditar con `cargo audit`, `cargo deny` o `cargo vet`.
+  etiquetas: ["seguridad", "cadena de suministro"]
+
+- id: m19-proc-linker
+  titulo: "¿Por qué necesita el enlazador?"
+  mundo: 19-macros
+  tema: macros-procedurales
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Compilas para un microcontrolador desde tu PC. ¿Para qué plataforma se compila una crate `proc-macro` que usas?"
+  opciones: ["Para el microcontrolador", "Para tu PC, porque el compilador la carga y la ejecuta allí", "Para wasm", "No se compila: se interpreta"]
+  correcta: 1
+  solucion: |
+    La macro corre dentro del compilador, que corre en tu PC. Por eso se compila como biblioteca dinámica para el sistema anfitrión, y necesita su enlazador.
+  etiquetas: ["proc-macro", "host"]
+
+- id: m19-jefe
+  titulo: "Una macro que escribe un enum"
+  mundo: 19-macros
+  tema: macros
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m19/jefe-estados
+  opciones: ["hay 3 estados / Verde -> Verde / Ambar -> Ambar / Rojo -> Rojo / true", "hay 3 estados / Verde -> 0 / Ambar -> 1 / Rojo -> 2 / true", "No compila: una macro no puede generar un enum y su impl", "hay 0 estados / true"]
+  correcta: 0
+  solucion: |
+    `contar!` da 3 al compilar; `TODOS` contiene las variantes en orden; `nombre()` devuelve `stringify!` de cada una; y `==` usa el `PartialEq` pedido con `derive`, reenviado con `$(#[$meta:meta])*`.
+  etiquetas: ["meta", "vis", "stringify!"]
+
+- id: m19-vis
+  titulo: "pub, pub(crate) o nada"
+  mundo: 19-macros
+  tema: macros
+  dificultad: media
+  tipo: respuesta
+  enunciado: "¿Qué fragmento acepta una visibilidad como `pub`, `pub(crate)` o ninguna? Escribe su nombre."
+  respuestas: ["vis"]
+  solucion: |
+    `$v:vis` es el único fragmento que puede encajar con **nada** (visibilidad privada). Se usa en macros que generan structs, enums o funciones para respetar la visibilidad que pida el usuario.
+  etiquetas: ["vis", "fragmentos"]

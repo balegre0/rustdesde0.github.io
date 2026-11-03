@@ -1,0 +1,96 @@
+---
+title: "Crates binarios y bibliotecas"
+description: "Un paquete puede tener un crate biblioteca (lib.rs) y varios binarios (main.rs, src/bin/). La biblioteca es lo que otros pueden usar; el binario, lo que se ejecuta."
+sidebar:
+  order: 5
+duracion: 11
+desde: "1.0"
+requiere: ["12-modulos-crates-y-cargo/04-modulos-en-archivos"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre un crate binario y uno biblioteca?"
+    r: "El binario tiene `fn main` y produce un ejecutable. La biblioteca no tiene `main`: es código para que lo usen otros crates."
+  - p: "¿Qué archivos son la raíz de cada crate en un paquete?"
+    r: "`src/main.rs` para el binario y `src/lib.rs` para la biblioteca. Más binarios en `src/bin/*.rs`."
+  - p: "¿Cómo usa `main.rs` el código de `lib.rs` del mismo paquete?"
+    r: "Como un crate externo, por el nombre del paquete: `use mi_paquete::algo;` (y solo ve lo que es `pub`)."
+  - p: "¿Cómo creas un paquete de biblioteca?"
+    r: "`cargo new --lib nombre`."
+---
+
+import { Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Hasta ahora todos tus paquetes eran **programas**. Pero la mayoría del código de Rust del mundo son **bibliotecas**: crates sin `main` que otros usan. Un mismo paquete puede ser las dos cosas.
+
+## La idea
+
+Un **crate** es lo que `rustc` compila de una vez. Hay dos clases:
+
+- **Binario**: tiene `fn main` y produce un ejecutable (`hola.exe`).
+- **Biblioteca** (*library*): no tiene `main`; produce código que otros crates usan.
+
+Un **paquete** de Cargo puede tener **una** biblioteca y **varios** binarios. Cargo los encuentra por convención:
+
+```text
+calculadora/
+├── Cargo.toml
+└── src/
+    ├── lib.rs          ← raíz del crate biblioteca «calculadora»
+    ├── main.rs         ← raíz del binario «calculadora»
+    └── bin/
+        └── conversor.rs   ← otro binario: «conversor»
+```
+
+`cargo run` ejecuta `main.rs`; `cargo run --bin conversor` ejecuta el otro.
+
+Lo interesante: **`main.rs` usa `lib.rs` como si fuera un crate externo**, por el nombre del paquete:
+
+```rust
+// src/lib.rs
+pub fn sumar(a: i32, b: i32) -> i32 { a + b }
+
+// src/main.rs
+use calculadora::sumar;
+
+fn main() {
+    println!("{}", sumar(2, 3));
+}
+```
+
+Y, como un crate externo, **solo ve lo que es `pub`**. Este patrón (casi toda la lógica en `lib.rs` y un `main.rs` corto) es muy habitual, porque la biblioteca se puede probar a fondo (mundo 16) y reutilizar en varios binarios.
+
+## Pruébalo en tu PC
+
+```powershell
+cargo new --lib calculadora
+cd calculadora
+```
+
+`cargo new --lib` crea `src/lib.rs` (con una función y un test de ejemplo) en vez de `main.rs`. Añade tú un `src/main.rs` que use la biblioteca y ejecuta `cargo run`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El crate es la unidad de compilación.** `rustc` compila un crate entero de una vez: todos sus módulos, aunque estén en cien archivos. Por eso el compilador puede optimizar entre módulos libremente, y por eso partir un proyecto enorme en **varios** crates acelera la recompilación: si cambias un crate, los que no dependen de él no se recompilan.
+
+**Qué produce una biblioteca.** Para que otros crates de Rust la usen, `rustc` genera un archivo `.rlib`: el código compilado más los **metadatos** (tipos, firmas, genéricos sin instanciar). Los genéricos se instancian en el crate que los usa (monomorfización, mundo 13). Otros tipos de crate (`cdylib`, `staticlib`) sirven para que te llamen desde otros lenguajes (mundo 22).
+
+</BajoElCapo>
+
+<Trampa titulo="Usar crate:: desde main.rs para llegar a lib.rs">
+
+❌ En `main.rs`, escribir `crate::sumar`. `crate` es la raíz del crate **actual**, que es el binario. La biblioteca es otro crate.
+
+✅ `use calculadora::sumar;` (el nombre del paquete, con `-` cambiado por `_`).
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En un paquete `mi-app` con `lib.rs` y `main.rs`, ¿cómo importa `main.rs` la función pública `iniciar` de `lib.rs`?"
+  opciones={["`use crate::iniciar;`", "`use mi_app::iniciar;`", "`mod lib;`", "No se puede"]}
+  correcta={1}
+  explicacion="La biblioteca es un crate distinto, que se nombra como el paquete con `_` en vez de `-`."
+  porque={["`crate` es el binario, no la biblioteca.", "", "Eso compilaría `lib.rs` otra vez como módulo del binario: un error frecuente.", "Es el patrón habitual."]}
+/>

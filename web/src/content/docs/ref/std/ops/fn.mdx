@@ -1,0 +1,85 @@
+---
+title: "Fn, FnMut y FnOnce"
+description: "Los traits de lo que se puede llamar: closures y funciones, según lo que hacen con lo que capturan."
+sidebar:
+  order: 4
+insignias: ["Desde 1.35", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::ops::{Fn, FnMut, FnOnce}` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub trait FnOnce<Args>
+where
+    Args: Tuple,
+{
+    type Output;
+
+    // Required method
+    extern "rust-call" fn call_once(self, args: Args) -> Self::Output;
+}
+
+pub trait FnMut<Args>: FnOnce<Args>
+where
+    Args: Tuple,
+{
+    // Required method
+    extern "rust-call" fn call_mut(
+        &mut self,
+        args: Args,
+    ) -> Self::Output;
+}
+
+pub trait Fn<Args>: FnMut<Args>
+where
+    Args: Tuple,
+{
+    // Required method
+    extern "rust-call" fn call(&self, args: Args) -> Self::Output;
+}
+```
+
+## Qué hace
+
+Toda closure implementa uno o varios de estos traits, según lo que haga con lo que **captura**:
+
+| Trait | La closure… | Se puede llamar |
+|---|---|---|
+| `FnOnce` | consume (mueve fuera) algo capturado | una vez |
+| `FnMut` | modifica algo capturado | muchas veces, con `&mut` |
+| `Fn` | solo lee lo capturado | muchas veces, con `&` (también a la vez) |
+
+Cada `Fn` es también `FnMut`, y cada `FnMut` es también `FnOnce`. Al escribir una función que recibe una closure, pide el **más flexible para quien llama** que te sirva: `FnOnce` si la llamas una vez, `FnMut` si la llamas varias, `Fn` si además la compartes. Las funciones normales (`fn`) implementan los tres.
+
+En la sinopsis aparecen `extern "rust-call"` y `Tuple`: son detalles internos e inestables. En Rust estable no puedes implementar estos traits a mano; el compilador los implementa para las closures y las funciones, y tú los usas como límites (`F: Fn(i32) -> i32`).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/ops-fn" />
+
+**Salida:**
+
+```text
+15
+10
+3
+Ana Gil
+[5, 16]
+```
+
+## Desde
+
+Rust 1.35 (estable).
+
+## Ver también
+
+- [E0525](/errores/e0525/)
+- [E0373](/errores/e0373/)
+- [Iteradores](/ref/std/iter/adaptadores/)
+
+## Aprende esto en
+
+- [Mundo 14 · Closures e iteradores](/curso/14-closures-e-iteradores/)

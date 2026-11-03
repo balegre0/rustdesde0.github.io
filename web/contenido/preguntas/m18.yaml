@@ -1,0 +1,645 @@
+# Banco de preguntas del mundo 18 (Async). Salidas y errores verificados con rustc 1.99.1
+# (ejemplos en web/ejemplos/m18/, ejecutados en wasm32-wasip1).
+
+- id: m18-perezoso
+  titulo: "¿Cuándo se ejecuta el cuerpo?"
+  mundo: 18-async
+  tema: async
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿En qué momento se imprime «(dentro de saludar)»?"
+  ej: m18/perezoso
+  opciones: ["Justo después de «1. llamo a saludar()»", "Después de «3. lo sondeo»", "Nunca", "No compila"]
+  correcta: 1
+  solucion: |
+    Llamar a una `async fn` solo **crea** el future; no ejecuta nada. El cuerpo empieza en el primer `poll`, así que «(dentro de saludar)» sale entre «3. lo sondeo» y «4. listo: 7». Compila sin `.await` porque el future se sondea a mano.
+  etiquetas: ["Future", "poll", "perezoso"]
+
+- id: m18-future-sin-usar
+  titulo: "El future olvidado"
+  mundo: 18-async
+  tema: async
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Escribes `descargar(url);` (una `async fn`) como sentencia suelta, sin `.await`. ¿Qué pasa?"
+  opciones: ["Descarga en segundo plano", "No se descarga nada y rustc avisa: «unused implementer of `Future` that must be used»", "El programa espera a que termine", "Error de compilación"]
+  correcta: 1
+  solucion: |
+    Los futures son perezosos: sin `.await` ni ejecutor no hacen nada. rustc 1.99.1 avisa con `unused_must_use` y la nota «futures do nothing unless you `.await` or poll them». Es un aviso, no un error: el programa compila.
+  etiquetas: ["must_use", "perezoso"]
+
+- id: m18-poll-devuelve
+  titulo: "Lo que devuelve poll"
+  mundo: 18-async
+  tema: async
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué tipo devuelve `Future::poll`?"
+  opciones: ["`Option<T>`", "`Result<T, E>`", "`Poll<T>`, con las variantes `Ready(T)` y `Pending`", "`bool`"]
+  correcta: 2
+  solucion: |
+    `fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>`. `Poll` tiene la forma de un `Option`, pero sus nombres dicen lo que significan: `Ready(valor)` o `Pending` («todavía no»).
+  etiquetas: ["Poll"]
+
+- id: m18-self-poll
+  titulo: "El self de poll"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: respuesta
+  enunciado: "Escribe el tipo exacto del parámetro `self` en `Future::poll`."
+  respuestas: ["Pin<&mut Self>", "self: Pin<&mut Self>"]
+  solucion: |
+    `self: Pin<&mut Self>`. Es una referencia exclusiva (para que el future pueda actualizar su estado entre sondeos) envuelta en `Pin` (la promesa de que no se moverá, porque puede ser autorreferencial).
+  etiquetas: ["Pin", "poll"]
+
+- id: m18-cuenta-sondeos
+  titulo: "Contar sondeos"
+  mundo: 18-async
+  tema: async
+  dificultad: facil
+  tipo: predice
+  enunciado: "`Cuenta { veces: 3 }` devuelve `Pending` mientras `veces > 0`. ¿Cuántos sondeos hacen falta?"
+  ej: m18/future-a-mano
+  opciones: ["3", "4", "2", "Infinitos"]
+  correcta: 1
+  solucion: |
+    Tres `Pending` (con `veces` = 3, 2, 1) y un cuarto sondeo que devuelve `Ready`. La salida termina con «¡hecho! tras 4 sondeos».
+  etiquetas: ["poll"]
+
+- id: m18-pending-sin-waker
+  titulo: "Pending mudo"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: opcion
+  enunciado: "Un `poll` devuelve `Poll::Pending` sin guardar ni llamar al waker. En un ejecutor que solo sondea tareas despertadas, ¿qué ocurre?"
+  opciones: ["Se sondea otra vez enseguida", "Error de compilación", "La tarea se queda dormida para siempre, sin ningún error", "Pánico inmediato"]
+  correcta: 2
+  solucion: |
+    El contrato de `poll`: si devuelves `Pending`, alguien tiene que llamar a tu waker cuando puedas avanzar. Si nadie lo hace, el ejecutor nunca vuelve a sondearte. El compilador no puede detectarlo: es un error de lógica.
+  etiquetas: ["Waker", "contrato"]
+
+- id: m18-wake-vs-by-ref
+  titulo: "wake o wake_by_ref"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué diferencia hay entre `waker.wake()` y `waker.wake_by_ref()`?"
+  opciones: ["Ninguna", "`wake` consume el waker; `wake_by_ref` lo usa por referencia y lo deja vivo", "`wake_by_ref` es asíncrono", "`wake` despierta a todas las tareas"]
+  correcta: 1
+  solucion: |
+    `wake(self)` toma el waker por valor. `wake_by_ref(&self)` no. Con el trait `Wake`, si solo implementas `wake`, la versión por referencia por defecto clona el `Arc` y llama a `wake`.
+  etiquetas: ["Waker", "Wake"]
+
+- id: m18-waker-cell
+  titulo: "Un waker con Cell"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este waker?"
+  ej: m18/waker-cell
+  opciones: ["`Wake` no se puede implementar para structs", "Falta implementar `wake_by_ref`", "`Waker::from(Arc<W>)` exige `W: Send + Sync`, y `Cell<u32>` no es `Sync`", "`Arc` no se puede clonar"]
+  correcta: 2
+  solucion: |
+    Error real: E0277 «`Cell<u32>` cannot be shared between threads safely», con la nota «required for `Waker` to implement `From<Arc<Avisos>>`». Un waker puede clonarse y llamarse desde otro hilo; con un `Cell` dentro habría una carrera de datos. Fíjate en que el `impl Wake` sí compila: el error aparece al convertir. Arreglo: `AtomicU32`.
+  etiquetas: ["E0277", "Sync", "Waker"]
+
+- id: m18-vtable-waker
+  titulo: "La vtable del waker"
+  mundo: 18-async
+  tema: async
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Qué cuatro funciones contiene una `RawWakerVTable`?"
+  opciones: ["new, poll, wake, drop", "clone, wake, wake_by_ref, drop", "lock, unlock, wake, sleep", "send, recv, wake, close"]
+  correcta: 1
+  solucion: |
+    Un `Waker` es por dentro un `RawWaker`: un puntero de datos y una tabla con `clone`, `wake`, `wake_by_ref` y `drop`. Es un puntero gordo hecho a mano, sin `dyn`, para funcionar también sin asignador. Construirlo a mano con `RawWaker::new` es `unsafe`.
+  etiquetas: ["RawWaker", "vtable"]
+
+- id: m18-avisos
+  titulo: "Avisos y Pending"
+  mundo: 18-async
+  tema: async
+  dificultad: facil
+  tipo: predice
+  enunciado: "`DosVueltas` devuelve `Pending` dos veces y llama a `wake_by_ref` antes de cada una. ¿Qué imprime?"
+  ej: m18/waker-cuenta
+  opciones: ["Pending devuelto: 2 veces / avisos recibidos: 2", "Pending devuelto: 3 veces / avisos recibidos: 2", "Pending devuelto: 2 veces / avisos recibidos: 0", "Pending devuelto: 0 veces / avisos recibidos: 0"]
+  correcta: 0
+  solucion: |
+    Cada `Pending` va acompañado de su aviso, así que las dos cuentas coinciden: 2 y 2.
+  etiquetas: ["Wake"]
+
+- id: m18-block-on-sondeos
+  titulo: "Sondeos de block_on"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: predice
+  enunciado: "`sumar` cede el turno una vez. El bloque llama a `sumar` dos veces seguidas. ¿Qué imprime el ejecutor?"
+  ej: m18/block-on
+  opciones: ["[ejecutor] 2 sondeos", "[ejecutor] 3 sondeos", "[ejecutor] 4 sondeos", "[ejecutor] 1 sondeos"]
+  correcta: 1
+  solucion: |
+    Sondeo 1: el primer `sumar` cede. Sondeo 2: termina el primero, empieza el segundo y cede. Sondeo 3: termina todo. Después imprime «resultado = 26» ((1 + 2) + 10 = 13, por 2).
+  etiquetas: ["ejecutor", "block_on"]
+
+- id: m18-std-ejecutor
+  titulo: "¿Trae ejecutor std?"
+  mundo: 18-async
+  tema: async
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué aporta la biblioteca estándar de Rust para async?"
+  opciones: ["Un runtime completo como Tokio", "Los tipos y traits (`Future`, `Poll`, `Context`, `Waker`, `Wake`) pero ningún ejecutor de propósito general", "Nada", "Solo `block_on`"]
+  correcta: 1
+  solucion: |
+    El lenguaje pone `async`/`.await` y `core`/`std` la interfaz. El ejecutor lo pone un crate (Tokio, smol, Embassy) o tu código, para que async sirva igual en un servidor que en un microcontrolador.
+  etiquetas: ["runtime"]
+
+- id: m18-tamano-array
+  titulo: "Bytes de un future"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Cuánto miden los futures de `con_array` y `sin_array`?"
+  ej: m18/tamanos
+  opciones: ["8 y 8", "120 y 24", "100 y 0", "No se pueden medir"]
+  correcta: 1
+  solucion: |
+    El array de 100 bytes está vivo a través del `.await`, así que viaja dentro del future: 120 bytes (1 de discriminante + 117 del estado más grande, redondeado a la alineación de 8). Sin el array: 24. Medido con rustc 1.99.1.
+  etiquetas: ["máquina de estados", "size_of_val"]
+
+- id: m18-variantes
+  titulo: "Contar estados"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: respuesta
+  enunciado: "Una `async fn` tiene exactamente tres `.await`. ¿Cuántas variantes tiene su máquina de estados? (Escribe el número.)"
+  respuestas: ["6", "seis"]
+  solucion: |
+    `Unresumed`, `Suspend0`, `Suspend1`, `Suspend2`, `Returned` y `Panicked`: 6. Comprobado con `-Zprint-type-sizes` (nightly 1.101.0).
+  etiquetas: ["corrutina"]
+
+- id: m18-que-se-guarda
+  titulo: "¿Qué viaja dentro?"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué variables de una `async fn` se guardan dentro de su future?"
+  opciones: ["Todas las variables locales", "Solo los argumentos", "Los argumentos y las variables vivas a través de algún `.await`", "Ninguna: viven en la pila"]
+  correcta: 2
+  solucion: |
+    Cuando `poll` devuelve `Pending`, la pila de esa llamada desaparece. Lo que haga falta después del `.await` tiene que estar en el future. Una variable que nace y muere entre dos `.await` no ocupa sitio.
+  etiquetas: ["máquina de estados"]
+
+- id: m18-anidado
+  titulo: "Futures dentro de futures"
+  mundo: 18-async
+  tema: async
+  dificultad: dificil
+  tipo: predice
+  enunciado: "En el navegador (punteros de 4 bytes), `hoja` mide 66 bytes. ¿Qué miden `rama` (que hace `hoja().await`) y `rama_en_caja` (que hace `Box::pin(hoja()).await`)?"
+  ej: m18/anidado
+  opciones: ["rama: 1 / rama_en_caja: 1", "rama: 67 / rama_en_caja: 8", "rama: 132 / rama_en_caja: 66", "rama: 66 / rama_en_caja: 66"]
+  correcta: 1
+  solucion: |
+    Esperar un future lo guarda **dentro** de quien espera: `rama` contiene a `hoja` y crece (67). Con `Box::pin`, dentro solo va el puntero a la caja más el estado: 8 bytes en el navegador (en un PC de 64 bits, el puntero mide 8 y el total cambia). Es la técnica para que los futures anidados no engorden.
+  etiquetas: ["Box::pin", "tamaño"]
+
+- id: m18-poll-tras-ready
+  titulo: "Sondear después de terminar"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué pasa al sondear por segunda vez el future de una `async fn` que ya devolvió `Ready`?"
+  ej: m18/poll-tras-ready
+  opciones: ["Devuelve `Ready(1)` otra vez", "Devuelve `Pending`", "Pánico: «`async fn` resumed after completion»", "Comportamiento indefinido"]
+  correcta: 2
+  solucion: |
+    La máquina de estados está en `Returned`, y reanudarla provoca un pánico con ese mensaje. No es UB: `poll` es seguro y el contrato solo dice que el resultado no está especificado (pánico, bloqueo o lo que sea), nunca memoria corrupta.
+  etiquetas: ["Returned", "pánico"]
+
+- id: m18-orden-await
+  titulo: "El orden lo marca .await"
+  mundo: 18-async
+  tema: async
+  dificultad: facil
+  tipo: predice
+  enunciado: "Se crean `a = paso(\"uno\")` y `b = paso(\"tres\")`, y luego se hace `b.await` y `a.await`. ¿En qué orden salen los mensajes?"
+  ej: m18/await-orden
+  opciones: ["empieza uno, empieza tres, futures creados", "futures creados, empieza uno, empieza tres", "futures creados, empieza tres, empieza uno", "empieza tres, empieza uno, futures creados"]
+  correcta: 2
+  solucion: |
+    Crear no ejecuta. Primero sale «futures creados», después el cuerpo de `b` y luego el de `a`. Total: 3 + 4 = 7.
+  etiquetas: [".await", "orden"]
+
+- id: m18-await-fuera
+  titulo: ".await en main"
+  mundo: 18-async
+  tema: async
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m18/await-fuera
+  opciones: ["`tarea` no devuelve nada", "E0728: `.await` solo se permite dentro de funciones y bloques async, y `main` no lo es", "Falta importar `Future`", "Hay que escribir `await tarea()`"]
+  correcta: 1
+  solucion: |
+    Error real: E0728 «`await` is only allowed inside `async` functions and blocks», señalando que `main` «is not `async`». Hace falta un ejecutor (`block_on`) como frontera.
+  etiquetas: ["E0728"]
+
+- id: m18-closure-async
+  titulo: "Closures async"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: predice
+  enunciado: "`aplicar_dos_veces(sumar, 1)` con `sumar = async |n| n + suma` y `suma = 10`. ¿Qué imprime la primera línea?"
+  ej: m18/async-closure
+  opciones: ["r = 11", "r = 21", "r = 20", "No compila: las closures no pueden ser async"]
+  correcta: 1
+  solucion: |
+    (1 + 10) + 10 = 21. Las closures async y los traits `AsyncFn*` son estables desde Rust 1.85.
+  etiquetas: ["AsyncFn", "1.85"]
+
+- id: m18-async-move
+  titulo: "async move"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuándo necesitas `async move { … }` en lugar de `async { … }`?"
+  opciones: ["Nunca", "Cuando el future tiene que vivir más que las variables locales que usa (por ejemplo, al lanzarlo como tarea `'static`)", "Para que se ejecute en otro hilo", "Para que sea más rápido"]
+  correcta: 1
+  solucion: |
+    Como con las closures: `move` toma en propiedad lo que usa. Un `tokio::spawn` exige `'static`, así que no puede tomar prestadas variables locales.
+  etiquetas: ["move", "'static"]
+
+- id: m18-autorreferencia
+  titulo: "Mover algo que se apunta a sí mismo"
+  mundo: 18-async
+  tema: pin
+  dificultad: media
+  tipo: predice
+  enunciado: "El struct guarda la dirección de su propio campo. ¿Qué imprime antes y después de moverlo a un `Box`?"
+  ej: m18/autorreferencia
+  opciones: ["true / true", "true / false", "false / false", "No compila"]
+  correcta: 1
+  solucion: |
+    Mover copia los bytes a otro sitio, pero la dirección guardada sigue siendo la vieja. Si fuera una referencia de verdad, colgaría: un uso tras liberar. Es exactamente el peligro que evita `Pin`.
+  etiquetas: ["Pin", "autorreferencial"]
+
+- id: m18-poll-sin-pin
+  titulo: "poll sin fijar"
+  mundo: 18-async
+  tema: pin
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `fut.poll(&mut cx)`?"
+  ej: m18/poll-sin-pin
+  opciones: ["Falta `use std::future::Future`", "E0599: `poll` solo existe sobre `Pin<&mut ...>`; hay que fijar el future", "El future ya terminó", "`Context` está mal creado"]
+  correcta: 1
+  solucion: |
+    Error real: E0599 «no method named `poll` found for opaque type `impl Future<Output = u8>`», con la ayuda «self type must be pinned to call `Future::poll`» y la sugerencia de usar `std::pin::pin!` y `.as_mut().poll(...)`.
+  etiquetas: ["E0599", "pin!"]
+
+- id: m18-pin-new
+  titulo: "Pin::new con un future async"
+  mundo: 18-async
+  tema: pin
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `Pin::new(&mut fut)` con el future de una `async fn`?"
+  ej: m18/pin-new-falla
+  opciones: ["`Pin::new` es `unsafe`", "E0277: `Pin::new` exige `Unpin` y el future de una `async fn` no lo es", "Hay que usar `&fut`", "Los futures no se pueden fijar"]
+  correcta: 1
+  solucion: |
+    Error real: E0277 «`{async fn body of tarea()}` cannot be unpinned», con la nota «consider using the `pin!` macro / consider using `Box::pin`». `Pin::new` no puede comprobar que no vayas a mover el valor, así que solo lo permite para tipos que se mueven sin peligro.
+  etiquetas: ["E0277", "Unpin"]
+
+- id: m18-pin-mutar
+  titulo: "¿Fijar impide mutar?"
+  mundo: 18-async
+  tema: pin
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué impide `Pin` a un valor que no es `Unpin`?"
+  opciones: ["Leerlo", "Mutarlo", "Moverlo de su sitio en memoria", "Destruirlo"]
+  correcta: 2
+  solucion: |
+    `Pin` impide **mover**, no mutar: el propio `poll` muta el future en cada sondeo. Lo que no puedes obtener de forma segura es un `&mut T` con el que hacer `mem::swap` o `mem::replace`.
+  etiquetas: ["Pin"]
+
+- id: m18-unpin-auto
+  titulo: "Unpin es automático"
+  mundo: 18-async
+  tema: pin
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cómo se consigue que un struct propio **no** sea `Unpin`?"
+  opciones: ["Implementando `!Unpin`", "Añadiendo un campo `PhantomPinned`", "Metiéndolo en un `Box`", "Es imposible"]
+  correcta: 1
+  solucion: |
+    `Unpin` es un auto trait: se implementa solo si todos los campos lo son. `PhantomPinned` (0 bytes) no es `Unpin`, así que lo «desactiva». Las implementaciones negativas (`impl !Unpin`) no son estables.
+  etiquetas: ["PhantomPinned", "auto trait"]
+
+- id: m18-pin-tamano
+  titulo: "Lo que mide un Pin"
+  mundo: 18-async
+  tema: pin
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuánto ocupa `Pin<&mut i32>` comparado con `&mut i32`?"
+  opciones: ["Lo mismo", "El doble", "4 bytes más", "Cero"]
+  correcta: 0
+  solucion: |
+    `Pin` es un envoltorio sin coste: solo cambia qué operaciones permite el compilador. En el navegador, los dos miden 4 bytes.
+  etiquetas: ["Pin", "coste cero"]
+
+- id: m18-pin-donde
+  titulo: "pin! o Box::pin"
+  mundo: 18-async
+  tema: pin
+  dificultad: media
+  tipo: opcion
+  enunciado: "Quieres guardar varios futures de tipos distintos en un `Vec` y sondearlos más tarde. ¿Qué usas?"
+  opciones: ["`std::pin::pin!`", "`Box::pin`, para tener `Vec<Pin<Box<dyn Future<Output = T>>>>`", "`Pin::new`", "Nada, se guardan tal cual"]
+  correcta: 1
+  solucion: |
+    `pin!` fija en la pila de la función actual: no sirve para guardar. `Box::pin` fija en el heap y, con `dyn Future`, da un tipo común a futures distintos. `Pin::new` exige `Unpin`.
+  etiquetas: ["Box::pin", "dyn Future"]
+
+- id: m18-cola-orden
+  titulo: "Turnos en la cola"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: predice
+  enunciado: "Dos tareas comparten un ejecutor con cola FIFO: «ana» da 2 pasos y «leo» 3, cediendo el turno tras cada paso. ¿Qué línea sale justo después de «ana: fin»?"
+  ej: m18/ejecutor-cola
+  opciones: ["leo: paso 2", "leo: paso 3", "leo: fin", "cola vacía: todas las tareas terminaron"]
+  correcta: 1
+  solucion: |
+    Orden completo: ana 1, leo 1, ana 2, leo 2, ana fin, leo 3, leo fin. Con un hilo y una cola por orden de llegada, el resultado es determinista.
+  etiquetas: ["ejecutor", "cola"]
+
+- id: m18-rc-await
+  titulo: "Rc a través de .await"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: no-compila
+  enunciado: "`lanzar` exige `F: Future + Send + 'static`, como `tokio::spawn`. ¿Por qué no compila?"
+  ej: m18/rc-await
+  opciones: ["`Rc` no se puede usar en async", "El future no es `Send` porque un `Rc` (que no es `Send`) está vivo a través del `.await`", "Falta `move`", "`println!` no funciona en async"]
+  correcta: 1
+  solucion: |
+    Error real (sin código E0xxx): «future cannot be sent between threads safely», con la nota «future is not `Send` as this value is used across an await», señalando `contador`. Arreglos: `Arc` en lugar de `Rc`, o soltar el `Rc` antes del `.await`.
+  etiquetas: ["Send", "Rc"]
+
+- id: m18-guard-await
+  titulo: "MutexGuard a través de .await"
+  mundo: 18-async
+  tema: async
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué este future no es `Send`?"
+  ej: m18/guard-await
+  opciones: ["`Mutex` no es `Sync`", "El `MutexGuard` de `std` no es `Send` y sigue vivo durante el `.await`", "Los statics no se pueden usar en async", "`*g += 1` necesita `unsafe`"]
+  correcta: 1
+  solucion: |
+    rustc 1.99.1: «the trait `Send` is not implemented for `std::sync::MutexGuard<'_, u32>`» y «await occurs here, with `mut g` maybe used later». Además de no ser `Send`, mantener un cerrojo durante una espera bloquea a los demás. Arreglo: encerrar el guard en un bloque `{ }` que termine antes del `.await`.
+  etiquetas: ["MutexGuard", "Send"]
+
+- id: m18-spawn-static
+  titulo: "Por qué 'static"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué `tokio::spawn` exige que el future sea `'static`?"
+  opciones: ["Porque Tokio solo acepta constantes", "Porque la tarea puede sobrevivir a la función que la lanzó, así que no puede tomar prestadas sus variables locales", "Por rendimiento", "No lo exige"]
+  correcta: 1
+  solucion: |
+    Es el mismo motivo que en `thread::spawn`. Se resuelve con `async move` y compartiendo con `Arc`.
+  etiquetas: ["spawn", "'static"]
+
+- id: m18-bloquear-ejecutor
+  titulo: "thread::sleep en async"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: opcion
+  enunciado: "Dentro de una tarea Tokio llamas a `std::thread::sleep(Duration::from_secs(2))`. ¿Qué pasa?"
+  opciones: ["Solo esa tarea espera; las demás siguen", "Se bloquea el hilo entero del ejecutor: ninguna otra tarea de ese hilo avanza durante 2 segundos", "Error de compilación", "Tokio lo convierte en `sleep` async"]
+  correcta: 1
+  solucion: |
+    `thread::sleep` no devuelve `Pending`: duerme el hilo. Usa `tokio::time::sleep(...).await` o, para trabajo bloqueante, `tokio::task::spawn_blocking`.
+  etiquetas: ["bloqueo", "spawn_blocking"]
+
+- id: m18-reactor
+  titulo: "El reactor"
+  mundo: 18-async
+  tema: async
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Qué hace el reactor de un runtime como Tokio?"
+  opciones: ["Compila los futures", "Pregunta al sistema operativo qué E/S está lista (epoll, kqueue, IOCP) y llama a los wakers de las tareas afectadas", "Reparte tareas entre hilos", "Libera la memoria de las tareas"]
+  correcta: 1
+  solucion: |
+    El ejecutor sondea; el reactor despierta. En Tokio el reactor usa el crate `mio` sobre `epoll` (Linux), `kqueue` (macOS/BSD) o IOCP (Windows). Repartir tareas entre hilos es cosa del planificador (robo de trabajo).
+  etiquetas: ["reactor", "mio"]
+
+- id: m18-async-std
+  titulo: "async-std"
+  mundo: 18-async
+  tema: ecosistema
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál es el estado de `async-std` en 2026?"
+  opciones: ["Es el runtime oficial de Rust", "Descontinuado desde la 1.13.1 (febrero de 2025); sus mantenedores recomiendan smol", "Se fusionó con Tokio", "Forma parte de std"]
+  correcta: 1
+  solucion: |
+    `async-std` se descontinuó y su README recomienda `smol`. Tokio sigue siendo el estándar de facto en servidores, y Embassy es la referencia en embebido.
+  etiquetas: ["async-std", "smol"]
+
+- id: m18-join-sondeos
+  titulo: "join frente a secuencial"
+  mundo: 18-async
+  tema: async
+  dificultad: dificil
+  tipo: predice
+  enunciado: "Dos futures `Tarda(3)` (3 `Pending` y luego `Ready`). Esperarlos uno tras otro frente a juntarlos con un `join`: ¿cuántos sondeos del bloque hacen falta en cada caso?"
+  ej: m18/join-vs-secuencial
+  opciones: ["secuencial: 8 / join: 8", "secuencial: 7 / join: 4", "secuencial: 6 / join: 3", "secuencial: 4 / join: 7"]
+  correcta: 1
+  solucion: |
+    Secuencial: 3 `Pending` del primero + 3 del segundo + el sondeo final = 7 (el primero termina en el mismo sondeo en que el segundo da su primer `Pending`). Con `join`, los dos avanzan en cada sondeo: 3 `Pending` + 1 = 4. Es la diferencia entre sumar esperas y solaparlas.
+  etiquetas: ["join"]
+
+- id: m18-select-cancela
+  titulo: "El perdedor de select"
+  mundo: 18-async
+  tema: cancelacion
+  dificultad: media
+  tipo: predice
+  enunciado: "`select(lento, rapido)`: lento necesita 5 sondeos y rápido 1. ¿Qué imprime el `Drop` del perdedor?"
+  ej: m18/select-propio
+  opciones: ["Nada: el perdedor sigue ejecutándose", "lento cancelado (le faltaban 3 sondeos)", "lento cancelado (le faltaban 5 sondeos)", "rápido cancelado (le faltaban 0 sondeos)"]
+  correcta: 1
+  solucion: |
+    `select` sondea a los dos en cada vuelta. En la segunda vuelta gana el rápido; para entonces el lento ha recibido 2 sondeos (le faltan 3). `select` devuelve y lo suelta: su `Drop` se ejecuta antes de «select terminó».
+  etiquetas: ["select", "Drop"]
+
+- id: m18-cancelar
+  titulo: "Cómo se cancela"
+  mundo: 18-async
+  tema: cancelacion
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cómo se cancela un future en Rust?"
+  opciones: ["Llamando a `future.cancel()`", "Soltándolo (drop): nadie lo vuelve a sondear y se ejecutan los Drop de lo que guardaba", "Con un pánico", "No se puede"]
+  correcta: 1
+  solucion: |
+    No hay `cancel()`. Un future solo avanza si lo sondean; al soltarlo se queda parado en su último `.await` y se liberan sus datos. En `cancelar-drop`, «drop de guardia de tarea» sale justo después de «suelto el future».
+  etiquetas: ["cancelación", "drop"]
+
+- id: m18-cancel-safety
+  titulo: "Mensaje perdido"
+  mundo: 18-async
+  tema: cancelacion
+  dificultad: dificil
+  tipo: predice
+  enunciado: "Cola inicial [\"a\", \"b\"]. Se sondea una vez cada función y se cancela. ¿Cómo queda la cola en cada caso?"
+  ej: m18/cancel-safety
+  opciones: ["mal: [\"a\", \"b\"] / bien: [\"a\", \"b\"]", "mal: [\"b\"] / bien: [\"a\", \"b\"]", "mal: [\"b\"] / bien: [\"b\"]", "mal: [] / bien: [\"a\"]"]
+  correcta: 1
+  solucion: |
+    `procesar_mal` saca «a» antes del `.await`; al cancelarla, «a» no vuelve ni se procesa: perdido. `procesar_bien` espera antes de tocar la cola: cancelarla no pierde nada. Esa es la diferencia entre un future cancel-safe y uno que no lo es.
+  etiquetas: ["cancel safety"]
+
+- id: m18-read-exact
+  titulo: "select! y read_exact"
+  mundo: 18-async
+  tema: cancelacion
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En un bucle, compites un `read_exact` recién creado contra un temporizador con `select!`. ¿Qué riesgo hay?"
+  opciones: ["Ninguno", "Si gana el temporizador, el `read_exact` a medias se suelta y los bytes ya leídos se pierden", "El temporizador nunca gana", "Pánico de Tokio"]
+  correcta: 1
+  solucion: |
+    `read_exact` no es cancel-safe. Usa operaciones cancel-safe en `select!` o crea el future una vez fuera del bucle, fíjalo con `pin!` y compite con `&mut fut` para que perder una vuelta no lo suelte.
+  etiquetas: ["select!", "cancel safety"]
+
+- id: m18-join-paralelo
+  titulo: "¿join es paralelismo?"
+  mundo: 18-async
+  tema: async
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿`join(a, b)` ejecuta `a` y `b` en dos núcleos a la vez?"
+  opciones: ["Sí, siempre", "No: los sondea por turnos dentro de la misma tarea; solapa esperas, no reparte CPU", "Solo en Tokio multihilo", "Solo si son `Send`"]
+  correcta: 1
+  solucion: |
+    Todo ocurre en una tarea y, por tanto, en un hilo a la vez. Para paralelismo de CPU hay que lanzar tareas separadas en un runtime multihilo (o usar hilos).
+  etiquetas: ["join", "paralelismo"]
+
+- id: m18-trait-175
+  titulo: "async fn en traits"
+  mundo: 18-async
+  tema: traits
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Desde qué versión estable se puede escribir `async fn` dentro de un trait?"
+  opciones: ["1.39", "1.75", "1.85", "Todavía no se puede"]
+  correcta: 1
+  solucion: |
+    Rust 1.75 (diciembre de 2023). 1.39 trajo `async`/`.await`; 1.85, las closures async.
+  etiquetas: ["1.75", "traits"]
+
+- id: m18-trait-dyn
+  titulo: "dyn con métodos async"
+  mundo: 18-async
+  tema: traits
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `Box<dyn Almacen>`?"
+  ej: m18/trait-dyn
+  opciones: ["Falta `+ Send`", "E0038: el trait no es compatible con dyn porque su método es async", "`Box` no admite traits", "`Memoria` no implementa `Almacen`"]
+  correcta: 1
+  solucion: |
+    Error real: E0038 «the trait `Almacen` is not dyn compatible», «because method `leer` is `async`». Cada implementación devuelve un future de tipo distinto y la vtable no puede describirlo. Arreglo: devolver `Pin<Box<dyn Future<Output = u32> + '_>>`.
+  etiquetas: ["E0038", "dyn"]
+
+- id: m18-rtn
+  titulo: "Lo que aún no es estable"
+  mundo: 18-async
+  tema: traits
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Cuál de estas piezas **sigue sin estabilizar** en Rust 1.99.1?"
+  opciones: ["`async fn` en traits", "`std::pin::pin!`", "La notación de tipo de retorno (RTN) y async drop", "`Waker::noop`"]
+  correcta: 2
+  solucion: |
+    RTN (para exigir, por ejemplo, que el future de un método de trait sea `Send`) y async drop siguen en desarrollo. `async fn` en traits es de 1.75, `pin!` de 1.68 y `Waker::noop` de 1.85.
+  etiquetas: ["RTN", "async drop"]
+
+- id: m18-trait-estatico
+  titulo: "El coste del genérico"
+  mundo: 18-async
+  tema: traits
+  dificultad: media
+  tipo: opcion
+  enunciado: "`async fn edad_o_cero<A: Almacen>(a: &A)` llama a `a.leer(\"edad\").await`. ¿Qué coste extra tiene frente a una función async normal?"
+  opciones: ["Una asignación en el heap", "Una llamada por vtable", "Ninguno: despacho estático y el future va en línea", "Un hilo"]
+  correcta: 2
+  solucion: |
+    Con genéricos el compilador conoce el tipo exacto del future de cada implementación (monomorfización) y lo incrusta. La versión `Pin<Box<dyn Future>>` sí paga una asignación por llamada.
+  etiquetas: ["monomorfización"]
+
+- id: m18-colores
+  titulo: "Funciones de colores"
+  mundo: 18-async
+  tema: diseno
+  dificultad: media
+  tipo: opcion
+  enunciado: "En el debate del «coloreado de funciones», ¿qué significa que async «se contagia»?"
+  opciones: ["Que los futures crecen sin control", "Que para hacer `.await` hay que estar en async, así que quien llama tiende a volverse async también", "Que async es más lento", "Que no se puede llamar a funciones normales desde async"]
+  correcta: 1
+  solucion: |
+    Desde async puedes llamar a funciones normales sin problema; lo que cuesta es al revés (necesitas un ejecutor). Los defensores del diseño de Rust señalan que esa marca en el tipo hace visibles los puntos de suspensión y de cancelación.
+  etiquetas: ["diseño"]
+
+- id: m18-jefe-reloj
+  titulo: "El salto del reloj"
+  mundo: 18-async
+  tema: async
+  dificultad: dificil
+  tipo: predice
+  enunciado: "En el runtime del jefe: tostadas (3 tics), café (1) y luego leche (1), huevos (2), todo desde t=0. ¿Cuál es la última línea?"
+  ej: m18/jefe
+  opciones: ["desayuno servido en t=7", "desayuno servido en t=3", "desayuno servido en t=2", "desayuno servido en t=4"]
+  correcta: 1
+  solucion: |
+    Las esperas se solapan: café en t=1, leche y huevos en t=2, tostadas en t=3. El ejecutor salta el reloj de alarma en alarma: 0 → 1 → 2 → 3.
+  etiquetas: ["temporizadores", "runtime"]
+
+- id: m18-wake-send-sync
+  titulo: "La firma de From"
+  mundo: 18-async
+  tema: async
+  dificultad: dificil
+  tipo: respuesta
+  enunciado: "Para que `Waker::from(arc)` acepte un `Arc<W>`, `W` debe implementar `Wake` y dos auto traits más (además de `'static`). ¿Cuáles? (Escríbelos separados por «+».)"
+  respuestas: ["Send + Sync", "Sync + Send"]
+  solucion: |
+    `impl<W: Wake + Send + Sync + 'static> From<Arc<W>> for Waker`. Un waker se puede clonar y usar desde cualquier hilo.
+  etiquetas: ["Wake", "Send", "Sync"]

@@ -1,0 +1,112 @@
+---
+title: "El operador ?"
+description: "Propaga errores hacia quien te llamó en un solo carácter, y entiende exactamente qué hace por dentro."
+sidebar:
+  order: 4
+duracion: 13
+desde: "1.13"
+requiere: ["10-errores/02-result"]
+tarjetas:
+  - p: "¿Qué hace `expr?` cuando `expr` es un `Result`?"
+    r: "Si es `Ok(v)`, la expresión vale `v` y se sigue. Si es `Err(e)`, la función termina en ese mismo punto devolviendo `Err(From::from(e))`."
+  - p: "¿Dónde se puede usar `?`?"
+    r: "Solo dentro de funciones (o closures) que devuelven `Result`, `Option` u otro tipo compatible. En una función que devuelve `()` da E0277."
+  - p: "¿Se puede usar `?` sobre un `Result` dentro de una función que devuelve `Option`?"
+    r: "No directamente (E0277). Hay que convertir: `resultado.ok()?` descarta el error y lo trata como `None`."
+  - p: "¿Qué hace `?` sobre un `Option`?"
+    r: "Si es `Some(v)`, vale `v`; si es `None`, la función devuelve `None` en ese punto."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a aprender el carácter más útil de Rust para errores: `?`. Es una de las preguntas más vistas sobre Rust en Stack Overflow; aquí verás qué hace, sin magia.
+
+## Predice
+
+<Predice
+  ej="m10/interrogacion-predice"
+  opciones={["Primera llamada: lee los dos y da `Ok(9)`. Segunda: lee el primero y da `Err(…)` sin llegar a leer el segundo", "Las dos llamadas imprimen los dos mensajes", "La segunda llamada entra en pánico", "La segunda devuelve `Ok(4)`"]}
+  correcta={0}
+  explicacion="`?` devuelve el error en cuanto aparece: la función sale en esa línea, así que `segundo leído` no se imprime en la segunda llamada."
+  porque={["Correcto.", "Tras el `?` que falla, el resto de la función no se ejecuta.", "`?` no es un pánico: devuelve el `Err` a quien llamó.", "Con un error no hay suma: se devuelve `Err`."]}
+/>
+
+## La idea
+
+Muchas funciones hacen varias cosas que pueden fallar, y ante cualquier fallo quieren lo mismo: **dejar de trabajar y pasar el error a quien las llamó**. Escrito con `match`, cada paso son cuatro líneas:
+
+```rust
+let n = match texto.parse::<i32>() {
+    Ok(valor) => valor,
+    Err(e) => return Err(e),
+};
+```
+
+El operador **`?`** (*question mark operator*) escribe eso por ti: `let n: i32 = texto.parse()?;`. Si el resultado es `Ok`, te da el valor; si es `Err`, **sale de la función** devolviendo ese error. Funciona igual con `Option`: `None` sale de la función con `None`.
+
+Una condición: la función que contiene el `?` tiene que devolver un tipo donde quepa ese error. `?` sobre un `Result` exige que la función devuelva un `Result`; sobre un `Option`, un `Option`. No se mezclan solos (se convierten con `.ok()` o `.ok_or(…)`, lección 5).
+
+## Pruébalo
+
+<Ejecutar ej="m10/interrogacion" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+La expansión exacta de `expr?` para `Result` es casi la de arriba, con un detalle importante:
+
+```rust
+match expr {
+    Ok(v) => v,
+    Err(e) => return Err(From::from(e)),
+}
+```
+
+Ese `From::from(e)` **convierte** el error al tipo de error de tu función. Si son el mismo tipo, no hace nada; si no, busca una conversión. Es lo que permite que una función que devuelve `Result<_, MiError>` use `?` sobre errores de tipos distintos (lección 7).
+
+Oficialmente, `?` funciona con cualquier tipo que implemente el trait `Try` (todavía inestable); en Rust estable, en la práctica, `Result`, `Option` y algunos tipos de la biblioteca como `ControlFlow` y `Poll`. El compilador lo traduce a `match` antes de generar código: un `?` cuesta lo mismo que el `match` que escribirías a mano, ni más ni menos. Existe desde Rust 1.13 (2016); antes se usaba una macro llamada `try!`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m10/interrogacion-en-unit"
+  explicacion="`main` devuelve `()`, y no hay forma de meter un error en `()` (E0277). El mensaje es muy claro y propone el arreglo: que `main` devuelva un `Result` (lo verás a fondo en la lección 9)."
+/>
+
+<NoCompila
+  ej="m10/interrogacion-mezcla"
+  explicacion="La función devuelve `Option`, pero `parse()?` produce un `Result`: un `Err` no cabe en un `Option` (E0277). rustc sugiere `.ok()?`, que convierte el `Result` en `Option` descartando el error."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m10/area-texto"
+  enunciado="Completa `area(ancho, alto)` usando `?`: convierte los dos textos a `u32` y devuelve su producto. Debe imprimir `Ok(42)` y `Err(ParseIntError { kind: InvalidDigit })`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta={'¿Qué hace exactamente `let n: i32 = s.parse()?;` si `s` es `"x"`?'}
+  opciones={["La función actual termina y devuelve `Err(From::from(e))`", "Entra en pánico", "`n` vale 0 y se sigue", "Salta a la siguiente línea con `n` sin valor"]}
+  correcta={0}
+  porque={["Correcto: retorno temprano con el error convertido.", "`?` nunca entra en pánico por sí mismo.", "No hay valor por defecto.", "Rust nunca deja una variable sin valor: sale de la función."]}
+/>
+
+<Pregunta
+  pregunta={'¿Cuál de estas funciones puede usar `?` sobre `"5".parse::<i32>()`?'}
+  opciones={["`fn f() -> Result<i32, std::num::ParseIntError>`", "`fn f() -> i32`", "`fn f()`", "`fn f() -> Option<i32>`"]}
+  correcta={0}
+  porque={["Correcto: el error de `parse` cabe en ese `Result`.", "`i32` no tiene sitio para un error.", "`()` tampoco (E0277).", "Haría falta `.ok()?` para pasar de `Result` a `Option`."]}
+/>
+
+<Pregunta
+  pregunta={'`fn g() -> Option<char> { let c = "".chars().next()?; Some(c) }`. ¿Qué devuelve `g()`?'}
+  opciones={["`None`", "Un pánico", "`Some(' ')`", "No compila"]}
+  correcta={0}
+  porque={["Correcto: `next()` da `None` y `?` sale con `None`.", "`?` sobre `None` no entra en pánico.", "No hay ningún carácter en la cadena vacía.", "Es válido: `?` sobre `Option` en una función que devuelve `Option`."]}
+/>

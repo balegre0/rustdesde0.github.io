@@ -1,0 +1,77 @@
+---
+title: "E0433: no se puede resolver la ruta"
+description: "Usas una ruta (algo::otra) o un tipo cuyo primer tramo no se encuentra; típico: olvidar un use."
+sidebar:
+  order: 38
+insignias: ["Nombres, módulos y visibilidad"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot find type `HashMap` in this scope ``
+
+## Qué significa
+
+Al escribir `HashMap::new()`, el compilador necesita saber qué es `HashMap`. Solo lo que está en el **preludio** (`Vec`, `String`, `Option`…) se conoce sin importarlo. `HashMap` vive en `std::collections` y hay que traerlo con `use`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0433" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0433]: cannot find type `HashMap` in this scope
+ --> E0433.rs:2:20
+  |
+2 |     let mut mapa = HashMap::new();
+  |                    ^^^^^^^ use of undeclared type `HashMap`
+  |
+help: consider importing this struct
+  |
+1 + use std::collections::HashMap;
+  |
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Usar `HashMap`, `HashSet`, `BTreeMap`, `Rc`, `RefCell`… sin `use`.
+- Escribir mal el nombre de un módulo o crate en una ruta.
+- Usar un crate externo que no está en `Cargo.toml`.
+
+## Cómo arreglarlo
+
+Añade el `use` que propone rustc (`use std::collections::HashMap;`) o escribe la ruta completa (`std::collections::HashMap::new()`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+use std::collections::HashMap;
+
+fn main() {
+    let mut mapa = HashMap::new();
+    mapa.insert("uno", 1);
+    println!("{mapa:?}");
+}
+```
+
+**Salida:**
+
+```text
+{"uno": 1}
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0433` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0432](/errores/e0432/): importación sin resolver
+- [E0425](/errores/e0425/): nombre no encontrado
+
+## Aprende esto en
+
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

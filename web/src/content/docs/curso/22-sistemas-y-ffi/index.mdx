@@ -1,0 +1,30 @@
+---
+title: "Mundo 22 · Sistemas y FFI"
+description: "Haz que tus programas hablen con el sistema operativo: argumentos, entrada y salida, archivos, procesos, red, bibliotecas externas y tu propio asignador de memoria."
+sidebar:
+  order: 0
+---
+
+Hasta ahora tus programas vivían en una burbuja: recibían datos por la entrada estándar y escribían por la salida. En este mundo rompes la burbuja. Vas a leer argumentos y variables de entorno, manejar archivos y rutas, lanzar otros programas, abrir un servidor de red, llamar a funciones de bibliotecas que no están escritas en Rust (y dejar que te llamen a ti), quitarte la biblioteca estándar de encima y, al final, **escribir tu propio asignador de memoria**.
+
+Un aviso práctico: el navegador es un sitio muy seguro precisamente porque **no** deja tocar el sistema. Tus programas se ejecutan ahí como WebAssembly con WASI, sin archivos, sin procesos y sin red. En cada lección verás qué pasa en el navegador (salida real) y qué tienes que probar en tu PC con `cargo run`.
+
+## Lo que vas a conseguir
+
+| # | Lección | Al terminar sabrás… |
+|---|---|---|
+| 1 | [Argumentos y entorno](/curso/22-sistemas-y-ffi/01-argumentos-y-entorno/) | leer `std::env::args` y variables de entorno sin pánicos |
+| 2 | [Leer la entrada](/curso/22-sistemas-y-ffi/02-leer-la-entrada/) | `stdin`, `BufRead`, `lines()` y por qué bloquear la entrada |
+| 3 | [Escribir la salida](/curso/22-sistemas-y-ffi/03-escribir-la-salida/) | `Write`, `BufWriter`, `stderr`, `main` que devuelve `Result` |
+| 4 | [Archivos y rutas](/curso/22-sistemas-y-ffi/04-archivos-y-rutas/) | `Path`, `PathBuf` y `std::fs` con sus errores |
+| 5 | [Procesos](/curso/22-sistemas-y-ffi/05-procesos/) | lanzar programas con `Command` y salir con `ExitCode` |
+| 6 | [Un servidor TCP](/curso/22-sistemas-y-ffi/06-un-servidor-tcp/) | `TcpListener`, `TcpStream` y un servidor de eco |
+| 7 | [Cadenas del sistema](/curso/22-sistemas-y-ffi/07-cadenas-del-sistema/) | `OsString`, `CString`, `CStr` y los literales `c"…"` |
+| 8 | [Llamar a una biblioteca externa](/curso/22-sistemas-y-ffi/08-llamar-a-una-biblioteca-externa/) | `unsafe extern "C"`, `repr(C)`, callbacks y bindgen |
+| 9 | [Que te llamen a ti](/curso/22-sistemas-y-ffi/09-que-te-llamen-a-ti/) | `extern "C" fn`, `no_mangle`, `staticlib`/`cdylib`, cbindgen y pánicos en la frontera |
+| 10 | [`no_std` y `alloc`](/curso/22-sistemas-y-ffi/10-no-std-y-alloc/) | las tres capas `core`, `alloc` y `std` |
+| 11 | [Tu propio asignador](/curso/22-sistemas-y-ffi/11-tu-propio-asignador/) | `GlobalAlloc`: un contador y un asignador bump |
+| 12 | [Windows y Unix](/curso/22-sistemas-y-ffi/12-windows-y-unix/) | `windows-sys`, `windows`, `nix` y `rustix` |
+| 13 | [Jefe: tu propio `grep`](/curso/22-sistemas-y-ffi/13-jefe/) | una herramienta de terminal completa |
+
+Requisitos: los mundos 0–21, sobre todo el 10 (errores), el 15 (punteros inteligentes) y el 20 (unsafe).

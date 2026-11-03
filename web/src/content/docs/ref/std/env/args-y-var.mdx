@@ -1,0 +1,43 @@
+---
+title: "args, var y vars"
+description: "Leer los argumentos del programa y las variables de entorno al ejecutar, con sus errores."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::env::{args, args_os, var, var_os, vars, current_dir}`
+
+## Sinopsis
+
+```rust
+pub fn args() -> Args;                       // iterador de String
+pub fn args_os() -> ArgsOs;                  // iterador de OsString
+pub fn var<K: AsRef<OsStr>>(clave: K) -> Result<String, VarError>;
+pub fn var_os<K: AsRef<OsStr>>(clave: K) -> Option<OsString>;
+pub fn vars() -> Vars;                       // todas las variables (clave, valor)
+pub fn current_dir() -> io::Result<PathBuf>;
+```
+
+## Qué hace
+
+- **`args()`**: los argumentos de la línea de órdenes. El primero suele ser la ruta del programa. Entra en pánico si alguno no es UTF-8 válido; `args_os()` no.
+- **`var(clave)`**: una variable de entorno, al ejecutar. Devuelve `Err(VarError::NotPresent)` si no existe y `Err(VarError::NotUnicode(_))` si no es UTF-8.
+- **`var_os`**: como `var`, pero sin exigir UTF-8.
+
+Para leer variables al **compilar**, está la macro [`env!`](/ref/std/macros/env/).
+
+`set_var` y `remove_var` existen, pero son `unsafe` desde la edición 2024: cambiar el entorno mientras otro hilo lo lee es comportamiento indefinido en algunos sistemas.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/env-args-var" />
+
+## Desde
+
+Rust 1.0. `set_var` como `unsafe`: edición 2024.
+
+## Ver también
+
+[`std::env`](/ref/std/env/) · [Argumentos y entorno](/curso/22-sistemas-y-ffi/01-argumentos-y-entorno/)

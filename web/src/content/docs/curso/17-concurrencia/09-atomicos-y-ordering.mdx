@@ -1,0 +1,95 @@
+---
+title: "Atómicos y Ordering"
+description: "Operaciones indivisibles sin candados (fetch_add, compare_exchange, try_update) y el modelo de memoria: Relaxed, Acquire/Release y SeqCst, con una prueba de tornasol."
+sidebar:
+  order: 9
+duracion: 16
+desde: "1.0"
+requiere: ["17-concurrencia/08-canales"]
+tarjetas:
+  - p: "¿Qué hace fetch_add en un AtomicU64?"
+    r: "Suma y devuelve el valor anterior en una sola operación indivisible: ningún otro hilo puede colarse entre la lectura y la escritura."
+  - p: "¿Qué hace compare_exchange(a, b, …)?"
+    r: "Si el valor actual es a, lo cambia por b y devuelve Ok(a); si no, no cambia nada y devuelve Err(valor_actual)."
+  - p: "¿Qué garantiza Ordering::Relaxed?"
+    r: "Solo que la operación es atómica. No ordena otros accesos a memoria respecto a ella."
+  - p: "¿Qué garantiza el par Release (al escribir) / Acquire (al leer)?"
+    r: "Que si el lector ve el valor escrito con Release, también ve todo lo que el escritor hizo antes de ese store."
+  - p: "¿Qué es una prueba de tornasol (litmus test)?"
+    r: "Un programa diminuto con varios hilos que se usa para preguntar qué resultados permite un modelo de memoria."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Un `Mutex` sirve para cualquier dato, pero para un simple contador o una bandera es mucho trabajo. Los **atómicos** son enteros y booleanos que se pueden modificar desde varios hilos sin candado. Y aquí aparece la pregunta más difícil de la concurrencia: ¿en qué **orden** ve cada hilo lo que hacen los demás?
+
+## Predice
+
+<Ejecutar ej="m17/atomicos-basico" />
+
+Antes de mirar la salida: ¿qué devuelve el segundo `compare_exchange(5, 99, …)`, si el valor ya es 10?
+
+## La idea
+
+Los tipos `AtomicBool`, `AtomicI32`, `AtomicU64`, `AtomicUsize`, `AtomicPtr<T>`… (en `std::sync::atomic`) se modifican a través de `&self`, así que se pueden compartir entre hilos sin `Mutex`. Sus operaciones son **indivisibles**: ningún otro hilo ve el estado a medias.
+
+| Operación | Qué hace |
+|---|---|
+| `load`, `store` | leer, escribir |
+| `fetch_add`, `fetch_sub`, `fetch_or`… | modificar y devolver el valor **anterior** |
+| `swap` | poner uno nuevo y devolver el viejo |
+| `compare_exchange(esperado, nuevo)` | «si vale `esperado`, ponlo a `nuevo`»: `Ok(viejo)` o `Err(actual)` |
+| `try_update(f)` | bucle de `compare_exchange` ya hecho: aplica `f` hasta conseguirlo (o hasta que `f` devuelva `None`) |
+
+Cada operación lleva un **`Ordering`**, que no habla de esa operación sino de **los demás accesos a memoria**:
+
+- **`Relaxed`**: la operación es atómica y nada más. Perfecto para contadores.
+- **`Release`** (al escribir) y **`Acquire`** (al leer): si un hilo lee con `Acquire` el valor que otro escribió con `Release`, ve **todo** lo que ese otro hizo **antes**. Es la forma de **publicar** un dato.
+- **`SeqCst`**: además, todas las operaciones `SeqCst` de todos los hilos forman un único orden global. Es lo más fácil de razonar y lo más caro.
+
+## Pruébalo
+
+Publicar un dato con una bandera (en el Playground, con hilos):
+
+<Ejecutar ej="m17/mensaje-acquire-release" />
+
+Si la bandera se leyera con `Relaxed`, el lector podría ver `LISTO == true` y, aun así, leer el `DATO` antiguo. En procesadores ARM ocurre de verdad.
+
+<Reto
+  ej="m17/reto-atomico"
+  enunciado="Completa `incrementar_hasta`: suma 1 a `c` solo si todavía no ha llegado a `tope`, de forma atómica (comprobar y sumar tiene que ser una sola operación). Devuelve si lo consiguió. Con tope 3 y 5 intentos debe imprimir `true true true false false` y `entradas vendidas: 3`."
+/>
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La prueba de tornasol «store buffering».** Dos hilos: el primero hace `x = 1; r1 = y;` y el segundo `y = 1; r2 = x;`. Si la memoria fuera una sola y cada paso ocurriera de uno en uno (**consistencia secuencial**), ¿podría salir `r1 = 0` y `r2 = 0`? El programa siguiente recorre todas las intercalaciones:
+
+<Ejecutar ej="m17/litmus-sb" />
+
+En ninguna sale `(0, 0)`: siempre hay alguna escritura antes de la segunda lectura. Pero **los procesadores reales sí producen `(0, 0)`**, incluidos los x86 de tu PC: cada núcleo guarda sus escrituras en un búfer (*store buffer*) antes de publicarlas, y puede leer de la memoria antes de que su propia escritura llegue a ella. Con `Relaxed`, e incluso con `Acquire`/`Release`, el modelo de Rust permite `(0, 0)`. Solo si las cuatro operaciones son `SeqCst` queda prohibido.
+
+**El modelo de memoria de Rust** es el de C++20: define qué resultados son posibles para cada combinación de órdenes. El compilador y el procesador pueden reordenar todo lo que el modelo permita. Para profundizar, el libro *Rust Atomics and Locks* de Mara Bos es la referencia en Rust.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="load y store por separado">
+
+❌ `if c.load(Relaxed) < tope { c.store(c.load(Relaxed) + 1, Relaxed); }`. Cada operación es atómica, pero **el conjunto no**: dos hilos pueden pasar la comprobación a la vez y vender la misma entrada dos veces.
+
+✅ Una sola operación que compruebe y modifique: `compare_exchange` en bucle o `try_update`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Varios hilos cuentan peticiones con `fetch_add(1, Relaxed)` y `main` lee el total después de hacer `join` de todos. ¿Es correcto?"
+  opciones={["Sí: ninguna suma se pierde, y el `join` ya sincroniza la lectura final", "No: con `Relaxed` se pierden sumas", "Solo con `SeqCst`", "Solo en x86"]}
+  correcta={0}
+  explicacion="`Relaxed` garantiza la atomicidad de cada suma. El orden respecto a otros datos no importa aquí."
+  porque={["", "Las operaciones atómicas nunca pierden actualizaciones.", "`SeqCst` no aporta nada en este caso, y cuesta más.", "Es correcto en cualquier procesador."]}
+/>

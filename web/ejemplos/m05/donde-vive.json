@@ -1,0 +1,1 @@
+{ "nota": "En el navegador (wasm32): usize = 4 bytes, ficha de String = 12, &str = 8. En un PC de 64 bits: usize = 8, String = 24, &str = 16. Las direcciones también cambian." }

@@ -1,0 +1,43 @@
+---
+title: "Mundo 12 · Módulos, crates y Cargo"
+description: "Organiza programas grandes: módulos y visibilidad, use, crates binarios y bibliotecas, dependencias y semver, features, perfiles, workspaces, build.rs, documentación y publicación."
+sidebar:
+  order: 0
+---
+
+Hasta ahora todo tu código cabía en un `main.rs`. Los programas de verdad tienen miles de líneas, repartidas en muchos archivos y apoyadas en bibliotecas de otros. Este mundo trata de **organizar**: quién puede ver qué, cómo se nombra cada cosa y cómo Cargo junta las piezas.
+
+Tres palabras que vas a usar todo el rato:
+
+| Palabra | Qué es |
+|---|---|
+| **Módulo** | Un espacio de nombres dentro de un crate (`mod cocina { … }`). Controla qué es visible desde fuera. |
+| **Crate** | La unidad que compila `rustc` de una vez: un ejecutable o una biblioteca. |
+| **Paquete** | Lo que crea `cargo new`: un `Cargo.toml` con uno o varios crates. |
+
+La idea de fondo es una sola: **todo es privado salvo que digas lo contrario**. Así puedes cambiar el interior de un módulo sin romper el código que lo usa, porque ese código solo ve lo que marcaste como `pub`.
+
+## Lecciones
+
+1. [Módulos](/curso/12-modulos-crates-y-cargo/01-modulos/): `mod`, rutas, `crate`, `self` y `super`.
+2. [Visibilidad](/curso/12-modulos-crates-y-cargo/02-visibilidad/): `pub`, campos privados y `pub(crate)` (E0603, E0616).
+3. [`use`](/curso/12-modulos-crates-y-cargo/03-use/): importar, renombrar y re-exportar (E0432).
+4. [Módulos en archivos](/curso/12-modulos-crates-y-cargo/04-modulos-en-archivos/): cómo se reparte el árbol en carpetas.
+5. [Crates binarios y bibliotecas](/curso/12-modulos-crates-y-cargo/05-binarios-y-bibliotecas/): `main.rs`, `lib.rs` y la raíz del crate.
+6. [Dependencias y semver](/curso/12-modulos-crates-y-cargo/06-dependencias-y-semver/): versiones, `Cargo.lock` y actualizaciones.
+7. [Features](/curso/12-modulos-crates-y-cargo/07-features/): partes opcionales de un crate.
+8. [Perfiles y `cfg`](/curso/12-modulos-crates-y-cargo/08-perfiles-y-cfg/): compilar distinto según el destino.
+9. [Workspaces](/curso/12-modulos-crates-y-cargo/09-workspaces/): varios paquetes que se compilan juntos.
+10. [`build.rs`](/curso/12-modulos-crates-y-cargo/10-build-rs/): código que se ejecuta antes de compilar.
+11. [Documentar con rustdoc](/curso/12-modulos-crates-y-cargo/11-documentar/): `///`, `//!` y ejemplos que se prueban solos.
+12. [Publicar en crates.io](/curso/12-modulos-crates-y-cargo/12-publicar/): versiones, licencias y compatibilidad.
+13. [Jefe: la biblioteca](/curso/12-modulos-crates-y-cargo/13-jefe/): organiza un programa en módulos.
+
+## Lo que el compilador vigila en este mundo
+
+| Error | Qué te impide hacer |
+|---|---|
+| [E0603](/errores/e0603/) | Usar un elemento privado desde fuera de su módulo |
+| [E0616](/errores/e0616/) | Leer o escribir un campo privado de un struct |
+| [E0432](/errores/e0432/) | Importar con `use` algo que no existe en esa ruta |
+| [E0433](/errores/e0433/) | Usar una ruta con un módulo o crate que no se encuentra |

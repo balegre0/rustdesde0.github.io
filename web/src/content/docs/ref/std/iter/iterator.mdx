@@ -1,0 +1,87 @@
+---
+title: "Iterator"
+description: "El trait de los iteradores: next() da el siguiente valor o None; todo lo demás viene gratis."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::iter::Iterator` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub trait Iterator {
+    type Item;
+
+    // Required method
+    fn next(&mut self) -> Option<Self::Item>;
+
+    // ... y 75 métodos provistos (con implementación por defecto)
+}
+```
+
+## Qué hace
+
+Para implementar `Iterator` solo hay que decir qué tipo produce (`type Item`) y escribir `next`, que devuelve `Some(valor)` mientras queden y `None` al acabar. A cambio, el tipo recibe automáticamente todos los métodos **provistos**: adaptadores y consumidores (ver [la lista](/ref/std/iter/adaptadores/)).
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`next`](#next) | Avanza y devuelve el siguiente valor, o `None` si ya no quedan. | 1.0 |
+| [`size_hint`](#size_hint) | Estimación de cuántos elementos quedan: `(mínimo, Option<máximo>)`. | 1.0 |
+| [`by_ref`](#by_ref) | Toma prestado el iterador para usar un adaptador sin consumirlo entero. | 1.0 |
+
+### `next`
+
+```rust
+fn next(&mut self) -> Option<Self::Item>
+```
+
+Avanza y devuelve el siguiente valor, o `None` si ya no quedan. Es el único método obligatorio.
+
+### `size_hint`
+
+```rust
+fn size_hint(&self) -> (usize, Option<usize>)
+```
+
+Estimación de cuántos elementos quedan: `(mínimo, Option<máximo>)`. Lo usa `collect` para reservar memoria.
+
+### `by_ref`
+
+```rust
+fn by_ref(&mut self) -> &mut Self
+where
+    Self: Sized,
+```
+
+Toma prestado el iterador para usar un adaptador sin consumirlo entero.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/iter-iterator" />
+
+**Salida:**
+
+```text
+Some(1) Some(2) Some(3) None
+1 2 3 
+9
+1 2 3 [11, 12, 13]
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [Adaptadores y consumidores](/ref/std/iter/adaptadores/)
+- [E0282 y E0283 (collect/sum sin tipo)](/errores/e0283/)
+
+## Aprende esto en
+
+- [Mundo 14 · Closures e iteradores](/curso/14-closures-e-iteradores/)

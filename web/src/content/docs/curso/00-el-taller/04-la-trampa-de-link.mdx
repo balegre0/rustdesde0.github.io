@@ -1,0 +1,125 @@
+---
+title: "La trampa de link.exe"
+description: "Rust compila tu código pero no puede crear el .exe: falta el enlazador de Microsoft. Cómo reconocer el error y arreglarlo con las Build Tools (o con la toolchain gnullvm)."
+sidebar:
+  order: 4
+duracion: 14
+requiere: ["00-el-taller/03-instalar-rust"]
+tarjetas:
+  - p: "¿Qué hace el enlazador (*linker*)?"
+    r: "Junta el código que generó el compilador con el de las bibliotecas del sistema y produce el ejecutable final (`.exe`)."
+  - p: "¿Qué significa ``linker `link.exe` not found``?"
+    r: "Que falta el enlazador de Microsoft. Tu código está bien; faltan las Build Tools de Visual Studio con «Desarrollo para el escritorio con C++»."
+  - p: "¿Por qué `cargo check` funciona y `cargo build` no, si falta el enlazador?"
+    r: "Porque `check` solo comprueba el código y no produce ejecutable: no llega a enlazar."
+  - p: "¿Qué instalas para arreglarlo (opción recomendada)?"
+    r: "Las Build Tools de Visual Studio con la carga de trabajo «Desarrollo para el escritorio con C++» (MSVC y el SDK de Windows)."
+  - p: "¿Qué error da el enlazador en Git Bash?"
+    r: "Uno absurdo (`link: missing operand…`), porque Git Bash tiene un `link.exe` propio que no es el enlazador. Compila desde PowerShell."
+---
+
+import { Pregunta, Trampa, BajoElCapo } from '~/components';
+
+Esta es la lección que casi ningún tutorial cuenta, y la razón número uno por la que la gente abandona Rust en Windows el primer día. Si te pasa, **tu código está bien**: es una pieza de la instalación que falta.
+
+## El síntoma
+
+Instalas Rust, creas un proyecto, ejecutas `cargo run` y aparece esto:
+
+```text
+error: linker `link.exe` not found
+  |
+  = note: program not found
+
+note: the msvc targets depend on the msvc linker but `link.exe` was not found
+
+note: please ensure that Visual Studio 2017 or later, or Build Tools for Visual
+      Studio were installed with the Visual C++ option.
+
+note: VS Code is a different product, and is not sufficient.
+```
+
+Lo raro: `cargo check` (que verás en la lección 7) funciona sin problema. Solo fallan las órdenes que producen un `.exe`: `cargo build`, `cargo run` y `cargo test`.
+
+## La idea
+
+Crear un programa tiene dos fases:
+
+1. **Compilar**: `rustc` traduce tu código a instrucciones de la máquina. Esto lo hace Rust solo.
+2. **Enlazar** (*link*): un programa aparte, el **enlazador** (*linker*), junta esas instrucciones con las bibliotecas del sistema (las que saben abrir archivos, escribir en pantalla…) y produce el `.exe`.
+
+En Windows con la toolchain `msvc`, el enlazador es `link.exe`, de Microsoft. **No viene con Rust** ni con Windows: viene con las **Build Tools de Visual Studio**. Si no las tienes, la fase 1 funciona y la 2 no. Por eso `cargo check`, que se queda en la fase 1, funciona.
+
+El último `note` es importante: **VS Code no sirve**. Es solo un editor, aunque se llame parecido.
+
+## La solución recomendada: las Build Tools
+
+Desde PowerShell:
+
+```powershell
+winget install --id Microsoft.VisualStudio.2022.BuildTools --override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+```
+
+O a mano, descargando **Build Tools for Visual Studio** desde la web de Microsoft (visualstudio.microsoft.com). En el instalador, marca la carga de trabajo **«Desarrollo para el escritorio con C++»** (*Desktop development with C++*). Asegúrate de que incluye:
+
+- **MSVC … x64/x86 build tools** (la versión más reciente);
+- **Windows 11 SDK**.
+
+Son varios gigas. Al terminar, **cierra y abre la terminal** y vuelve a ejecutar `cargo run`.
+
+Un consejo: añade también el **paquete de idioma inglés** de las Build Tools. Así los mensajes del enlazador (que son pocos, pero existen) saldrán en inglés y podrás buscarlos.
+
+## La alternativa: la toolchain gnullvm
+
+Si no puedes o no quieres instalar las Build Tools, Rust tiene otra plataforma para Windows que no usa las herramientas de Microsoft: `x86_64-pc-windows-gnullvm`, basada en LLVM.
+
+```powershell
+rustup toolchain install stable-x86_64-pc-windows-gnullvm
+rustup default stable-x86_64-pc-windows-gnullvm
+```
+
+Tiene dos inconvenientes: es una plataforma de **nivel 2** (se prueba menos que la de MSVC) y, según su documentación, para enlazar y para compilar bibliotecas escritas en C necesita las herramientas **llvm-mingw** instaladas aparte. Para este curso, la opción recomendada es la anterior.
+
+<Trampa titulo="El link.exe falso de Git Bash">
+
+Si compilas desde **Git Bash**, el error es todavía más confuso:
+
+```text
+  = note: link: missing operand after '\377\376'
+          Try 'link --help' for more information.
+note: `link.exe` returned an unexpected error
+```
+
+Git Bash trae su propio `link.exe`, una herramienta que crea enlaces entre archivos y no tiene nada que ver con el enlazador. Rust lo encuentra, lo ejecuta, y ese programa no entiende nada.
+
+✅ Compila siempre desde **PowerShell**. Si alguna vez ves `missing operand` al compilar, ya sabes qué ha pasado.
+
+</Trampa>
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Qué produce cada fase.** `rustc` genera *archivos objeto*: código máquina con «huecos» en los sitios donde se llama a funciones de otras bibliotecas. El enlazador rellena esos huecos con las direcciones correctas, añade el código de arranque del programa y escribe el formato de ejecutable de Windows (**PE**). Lo verás en detalle en el mundo 21.
+
+**Por qué Rust no trae su enlazador para Windows MSVC.** Rust sí incluye un enlazador propio (`rust-lld`), y lo usa para otras plataformas como WebAssembly o los microcontroladores. Pero los programas de Windows necesitan además las **bibliotecas** del sistema y del SDK de Windows, que Microsoft distribuye con sus propias condiciones. Por eso hay que instalarlas aparte.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`cargo check` funciona, pero `cargo run` dice ``linker `link.exe` not found``. ¿Dónde está el problema?"
+  opciones={["En tu código", "En la instalación: faltan las Build Tools de Visual Studio", "En VS Code", "En la versión de Rust"]}
+  correcta={1}
+  explicacion="Si `check` pasa, tu código compila. Lo que falla es la fase de enlazado, que necesita el enlazador de Microsoft."
+  porque={["Si el código tuviera errores, `cargo check` también fallaría.", "", "El editor no participa en el enlazado.", "Cualquier versión de Rust con la toolchain `msvc` necesita el enlazador."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué carga de trabajo marcas en el instalador de las Build Tools?"
+  opciones={["Desarrollo web", "Desarrollo para el escritorio con C++", "Desarrollo de juegos", "Ninguna: basta con instalar VS Code"]}
+  correcta={1}
+  explicacion="Incluye MSVC (con `link.exe`) y el SDK de Windows, que es lo que Rust necesita."
+  porque={["No incluye el enlazador de MSVC.", "", "No es la necesaria.", "El propio error lo dice: VS Code no basta."]}
+/>

@@ -1,0 +1,108 @@
+---
+title: "Operadores y precedencia"
+description: "Aritméticos, de comparación, lógicos con cortocircuito, de bits y compuestos: qué hace cada uno, en qué orden se evalúan y las trampas de la división, el resto y el signo menos."
+sidebar:
+  order: 8
+duracion: 13
+desde: "1.0"
+requiere: ["04-expresiones-y-control/07-primer-match"]
+tarjetas:
+  - p: "¿Cuánto vale -7 / 2 en Rust? ¿Y -7 % 3?"
+    r: "-3 y -1. La división entera trunca hacia cero, y el resto tiene el signo del dividendo. Para el resto siempre positivo: (-7i32).rem_euclid(3) = 2."
+  - p: "¿Qué hace el cortocircuito de && y ||?"
+    r: "&& no evalúa la derecha si la izquierda es false; || no la evalúa si la izquierda es true."
+  - p: "¿Cuánto vale -2i32.pow(2) y por qué?"
+    r: "-4: la llamada a método se aplica antes que el signo menos, así que es -(2.pow(2)). Para (-2)², escribe (-2i32).pow(2)."
+  - p: "¿Por qué no compila `12 < edad < 18`?"
+    r: "Porque en Rust los operadores de comparación no se pueden encadenar. Se escribe 12 < edad && edad < 18, o (13..18).contains(&edad)."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Llevas varios mundos usando `+`, `<` o `==`. Esta lección los junta todos, explica en qué orden se evalúan y señala las cuatro trampas que más errores provocan.
+
+## Predice
+
+<Predice
+  ej="m04/operadores-predice"
+  pregunta="¿Qué imprimen las tres últimas líneas?"
+  opciones={["`-3`, `-1` y `-4`", "`-4`, `2` y `4`", "`-3`, `2` y `4`", "`-4`, `-1` y `-4`"]}
+  correcta={0}
+  explicacion="La división entera trunca **hacia cero** (−3,5 → −3), el resto lleva el signo del dividendo (−7 = 2·(−3) − 1) y, en `-2i32.pow(2)`, el método se aplica antes que el signo menos: −(2²) = −4."
+  porque={["", "Eso sería redondear hacia abajo y usar el resto euclídeo (`div_euclid`, `rem_euclid`).", "El resto de `%` puede ser negativo, y el signo menos se aplica después de `pow`.", "La división no redondea hacia abajo, sino hacia cero."]}
+/>
+
+## La idea
+
+| Tipo | Operadores | Ejemplo |
+|---|---|---|
+| Aritméticos | `+ - * / %` | `7 / 2` → `3`, `7 % 2` → `1` |
+| Comparación | `== != < > <= >=` | `edad >= 18` → `bool` |
+| Lógicos | `&& \|\| !` | `a && !b` |
+| Bits | `& \| ^ ! << >>` | `a & 0b1111` |
+| Compuestos | `+= -= *= /= %= &= \|= ^= <<= >>=` | `x += 1` |
+
+**Precedencia** (de más a menos fuerte, los más usados):
+
+1. llamadas a métodos y campos: `x.pow(2)`, `p.x`
+2. unarios: `-x`, `!x`
+3. `as`
+4. `* / %`
+5. `+ -`
+6. `<< >>`
+7. `&`, después `^`, después `|`
+8. comparaciones (`== < …`), que **no se pueden encadenar**
+9. `&&`, después `||`
+10. asignaciones (`= +=`…), que van de derecha a izquierda
+
+Cuando dudes, **pon paréntesis**: no cuestan nada y el lector te lo agradecerá.
+
+**Cortocircuito.** `a && b` no evalúa `b` si `a` es `false`; `a || b` no la evalúa si `a` es `true`. Sirve para proteger operaciones peligrosas: `d != 0 && 10 / d > 2` nunca divide entre cero.
+
+## Pruébalo
+
+<Ejecutar ej="m04/cortocircuito" />
+
+En las líneas 1 y 3 no aparece el mensaje «miro si…»: la función ni se llamó.
+
+Los operadores de bits trabajan sobre cada bit por separado (los usarás con registros en el mundo 23):
+
+<Ejecutar ej="m04/operadores-bits" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Los operadores son traits.** `a + b` es azúcar de `std::ops::Add::add(a, b)`, `a == b` de `PartialEq::eq(&a, &b)` y `a < b` de `PartialOrd::lt(&a, &b)`. Por eso, en el mundo 13, podrás hacer que `+` funcione con tus propios tipos. Para los enteros, el compilador lo convierte en una sola instrucción del procesador.
+
+**División entre cero y desbordamiento.** `x / 0` con enteros siempre es un pánico, en los dos perfiles. `i32::MIN / -1` también (el resultado no cabe). Y `+`, `-` y `*` desbordan según el perfil, como viste en el mundo 03.
+
+**`&&` y `||` no son métodos.** A diferencia de los demás, no tienen trait: el cortocircuito es una regla del lenguaje. Por eso no se pueden sobrecargar.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Encadenar comparaciones">
+
+<NoCompila ej="m04/comparar-encadenado" explicacion="Rust rechaza `12 < edad < 18`: se evaluaría como `(12 < edad) < 18`, comparando un `bool` con un número. El compilador lo dice claramente y sugiere separarlo con `&&`. Otra forma: `(13..18).contains(&edad)`." />
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuánto vale `2 + 3 * 4 - 1`?"
+  opciones={["13", "19", "11", "15"]}
+  correcta={0}
+  explicacion="Primero `3 * 4 = 12`, luego de izquierda a derecha: `2 + 12 - 1 = 13`."
+  porque={["", "Eso sería `(2 + 3) * 4 - 1`.", "Revisa la multiplicación: 3 × 4 = 12.", "Eso sería `2 + 3 * (4 - 1)`."]}
+/>
+
+<Pregunta
+  pregunta="En `v.len() > 0 && v[0] == 7`, ¿qué pasa si `v` está vacío?"
+  opciones={["Devuelve `false` sin evaluar `v[0]`", "Pánico por índice fuera de rango", "No compila", "Devuelve `true`"]}
+  correcta={0}
+  explicacion="Por el cortocircuito, si la izquierda es `false`, `&&` ya no mira la derecha."
+  porque={["", "`v[0]` nunca llega a evaluarse.", "Compila sin problema.", "Con la izquierda `false`, el resultado es `false`."]}
+/>

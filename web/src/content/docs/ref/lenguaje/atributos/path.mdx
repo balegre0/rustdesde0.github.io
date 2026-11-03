@@ -1,0 +1,36 @@
+---
+title: "#[path]"
+description: "Indica de qué archivo cargar un módulo cuando no sigue la convención nombre.rs o nombre/mod.rs."
+sidebar:
+  order: 18
+insignias: ["Desde 1.0", "Módulos"]
+---
+
+`#[path = "…"]` cambia el archivo del que se carga un `mod`.
+
+## Sinopsis
+
+```rust
+#[path = "plataforma/windows.rs"]
+mod sistema;
+```
+
+## Qué hace
+
+Por defecto, `mod sistema;` busca `sistema.rs` o `sistema/mod.rs` (lección [Módulos en archivos](/curso/12-modulos-crates-y-cargo/04-modulos-en-archivos/)). Con `#[path]`, la ruta es la que escribas, relativa a la carpeta del archivo actual. Un uso típico es elegir la implementación por plataforma:
+
+```rust
+#[cfg_attr(windows, path = "sistema/windows.rs")]
+#[cfg_attr(unix, path = "sistema/unix.rs")]
+mod sistema;
+```
+
+Úsalo poco: rompe la correspondencia entre árbol de módulos y carpetas que todo el mundo espera, y confunde a las herramientas.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[`#[cfg]`](/ref/lenguaje/atributos/cfg/)

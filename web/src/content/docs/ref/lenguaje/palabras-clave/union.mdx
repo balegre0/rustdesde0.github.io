@@ -1,0 +1,63 @@
+---
+title: "union"
+description: "Palabra clave débil: define una unión, un tipo cuyos campos comparten la misma memoria."
+sidebar:
+  order: 74
+desde: "1.19"
+categoria: "debil"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Una `union` es como un `struct` en el que **todos los campos ocupan la misma memoria**: en cada momento solo uno tiene sentido, y el compilador no sabe cuál.
+
+## Sinopsis
+
+```text
+#[repr(C)]
+union Nombre { campo1: T1, campo2: T2 }
+Nombre { campo1: valor }        // se inicializa exactamente un campo
+unsafe { u.campo2 }             // leer un campo exige unsafe
+```
+
+## Qué hace
+
+- El tamaño es el del campo más grande (redondeado a la alineación).
+- **Escribir** un campo es seguro. **Leerlo** exige `unsafe`, porque los bytes pueden venir de otro campo: si no forman un valor válido del tipo leído (por ejemplo, un `bool` que no es 0 ni 1), es comportamiento indefinido.
+- Los campos deben ser `Copy`, referencias, `ManuallyDrop<T>` o tuplas/arrays de ellos: una union **nunca** ejecuta destructores de sus campos.
+- Se usa sobre todo para hablar con código externo que usa uniones y para reinterpretar bits (aunque para eso suelen bastar `f32::to_bits` y similares).
+- Hacer `match` sobre una union también es `unsafe`.
+
+`union` es palabra clave débil: solo es especial al **declarar** una unión. `let union = 1;` es válido.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-union" />
+
+Salida:
+
+```text
+0x3f800000
+4 bytes
+palabra débil
+```
+
+`0x3f800000` es la representación en bits del `f32` `1.0`.
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-union-error" />
+
+`error[E0133]: access to union field is unsafe and requires unsafe block`, con la nota de que el campo podría no estar inicializado.
+
+## Desde
+
+Rust 1.19.
+
+## Ver también
+
+- [`struct`](/ref/lenguaje/palabras-clave/struct/) · [`enum`](/ref/lenguaje/palabras-clave/enum/) · [`unsafe`](/ref/lenguaje/palabras-clave/unsafe/) · [Layout de tipos](/ref/lenguaje/layout-de-tipos/) · [Comportamiento indefinido](/ref/ub/)
+
+## Aprende esto en
+
+- [Mundo 20 · Unsafe y UB](/curso/20-unsafe-y-ub/)

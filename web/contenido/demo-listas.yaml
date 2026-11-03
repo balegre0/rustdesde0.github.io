@@ -1,0 +1,5 @@
+- id: demo-primeros-pasos
+  titulo: "Demo: primeros pasos"
+  descripcion: "Lista de demostración: tipos, préstamos y un problema."
+  preguntas: [demo-division, demo-u8-max, demo-mover-string, demo-dos-mut]
+  problemas: [demo-suma-pares]

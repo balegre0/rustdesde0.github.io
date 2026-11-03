@@ -1,0 +1,23 @@
+// Un árbol binario: cada nodo tiene un valor y, quizá, un hijo a cada lado.
+struct Arbol {
+    valor: i32,
+    izq: Option<Box<Arbol>>,
+    der: Option<Box<Arbol>>,
+}
+
+fn hoja(valor: i32) -> Option<Box<Arbol>> {
+    Some(Box::new(Arbol { valor, izq: None, der: None }))
+}
+
+// Suma todos los valores del árbol.
+fn suma(a: &Option<Box<Arbol>>) -> i32 {
+    match a {
+        Some(n) => n.valor + suma(&n.izq) + suma(&n.der),
+        None => 0,
+    }
+}
+
+fn main() {
+    let arbol = Some(Box::new(Arbol { valor: 1, izq: hoja(2), der: hoja(3) }));
+    println!("suma = {}", suma(&arbol));
+}

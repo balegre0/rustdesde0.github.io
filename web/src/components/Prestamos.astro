@@ -1,0 +1,97 @@
+---
+// <Prestamos lineas={[{ codigo: "let r = &v;", permisos: { v: "R-", r: "RO" }, nota?: "…" }, …]} titulo? />
+// CONTENIDO.md §4 — tabla de permisos línea a línea (notación de Aquascope):
+//   R = leer, W = escribir, O = propiedad (mover o liberar). Cada cadena lista los permisos que tiene
+//   el camino (variable, *r, v.campo…) DESPUÉS de ejecutar la línea; «-» es un hueco sin significado.
+//   Lo perdido respecto a la línea anterior se tacha; lo ganado se marca con «+».
+import { mdEnLinea } from './islas/md';
+
+type Linea = { codigo: string; permisos?: Record<string, string>; nota?: string };
+interface Props { lineas: Linea[]; titulo?: string }
+const { lineas, titulo } = Astro.props;
+if (!Array.isArray(lineas) || !lineas.length) throw new Error('<Prestamos>: "lineas" debe ser una lista con al menos una línea.');
+
+const PERMISOS = [
+  { l: 'R', nombre: 'leer', ayuda: 'R (read): se puede leer el valor.' },
+  { l: 'W', nombre: 'escribir', ayuda: 'W (write): se puede modificar el valor.' },
+  { l: 'O', nombre: 'propiedad', ayuda: 'O (own): se puede mover o liberar el valor; eres su dueño.' },
+] as const;
+for (const [i, l] of lineas.entries())
+  for (const [v, p] of Object.entries(l.permisos ?? {}))
+    if (!/^[RWO-]*$/.test(p)) throw new Error(`<Prestamos>: línea ${i + 1}, «${v}: "${p}"»: solo se admiten las letras R, W, O y «-».`);
+
+const caminos: string[] = [];
+for (const l of lineas) for (const k of Object.keys(l.permisos ?? {})) if (!caminos.includes(k)) caminos.push(k);
+
+type Celda = { estado: 'tiene' | 'gana' | 'pierde' | 'nada'; l: string; nombre: string; ayuda: string }[] | null;
+const filas = lineas.map((l, i) => {
+  const celdas: Celda[] = caminos.map((c) => {
+    const ahora = l.permisos?.[c];
+    const antes = i > 0 ? lineas[i - 1].permisos?.[c] : undefined;
+    if (ahora === undefined) return null;
+    return PERMISOS.map((p) => {
+      const tiene = ahora.includes(p.l);
+      const tenia = antes?.includes(p.l) ?? false;
+      return { ...p, estado: tiene ? (antes !== undefined && !tenia ? 'gana' : 'tiene') : tenia ? 'pierde' : 'nada' };
+    });
+  });
+  return { ...l, n: i + 1, celdas };
+});
+const describir = (c: string, cel: NonNullable<Celda>) => {
+  const g = (e: string) => cel.filter((x) => x.estado === e).map((x) => x.nombre);
+  const partes = [];
+  const t = [...g('tiene'), ...g('gana')];
+  partes.push(t.length ? `puede ${t.join(', ')}` : 'sin permisos');
+  if (g('gana').length) partes.push(`gana ${g('gana').join(', ')}`);
+  if (g('pierde').length) partes.push(`pierde ${g('pierde').join(', ')}`);
+  return `${c}: ${partes.join('; ')}`;
+};
+const id = 'pr-' + Math.abs([...JSON.stringify(lineas)].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7)).toString(36);
+---
+<figure class="rdc-prestamos not-content" aria-labelledby={`${id}-t`}>
+  <figcaption id={`${id}-t`} class="rdc-prestamos-titulo">
+    <span>{titulo ?? 'Permisos línea a línea'}</span>
+    <span class="rdc-prestamos-leyenda" aria-label="Leyenda">
+      {PERMISOS.map((p) => <abbr class="rdc-perm" data-p={p.l} title={p.ayuda}>{p.l}<span class="rdc-sr"> = {p.nombre}</span></abbr>)}
+      <span class="rdc-prestamos-ley-txt"><span class="rdc-perm" data-p="R" data-estado="pierde" aria-hidden="true">R</span> perdido · <span class="rdc-perm" data-p="R" data-estado="gana" aria-hidden="true">R</span> ganado</span>
+    </span>
+  </figcaption>
+  <div class="rdc-prestamos-scroll" tabindex="0" role="region" aria-labelledby={`${id}-t`}>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col" class="rdc-pr-num"><span class="rdc-sr">Línea</span>#</th>
+          <th scope="col">Código</th>
+          {caminos.map((c) => <th scope="col" class="rdc-pr-camino"><code>{c}</code></th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {filas.map((f) => (
+          <>
+            <tr>
+              <td class="rdc-pr-num">{f.n}</td>
+              <th scope="row" class="rdc-pr-codigo"><code>{f.codigo}</code></th>
+              {f.celdas.map((cel, j) => (
+                <td class="rdc-pr-celda">
+                  {cel ? (
+                    <span class="rdc-pr-perms" title={describir(caminos[j], cel)}>
+                      <span class="rdc-sr">{describir(caminos[j], cel)}</span>
+                      {cel.map((p) => p.estado === 'nada'
+                        ? <span class="rdc-perm" data-estado="nada" aria-hidden="true">·</span>
+                        : p.estado === 'pierde'
+                          ? <del class="rdc-perm" data-p={p.l} data-estado="pierde" aria-hidden="true" title={`Pierde ${p.nombre}`}>{p.l}</del>
+                          : <span class="rdc-perm" data-p={p.l} data-estado={p.estado} aria-hidden="true" title={p.ayuda}>{p.l}</span>)}
+                    </span>
+                  ) : <span class="rdc-pr-vacio" aria-label={`${caminos[j]}: no existe aquí`}>—</span>}
+                </td>
+              ))}
+            </tr>
+            {f.nota && (
+              <tr class="rdc-pr-nota-fila"><td></td><td colspan={caminos.length + 1} class="rdc-pr-nota" set:html={mdEnLinea(f.nota)} /></tr>
+            )}
+          </>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</figure>

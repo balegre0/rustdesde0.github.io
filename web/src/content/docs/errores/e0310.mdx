@@ -1,0 +1,76 @@
+---
+title: "E0310: el tipo genérico podría no vivir lo suficiente"
+description: "Guardas un valor de tipo genérico T en algo que exige 'static (como Box<dyn Trait>) sin pedir T: 'static."
+sidebar:
+  order: 30
+insignias: ["Lifetimes"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` the parameter type `T` may not live long enough ``
+
+## Qué significa
+
+`Box<dyn Display>` sin lifetime significa `Box<dyn Display + 'static>`: una caja que puede guardarse todo el tiempo que se quiera. Para meter un `T` dentro, `T` tiene que cumplir `'static`, es decir, no llevar préstamos que puedan caducar. Pero `T` es genérico: podría ser `&'a String` hacia una variable local.
+
+## Qué error evita
+
+Si se permitiera, alguien podría llamar a la función con una referencia a una variable local, guardar la caja y usarla después de que esa variable muriera: una referencia colgante dentro de la caja.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0310" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0310]: the parameter type `T` may not live long enough
+ --> E0310.rs:4:5
+  |
+3 | fn guardar<T: Display>(t: T) -> Box<dyn Display> {
+  |                                     ----------- this `dyn Trait` has an implicit `'static` lifetime bound
+4 |     Box::new(t)
+  |     ^^^^^^^^^^^
+  |     |
+  |     the parameter type `T` must be valid for the static lifetime...
+  |     ...so that the type `T` will meet its required lifetime bounds
+  |
+help: consider adding an explicit lifetime bound
+  |
+3 | fn guardar<T: Display + 'static>(t: T) -> Box<dyn Display> {
+  |                       +++++++++
+```
+
+## Causas típicas
+
+- Devolver `Box<dyn Trait>` construido a partir de un `T` genérico.
+- Pasar un `T` genérico a `std::thread::spawn` o a una tarea asíncrona, que exigen `'static`.
+
+## Cómo arreglarlo
+
+Si el valor tiene que poder guardarse indefinidamente, pide la cota: `T: Display + 'static`. `String`, `i32` y cualquier tipo sin referencias la cumplen. Si quieres aceptar también referencias, pon una lifetime a la caja: `fn guardar<'a, T: Display + 'a>(t: T) -> Box<dyn Display + 'a>`.
+
+```rust
+fn guardar<T: Display + 'static>(t: T) -> Box<dyn Display> {
+    Box::new(t)
+}
+```
+
+**Salida:**
+
+```text
+5
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0310` muestra la explicación oficial (en inglés), sin conexión.
+
+## Errores parecidos
+
+- [E0597](/errores/e0597/): un valor no vive lo suficiente
+- [E0515](/errores/e0515/): devolver una referencia a una variable local
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/08-static/)

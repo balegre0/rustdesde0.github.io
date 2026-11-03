@@ -1,0 +1,127 @@
+---
+title: "Qué es unsafe (y qué no)"
+description: "Conoce los cinco superpoderes que desbloquea unsafe y por qué el borrow checker sigue vigilando."
+sidebar:
+  order: 1
+duracion: 12
+desde: "1.0"
+requiere: ["15-punteros-inteligentes/01-box"]
+tarjetas:
+  - p: "¿Cuáles son los cinco superpoderes de unsafe?"
+    r: "Desreferenciar punteros crudos, llamar a funciones unsafe, acceder a un static mut, implementar un trait unsafe y leer campos de una union."
+  - p: "¿unsafe desactiva el borrow checker?"
+    r: "No. Tipos, préstamos y tiempos de vida se comprueban igual; solo se permiten las cinco operaciones extra."
+  - p: "¿Qué diferencia hay entre `unsafe fn` y `unsafe { }`?"
+    r: "`unsafe fn` declara un contrato que debe cumplir quien llama; `unsafe { }` es el sitio donde tú afirmas que lo cumples."
+  - p: "En la edición 2024, ¿el cuerpo de una unsafe fn es un bloque unsafe?"
+    r: "No: cada operación insegura necesita su propio `unsafe { }` (lint unsafe_op_in_unsafe_fn, aviso por defecto)."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a descubrir qué te deja hacer exactamente la palabra `unsafe`, y —más importante— todo lo que **no** cambia cuando la escribes.
+
+## Predice
+
+Este programa mete dos préstamos exclusivos dentro de un bloque `unsafe`. Mucha gente cree que `unsafe` «apaga las comprobaciones». ¿Por qué no compila entonces?
+
+<NoCompila ej="m20/unsafe-no-apaga" explicacion="El bloque unsafe solo permite la desreferencia de `p`. Las reglas de préstamos siguen intactas: `a` y `b` serían dos préstamos exclusivos vivos a la vez, y eso es E0499 dentro o fuera de unsafe." />
+
+## La idea
+
+Rust es, en realidad, **dos lenguajes en uno**. El Rust *seguro* (el que llevas 19 mundos escribiendo) tiene una garantía fuerte: ningún programa que compile puede tener comportamiento indefinido. El Rust *inseguro* (*unsafe Rust*) añade un puñado de operaciones que el compilador **no puede comprobar**, y por eso te pide que las marques.
+
+Esas operaciones extra son exactamente cinco, los «superpoderes»:
+
+1. **Desreferenciar un puntero crudo** (`*const T` o `*mut T`).
+2. **Llamar a una función `unsafe`** (incluidas las de otras bibliotecas a través de FFI).
+3. **Leer o escribir un `static mut`**.
+4. **Implementar un trait `unsafe`** (como `Send`, `Sync` o `GlobalAlloc`).
+5. **Leer un campo de una `union`**.
+
+Nada más. Dentro de `unsafe { }` los tipos se comprueban igual, los préstamos se comprueban igual y los tiempos de vida se comprueban igual. Lo único distinto es que esas cinco cosas pasan a estar permitidas… **bajo tu palabra**. `unsafe` no es un permiso, es una promesa: «yo garantizo que aquí se cumplen las condiciones que el compilador no ve». Si la promesa es falsa, el programa tiene UB.
+
+## Pruébalo
+
+Los cinco superpoderes, usados correctamente. Fíjate en que **crear** el puntero (`&raw const x`) no necesita `unsafe`: lo peligroso es **usarlo**.
+
+<Ejecutar ej="m20/superpoderes" />
+
+Cada bloque lleva un comentario `// SAFETY:` que explica por qué la promesa es cierta. No es decoración: es la prueba que otra persona (o tú dentro de un mes) leerá para auditar el código.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`unsafe` no existe en el binario.** No genera instrucciones, no activa ningún modo especial del procesador y no cuesta nada en tiempo de ejecución. Es información **para el compilador y para las personas**: delimita qué líneas dependen de una prueba manual.
+
+**Dos papeles de la misma palabra:**
+
+| Dónde | Qué significa | Quién tiene la obligación |
+|---|---|---|
+| `unsafe fn f()` | «llamarme exige condiciones» (se documentan en `# Safety`) | quien llama |
+| `unsafe trait T` | «implementarme exige condiciones» | quien implementa |
+| `unsafe { … }` | «aquí cumplo las condiciones» | quien escribe el bloque |
+| `unsafe impl T for X` | «este tipo cumple las condiciones del trait» | quien escribe el `impl` |
+
+Las dos primeras **declaran** una obligación; las dos últimas la **descargan**.
+
+**Edición 2024.** Antes, el cuerpo entero de una `unsafe fn` contaba como un bloque `unsafe`. Desde la edición 2024 ya no: dentro de una `unsafe fn` cada operación peligrosa necesita su propio `unsafe { }`. Así queda marcada la línea exacta que hay que auditar. Si lo olvidas, `rustc` 1.99.1 avisa (es un aviso, no un error):
+
+```text
+warning[E0133]: dereference of raw pointer is unsafe and requires unsafe block
+ --> unsafe-op-en-unsafe-fn.rs:3:5
+  |
+3 |     *p // operación insegura sin su propio `unsafe {}`
+  |     ^^ dereference of raw pointer
+  |
+note: an unsafe function restricts its caller, but its body is safe by default
+  = note: `#[warn(unsafe_op_in_unsafe_fn)]` (part of `#[warn(rust_2024_compatibility)]`) on by default
+```
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Lo envuelvo en unsafe y el error desaparece»">
+
+❌ Ante un error del borrow checker, rodear el código con `unsafe { }` **no arregla nada**: el error sigue ahí (lo viste en *Predice*). Y si consigues «engañarlo» con punteros crudos, has cambiado un error de compilación por comportamiento indefinido, que es muchísimo peor.
+
+✅ Un error de préstamos casi siempre tiene solución segura: reordenar, usar `split_at_mut`, `Cell`/`RefCell`, índices o `clone`. `unsafe` es para lo que el compilador **no puede expresar**, no para lo que te ha rechazado.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m20/leer-puntero" enunciado="Completa `leer`: dentro de la `unsafe fn` desreferencia `p` con su propio bloque `unsafe { }` (edición 2024) y un comentario `// SAFETY:`. Debe imprimir `leído: 20`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estas operaciones **no** necesita `unsafe`?"
+  opciones={["Desreferenciar un `*const i32`", "Crear un puntero crudo con `&raw const x`", "Llamar a una `unsafe fn`", "Leer un campo de una `union`"]}
+  correcta={1}
+  explicacion="Crear un puntero crudo es inofensivo: un puntero es solo un valor. El peligro está en usarlo para leer o escribir memoria."
+  porque={["Es el superpoder 1: el puntero podría ser nulo, colgante o desalineado.", "Correcto: crearlo nunca puede causar UB.", "Es el superpoder 2: la función tiene condiciones que solo tú puedes garantizar.", "Es el superpoder 5: el compilador no sabe qué campo se escribió por última vez."]}
+/>
+
+<Pregunta
+  pregunta="Escribes `unsafe { }` alrededor de un código y el programa funciona bien en tus pruebas. ¿Qué puedes concluir?"
+  opciones={["Que no tiene comportamiento indefinido", "Nada sobre el UB: un programa con UB puede «funcionar» en tus pruebas", "Que el compilador ha comprobado tus punteros", "Que es seguro siempre que no uses hilos"]}
+  correcta={1}
+  explicacion="El UB no es «un fallo visible»: es que el programa deja de tener significado. Puede funcionar hoy y romperse con otra optimización, otra máquina u otra versión del compilador."
+  porque={["Las pruebas solo ven lo que ocurrió en esa ejecución, no lo que el compilador tenía derecho a hacer.", "Correcto.", "Dentro de unsafe el compilador confía en ti para esas cinco operaciones; no las comprueba.", "El UB no tiene nada que ver con los hilos necesariamente: un puntero colgante en un solo hilo ya lo es."]}
+/>
+
+<Pregunta
+  pregunta="¿Quién debe cumplir las condiciones documentadas en la sección `# Safety` de una `unsafe fn`?"
+  opciones={["La propia función, en su cuerpo", "El compilador", "Quien la llama", "Nadie: es solo documentación"]}
+  correcta={2}
+  explicacion="Una `unsafe fn` traslada una obligación a quien la llama. Por eso la llamada va dentro de `unsafe { }`: ahí el llamante afirma que cumple el contrato."
+  porque={["La función puede confiar en esas condiciones precisamente porque no las comprueba.", "El compilador no puede comprobarlas; por eso la función es unsafe.", "Correcto.", "Es un contrato: si el llamante no lo cumple, hay UB."]}
+/>
+
+## Para saber más
+
+- *The Rustonomicon*, capítulo «Meet Safe and Unsafe» (en inglés).
+- En este curso: [la lista del comportamiento indefinido](../03-la-lista-de-ub/).

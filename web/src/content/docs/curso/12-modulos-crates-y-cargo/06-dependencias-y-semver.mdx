@@ -1,0 +1,93 @@
+---
+title: "Dependencias y semver"
+description: "Cómo elige Cargo la versión de cada dependencia: requisitos de versión, versionado semántico, Cargo.lock, cargo update y el árbol de dependencias."
+sidebar:
+  order: 6
+duracion: 12
+desde: "1.0"
+requiere: ["12-modulos-crates-y-cargo/05-binarios-y-bibliotecas"]
+tarjetas:
+  - p: "¿Qué significan los tres números de `1.4.2` en semver?"
+    r: "MAYOR (cambios incompatibles), MENOR (funciones nuevas compatibles) y PARCHE (arreglos compatibles)."
+  - p: "¿Qué versiones acepta `serde = \"1.0.200\"`?"
+    r: "Cualquier `1.x.y` mayor o igual que 1.0.200 y menor que 2.0.0: Cargo entiende un requisito «compatible» (`^`) por defecto."
+  - p: "¿Qué versiones acepta `rand = \"0.9\"`?"
+    r: "`>=0.9.0` y `<0.10.0`. Con mayor 0, el número menor hace de «mayor»: 0.9 → 0.10 se considera incompatible."
+  - p: "¿Qué hace `cargo update`?"
+    r: "Actualiza `Cargo.lock` a las versiones más nuevas que cumplan los requisitos de `Cargo.toml`."
+  - p: "¿Qué muestra `cargo tree`?"
+    r: "El árbol de dependencias: qué crates usa tu paquete y qué crates usan ellos."
+---
+
+import { Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Usar bibliotecas de otros es lo que hace productivo a Rust: hay más de 150 000 crates en crates.io. Pero las bibliotecas cambian. Esta lección explica cómo Cargo decide **qué versión** usar y cómo evita que una actualización te rompa el programa.
+
+## La idea
+
+Las versiones de los crates siguen el **versionado semántico** (*semver*): `MAYOR.MENOR.PARCHE`.
+
+| Sube… | Cuando… | Ejemplo |
+|---|---|---|
+| PARCHE | se arregla un fallo sin cambiar la interfaz | 1.4.2 → 1.4.3 |
+| MENOR | se añade algo, sin romper lo existente | 1.4.3 → 1.5.0 |
+| MAYOR | se rompe algo (se quita o cambia una función…) | 1.5.0 → 2.0.0 |
+
+En `Cargo.toml`, `serde = "1.0.200"` **no** significa «exactamente esa». Significa «cualquier versión **compatible**»: de 1.0.200 en adelante, sin llegar a 2.0.0. Es lo mismo que escribir `"^1.0.200"`.
+
+Con versiones `0.x`, la regla cambia: el número **menor** hace de mayor. `rand = "0.9"` acepta 0.9.x, pero **no** 0.10, porque antes de la 1.0 cualquier versión menor puede romper cosas.
+
+Otros requisitos posibles: `"=1.2.3"` (exacta), `">=1.2, <1.5"` (rango), `"1.2.*"`. Úsalos poco: el requisito por defecto es casi siempre el correcto.
+
+## Cargo.lock: la foto exacta
+
+La primera vez que compilas, Cargo elige la versión más nueva que cumple cada requisito y la apunta en **`Cargo.lock`**. A partir de ahí usa **siempre esa**, aunque salgan versiones nuevas. Así, tu programa compila hoy y dentro de un año exactamente igual.
+
+Para actualizar a propósito:
+
+```powershell
+cargo update             # todas las dependencias, dentro de los requisitos
+cargo update -p serde    # solo una
+cargo tree               # ver el árbol completo
+cargo tree -d            # ver dependencias duplicadas (dos versiones del mismo crate)
+```
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El resolutor.** Cargo tiene que elegir una versión para cada crate de **todo** el árbol de forma que se cumplan todos los requisitos a la vez. Si dos dependencias piden versiones **compatibles** del mismo crate (`^1.2` y `^1.5`), elige una sola (la 1.5.x más nueva). Si piden versiones **incompatibles** (`^1` y `^2`), compila las dos: son crates distintos para el compilador, y sus tipos no se pueden mezclar.
+
+**Desde Rust 1.84, el resolutor tiene en cuenta `rust-version`**: si un paquete declara la versión mínima de Rust que necesita, Cargo prefiere versiones de las dependencias que funcionen con ella. Es el comportamiento por defecto en los paquetes de la edición 2024.
+
+**Ojo con la seguridad.** Una dependencia es código de otro que se ejecuta con tus permisos (y algunos crates ejecutan código al compilar, como verás con `build.rs`). Antes de añadir una, mira cuántas descargas tiene, quién la mantiene y cuándo se actualizó. En el mundo 16 verás `cargo audit` y `cargo deny`, que avisan de vulnerabilidades conocidas.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Pensar que «1.0» significa la versión 1.0">
+
+❌ Escribir `serde = "1.0"` y creer que usarás la 1.0.0. Usarás la 1.x más nueva que haya cuando se cree el `Cargo.lock`.
+
+✅ Si un día una actualización «compatible» rompe algo (pasa poco, pero pasa), tu `Cargo.lock` te protege: vuelve a la versión anterior con `cargo update -p nombre --precise 1.0.199` y avisa al autor del crate.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta={"Tu `Cargo.toml` pide `regex = \"1.10\"`. ¿Qué versión podría acabar usando Cargo?"}
+  opciones={["Solo la 1.10.0", "La 1.11.2", "La 2.0.0", "La 1.9.5"]}
+  correcta={1}
+  explicacion="El requisito por defecto acepta cualquier 1.x.y que sea al menos 1.10.0. La 2.0.0 sería incompatible y la 1.9.5 es anterior al mínimo."
+  porque={["Eso sería `=1.10.0`.", "", "Cambiar el número mayor indica cambios incompatibles: no se acepta.", "Es menor que el mínimo, 1.10."]}
+/>
+
+<Pregunta
+  pregunta="¿Para qué sirve `Cargo.lock`?"
+  opciones={["Para bloquear el proyecto y que nadie lo edite", "Para guardar las versiones exactas elegidas y que la compilación sea reproducible", "Para listar las features", "Para guardar contraseñas de crates.io"]}
+  correcta={1}
+  explicacion="Con `Cargo.lock`, compilar hoy y dentro de un año usa las mismas versiones de todas las dependencias."
+  porque={["No bloquea nada.", "", "Las features se declaran en `Cargo.toml`.", "Nunca guarda credenciales."]}
+/>

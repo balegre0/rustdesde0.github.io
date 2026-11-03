@@ -1,0 +1,60 @@
+---
+title: "Self"
+description: "Palabra clave estricta: el tipo que se está implementando o definiendo."
+sidebar:
+  order: 29
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`Self` (en mayúscula) es un **alias del tipo actual**: el del bloque `impl`, el que implementa el `trait`, o el que se está definiendo.
+
+## Sinopsis
+
+```text
+impl Punto { fn nuevo() -> Self { Self { … } } }    // Self = Punto
+trait T { fn f(&self) -> Self; }                     // Self = quien implemente T
+Self::elemento_asociado
+```
+
+## Qué hace
+
+- En un `impl Tipo`, `Self` es `Tipo` con todos sus parámetros genéricos. Ahorra repetir el nombre y facilita renombrar.
+- Sirve como constructor: `Self { x, y }`, `Self(valor)` o `Self::Variante`.
+- En un `trait`, `Self` es un parámetro de tipo implícito: «el tipo que implementa este trait». Por eso un método que devuelve `Self` no puede llamarse a través de `dyn Trait`.
+- Dentro de un trait, `Self` no tiene `Sized` implícito; `where Self: Sized` lo exige.
+- `Self::Item` nombra un tipo asociado; `Self::CONSTANTE`, una constante asociada.
+
+`Self` no puede usarse como nombre, ni con `r#Self`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-self-tipo" />
+
+Salida:
+
+```text
+Punto { x: -3, y: 4 }
+x + y = 1
+42
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-self-tipo-error" />
+
+`error[E0411]: cannot find type Self in this scope`, con la explicación `Self is only available in impls, traits, and type definitions`.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+- [`self`](/ref/lenguaje/palabras-clave/self/) · [`impl`](/ref/lenguaje/palabras-clave/impl/) · [`trait`](/ref/lenguaje/palabras-clave/trait/) · [`dyn`](/ref/lenguaje/palabras-clave/dyn/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

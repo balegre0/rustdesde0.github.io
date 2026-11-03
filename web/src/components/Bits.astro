@@ -1,0 +1,7 @@
+---
+// <Bits objetivo={200} bits? /> — CONTENIDO.md §4
+import BitsIsla from './islas/Bits';
+interface Props { objetivo?: number; bits?: number }
+const { objetivo, bits = 8 } = Astro.props;
+---
+<BitsIsla client:visible objetivo={objetivo} bits={bits} />

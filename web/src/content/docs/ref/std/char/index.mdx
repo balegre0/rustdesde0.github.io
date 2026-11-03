@@ -1,0 +1,79 @@
+---
+title: "char"
+description: "El tipo char: un carácter Unicode de 4 bytes. Clasificar, convertir mayúsculas, dígitos y UTF-8."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `char (tipo primitivo) y std::char`
+
+## Para qué sirve
+
+Un `char` es un **valor escalar Unicode**: cualquier carácter de cualquier idioma, más los emojis. Siempre ocupa 4 bytes en memoria, aunque dentro de un `String` (UTF-8) ocupa de 1 a 4. Se escribe entre comillas simples: `'a'`, `'ñ'`, `'🦀'`.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| `is_alphabetic, is_numeric, is_whitespace...` | Clasificar caracteres. | 1.0 |
+| `to_uppercase, to_lowercase` | Cambiar mayúsculas (devuelven iteradores: puede haber más de un carácter). | 1.0 |
+| `to_digit, from_digit` | Entre dígitos y números en una base. | 1.0 |
+| `len_utf8` | Bytes que ocupa en UTF-8. | 1.0 |
+| `from_u32` | Crea un `char` desde su número (si es válido). | 1.52 |
+
+**Ficha detallada:** [char](/ref/std/char/char/)
+
+## Conceptos clave
+
+- **No todo número es un `char`**: los valores entre `0xD800` y `0xDFFF` y los mayores que `0x10FFFF` no lo son. Por eso `char::from_u32` devuelve `Option`. Un `char` inválido sería comportamiento indefinido.
+- **`as`**: `'a' as u32` da su número; de `u8` a `char` también vale con `as`; de `u32` a `char` no (usa `from_u32`).
+- **Una «letra» que ves puede ser varios `char`** (por ejemplo, una letra más un acento combinado).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/char-metodos" />
+
+**Salida:**
+
+```text
+'a': alfa true num false esp false mayús false bytes 1 U+0061
+'Ñ': alfa true num false esp false mayús true bytes 2 U+00D1
+'7': alfa false num true esp false mayús false bytes 1 U+0037
+' ': alfa false num false esp true mayús false bytes 1 U+0020
+'é': alfa true num false esp false mayús false bytes 2 U+00E9
+'🦀': alfa false num false esp false mayús false bytes 4 U+1F980
+Ñ é
+Some(7) Some(15)
+Some('9') Some('A')
+97 c
+true
+4
+```
+
+## Sinopsis
+
+```rust
+pub fn is_alphabetic(self) -> bool
+
+pub fn to_uppercase(self) -> ToUppercase
+
+pub const fn to_digit(self, radix: u32) -> Option<u32>
+
+pub const fn from_digit(num: u32, radix: u32) -> Option<char>
+
+pub const fn from_u32(i: u32) -> Option<char>
+
+pub const fn len_utf8(self) -> usize
+```
+
+## Ver también
+
+- [str](/ref/std/str/str/)
+- [String](/ref/std/string/string/)
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

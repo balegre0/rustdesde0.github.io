@@ -1,0 +1,137 @@
+---
+title: "Ejecutores y Tokio"
+description: "Construir un ejecutor con cola de tareas y entender cómo lo hacen Tokio, smol y Embassy."
+sidebar:
+  order: 8
+duracion: 14
+desde: "1.39"
+requiere: ["18-async/04-ejecutor", "17-concurrencia/04-send-y-sync"]
+tarjetas:
+  - p: "¿Qué hace la cola de un ejecutor?"
+    r: "Guarda qué tareas están listas para avanzar; el waker de cada tarea la vuelve a meter en la cola."
+  - p: "¿Qué exige tokio::spawn al future que lanzas?"
+    r: "Que sea Send + 'static, porque puede ejecutarse en otro hilo y vivir más que quien lo lanzó."
+  - p: "¿Qué es el reactor de un runtime?"
+    r: "La parte que pregunta al sistema operativo qué E/S está lista (epoll, kqueue, IOCP) y llama a los wakers correspondientes."
+  - p: "¿Qué pasó con async-std?"
+    r: "Se descontinuó (última versión 1.13.1, febrero de 2025); sus mantenedores recomiendan smol."
+  - p: "¿Qué hacer con un cálculo largo o una llamada bloqueante dentro de Tokio?"
+    r: "Sacarlo del hilo del ejecutor con tokio::task::spawn_blocking (o un hilo propio)."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa, Historia } from '~/components';
+
+Vas a pasar de ejecutar **un** future a ejecutar **muchas tareas** intercaladas, y a reconocer esas mismas piezas dentro de Tokio.
+
+## Predice
+
+<Pregunta
+  pregunta="Dos tareas: «ana» da 2 pasos y «leo» 3. Después de cada paso, cada una cede el turno (`Pending` + `wake`). El ejecutor saca tareas de una cola por orden de llegada. ¿Quién imprime «fin» primero?"
+  opciones={["leo", "ana", "las dos a la vez", "depende del azar"]}
+  correcta={1}
+  explicacion="Se turnan: ana1, leo1, ana2, leo2, ana fin, leo3, leo fin. Con una cola por orden de llegada y un solo hilo, el resultado es determinista."
+  porque={["leo tiene un paso más.", "Correcto.", "Con un hilo, nada pasa «a la vez».", "Con un solo hilo y una cola FIFO no hay azar."]}
+/>
+
+## La idea
+
+Un **ejecutor** (*executor*) de verdad gestiona muchas **tareas** (*tasks*): futures de primer nivel, cada uno con su propio waker. Su corazón es una **cola de tareas listas**:
+
+1. Saca una tarea de la cola y la sondea.
+2. Si devuelve `Ready`, la tarea ha terminado: se suelta.
+3. Si devuelve `Pending`, no se vuelve a meter en la cola **hasta que su waker la despierte**. El waker de cada tarea sabe su número y, al llamarse, lo empuja a la cola.
+
+Cuando la cola se queda vacía pero aún hay tareas esperando E/S, entra en juego la otra mitad de un runtime: el **reactor**. Pregunta al sistema operativo «¿qué sockets o temporizadores tienen novedades?» (con `epoll` en Linux, `kqueue` en macOS y BSD, IOCP en Windows; en Tokio, a través del crate `mio`), duerme el hilo hasta que haya algo, y llama a los wakers de las tareas afectadas.
+
+## Pruébalo
+
+<Ejecutar ej="m18/ejecutor-cola" />
+
+Es tu `block_on` de la lección 4 con dos cambios: varias tareas en un `Vec` de `Pin<Box<dyn Future>>` y una cola `VecDeque` que alimentan los wakers. Usamos `Arc<Mutex<...>>` porque `Wake` exige `Send + Sync`; en el navegador hay un solo hilo, pero el tipo tiene que ser correcto igualmente.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Tokio** es el runtime más usado del ecosistema (la línea 1.x es estable desde 2020; la última versión publicada es la 1.54.1, del 21 de octubre de 2026). Ofrece dos planificadores:
+
+| Planificador | Hilos | Qué exige a las tareas |
+|---|---|---|
+| `current_thread` | uno: el que llama a `block_on` | basta `'static` (con `LocalSet`, ni `Send`) |
+| `multi_thread` (por defecto con `#[tokio::main]`) | uno por núcleo, por defecto | `Send + 'static` |
+
+El multihilo usa **robo de trabajo** (*work stealing*): cada hilo tiene su propia cola local y, cuando se queda sin tareas, roba la mitad de la cola de otro. Así se reparte la carga sin un cerrojo central.
+
+Un programa Tokio típico tiene esta forma (es un **concepto**: necesita el crate `tokio`, que no está disponible en el navegador; pruébalo en el Playground o en tu proyecto con `cargo add tokio --features full`):
+
+```rust
+// Concepto: requiere el crate tokio (Playground o tu proyecto)
+use tokio::time::{sleep, Duration};
+
+#[tokio::main] // crea el runtime y hace block_on de este main
+async fn main() {
+    let tarea = tokio::spawn(async {      // lanza una tarea: Send + 'static
+        sleep(Duration::from_millis(50)).await;
+        21 * 2
+    });
+    let r = tarea.await.unwrap();          // JoinHandle es un future
+    println!("{r}");
+}
+```
+
+`#[tokio::main]` es una macro (mundo 19) que reescribe tu `main` async en un `main` normal que construye el runtime y llama a `block_on`.
+
+**Por qué `Send`.** En el planificador multihilo, una tarea puede sondearse en un hilo, suspenderse y continuar en otro. Todo lo que viaja dentro del future (las variables vivas a través de un `.await`) tiene que poder cambiar de hilo. El compilador lo comprueba con el trait `Send` del mundo 17, y su mensaje señala la variable culpable:
+
+<NoCompila ej="m18/rc-await" explicacion="`contador` es un `Rc`, que no es `Send`, y está vivo a través del `.await`, así que el future entero deja de ser `Send`. Fíjate en que este error no tiene código E0xxx: es un diagnóstico especial para futures. El arreglo usa `Arc`. Otra opción: soltar el `Rc` antes del `.await` (encerrándolo en un bloque)." />
+
+**El resto del ecosistema:**
+- **smol**: runtime pequeño y modular (`async-executor`, `async-io`, `futures-lite`). Es el que recomiendan los antiguos mantenedores de **async-std**, que quedó **descontinuado** con su versión 1.13.1 (21 de febrero de 2025).
+- **Embassy**: async para microcontroladores, sin sistema operativo y sin asignador de memoria; los futures viven en memoria estática y el reactor son las interrupciones del hardware. Funciona en Rust estable.
+- Los crates `futures` y `futures-lite` aportan utilidades independientes del runtime (`join!`, `select!`, `Stream`).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Bloquear el hilo del ejecutor">
+
+❌ Dentro de una tarea async, hacer algo que **bloquea** sin `.await`: `std::thread::sleep`, leer un archivo grande con `std::fs`, un bucle de cálculo de varios segundos.
+
+```rust
+async fn mala() {
+    std::thread::sleep(std::time::Duration::from_secs(2)); // el hilo entero se para
+}
+```
+
+Mientras tanto, ese hilo no sondea ninguna otra tarea: en `current_thread`, **todo** el programa se congela.
+
+✅ Usa las versiones async (`tokio::time::sleep(...).await`, `tokio::fs`) y saca el trabajo bloqueante o pesado con `tokio::task::spawn_blocking(|| ...)`, que lo ejecuta en un grupo de hilos aparte.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m18/reto-turnos" enunciado="Completa `por_turnos`: un ejecutor sin wakers propios que saca una tarea de la cola, la sondea y, si sigue `Pending`, la vuelve a poner al final. Debe imprimir a1 b1 c1 b2 c2 b3 (una por línea)." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una tarea devuelve `Pending` y su waker nunca se llama. En un ejecutor con cola, ¿qué le pasa?"
+  opciones={["El ejecutor la sondea igualmente en la siguiente vuelta", "Se queda fuera de la cola para siempre (y su memoria sigue reservada)", "Se cancela automáticamente", "El programa entra en pánico"]}
+  correcta={1}
+  explicacion="Solo vuelven a la cola las tareas despertadas. Una tarea que nadie despierta es una tarea perdida: no avanza y no se libera."
+  porque={["Eso solo pasa en ejecutores de espera activa, como el del reto.", "Correcto.", "Cancelar es soltar el future; nadie lo hace por ti.", "Nadie detecta que esté perdida."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `tokio::spawn` exige `'static`?"
+  opciones={["Por rendimiento", "Porque la tarea puede seguir viva después de que termine la función que la lanzó, así que no puede tomar prestadas sus variables locales", "Porque Tokio solo admite constantes", "No lo exige"]}
+  correcta={1}
+  explicacion="Es el mismo motivo que en `thread::spawn` (mundo 17). Por eso se usa `async move` y `Arc` para compartir datos con las tareas."
+  porque={["Es una cuestión de seguridad de memoria.", "Correcto.", "`'static` no significa «constante».", "Sí lo exige."]}
+/>
+
+<Historia titulo="Un runtime que no viene de serie">
+Rust decidió no incluir un runtime en la biblioteca estándar para que async sirviera igual en un servidor con 64 núcleos que en un microcontrolador de 16 KiB de RAM. El precio es que tienes que elegir uno, y que durante años convivieron varios incompatibles entre sí. Hoy el panorama está más claro: Tokio domina en servidores, smol cubre lo ligero y Embassy el embebido.
+</Historia>

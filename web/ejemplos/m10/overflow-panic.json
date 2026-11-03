@@ -1,0 +1,1 @@
+{ "perfiles": ["debug", "release"], "nota": "En debug, el desbordamiento es un pánico; en release, el número da la vuelta." }

@@ -1,0 +1,87 @@
+---
+title: "Windows y Unix"
+description: "Hablar directamente con el sistema operativo: los crates windows-sys y windows en Windows, libc, nix y rustix en Unix, y cómo escribir código que compile en los dos."
+sidebar:
+  order: 12
+duracion: 10
+desde: "1.0"
+requiere: ["22-sistemas-y-ffi/11-tu-propio-asignador"]
+tarjetas:
+  - p: "¿Qué crates ofrece Microsoft para usar la API de Windows desde Rust?"
+    r: "windows-sys (declaraciones crudas, todo unsafe, compila rápido) y windows (envoltorios más cómodos, COM, Result)."
+  - p: "¿Qué diferencia hay entre libc, nix y rustix?"
+    r: "libc: declaraciones crudas de la biblioteca del sistema. nix: envoltorios seguros sobre libc. rustix: envoltorios seguros que en Linux pueden hacer las llamadas al sistema directamente, sin libc."
+  - p: "¿Cómo se escribe código distinto para Windows y para Unix?"
+    r: "Con #[cfg(windows)] y #[cfg(unix)] (o target_os), normalmente en módulos separados con la misma interfaz."
+---
+
+import { Pregunta, BajoElCapo } from '~/components';
+
+La biblioteca estándar cubre lo común a todos los sistemas: archivos, procesos, red, hilos. Para lo específico de cada uno (el registro de Windows, las señales de Unix, los permisos de archivos…) hay que hablar directamente con el sistema operativo.
+
+## Windows
+
+Microsoft publica dos crates oficiales, generados a partir de los metadatos de toda la API de Windows:
+
+- **`windows-sys`**: declaraciones crudas, todas `unsafe`. Compila muy rápido.
+- **`windows`**: además, envoltorios más cómodos: convierte los códigos de error en `Result`, maneja las cadenas y las interfaces COM.
+
+```rust
+// Cargo.toml: windows = { version = "…", features = ["Win32_System_SystemInformation"] }
+use windows::Win32::System::SystemInformation::GetTickCount64;
+
+fn main() {
+    let ms = unsafe { GetTickCount64() };
+    println!("encendido desde hace {} s", ms / 1000);
+}
+```
+
+Cada parte de la API va detrás de una **feature** (el árbol es enorme), así que solo compilas lo que usas.
+
+## Unix (Linux, macOS, BSD)
+
+- **`libc`**: las declaraciones crudas de la biblioteca de C del sistema. Es lo que usa `std` por dentro.
+- **`nix`**: envoltorios seguros y con tipos de Rust sobre `libc`: `nix::unistd::getpid()`, señales, `fork`…
+- **`rustix`**: envoltorios seguros que, en Linux, pueden hacer las **llamadas al sistema directamente**, sin pasar por la biblioteca de C. Lo usan muchas herramientas modernas.
+
+Además, `std` tiene módulos con extensiones por plataforma: `std::os::unix::fs::PermissionsExt` (permisos `0o755`) o `std::os::windows::ffi::OsStrExt` (UTF-16).
+
+## Código para los dos
+
+```rust
+#[cfg(windows)]
+mod sistema {
+    pub fn nombre() -> &'static str { "Windows" }
+}
+
+#[cfg(unix)]
+mod sistema {
+    pub fn nombre() -> &'static str { "Unix" }
+}
+
+fn main() {
+    println!("{}", sistema::nombre());
+}
+```
+
+El mismo módulo, con la misma interfaz, en dos versiones. Solo se compila la de la plataforma de destino ([`#[cfg]`](/ref/lenguaje/atributos/cfg/)).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Cómo se generan.** Los crates de Windows se generan con `windows-bindgen` a partir de los archivos de metadatos (`.winmd`) que Microsoft publica para toda su API. Por eso cubren miles de funciones y siempre están al día.
+
+**Llamadas al sistema sin libc.** En Linux, la interfaz estable es la de las llamadas al sistema (`syscall`), así que se puede prescindir de la biblioteca de C. En macOS y Windows no: la interfaz estable es la biblioteca del sistema, y llamar directamente al núcleo puede romperse en cualquier actualización.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Necesitas cambiar los permisos de un archivo a `0o755` en Linux. ¿Qué es lo más sencillo?"
+  opciones={["`std::os::unix::fs::PermissionsExt` con `Permissions::from_mode(0o755)`", "Llamar a la API de Windows", "No se puede desde Rust", "Lanzar `chmod` con `Command` siempre"]}
+  correcta={0}
+  explicacion="La biblioteca estándar tiene extensiones por plataforma para lo más habitual."
+  porque={["", "Es Linux, no Windows.", "Sí se puede.", "Funciona, pero lanzar un proceso es mucho más caro y frágil."]}
+/>

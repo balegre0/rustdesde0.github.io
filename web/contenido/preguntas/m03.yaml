@@ -1,0 +1,1260 @@
+# Banco de preguntas del mundo 03 (CONTENIDO.md §7.1). Todo verificado con rustc 1.99.1, ed. 2024,
+# en wasm32-wasip1 (usize = 4 bytes) salvo que se diga otra cosa.
+
+# ─── variables ───────────────────────────────────────────────────────────────
+
+- id: m03-variable-sin-valor
+  titulo: "Declarada, pero vacía"
+  mundo: 03-valores-y-tipos
+  tema: variables
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/sin-valor
+  opciones:
+    - "`x` se lee sin haber recibido nunca un valor (E0381)"
+    - "Falta escribir `mut` en `let x`"
+    - "Una variable con anotación de tipo tiene que llevar `const`"
+    - "`println!` no puede imprimir un `i32`"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0381]: used binding x isn't initialized` y propone `let x: i32 = 42;`.
+    Rust sigue todos los caminos del programa y no deja **leer** una variable a la que nunca se le ha dado valor: sería leer memoria sin inicializar.
+    - `mut` sirve para cambiar un valor que ya existe; aquí el problema es que no hay ninguno.
+    - Declarar con tipo y sin valor es válido con `let`, siempre que se le dé valor antes de leerla.
+    - `println!` imprime enteros sin problema.
+  etiquetas: ["E0381", "let"]
+
+- id: m03-asignar-dos-veces
+  titulo: "Diez puntos para siempre"
+  mundo: 03-valores-y-tipos
+  tema: variables
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/inmutable
+  opciones:
+    - "`puntos` es inmutable: le falta `mut` para poder asignarle 20 (E0384)"
+    - "No se puede imprimir una variable dos veces"
+    - "20 no cabe en el tipo de `puntos`"
+    - "Hay que repetir `let` para cambiar el valor, y eso está prohibido"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0384]: cannot assign twice to immutable variable puntos` y sugiere `let mut puntos = 10;`.
+    En Rust las variables son inmutables por defecto.
+    - Imprimir una variable las veces que quieras está permitido.
+    - `puntos` es `i32`: 20 cabe de sobra.
+    - Repetir `let` sí está permitido (es el sombreado) y sería otra solución válida, pero no es lo que hace este código.
+  etiquetas: ["E0384", "mut"]
+
+- id: m03-mut-no-cambia-tipo
+  titulo: "mut no cambia el tipo"
+  mundo: 03-valores-y-tipos
+  tema: variables
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/mut-tipo
+  opciones:
+    - "`espacios` es un `&str` para siempre; `len()` devuelve un `usize` y no cabe en ella (E0308)"
+    - "`len()` no existe para textos"
+    - "Falta `mut` en la declaración"
+    - "No se puede llamar a un método de una variable al asignarle algo"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0308]: mismatched types … expected &str, found usize`, y señala el valor inicial como la razón.
+    `mut` permite cambiar el **valor**, nunca el **tipo**. La solución es sombrear: `let espacios = espacios.len();`.
+    - `len()` sí existe: devuelve el número de bytes.
+    - `mut` ya está escrito.
+    - Usar el valor viejo para calcular el nuevo es válido (`x = x + 1`).
+  etiquetas: ["E0308", "mut", "shadowing"]
+
+- id: m03-sombra-en-bloque
+  titulo: "La sombra no sale del bloque"
+  mundo: 03-valores-y-tipos
+  tema: variables
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la segunda línea?"
+  ej: m03/sombra
+  opciones:
+    - "`fuera: 10`"
+    - "`fuera: 110`"
+    - "`fuera: 5`"
+    - "No compila: `x` se declara tres veces"
+  correcta: 0
+  solucion: |
+    Salida real: `dentro: 110` y `fuera: 10`.
+    La segunda `let x = x * 2` crea una `x` que vale 10. La `x` del bloque (110) es otra sombra que muere en la `}`; fuera vuelve a verse la que vale 10.
+    - 110 sería creer que la sombra del bloque modifica la de fuera.
+    - 5 olvida la segunda `let`, que ocurre antes del bloque.
+    - Declarar el mismo nombre con `let` varias veces es válido: es el sombreado.
+  etiquetas: ["shadowing", "bloques"]
+
+- id: m03-sombra-y-mut
+  titulo: "Una copia que crece"
+  mundo: 03-valores-y-tipos
+  tema: variables
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m03/p-sombra-mut
+  opciones:
+    - "`22 11`"
+    - "`22 1`"
+    - "`2 11`"
+    - "`22 22`"
+  correcta: 0
+  solucion: |
+    Salida real: `22 11`.
+    `y` empieza con una copia de `x` (1) y pasa a 11 con `+= 10`. La última línea crea **otra** `x` que vale 11 × 2 = 22. `y` no se toca.
+    - `22 1` supone que `y += 10` no cambia nada; `y` es `mut`, así que sí cambia.
+    - `2 11` usa la `x` vieja (1 × 2); pero el cálculo usa `y`, no `x`.
+    - `22 22` cree que la nueva `x` y `y` son la misma variable.
+  etiquetas: ["shadowing", "mut"]
+
+- id: m03-mut-o-sombra
+  titulo: "¿Qué solo hace el sombreado?"
+  mundo: 03-valores-y-tipos
+  tema: variables
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál de estas cosas **solo** se consigue con sombreado (`let` con el mismo nombre) y no con `let mut`?"
+  opciones:
+    - "Que el nombre pase a tener un valor de otro tipo"
+    - "Cambiar el valor"
+    - "Sumarle 1 al valor actual"
+    - "Usar el valor anterior para calcular el nuevo"
+  correcta: 0
+  solucion: |
+    El tipo de una variable es fijo desde que se crea. El sombreado crea una variable **nueva**, que puede ser de otro tipo (`let x = x.len();`).
+    - Cambiar el valor es justo lo que hace `mut`.
+    - `x += 1` funciona con `let mut`.
+    - `x = x * 2` también usa el valor anterior y es válido con `mut`.
+  etiquetas: ["shadowing", "mut"]
+
+- id: m03-aviso-mut
+  titulo: "Un mut que sobra"
+  mundo: 03-valores-y-tipos
+  tema: variables
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Escribes `let mut nombre = \"Ana\";` y nunca cambias `nombre`. ¿Qué hace el compilador?"
+  opciones:
+    - "Compila, pero da el aviso «variable does not need to be mutable»"
+    - "No compila: E0384"
+    - "Compila sin decir nada"
+    - "Convierte la variable en `const`"
+  correcta: 0
+  solucion: |
+    Es un aviso (*warning*) del lint `unused_mut`: no impide compilar, pero te sugiere `help: remove this mut`. Verificado con rustc 1.99.1.
+    - E0384 es el error contrario: asignar sin `mut`.
+    - El compilador sí avisa: los `mut` innecesarios esconden qué cambia de verdad.
+    - Nunca transforma tu código en otra cosa.
+  etiquetas: ["unused_mut", "warning"]
+
+# ─── enteros ─────────────────────────────────────────────────────────────────
+
+- id: m03-entero-por-defecto
+  titulo: "El entero por defecto"
+  mundo: 03-valores-y-tipos
+  tema: enteros
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "Si escribes `let x = 42;` y nada obliga a otro tipo, ¿qué tipo tiene `x`?"
+  respuestas: ["i32"]
+  solucion: |
+    `i32`. El compilador **no** elige el tipo más pequeño en el que cabe el número (sería `u8`): si no hay más información, un literal entero es `i32`.
+  etiquetas: ["i32", "inferencia"]
+
+- id: m03-rango-i8
+  titulo: "El más pequeño de un i8"
+  mundo: 03-valores-y-tipos
+  tema: enteros
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuánto vale `i8::MIN`?"
+  respuestas: ["-128", "−128"]
+  solucion: |
+    −128. Un `i8` usa complemento a dos con 8 bits: de −128 a 127. Hay un negativo más que positivos porque el 0 ocupa un sitio en la mitad «no negativa». Salida real del ejemplo `m03/enteros`: `i8:   -128 ..= 127`.
+  etiquetas: ["i8", "MIN"]
+
+- id: m03-usize-navegador
+  titulo: "usize no mide siempre lo mismo"
+  mundo: 03-valores-y-tipos
+  tema: enteros
+  dificultad: media
+  tipo: predice
+  enunciado: "Este programa se ejecuta **en el navegador** (wasm32). ¿Qué imprime la línea de `usize`?"
+  ej: m03/usize
+  opciones:
+    - "`usize ocupa 4 bytes`"
+    - "`usize ocupa 8 bytes`"
+    - "`usize ocupa 1 byte`"
+    - "`usize ocupa 16 bytes`"
+  correcta: 0
+  solucion: |
+    Salida real en el navegador: `usize ocupa 4 bytes` y `usize::MAX = 4294967295`.
+    `usize` mide lo que mide una dirección de memoria en la máquina donde corre el programa: 4 bytes en WebAssembly de 32 bits.
+    - 8 bytes es lo que mide en un PC de 64 bits (comprobado compilando para `x86_64-pc-windows-msvc`), no en el navegador.
+    - 1 byte es un `u8`.
+    - 16 bytes es un `i128`/`u128`.
+  etiquetas: ["usize", "wasm32", "size_of"]
+
+- id: m03-division-negativa
+  titulo: "Dividir hacia el cero"
+  mundo: 03-valores-y-tipos
+  tema: enteros
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprimen las dos primeras líneas?"
+  ej: m03/p-div-negativa
+  opciones:
+    - "`-2` y `-1`"
+    - "`-3` y `3`"
+    - "`-2.25` y `0`"
+    - "`-2` y `1`"
+  correcta: 0
+  solucion: |
+    Salida real: `-2`, `-1`, `1`, `3`.
+    La división entera **redondea hacia el cero**: −9 / 4 = −2,25 → −2. El resto cumple `(a / b) * b + a % b == a`: −9 − (−2 × 4) = −1, así que lleva el signo del dividendo.
+    - `-3` y `3` es la división «hacia abajo» con resto siempre positivo; eso es `div_euclid`/`rem_euclid` (la última línea, `rem_euclid`, sí da 3).
+    - Entre enteros no hay decimales.
+    - El signo del resto es el del dividendo (−9), no el del divisor.
+  etiquetas: ["division", "resto", "rem_euclid"]
+
+- id: m03-literales
+  titulo: "Bases y guiones bajos"
+  mundo: 03-valores-y-tipos
+  tema: enteros
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la primera línea?"
+  ej: m03/literales
+  opciones:
+    - "`1000000 255 10 15 5 7`"
+    - "`1_000_000 0xff 0b1010 0o17 5u8 7_i64`"
+    - "`1000000 ff 1010 17 5 7`"
+    - "No compila: `_` no puede ir dentro de un número"
+  correcta: 0
+  solucion: |
+    Salida real: `1000000 255 10 15 5 7` (y después `b'A' = 65`).
+    `println!` imprime el **valor** en decimal, no cómo lo escribiste: `0xff` = 255, `0b1010` = 10, `0o17` = 15. Los sufijos (`u8`, `_i64`) solo fijan el tipo.
+    - La forma de escribir el literal no se conserva en el programa.
+    - Para ver hexadecimal o binario hace falta pedirlo: `{:x}`, `{:b}`.
+    - `_` es un separador válido en cualquier literal numérico.
+  etiquetas: ["literales", "hex", "binario"]
+
+- id: m03-maximos-y-casts
+  titulo: "Un u16::MAX disfrazado"
+  mundo: 03-valores-y-tipos
+  tema: enteros
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime la segunda línea, `u16::MAX as i16`?"
+  ej: m03/p-max-min
+  opciones:
+    - "`-1`"
+    - "`32767`"
+    - "`65535`"
+    - "`0`"
+  correcta: 0
+  solucion: |
+    Salida real: `32767`, `-1`, `-128`, `32`.
+    `u16::MAX` son 16 bits a 1. Leídos como `i16` en complemento a dos, eso es −1. `as` entre tipos del mismo tamaño no cambia ningún bit, solo la lectura.
+    - 32767 sería saturar al máximo de `i16`; `as` entre enteros no satura.
+    - 65535 no cabe en un `i16`.
+    - No se pierde ningún bit, así que no puede salir 0.
+  etiquetas: ["as", "complemento a dos", "MAX"]
+
+- id: m03-segundos-resto
+  titulo: "Horas, minutos y segundos"
+  mundo: 03-valores-y-tipos
+  tema: enteros
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "Con enteros, ¿cuánto vale `3725 % 3600 / 60`? (Recuerda que `%` y `/` tienen la misma precedencia y se evalúan de izquierda a derecha.)"
+  ej: m03/segundos
+  respuestas: ["2"]
+  solucion: |
+    `3725 % 3600` = 125, y `125 / 60` = 2 (división entera). Son los minutos de 3725 segundos: la solución del ejemplo imprime `3725 s = 1 h 2 min 5 s`.
+  etiquetas: ["division", "resto", "precedencia"]
+
+- id: m03-sumar-u8-u32
+  titulo: "Un u8 y un u32 no se suman"
+  mundo: 03-valores-y-tipos
+  tema: enteros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/suma-tipos
+  opciones:
+    - "Rust no convierte tipos a escondidas: `u8 + u32` no existe (E0308 y E0277)"
+    - "10 + 20 desborda un `u8`"
+    - "Falta `mut` en `c`"
+    - "Las variables con anotación de tipo no se pueden sumar"
+  correcta: 0
+  solucion: |
+    rustc da dos errores reales: `error[E0308]: mismatched types … expected u8, found u32` y `error[E0277]: cannot add u32 to u8`.
+    Los dos lados de un `+` tienen que ser del mismo tipo. Arreglo: convertir uno, por ejemplo `a as u32 + b` o `u32::from(a) + b`.
+    - 30 cabe en un `u8`; además el desbordamiento no se mira en esta fase.
+    - `c` no cambia, así que no necesita `mut`.
+    - Las anotaciones no impiden nada; el problema es que los tipos son distintos.
+  etiquetas: ["E0308", "E0277", "conversiones"]
+
+# ─── overflow ────────────────────────────────────────────────────────────────
+
+- id: m03-overflow-release
+  titulo: "255 + 1 en release"
+  mundo: 03-valores-y-tipos
+  tema: overflow
+  dificultad: media
+  tipo: predice
+  enunciado: "El mismo programa compilado en **release** (sin `overflow-checks`). ¿Qué imprime la última línea?"
+  ej: m03/overflow
+  opciones:
+    - "`fin: 1`"
+    - "`fin: 257`"
+    - "`fin: 255`"
+    - "Un pánico"
+  correcta: 0
+  solucion: |
+    Salida real en release: `nivel = 253`, `254`, `255`, `nivel = 0` y `fin: 1`.
+    Sin comprobaciones, la suma da la vuelta módulo 256: 255 + 1 = 0 y 0 + 1 = 1.
+    - 257 no cabe en un `u8`.
+    - Quedarse en 255 sería **saturar**, y eso solo lo hace `saturating_add`.
+    - El pánico es el comportamiento de debug.
+  etiquetas: ["overflow", "release", "wrapping"]
+
+- id: m03-resta-stock
+  titulo: "Vender más de lo que hay"
+  mundo: 03-valores-y-tipos
+  tema: overflow
+  dificultad: media
+  tipo: opcion
+  enunciado: "`stock: u32 = 2` y se venden 3 (calculado en un bucle). En **release**, ¿qué imprime `quedan {quedan}`?"
+  ej: m03/overflow-resta
+  opciones:
+    - "`quedan 4294967295`"
+    - "`quedan -1`"
+    - "`quedan 0`"
+    - "Un pánico, también en release"
+  correcta: 0
+  solucion: |
+    Salida real en release: `quedan 4294967295`. En debug: pánico `attempt to subtract with overflow`.
+    2 − 3 da la vuelta en 32 bits sin signo: todos los bits a 1 = `u32::MAX`.
+    - Un `u32` no puede ser negativo.
+    - 0 sería `saturating_sub`.
+    - Release no comprueba salvo que actives `overflow-checks = true` en el perfil.
+  etiquetas: ["overflow", "release", "u32"]
+
+- id: m03-overflow-no-es-ub
+  titulo: "¿Desbordar es UB?"
+  mundo: 03-valores-y-tipos
+  tema: overflow
+  dificultad: media
+  tipo: opcion
+  enunciado: "En Rust seguro, ¿desbordar un entero con `+` es comportamiento indefinido?"
+  opciones:
+    - "No: con `overflow-checks` hay pánico, y sin ellas da la vuelta en complemento a dos; las dos cosas están definidas"
+    - "Sí, siempre"
+    - "Solo con enteros con signo"
+    - "Solo en release"
+  correcta: 0
+  solucion: |
+    Rust define los dos resultados posibles. Debug activa `-C overflow-checks` y la suma compila a `add` + `jo` (salta a `panic_const_add_overflow`); release la compila a un simple `lea` que da la vuelta. Verificado en el ensamblador de rustc 1.99.1 para x86-64.
+    - En Rust seguro no hay UB por aritmética.
+    - Con o sin signo, el resultado está definido.
+    - En release el resultado es la vuelta, también definida.
+  etiquetas: ["overflow", "UB", "overflow-checks"]
+
+- id: m03-cuatro-familias
+  titulo: "Saturar, envolver, comprobar"
+  mundo: 03-valores-y-tipos
+  tema: overflow
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime `x.saturating_add(10)` con `x: u8 = 250`?"
+  ej: m03/familias
+  opciones:
+    - "`saturating 250 + 10 = 255`"
+    - "`saturating 250 + 10 = 4`"
+    - "`saturating 250 + 10 = None`"
+    - "`saturating 250 + 10 = (4, true)`"
+  correcta: 0
+  solucion: |
+    Salida real (fragmento): `checked 250 + 10 = None`, `wrapping 250 + 10 = 4`, `saturating 250 + 10 = 255`, `overflowing 250 + 10 = (4, true)`.
+    Saturar es quedarse pegado al límite: 255.
+    - 4 es `wrapping_add` (da la vuelta).
+    - `None` es `checked_add`.
+    - `(4, true)` es `overflowing_add`.
+  etiquetas: ["saturating_add", "checked_add", "wrapping_add"]
+
+- id: m03-familias-mul
+  titulo: "Multiplicar sin miedo"
+  mundo: 03-valores-y-tipos
+  tema: overflow
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la segunda línea, `16u8.wrapping_mul(17)`?"
+  ej: m03/p-saturar
+  opciones:
+    - "`16`"
+    - "`272`"
+    - "`255`"
+    - "`0`"
+  correcta: 0
+  solucion: |
+    Salida real: `255`, `16`, `None`, `(-56, true)`, `-128`.
+    16 × 17 = 272, que no cabe en un `u8`; dando la vuelta: 272 − 256 = 16.
+    - 272 no cabe en 8 bits.
+    - 255 sería saturar (`saturating_mul`, la primera línea).
+    - 0 saldría con 16 × 16 = 256; aquí es × 17.
+  etiquetas: ["wrapping_mul", "overflow"]
+
+- id: m03-i8-min-neg
+  titulo: "El negativo sin pareja"
+  mundo: 03-valores-y-tipos
+  tema: overflow
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime la cuarta línea, `i8::MIN.checked_neg()`?"
+  ej: m03/familias-mas
+  opciones:
+    - "`None`"
+    - "`Some(128)`"
+    - "`Some(-128)`"
+    - "`Some(127)`"
+  correcta: 0
+  solucion: |
+    Salida real: `None`, `None`, `-128`, `None`, `-128`, `None`.
+    Cambiar de signo −128 daría +128, que no cabe en un `i8` (máximo 127): el rango con signo es asimétrico. `checked_neg` lo detecta.
+    - 128 no es un `i8` válido.
+    - `-128` es lo que da `wrapping_neg` (la tercera línea): invertir `10000000` y sumar 1 vuelve a dar `10000000`.
+    - 127 sería saturar, y `checked_` nunca satura.
+  etiquetas: ["checked_neg", "i8", "complemento a dos"]
+
+- id: m03-vida-del-personaje
+  titulo: "La vida no baja de cero"
+  mundo: 03-valores-y-tipos
+  tema: overflow
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Un personaje tiene `vida: u32 = 30` y recibe 50 de daño. ¿Qué operación da el resultado más razonable?"
+  opciones:
+    - "`vida.saturating_sub(50)`, que da 0"
+    - "`vida.wrapping_sub(50)`, que da 4294967276"
+    - "`vida - 50`"
+    - "`vida as i8 - 50`"
+  correcta: 0
+  solucion: |
+    La vida tiene un tope natural en 0: saturar es lo correcto.
+    - Dar la vuelta convierte al personaje en casi inmortal (2³² − 20).
+    - `-` a secas: pánico en debug, vuelta en release.
+    - Convertir a `i8` es arbitrario y desborda con vidas mayores de 127.
+  etiquetas: ["saturating_sub", "diseño"]
+
+# ─── conversiones ────────────────────────────────────────────────────────────
+
+- id: m03-300-as-u8
+  titulo: "300 en un byte"
+  mundo: 03-valores-y-tipos
+  tema: conversiones
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la primera línea?"
+  ej: m03/as
+  opciones:
+    - "`300 as u8 = 44`"
+    - "`300 as u8 = 255`"
+    - "`300 as u8 = 300`"
+    - "Un pánico: 300 no cabe"
+  correcta: 0
+  solucion: |
+    Salida real: `300 as u8 = 44`.
+    `as` entre enteros se queda con los bits de abajo: 300 = `1 0010 1100`, y los 8 de abajo valen 44 (300 − 256).
+    - Entre enteros, `as` trunca; no satura.
+    - Un `u8` no puede valer 300.
+    - `as` nunca da pánico: por eso es peligroso.
+  etiquetas: ["as", "truncar"]
+
+- id: m03-as-con-signo
+  titulo: "1000 en un i8"
+  mundo: 03-valores-y-tipos
+  tema: conversiones
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime la última línea, `1000i32 as i8`?"
+  ej: m03/p-as-signo
+  opciones:
+    - "`-24`"
+    - "`127`"
+    - "`232`"
+    - "`100`"
+  correcta: 0
+  solucion: |
+    Salida real: `255`, `-128`, `255`, `A`, `-24`.
+    1000 = `0x3E8`; el byte de abajo es `0xE8` = `11101000`. Como `i8` en complemento a dos: −128 + 64 + 32 + 8 = −24.
+    - 127 sería saturar; `as` entre enteros no satura.
+    - 232 es el mismo byte leído **sin** signo (como `u8`).
+    - No se descarta ninguna cifra decimal: se cortan bits.
+  etiquetas: ["as", "i8", "complemento a dos"]
+
+- id: m03-truncar-decimal
+  titulo: "−2,7 a entero"
+  mundo: 03-valores-y-tipos
+  tema: conversiones
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la primera línea, `-2.7f64 as i32`?"
+  ej: m03/p-redondeo
+  opciones:
+    - "`-2`"
+    - "`-3`"
+    - "`-2.7`"
+    - "`0`"
+  correcta: 0
+  solucion: |
+    Salida real: `-2`, `3`, `2`, `255`, `2.2`.
+    `as` corta la parte decimal **hacia el cero**: −2,7 → −2.
+    - −3 sería redondear hacia abajo (`floor`) o al más cercano (`round`).
+    - Un `i32` no tiene decimales.
+    - −2,7 está dentro del rango de `i32`: no hay saturación.
+  etiquetas: ["as", "f64", "truncar"]
+
+- id: m03-try-from
+  titulo: "La conversión que avisa"
+  mundo: 03-valores-y-tipos
+  tema: conversiones
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime `u8::try_from(300i32)` con `{:?}`?"
+  ej: m03/try-from
+  opciones:
+    - "`Err(TryFromIntError(PosOverflow))`"
+    - "`Ok(44)`"
+    - "`Ok(255)`"
+    - "`None`"
+  correcta: 0
+  solucion: |
+    Salida real: `u64::from(200u8) = 200`, `Ok(200)`, `Err(TryFromIntError(PosOverflow))`, `Err(TryFromIntError(NegOverflow))`.
+    `try_from` comprueba el rango y devuelve un `Result`. `PosOverflow` = demasiado grande.
+    - `Ok(44)` es lo que haría `as` (truncar) si encima te lo dijera como éxito.
+    - No satura.
+    - `try_from` devuelve `Result` (`Ok`/`Err`), no `Option`.
+  etiquetas: ["try_from", "Result"]
+
+- id: m03-as-char
+  titulo: "Un u32 que quiere ser letra"
+  mundo: 03-valores-y-tipos
+  tema: conversiones
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/as-char
+  opciones:
+    - "Con `as` solo un `u8` se puede convertir en `char`; para un `u32` hace falta `char::from_u32` (E0604)"
+    - "241 no es un carácter"
+    - "Falta `mut` en `c`"
+    - "`char` no existe como tipo"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0604]: only u8 can be cast as char, not u32` y sugiere `char::from_u32(n)`.
+    No todo `u32` es un carácter válido (por ejemplo 0xD800), así que la conversión tiene que poder fallar: `char::from_u32(241)` da `Some('ñ')`.
+    - 241 sí es un carácter: la ñ.
+    - `c` no se modifica.
+    - `char` es un tipo primitivo.
+  etiquetas: ["E0604", "char", "as"]
+
+- id: m03-mezclar-entero-decimal
+  titulo: "Unidades por precio"
+  mundo: 03-valores-y-tipos
+  tema: conversiones
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/mezcla
+  opciones:
+    - "No existe multiplicación entre un entero y un decimal; hay que convertir con `as f64` (E0277)"
+    - "2.5 no es un número válido"
+    - "Falta poner el tipo de `total`"
+    - "El resultado tiene decimales y `println!` no los imprime"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0277]: cannot multiply {integer} by {float}`. `{integer}` y `{float}` significan «un entero (o decimal) cuyo tipo concreto aún no está decidido».
+    Rust nunca convierte en silencio. Arreglo: `unidades as f64 * precio`, que imprime `7.5`.
+    - 2.5 es un `f64` válido.
+    - El tipo de `total` se infiere; el problema está en la operación.
+    - `println!` imprime decimales sin problema.
+  etiquetas: ["E0277", "f64", "as"]
+
+- id: m03-from-o-as
+  titulo: "Datos que vienen de fuera"
+  mundo: 03-valores-y-tipos
+  tema: conversiones
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Tienes un `i64` que escribe el usuario y quieres guardarlo en un `u8` **sabiendo si no cabe**. ¿Qué usas?"
+  opciones:
+    - "`u8::try_from(x)`"
+    - "`x as u8`"
+    - "`u8::from(x)`"
+    - "`x.wrapping_add(0) as u8`"
+  correcta: 0
+  solucion: |
+    `try_from` devuelve `Err` si el valor no cabe.
+    - `as` truncaría en silencio (300 → 44).
+    - `From` solo existe para conversiones que nunca fallan; `u8::from(x)` con un `i64` no compila: `the trait bound u8: From<i64> is not satisfied` (E0277, verificado).
+    - Sumar 0 no cambia nada: seguiría truncando.
+  etiquetas: ["try_from", "From", "as"]
+
+# ─── flotantes ───────────────────────────────────────────────────────────────
+
+- id: m03-cero-uno-mas-cero-dos
+  titulo: "0.1 + 0.2"
+  mundo: 03-valores-y-tipos
+  tema: flotantes
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la línea de `0.1 + 0.2`?"
+  ej: m03/flotantes
+  opciones:
+    - "`0.1 + 0.2 = 0.30000000000000004`"
+    - "`0.1 + 0.2 = 0.3`"
+    - "`0.1 + 0.2 = 0.29999999999999998`"
+    - "No compila"
+  correcta: 0
+  solucion: |
+    Salida real: `0.1 + 0.2 = 0.30000000000000004` y después `es 0.3: false`.
+    0.1 y 0.2 son periódicos en binario y se guardan redondeados; la suma queda un poco por encima de 0.3. Rust imprime las cifras justas para identificar el valor guardado.
+    - 0.3 es lo que saldría en papel.
+    - El error es hacia arriba, no hacia abajo.
+    - Sumar dos `f64` es válido.
+  etiquetas: ["f64", "IEEE 754"]
+
+- id: m03-diez-decimas
+  titulo: "Diez veces 0.1"
+  mundo: 03-valores-y-tipos
+  tema: flotantes
+  dificultad: media
+  tipo: predice
+  enunciado: "Se suma `0.1` diez veces a `total`. ¿Qué imprime?"
+  ej: m03/p-diez-decimas
+  opciones:
+    - "`0.9999999999999999` y `false`"
+    - "`1` y `true`"
+    - "`1.0000000000000002` y `false`"
+    - "`0.1` y `false`"
+  correcta: 0
+  solucion: |
+    Salida real: `0.9999999999999999` y `false`.
+    Cada suma redondea, y los errores se acumulan. Esta vez el resultado se queda **por debajo** de 1.
+    - 1 exacto no se alcanza: por eso nunca se comparan decimales con `==`, sino con un margen (`(total - 1.0).abs() < 1e-9`).
+    - El error no va siempre hacia arriba: depende de cada redondeo.
+    - El bucle suma diez veces, no una.
+  etiquetas: ["f64", "acumulación de errores"]
+
+- id: m03-nan
+  titulo: "Distinto de sí mismo"
+  mundo: 03-valores-y-tipos
+  tema: flotantes
+  dificultad: media
+  tipo: opcion
+  enunciado: "`let x = 0.0f64 / 0.0;` ¿Cuál es la forma correcta de saber si `x` es NaN?"
+  ej: m03/especiales
+  opciones:
+    - "`x.is_nan()`"
+    - "`x == f64::NAN`"
+    - "`x == 0.0`"
+    - "No hace falta: `0.0 / 0.0` da pánico"
+  correcta: 0
+  solucion: |
+    Salida real del ejemplo: `0.0 / 0.0 = NaN`, `nan == nan: false`, `nan.is_nan(): true`.
+    NaN no es igual a nada, ni a otro NaN; por eso `f64` implementa `PartialEq` pero no `Eq`.
+    - `x == f64::NAN` es **siempre** `false`.
+    - NaN tampoco es igual a 0.
+    - Con decimales, dividir entre cero no da pánico: da `inf`, `-inf` o `NaN`.
+  etiquetas: ["NaN", "is_nan", "PartialEq"]
+
+- id: m03-dividir-decimal-cero
+  titulo: "1.0 / 0.0"
+  mundo: 03-valores-y-tipos
+  tema: flotantes
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Qué imprime `println!(\"{}\", 1.0 / 0.0);`?"
+  ej: m03/especiales
+  respuestas: ["inf"]
+  solucion: |
+    `inf` (salida real del ejemplo: `1.0 / 0.0 = inf`). IEEE 754 define la división de un decimal entre cero como infinito con signo. Con **enteros**, en cambio, dividir entre cero es un pánico (o un error de compilación si el compilador lo ve venir).
+  etiquetas: ["inf", "f64"]
+
+- id: m03-redondeo-formato
+  titulo: "2.25 con un decimal"
+  mundo: 03-valores-y-tipos
+  tema: flotantes
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime la última línea, `{:.1}` de `2.25f64`?"
+  ej: m03/p-redondeo
+  opciones:
+    - "`2.2`"
+    - "`2.3`"
+    - "`2.25`"
+    - "`2`"
+  correcta: 0
+  solucion: |
+    Salida real: `2.2`. 2.25 es exacto en binario (2 + 1/4), así que hay un empate perfecto entre 2.2 y 2.3, y el formato de Rust lo resuelve hacia la cifra **par** (2.2).
+    - 2.3 es el «redondeo escolar» (empates hacia arriba); el formato no lo usa.
+    - `{:.1}` fuerza un decimal.
+    - `{:.1}` no quita los decimales: eso sería `{:.0}`.
+    Moraleja: `{:.N}` redondea **al mostrar** y tiene sus reglas; para cálculos, usa `round()`, que sí redondea los empates alejándose del cero (`2.5f64.round()` imprime `3`).
+  etiquetas: ["formato", "redondeo", "f64"]
+
+- id: m03-tamano-f32
+  titulo: "Bytes de un f32"
+  mundo: 03-valores-y-tipos
+  tema: flotantes
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuántos bytes ocupa un `f32`?"
+  ej: m03/bits-flotante
+  respuestas: ["4", "cuatro"]
+  solucion: |
+    4 bytes (32 bits). Salida real del ejemplo: `f32: 4 bytes, f64: 8 bytes`. `f64` es el tipo decimal por defecto y tiene más del doble de cifras de precisión.
+  etiquetas: ["f32", "size_of"]
+
+# ─── char y bool ─────────────────────────────────────────────────────────────
+
+- id: m03-char-bytes
+  titulo: "Lo que ocupa un euro"
+  mundo: 03-valores-y-tipos
+  tema: char
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la línea del `€`?"
+  ej: m03/char
+  opciones:
+    - "`€ -> U+20AC, bytes en UTF-8: 3`"
+    - "`€ -> U+20AC, bytes en UTF-8: 4`"
+    - "`€ -> U+20AC, bytes en UTF-8: 1`"
+    - "`€ -> U+20AC, bytes en UTF-8: 2`"
+  correcta: 0
+  solucion: |
+    Salida real: `€ -> U+20AC, bytes en UTF-8: 3`. Los caracteres de U+0800 a U+FFFF ocupan 3 bytes en UTF-8.
+    - 4 bytes es lo que mide **cualquier** `char` en memoria (última línea: `char ocupa 4 bytes`), no su codificación UTF-8.
+    - 1 byte solo para ASCII (hasta U+007F).
+    - 2 bytes para U+0080–U+07FF, como la ñ.
+  etiquetas: ["char", "UTF-8", "len_utf8"]
+
+- id: m03-comillas
+  titulo: "Comillas dobles, comillas simples"
+  mundo: 03-valores-y-tipos
+  tema: char
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/char-comillas
+  opciones:
+    - "`\"ñ\"` es un texto (`&str`), no un `char`; un `char` va entre comillas simples (E0308)"
+    - "La ñ no es un carácter Unicode válido"
+    - "Un `char` no se puede imprimir"
+    - "Falta `mut`"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0308]: mismatched types … expected char, found &str` y añade `help: if you meant to write a char literal, use single quotes`.
+    - La ñ es U+00F1, perfectamente válida.
+    - `println!` imprime `char` sin problema.
+    - No se modifica nada.
+  etiquetas: ["E0308", "char", "&str"]
+
+- id: m03-surrogate
+  titulo: "Un número que no es letra"
+  mundo: 03-valores-y-tipos
+  tema: char
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime `char::from_u32(0xD800)` con `{:?}`?"
+  ej: m03/char-de-numero
+  opciones:
+    - "`None`"
+    - "`Some('\\u{d800}')`"
+    - "Un pánico"
+    - "`Some('?')`"
+  correcta: 0
+  solucion: |
+    Salida real: `None`. 0xD800–0xDFFF son los «sustitutos» (*surrogates*) de Unicode: no son valores escalares, y Rust garantiza que un `char` siempre contiene uno válido.
+    - Ningún `char` puede valer 0xD800.
+    - `from_u32` no da pánico: devuelve un `Option`.
+    - Rust no sustituye en silencio un carácter inválido.
+  etiquetas: ["char", "from_u32", "Unicode"]
+
+# ─── tuplas ──────────────────────────────────────────────────────────────────
+
+- id: m03-tupla-indice
+  titulo: "El cuarto de tres"
+  mundo: 03-valores-y-tipos
+  tema: tuplas
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/tupla-indice
+  opciones:
+    - "La tupla tiene los campos `0`, `1` y `2`; `.3` no existe (E0609)"
+    - "Las tuplas se indexan con corchetes: `t[3]`"
+    - "Una tupla no se puede imprimir con `{}`"
+    - "Una tupla de enteros debe ser un array"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0609]: no field 3 on type ({integer}, {integer}, {integer})` y `note: available fields are: 0, 1, 2`. Se cuenta desde 0.
+    - Las tuplas se acceden con `.N`, no con `[]`.
+    - `t.2` es un entero y se imprime con `{}` sin problema; el error es el campo inexistente.
+    - Una tupla puede tener elementos del mismo tipo.
+  etiquetas: ["E0609", "tuplas"]
+
+- id: m03-tupla-anidada
+  titulo: "Tuplas dentro de tuplas"
+  mundo: 03-valores-y-tipos
+  tema: tuplas
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m03/p-tupla-anidada
+  opciones:
+    - "`3` y `5`"
+    - "`2` y `5`"
+    - "`3` y `4`"
+    - "No compila: `t.1.0` es ambiguo"
+  correcta: 0
+  solucion: |
+    Salida real: `3` y `5`.
+    `t.1` es la segunda tupla, `(3, 4)`, y su `.0` es 3. El patrón `((a, _), (_, d))` saca `a = 1` y `d = 4`: 1 + 4 = 5.
+    - 2 sería `t.0.1`.
+    - 4 olvida sumar `a`.
+    - `t.1.0` es válido: se lee de izquierda a derecha.
+  etiquetas: ["tuplas", "desestructurar"]
+
+- id: m03-unit
+  titulo: "Lo que devuelve println!"
+  mundo: 03-valores-y-tipos
+  tema: tuplas
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprimen la segunda y la tercera línea?"
+  ej: m03/p-unit
+  opciones:
+    - "`()` y `0`"
+    - "`hola` y `4`"
+    - "`()` y `1`"
+    - "No compila: `println!` no devuelve nada"
+  correcta: 0
+  solucion: |
+    Salida real: `hola`, `()`, `0`.
+    `println!` devuelve `()`, la tupla vacía (*unit*), que significa «nada útil». Se puede guardar en una variable e imprimir con `{:?}`. Su tamaño es 0 bytes: solo hay un valor posible.
+    - `x` no guarda el texto impreso.
+    - `()` no ocupa memoria.
+    - «Nada útil» en Rust es un valor de verdad: `()`.
+  etiquetas: ["unit", "()", "size_of"]
+
+# ─── arrays ──────────────────────────────────────────────────────────────────
+
+- id: m03-fuera-del-array
+  titulo: "Una vuelta de más"
+  mundo: 03-valores-y-tipos
+  tema: arrays
+  dificultad: facil
+  tipo: predice
+  enunciado: "El bucle lee `notas[i]` con `i` de 0 a 3 y el array tiene 3 elementos. ¿Qué pasa?"
+  ej: m03/fuera-ejecucion
+  opciones:
+    - "Imprime las tres notas y se detiene con `index out of bounds: the len is 3 but the index is 3`"
+    - "Imprime las tres notas y `nota 3: 0`"
+    - "Imprime las tres notas y un número cualquiera de la memoria"
+    - "No compila"
+  correcta: 0
+  solucion: |
+    Salida real: `nota 0: 7`, `nota 1: 9`, `nota 2: 5` y el pánico `index out of bounds: the len is 3 but the index is 3`.
+    Rust comprueba `i < len` antes de cada acceso con `[]`.
+    - No se inventan ceros.
+    - Leer la memoria de al lado es justo lo que la comprobación impide.
+    - Compila: el índice se calcula al ejecutar.
+  etiquetas: ["arrays", "panic", "límites"]
+
+- id: m03-array-mezcla
+  titulo: "Un array con un intruso"
+  mundo: 03-valores-y-tipos
+  tema: arrays
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/array-tipos
+  opciones:
+    - "Todos los elementos de un array son del mismo tipo; `2.5` es decimal y `1` fijó enteros (E0308)"
+    - "Los arrays no se pueden imprimir con `{:?}`"
+    - "Falta escribir la longitud del array"
+    - "Un array necesita `mut`"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0308]: mismatched types … expected integer, found floating-point number` señalando el `2.5`.
+    Arreglo: `[1.0, 2.5, 3.0]` (imprime `[1.0, 2.5, 3.0]`), o una tupla si quieres mezclar tipos.
+    - `{:?}` sí imprime arrays.
+    - La longitud se deduce del número de elementos.
+    - `mut` solo hace falta para cambiar elementos.
+  etiquetas: ["E0308", "arrays"]
+
+- id: m03-array-largo
+  titulo: "Tres prometidos, dos entregados"
+  mundo: 03-valores-y-tipos
+  tema: arrays
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/array-largo
+  opciones:
+    - "El tipo dice 3 elementos y el valor tiene 2: la longitud es parte del tipo (E0308)"
+    - "Rust rellena el tercero con 0, pero avisa"
+    - "Los arrays de `i32` necesitan sufijo en los literales"
+    - "`{:?}` no sabe imprimir arrays incompletos"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0308]: mismatched types … expected an array with a size of 3, found one with a size of 2` y propone `[i32; 2]`.
+    `[i32; 3]` y `[i32; 2]` son tipos distintos.
+    - Rust nunca rellena con valores por defecto.
+    - Los literales se adaptan a `i32` sin sufijo.
+    - No llega a ejecutarse: el error es de tipos.
+  etiquetas: ["E0308", "arrays", "[T; N]"]
+
+- id: m03-array-copia
+  titulo: "¿Copia o el mismo array?"
+  mundo: 03-valores-y-tipos
+  tema: arrays
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m03/p-array-copia
+  opciones:
+    - "`[1, 2, 3] [100, 2, 3]`"
+    - "`[100, 2, 3] [100, 2, 3]`"
+    - "`[1, 2, 3] [1, 2, 3]`"
+    - "No compila: `a` no es `mut`"
+  correcta: 0
+  solucion: |
+    Salida real: `[1, 2, 3] [100, 2, 3]`.
+    `let mut b = a;` copia los 12 bytes del array: `b` es otro array, en otro sitio de la pila. Cambiar `b[0]` no toca `a`.
+    - Los dos no comparten memoria (eso sería una referencia, del Mundo 7).
+    - `b[0] = 100` sí cambia `b`, que es `mut`.
+    - Solo se modifica `b`, y `b` sí es `mut`.
+  etiquetas: ["arrays", "Copy"]
+
+- id: m03-matriz
+  titulo: "Arrays de arrays"
+  mundo: 03-valores-y-tipos
+  tema: arrays
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la tercera línea, `size_of::<[[u8; 3]; 2]>()`?"
+  ej: m03/p-matriz
+  opciones:
+    - "`6`"
+    - "`5`"
+    - "`8`"
+    - "`2`"
+  correcta: 0
+  solucion: |
+    Salida real: `2`, `3`, `6`, `[[0, 0, 0], [0, 0, 0]]`.
+    Dos filas de tres `u8`: 2 × 3 × 1 = 6 bytes, todos seguidos. Un array no guarda su longitud en memoria: está en el tipo.
+    - 5 suma en vez de multiplicar.
+    - No hay relleno: los `u8` se alinean a 1.
+    - 2 es la longitud del array exterior (`tablero.len()`).
+  etiquetas: ["arrays", "size_of", "layout"]
+
+# ─── texto ───────────────────────────────────────────────────────────────────
+
+- id: m03-ano-len
+  titulo: "Los bytes de un año"
+  mundo: 03-valores-y-tipos
+  tema: texto
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la segunda línea?"
+  ej: m03/texto
+  opciones:
+    - "`\"año\": 4 bytes, 3 caracteres`"
+    - "`\"año\": 3 bytes, 3 caracteres`"
+    - "`\"año\": 12 bytes, 3 caracteres`"
+    - "`\"año\": 3 bytes, 4 caracteres`"
+  correcta: 0
+  solucion: |
+    Salida real: `"año": 4 bytes, 3 caracteres` y luego `bytes: [97, 195, 177, 111]`.
+    `len()` cuenta **bytes** UTF-8, y la ñ ocupa dos (195 177 = `c3 b1`).
+    - 3 bytes sería si la ñ ocupara uno.
+    - 12 serían tres `char` de 4 bytes; un texto no guarda `char`, guarda UTF-8.
+    - Hay más bytes que caracteres, no al revés.
+  etiquetas: ["len", "UTF-8", "ñ"]
+
+- id: m03-indexar-texto
+  titulo: "La primera letra de año"
+  mundo: 03-valores-y-tipos
+  tema: texto
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/indice-texto
+  opciones:
+    - "Un `str` no se indexa con un entero: en UTF-8 el byte 0 no tiene por qué ser un carácter entero (E0277)"
+    - "Los textos empiezan en el índice 1"
+    - "Hay que escribir `palabra(0)`"
+    - "Un `&str` no se puede leer, solo imprimir"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0277]: the type str cannot be indexed by {integer}`, `string indices are ranges of usize` y sugiere `.chars().nth()` o `.bytes().nth()`.
+    Arreglo: `palabra.chars().next()` da `Some('a')`.
+    - En Rust todo se cuenta desde 0.
+    - Esa sintaxis sería llamar a una función.
+    - Un `&str` se lee con `chars()`, `bytes()` o rangos de bytes.
+  etiquetas: ["E0277", "str", "UTF-8"]
+
+- id: m03-cortar-la-ene
+  titulo: "Media ñ"
+  mundo: 03-valores-y-tipos
+  tema: texto
+  dificultad: media
+  tipo: opcion
+  enunciado: "Con `let palabra = \"año\";`, ¿qué pasa con `&palabra[0..2]`?"
+  ej: m03/corte
+  opciones:
+    - "Pánico: el byte 2 cae dentro de la ñ (`is not a char boundary`)"
+    - "Imprime `añ`"
+    - "Imprime `a` y medio carácter raro"
+    - "No compila"
+  correcta: 0
+  solucion: |
+    Salida real: `&palabra[0..1]` = `a`, `&palabra[0..3]` = `añ`, y `0..2` da `end byte index 2 is not a char boundary; it is inside 'ñ' (bytes 1..3 of string)`.
+    Los rangos son de **bytes**: `añ` son los bytes 0..3.
+    - Para `añ` hace falta `0..3`.
+    - Rust nunca te da medio carácter: un `&str` es siempre UTF-8 válido.
+    - Compila: el rango se comprueba al ejecutar.
+  etiquetas: ["slicing", "UTF-8", "panic"]
+
+- id: m03-push-en-literal
+  titulo: "Ampliar un literal"
+  mundo: 03-valores-y-tipos
+  tema: texto
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/push-literal
+  opciones:
+    - "`saludo` es un `&str`, una vista a texto fijo: no tiene `push_str`; hace falta un `String` (E0599)"
+    - "Falta `mut` en `saludo`"
+    - "`push_str` solo admite un carácter"
+    - "Un texto no puede contener espacios"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0599]: no method named push_str found for reference &str`.
+    Un literal es texto guardado dentro del programa; `saludo` solo lo mira. Arreglo: `let mut saludo = String::from("hola");`.
+    - `mut` ya está: permite que `saludo` mire **otro** texto, pero no hacer crecer este.
+    - `push_str` añade un texto; `push` añade un `char`.
+    - Los espacios son caracteres normales.
+  etiquetas: ["E0599", "&str", "String"]
+
+- id: m03-string-sin-mut
+  titulo: "Un String que no se deja ampliar"
+  mundo: 03-valores-y-tipos
+  tema: texto
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/string-sin-mut
+  opciones:
+    - "`push_str` necesita cambiar `nombre`, y `nombre` no es `mut` (E0596)"
+    - "Un `String` no puede contener «ñ» ni «é»"
+    - "`push_str` solo funciona con `&str`"
+    - "Hay que usar `+` para juntar textos"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0596]: cannot borrow nombre as mutable, as it is not declared as mutable` y propone `let mut nombre`.
+    `push_str` necesita un **préstamo exclusivo** (`&mut`) del `String` (lo verás en el Mundo 7), y eso exige que la variable sea `mut`.
+    - Un `String` guarda cualquier texto UTF-8.
+    - `push_str` es un método de `String`; recibe un `&str` como argumento.
+    - `+` es otra forma, pero `push_str` es perfectamente válido.
+  etiquetas: ["E0596", "String", "mut"]
+
+- id: m03-al-reves
+  titulo: "Año al revés"
+  mundo: 03-valores-y-tipos
+  tema: texto
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m03/p-al-reves
+  opciones:
+    - "`oña` y `4`"
+    - "`oña` y `3`"
+    - "Un texto roto, porque se invierten los bytes de la ñ"
+    - "`año` y `4`"
+  correcta: 0
+  solucion: |
+    Salida real: `oña` y `4`.
+    `chars().rev()` invierte **caracteres**, no bytes, así que la ñ sigue entera. El nuevo `String` sigue ocupando 4 bytes.
+    - `len()` cuenta bytes, no letras.
+    - Invertir bytes sí rompería la ñ, pero `chars()` trabaja con caracteres completos.
+    - `rev()` sí invierte el orden.
+  etiquetas: ["chars", "rev", "UTF-8"]
+
+- id: m03-tamano-string
+  titulo: "La ficha de un String"
+  mundo: 03-valores-y-tipos
+  tema: texto
+  dificultad: dificil
+  tipo: predice
+  enunciado: "En el **navegador** (wasm32), ¿qué imprime la línea de `String`?"
+  ej: m03/tamanos-texto
+  opciones:
+    - "`String ocupa 12 bytes`"
+    - "`String ocupa 24 bytes`"
+    - "`String ocupa 4 bytes`"
+    - "`String ocupa 8 bytes`"
+  correcta: 0
+  solucion: |
+    Salida real en el navegador: `&str ocupa 8 bytes`, `String ocupa 12 bytes`, `usize ocupa 4 bytes`.
+    Un `String` es una ficha de tres `usize` (puntero al montón, capacidad y longitud): 3 × 4 = 12. El texto está en el montón y no cuenta.
+    - 24 bytes es en un PC de 64 bits (3 × 8), comprobado compilando para `x86_64-pc-windows-msvc`.
+    - 4 sería solo el puntero.
+    - 8 es un `&str` (puntero + longitud).
+  etiquetas: ["String", "size_of", "fat pointer", "wasm32"]
+
+- id: m03-push-char
+  titulo: "push y push_str"
+  mundo: 03-valores-y-tipos
+  tema: texto
+  dificultad: media
+  tipo: respuesta
+  enunciado: "Se crea un `String` vacío, se le hace `push('ñ')` y `push_str(\"u\")`. ¿Cuánto vale su `len()`?"
+  ej: m03/p-push
+  respuestas: ["3", "tres"]
+  solucion: |
+    3. Salida real: `ñu 3 2`: 3 bytes (2 de la ñ + 1 de la u) y 2 caracteres. `push` añade un `char`, codificado en UTF-8 dentro del `String`.
+  etiquetas: ["String", "push", "len"]
+
+# ─── constantes ──────────────────────────────────────────────────────────────
+
+- id: m03-const-sin-tipo
+  titulo: "Una constante sin tipo"
+  mundo: 03-valores-y-tipos
+  tema: constantes
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/const-sin-tipo
+  opciones:
+    - "Una `const` tiene que llevar su tipo escrito; no se infiere"
+    - "Las constantes no pueden ir fuera de `main`"
+    - "Los nombres de constantes deben ir en minúsculas"
+    - "100 no se puede calcular al compilar"
+  correcta: 0
+  solucion: |
+    rustc dice `error: missing type for const item` con `help: provide a type for the constant: : i32`.
+    - Las constantes pueden ir fuera de cualquier función.
+    - La convención es justo MAYÚSCULAS.
+    - Un literal es el valor más «calculable al compilar» que hay.
+  etiquetas: ["const", "tipos"]
+
+- id: m03-asignar-const
+  titulo: "Cambiar una constante"
+  mundo: 03-valores-y-tipos
+  tema: constantes
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/const-mut
+  opciones:
+    - "Una constante es un valor, no un sitio donde escribir: no se le puede asignar (E0070)"
+    - "Falta declararla como `const mut`"
+    - "200 es demasiado grande para un `i32`"
+    - "Las constantes no se pueden imprimir"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0070]: invalid left-hand side of assignment` y marca `LIMITE` con `cannot assign to this expression`. Asignar a una `const` es como escribir `100 = 200`.
+    - `const mut` no existe.
+    - 200 cabe de sobra en un `i32`.
+    - Imprimir una constante es válido: `println!("{LIMITE}")`.
+  etiquetas: ["E0070", "const"]
+
+- id: m03-const-de-variable
+  titulo: "Una constante que depende de una variable"
+  mundo: 03-valores-y-tipos
+  tema: constantes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/const-de-variable
+  opciones:
+    - "El valor de una `const` debe calcularse al compilar, y `precio` es una variable que solo existe al ejecutar (E0435)"
+    - "Las constantes no pueden ir dentro de una función"
+    - "`precio * 2` desborda"
+    - "Falta `mut` en `precio`"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0435]: attempt to use a non-constant value in a constant`.
+    Para un valor calculado al ejecutar que no va a cambiar basta con `let doble = precio * 2;`, que ya es inmutable.
+    - Una `const` puede declararse dentro de una función.
+    - 4 cabe en un `i32`.
+    - `mut` no convierte una variable en constante.
+  etiquetas: ["E0435", "const"]
+
+- id: m03-static-mut
+  titulo: "Un global que cambia"
+  mundo: 03-valores-y-tipos
+  tema: constantes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m03/static-mut
+  opciones:
+    - "Usar un `static mut` requiere un bloque `unsafe`: varios hilos podrían tocarlo a la vez (E0133)"
+    - "Un `static` no puede tener valor inicial"
+    - "`+=` no funciona con `u32`"
+    - "Los `static` tienen que ser `&str`"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0133]: use of mutable static is unsafe and requires unsafe block`, con la nota de que los static mutables pueden ser modificados por varios hilos y eso causaría comportamiento indefinido (carreras de datos).
+    Además, en la edición 2024 crear un `&` a un `static mut` es error (`static_mut_refs`).
+    - Un `static` siempre lleva valor inicial.
+    - `+=` funciona con cualquier entero.
+    - Un `static` puede ser de cualquier tipo que se pueda construir al compilar.
+  etiquetas: ["E0133", "static mut", "unsafe"]
+
+- id: m03-const-o-static
+  titulo: "Valor o sitio"
+  mundo: 03-valores-y-tipos
+  tema: constantes
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál es la diferencia esencial entre `const N: u32 = 7;` y `static S: u32 = 7;`?"
+  ej: m03/static-direccion
+  opciones:
+    - "La `const` es un valor que se copia donde se usa; el `static` es un sitio de memoria con una única dirección durante todo el programa"
+    - "La `const` se puede cambiar y el `static` no"
+    - "El `static` vive en el montón"
+    - "No hay ninguna diferencia"
+  correcta: 0
+  solucion: |
+    Salida real del ejemplo: `static: misma dirección = true` y `const: 7 7`.
+    - Ninguno de los dos se puede cambiar (salvo `static mut` con `unsafe`).
+    - Un `static` vive en una zona del ejecutable que se carga al arrancar, no en el montón.
+    - La diferencia importa para datos grandes (una `const` puede acabar copiada en cada uso) y para tener una sola dirección.
+  etiquetas: ["const", "static"]
+
+- id: m03-const-tamano-array
+  titulo: "El tamaño de un array"
+  mundo: 03-valores-y-tipos
+  tema: constantes
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "Para escribir `[0; N]`, `N` tiene que conocerse al compilar. ¿Qué palabra clave declara un `N` que sirva?"
+  ej: m03/constantes
+  respuestas: ["const"]
+  solucion: |
+    `const N: usize = 4;`. El ejemplo `m03/constantes` imprime `[0, 0, 0, 0]` con `let tablero = [0; N];`. Una variable `let` no sirve como tamaño de array, porque su valor solo existe al ejecutar.
+  etiquetas: ["const", "arrays"]

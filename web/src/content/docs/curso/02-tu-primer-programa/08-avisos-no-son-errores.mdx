@@ -1,0 +1,143 @@
+---
+title: "Los avisos no son errores"
+description: "Distingue un aviso de un error, entiende los avisos más comunes y aprende a silenciarlos (o endurecerlos) con criterio."
+sidebar:
+  order: 8
+duracion: 10
+desde: "1.0"
+requiere: ["02-tu-primer-programa/07-leer-errores-del-compilador"]
+tarjetas:
+  - p: "¿Un programa con avisos (*warnings*) se compila y se ejecuta?"
+    r: "Sí. Un aviso señala algo sospechoso, pero no impide compilar. Un error, sí."
+  - p: "¿Cómo le dices a Rust que una variable sin usar es intencionada?"
+    r: "Empezando su nombre por guion bajo: `_total`."
+  - p: "¿Qué hace `#[allow(dead_code)]` encima de una función?"
+    r: "Silencia el aviso de código muerto (función que nadie usa) solo para esa función."
+  - p: "¿Qué hace `#![deny(unused_variables)]` al principio de un archivo?"
+    r: "Convierte ese aviso en error para todo el crate: si hay una variable sin usar, no compila."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+No todo lo que te dice el compilador es un error. A veces solo levanta la ceja: «esto es raro, ¿seguro que querías hacerlo?». Hoy aprendes a distinguir esa ceja levantada de un «no» rotundo, y a decidir qué hacer con ella.
+
+## Predice
+
+Este programa declara una variable que nunca usa y una función a la que nadie llama. ¿Qué pasa al ejecutarlo?
+
+<Predice
+  ej="m02/avisos"
+  opciones={["No compila: hay código que sobra", "Compila con dos avisos y se ejecuta: imprime `El programa funciona igual`", "Se ejecuta e imprime también `Nadie me llama`", "Compila pero da un pánico al ejecutarse"]}
+  correcta={1}
+  explicacion="Una variable sin usar y una función sin llamar son **avisos**, no errores. El compilador te los muestra y genera el programa igualmente. `sin_usar` no se ejecuta porque nadie la llama."
+  porque={["El código que sobra es sospechoso, pero no incorrecto: Rust avisa y sigue.", "", "Una función solo se ejecuta si alguien la llama, y `main` no la llama.", "Los avisos son del compilador; no cambian nada al ejecutar."]}
+/>
+
+## La idea
+
+`rustc` tiene dos tipos de mensajes:
+
+- Un **error** (`error`) significa que el programa no es válido. No se genera nada.
+- Un **aviso** (`warning`) significa que el programa es válido pero tiene algo **sospechoso**: una variable que no usas, una función a la que nadie llama, un resultado que ignoras. El programa se genera igual.
+
+Cada tipo de aviso es un **lint** (palabra inglesa para «pelusa»: cosas pequeñas que conviene quitar) con nombre propio: `unused_variables`, `dead_code`… Cada lint tiene un **nivel**: `allow` (callado), `warn` (avisa), `deny` (lo convierte en error) y `forbid` (como `deny`, pero nadie puede volver a permitirlo más abajo en el código). El nivel se cambia con **atributos**: `#[allow(dead_code)]` afecta al elemento que tiene debajo; `#![deny(…)]`, con `!`, afecta a todo lo que lo contiene (al principio del archivo, al crate entero).
+
+Mientras aprendes es normal tener variables o funciones a medias. La forma limpia de decir «lo sé, es a propósito» es poner un **guion bajo** al principio del nombre: `_total`.
+
+## Pruébalo
+
+<Ejecutar ej="m02/avisos" />
+
+Salida real del programa:
+
+```text
+El programa funciona igual
+```
+
+Y estos son los avisos reales que da el compilador (rutas abreviadas):
+
+```text
+warning: unused variable: `total`
+ --> m02/avisos.rs:6:9
+  |
+6 |     let total = 42;
+  |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `sin_usar` is never used
+ --> m02/avisos.rs:1:4
+  |
+1 | fn sin_usar() {
+  |    ^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: 2 warnings emitted
+```
+
+Tienen la misma anatomía que un error: nivel, frase, ubicación, marcas, `help:` y `note:`. La nota te dice el nombre del lint (`unused_variables`, `dead_code`), que forma parte del grupo `unused`, y que está en nivel `warn` por defecto. Ahora la versión sin avisos:
+
+<Ejecutar ej="m02/avisos-silenciados" />
+
+```text
+Sin avisos
+```
+
+`_total` dice «sé que no la uso» y `#[allow(dead_code)]` calla el aviso **solo** para esa función.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Dónde viven los lints">
+Los lints se comprueban en varias fases del compilador, según lo que necesiten saber: unos miran solo la sintaxis, otros necesitan los tipos, otros el MIR. Por eso `cargo check` también te da los avisos: recorre esas fases aunque no genere código.
+
+Hay una segunda colección de lints, mucho más grande, en **Clippy**: `cargo clippy` ejecuta las comprobaciones de `rustc` más cientos de lints de estilo, rendimiento y errores comunes. Viene instalado con rustup y lo usarás en todo el curso; en el mundo 16 lo verás a fondo.
+
+Los niveles también se pueden fijar para todo un proyecto en `Cargo.toml`, en una sección `[lints]`, sin tocar el código. Y como último recurso existe el nivel `forbid`, pensado para proyectos que quieren garantizar que nadie relaja una regla en ningún rincón del código.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Silenciar todo de golpe">
+❌ Poner `#![allow(warnings)]` arriba del todo «para que deje de quejarse». Callas todos los avisos, también los que algún día te avisarán de un fallo de verdad.
+
+✅ Silencia **lo concreto, en el sitio concreto**: `_variable` o `#[allow(dead_code)]` en esa función. Y si un aviso no entiendes por qué sale, no lo calles: léelo. Muchos avisos son errores lógicos que todavía no han explotado.
+</Trampa>
+
+Lo contrario también es posible: endurecer un lint para que no se te escape nada.
+
+<NoCompila ej="m02/avisos-como-errores" explicacion="Con `#![deny(unused_variables)]` el aviso pasa a ser un `error`. La nota «the lint level is defined here» señala la línea que lo endureció." />
+
+## Tu turno
+
+<Pregunta
+  pregunta="Estás a medias con un programa y tienes `let resultado = 7;` sin usar todavía. ¿Cuál es la forma más limpia de evitar el aviso sin borrar la línea?"
+  opciones={["`#![allow(warnings)]` al principio del archivo", "Renombrarla a `_resultado`", "Ponerle `mut`", "Imprimirla con un `println!` que luego borrarás"]}
+  correcta={1}
+  explicacion="El guion bajo inicial es la forma estándar de decir «es intencionado». Afecta solo a esa variable."
+  porque={["Funciona, pero calla todos los avisos del crate, también los útiles.", "", "`mut` no tiene nada que ver con usar o no usar la variable; de hecho, añadiría otro aviso (`unused_mut`).", "Funciona, pero es un apaño: ensucia la salida del programa."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué diferencia hay entre `#[allow(dead_code)]` y `#![allow(dead_code)]`?"
+  opciones={["Ninguna", "Sin `!` afecta al elemento de debajo; con `!`, a lo que lo contiene (por ejemplo, el crate entero)", "Con `!` es más estricto", "El `!` lo convierte en una macro"]}
+  correcta={1}
+  explicacion="Es la misma regla que en los comentarios de documentación: `///` documenta lo de debajo y `//!` lo que lo contiene. `#[…]` es un atributo «exterior» y `#![…]` uno «interior»."
+  porque={["El `!` cambia a qué parte del código se aplica.", "", "La estrictez la decide el nivel (`allow`, `warn`, `deny`, `forbid`), no el `!`.", "Aquí el `!` va dentro de un atributo, no detrás de un nombre: no es una macro."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál de estas afirmaciones es correcta?"
+  opciones={["Si hay avisos, el ejecutable no se genera", "Un aviso puede convertirse en error con `deny`", "Los avisos solo los da `cargo clippy`", "Los avisos desaparecen en modo release"]}
+  correcta={1}
+  explicacion="`#![deny(nombre_del_lint)]` sube el nivel de ese lint a error."
+  porque={["Con avisos, el programa se genera igual.", "", "`rustc` tiene sus propios lints; Clippy añade más.", "Los avisos no dependen del modo de compilación."]}
+/>
+
+<Respuesta
+  pregunta="¿Cómo se llama el lint que avisa de una función que nadie usa?"
+  respuestas={["dead_code"]}
+  explicacion="`dead_code` (código muerto). Lo dice la nota del aviso: «`#[warn(dead_code)]` … on by default»."
+/>

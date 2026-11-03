@@ -1,0 +1,87 @@
+---
+title: "E0040: llamada explícita a drop()"
+description: "Llamas al método drop de un valor directamente; Rust no lo permite."
+sidebar:
+  order: 7
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` explicit use of destructor method ``
+
+## Qué significa
+
+`Drop::drop` lo llama **el compilador** automáticamente, una sola vez, cuando el valor sale de su ámbito. Si pudieras llamarlo tú, se ejecutaría dos veces (la tuya y la automática).
+
+## Qué error evita
+
+Una **doble liberación**: el destructor liberaría los recursos dos veces.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0040" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0040]: explicit use of destructor method
+  --> E0040.rs:11:7
+   |
+11 |     a.drop();
+   |       ^^^^ explicit destructor calls not allowed
+   |
+help: consider using `drop` function
+   |
+11 -     a.drop();
+11 +     drop(a);
+   |
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Querer destruir un valor antes de tiempo escribiendo `valor.drop()`.
+
+## Cómo arreglarlo
+
+Usa la función `drop(valor)` (es `std::mem::drop`, está en el preludio): **se lleva la propiedad** del valor, así que se destruye al terminar esa función y el compilador ya no lo destruirá otra vez.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+struct Archivo;
+
+impl Drop for Archivo {
+    fn drop(&mut self) {
+        println!("cerrado");
+    }
+}
+
+fn main() {
+    let a = Archivo;
+    drop(a); // std::mem::drop se lleva la propiedad y destruye el valor ya
+    println!("fin");
+}
+```
+
+**Salida:**
+
+```text
+cerrado
+fin
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0040` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0509](/errores/e0509/): mover fuera de un tipo con Drop
+- [E0184](/errores/e0184/): Copy y Drop a la vez
+
+## Aprende esto en
+
+- [Mundo 06 · Ownership](/curso/06-ownership/)
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

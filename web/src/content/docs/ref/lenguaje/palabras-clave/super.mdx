@@ -1,0 +1,57 @@
+---
+title: "super"
+description: "Palabra clave estricta: el módulo padre en una ruta."
+sidebar:
+  order: 32
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`super` en una ruta significa **el módulo padre** del actual.
+
+## Sinopsis
+
+```text
+super::elemento
+super::super::elemento      // el abuelo
+pub(super) elemento         // visible en el módulo padre
+use super::*;               // muy común en los módulos de pruebas
+```
+
+## Qué hace
+
+- Sube un nivel en el árbol de módulos. Se puede encadenar al principio de la ruta.
+- Es una ruta **relativa**: si mueves el módulo entero, sigue funcionando.
+- Uso típico: en `mod tests { use super::*; }`, para probar las funciones privadas del módulo que contiene las pruebas.
+- `super` no puede usarse como nombre, ni con `r#super`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-super" />
+
+Salida:
+
+```text
+a
+hola desde la raíz
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-super-error" />
+
+`error[E0433]: too many leading super keywords within crate`: la raíz no tiene padre.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+- [`self`](/ref/lenguaje/palabras-clave/self/) · [`crate`](/ref/lenguaje/palabras-clave/crate/) · [`mod`](/ref/lenguaje/palabras-clave/mod/) · [Visibilidad y rutas](/ref/lenguaje/visibilidad-y-rutas/)
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

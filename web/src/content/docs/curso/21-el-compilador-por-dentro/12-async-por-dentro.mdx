@@ -1,0 +1,136 @@
+---
+title: "Cómo se compila async"
+description: "Escribe a mano la máquina de estados que el compilador genera para un `async fn`, mide su tamaño y entiende por qué hace falta `Pin`."
+sidebar:
+  order: 12
+duracion: 14
+desde: "1.39"
+requiere: ["21-el-compilador-por-dentro/11-vtables", "18-async"]
+tarjetas:
+  - p: "¿En qué se convierte el cuerpo de un `async fn`?"
+    r: "En una corrutina: un tipo anónimo que es una máquina de estados (un enum) con un estado por cada punto de suspensión `.await`, más los estados inicial, terminado y «pánico»."
+  - p: "¿Qué variables se guardan dentro del futuro?"
+    r: "Las que siguen vivas a través de un `.await`: necesitan sobrevivir mientras la función está suspendida, así que forman parte del estado."
+  - p: "¿Cuáles son los cuatro estados que muestra `-Zprint-type-sizes` para un `async fn` con un `.await`?"
+    r: "`Unresumed` (creado, sin sondear), `Suspend0` (parado en el primer `.await`), `Returned` (terminó) y `Panicked` (entró en pánico durante un `poll`)."
+  - p: "¿Por qué `Future::poll` recibe `Pin<&mut Self>`?"
+    r: "Porque el futuro puede contener referencias a sus propios campos (una variable local prestada a través de un `.await`); si se moviera de sitio, esas referencias quedarían colgando."
+---
+
+import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+En el mundo 18 usaste `async` y `.await`. Pero la CPU no sabe «esperar»: solo ejecuta funciones que empiezan y terminan. ¿Cómo puede una función pararse a mitad y continuar después? El compilador la convierte en una **máquina de estados**. Hoy la escribes tú.
+
+## Predice
+
+<Predice
+  ej="m21/future-a-mano"
+  opciones={[
+    "con_array() ocupa 8 bytes y sin_array(1) ocupa 8 bytes",
+    "con_array() ocupa 102 bytes y sin_array(1) ocupa 24 bytes",
+    "Los dos ocupan lo mismo: un futuro es solo un puntero",
+    "No se puede medir el tamaño de un futuro"
+  ]}
+  correcta={1}
+  explicacion="El array `a` de 100 bytes sigue vivo a través del `.await` (se usa después), así que se guarda **dentro** del futuro: 100 + 1 del futuro interno + 1 de la etiqueta de estado = 102. `sin_array` guarda su `x: u64` (dos veces, como verás abajo) más la etiqueta, con relleno: 24."
+  porque={[
+    "Un futuro no es un puntero: es un valor que contiene todo su estado.",
+    "",
+    "Cada `async fn` genera un tipo distinto con su propio tamaño.",
+    "`size_of_val` funciona con cualquier valor, también con futuros."
+  ]}
+/>
+
+## La idea
+
+Al compilar `async fn f() -> T`, el compilador crea un **tipo anónimo** (en el compilador se llama *corrutina*, `Coroutine`) y hace que `f()` solo construya un valor de ese tipo, **sin ejecutar nada**. Ese tipo implementa `Future`, y su método `poll` ejecuta el cuerpo **hasta el siguiente `.await` que no esté listo**.
+
+Para poder continuar donde se quedó, el tipo es un **enum**: una variante por cada punto donde la función puede pararse. Cada variante guarda lo que hace falta para seguir desde ahí: las variables locales que **se usan después** del `.await` y el futuro que se está esperando. Cuando `poll` encuentra un futuro interno que devuelve `Poll::Pending`, guarda el estado y devuelve `Pending` también. Cuando alguien (el ejecutor) vuelve a llamar a `poll`, un `match` sobre el estado salta directamente al punto donde se quedó.
+
+Nada de esto necesita un sistema operativo ni hilos: es un enum y un `match`. El **ejecutor** (Tokio, smol, Embassy, o el de 6 líneas de este ejemplo) es quien decide cuándo volver a llamar a `poll`. El `Waker` del `Context` es la forma que tiene un futuro de decir «ya puedo avanzar, vuelve a llamarme».
+
+## Pruébalo
+
+`CuentaAtras` es una máquina de estados escrita a mano; `con_array` y `sin_array` son las que genera el compilador. `bloquear` es el ejecutor mínimo, con `Waker::noop()` (estable desde 1.85).
+
+<Ejecutar ej="m21/future-a-mano" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Con nightly, `-Zprint-type-sizes` muestra el enum que el compilador generó para `con_array`. Salida real (nightly 1.101.0, x86-64):
+
+```text
+print-type-size type: `{async fn body of con_array()}`: 102 bytes, alignment: 1 bytes
+print-type-size     discriminant: 1 bytes
+print-type-size     variant `Unresumed`: 0 bytes
+print-type-size     variant `Suspend0`: 101 bytes
+print-type-size         local `.a`: 100 bytes
+print-type-size         local `.__awaitee`: 1 bytes, type: {async fn body of paso()}
+print-type-size     variant `Returned`: 0 bytes
+print-type-size     variant `Panicked`: 0 bytes
+```
+
+Los mismos 102 bytes que mediste en el navegador: este tipo no contiene punteros, así que no depende de la arquitectura. Cuatro estados:
+
+- `Unresumed`: recién creado. Guarda los **argumentos** (aquí no hay).
+- `Suspend0`: parado en el primer `.await`. Guarda `a` (100 bytes) y `__awaitee`, el futuro de `paso()` que está esperando (1 byte: su propia etiqueta).
+- `Returned`: ya devolvió su valor; volver a sondearlo es un error.
+- `Panicked`: un `poll` anterior entró en pánico.
+
+Para `sin_array(x: u64)` (24 bytes en x86-64) la herramienta muestra el argumento `x` (marcado `upvar`) en `Unresumed` y, en `Suspend0`, el argumento más una copia local `.x` que vive a través del `.await`: por eso el 8 aparece dos veces. Más la etiqueta y el relleno. Si `a` no se usara después del `.await`, no tendría que guardarse.
+
+**Por qué `Pin`.** Imagina `let s = String::from("hola"); let r = &s; algo().await; println!("{r}");`. Tanto `s` como `r` viven en el estado `Suspend0`, **dentro del mismo futuro**, y `r` apunta a otro campo del propio futuro (es *autorreferencial*). Si después de sondearlo una vez movieras el futuro a otra dirección, `r` seguiría apuntando a la vieja: un uso tras liberar. `Pin<&mut Self>` es la promesa de que el futuro **no se moverá** mientras se sondea. Por eso `bloquear` usa `pin!(f)` antes del bucle.
+
+**Consecuencia práctica.** Variables grandes vivas a través de un `.await` hinchan el futuro y, si el futuro vive en la pila, la pila. Clippy tiene la lint `large_futures`, y la solución típica es `Box::pin(futuro)` para llevarlo al heap.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Creer que llamar a un `async fn` lo ejecuta">
+
+❌ `guardar_datos();` dentro de una función `async`, sin `.await`, «para que se haga en segundo plano».
+
+✅ Llamar a un `async fn` **solo construye** el enum en el estado `Unresumed`. Si nadie lo sondea (con `.await` o entregándolo a un ejecutor), el cuerpo **nunca se ejecuta**. El compilador avisa con la lint `unused_must_use`: los futuros llevan `#[must_use]`.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta={"En `async fn f() { let grande = [0u8; 4096]; let n = grande[0]; paso().await; println!(\"{n}\"); }`, ¿se guardan los 4096 bytes dentro del futuro?"}
+  opciones={[
+    "Sí: todas las variables locales van al futuro",
+    "No: `grande` ya no se usa después del `.await`; solo `n` (1 byte) cruza el punto de suspensión",
+    "Sí, pero solo en modo debug",
+    "No: los arrays siempre van al heap"
+  ]}
+  correcta={1}
+  explicacion="Solo cruza el `.await` lo que se usa después: lo medimos y ese futuro ocupa **3 bytes** (etiqueta + `n` + el futuro de `paso`). El compilador calcula qué está vivo en cada punto de suspensión, igual que el borrow checker calcula qué préstamos están vivos. Aun así, compruébalo con `size_of_val`: el análisis tiene casos conservadores (por ejemplo, valores con `Drop` que siguen en ámbito)."
+  porque={["Solo las variables vivas a través del `.await`.", "", "El análisis de qué cruza un `.await` es el mismo en todos los perfiles.", "Un array local vive en la pila (o en el futuro), nunca en el heap por sí solo."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué devuelve una llamada a `async fn f() -> u32` sin `.await`?"
+  opciones={["Un `u32`", "Un valor de un tipo anónimo que implementa `Future<Output = u32>`, en estado `Unresumed`", "Un hilo nuevo", "Un `Result<u32, Pending>`"]}
+  correcta={1}
+  explicacion="El cuerpo no se ejecuta hasta el primer `poll`."
+  porque={["El `u32` solo aparece cuando el futuro termina.", "", "`async` no crea hilos: es un enum y un `match`.", "`poll` devuelve `Poll<u32>`, pero la llamada a `f()` devuelve el futuro."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué estado tiene un futuro mientras espera en su primer `.await`?"
+  opciones={["`Unresumed`", "`Suspend0`", "`Returned`", "`Pending`"]}
+  correcta={1}
+  explicacion="Cada `.await` genera un estado `SuspendN`; el primero es `Suspend0`."
+  porque={["`Unresumed` es antes del primer `poll`.", "", "`Returned` es cuando ya terminó.", "`Pending` es lo que **devuelve** `poll`, no el nombre del estado."]}
+/>
+
+## Para saber más
+
+- Mundo 18 (async), y [Pánicos y unwinding](/curso/21-el-compilador-por-dentro/13-panicos-y-unwinding/) para el estado `Panicked`.
+- *Asynchronous Programming in Rust*: https://rust-lang.github.io/async-book/

@@ -1,0 +1,55 @@
+---
+title: "write! y writeln!"
+description: "Escribir texto formateado en cualquier destino: un String (fmt::Write), un archivo, stdout o un Vec<u8> (io::Write)."
+sidebar:
+  order: 10
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::write, std::writeln`
+
+## Sinopsis
+
+```rust
+macro_rules! write {
+    ($dst:expr, $($arg:tt)*) => { ... };
+    ($($arg:tt)*) => { ... };
+}
+
+macro_rules! writeln {
+    ($dst:expr $(,)?) => { ... };
+    ($dst:expr, $($arg:tt)*) => { ... };
+    ($($arg:tt)*) => { ... };
+}
+```
+
+## Qué hace
+
+`write!(destino, "...", args)` llama a `destino.write_fmt(...)`, así que sirve con cualquier tipo que tenga ese método: los que implementan `std::fmt::Write` (`String`) o `std::io::Write` (`File`, `Stdout`, `Vec<u8>`…). Devuelve un `Result`: usa `?`. Importa el trait que toque; si necesitas los dos en el mismo archivo, renómbralos al importarlos (`use std::fmt::Write as FmtWrite;`).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-write" />
+
+**Salida:**
+
+```text
+"1 y 2\nfin"
+[195, 177, 61, 195, 177, 10]
+directo a la consola
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [io::Write](/ref/std/io/write/)
+- [Display (dentro de fmt se usa write!)](/ref/std/fmt/display/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)

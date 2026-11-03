@@ -1,0 +1,140 @@
+---
+title: "Tu primer match"
+description: "Elige entre muchos casos con match, usa |, rangos, _ y guardas, y descubre por qué Rust te obliga a cubrir todos los valores posibles."
+sidebar:
+  order: 7
+duracion: 12
+desde: "1.0"
+requiere: ["04-expresiones-y-control/06-etiquetas"]
+tarjetas:
+  - p: "¿En qué orden se prueban los brazos de un `match`?"
+    r: "De arriba abajo; gana el primero cuyo patrón encaja. Los demás no se miran."
+  - p: "¿Qué significa que un `match` sea exhaustivo?"
+    r: "Que cubre todos los valores posibles del tipo. Si falta alguno, no compila (E0004)."
+  - p: "¿Qué hace el patrón `_`?"
+    r: "Encaja con cualquier valor sin ponerle nombre. Se usa como «todo lo demás», al final."
+  - p: "¿Qué es una guarda en un `match`?"
+    r: "Una condición extra tras el patrón: `x if x < 0 => ...`. El brazo solo se elige si el patrón encaja Y la condición es verdadera."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer `match`, la forma de Rust de **elegir entre muchos casos**. Es una de las herramientas más poderosas del lenguaje, y hoy das el primer paso.
+
+## Predice
+
+<NoCompila
+  ej="m04/match-no-exhaustivo"
+  explicacion="Antes de leer el error: `dado` es un `u8`, que puede valer de 0 a 255. ¿Qué haría el programa si `dado` valiera 0, o 200? Ningún brazo lo dice, y Rust no te deja dejar huecos. El compilador incluso te dice qué valores faltan: `0_u8` y `7_u8..=u8::MAX`."
+/>
+
+## La idea
+
+`match valor { patrón => resultado, ... }` compara `valor` con cada **patrón** (*pattern*), **de arriba abajo**, y ejecuta el **brazo** (*arm*) del primero que encaje. Un patrón puede ser un valor concreto (`6`), varios unidos con `|` (`2 | 3`), un rango (`4..=5`), el comodín `_` («cualquier cosa»), o un nombre (`x`) que encaja con todo y además guarda el valor para usarlo en el brazo.
+
+Como `if`, `match` es una **expresión**: vale lo que valga el brazo elegido, y todos los brazos deben dar el mismo tipo.
+
+Y lo más importante: un `match` tiene que ser **exhaustivo** (*exhaustive*). Tiene que cubrir **todos** los valores que el tipo puede tener. Si te dejas uno, no compila. Parece una exigencia pesada, pero evita una clase entera de errores: el caso «que nunca iba a pasar» y que un día pasa. El compilador hace la cuenta por ti y te dice exactamente qué falta.
+
+## Pruébalo
+
+<Ejecutar ej="m04/match-basico" />
+
+1. Cada valor del dado cae en el primer brazo que le encaja.
+2. `_` cubre «todo lo demás». Con un `u8` hay 256 valores posibles; sin el `_`, faltarían 0 y del 7 al 255.
+3. Con `char` también funciona: `'ñ'` no está en la lista de vocales, así que cae en `_`.
+
+Y con **guardas** (*match guards*): una condición `if` añadida al patrón.
+
+<Ejecutar ej="m04/match-guarda" />
+
+El patrón `x` encaja con cualquier número y lo llama `x`; la guarda `if x < 0` decide si ese brazo se queda con él. El último brazo, `x => ...`, no tiene guarda, así que recoge todo lo que quede: por eso el `match` es exhaustivo aunque no haya `_`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Cómo sabe Rust que falta algo.** El compilador conoce todos los valores de cada tipo: un `u8` va de 0 a 255; un `bool` es `true` o `false`. Con los patrones de tu `match` calcula qué valores quedan sin cubrir. Por eso el error puede decirte «`0_u8` and `7_u8..=u8::MAX` not covered» (no se cubren el 0 ni del 7 al máximo).
+
+**Las guardas no cuentan para la exhaustividad.** Como `x if x < 0` depende de una condición que se evalúa al ejecutar, el compilador no puede usarla para demostrar que has cubierto algo. Por eso siempre hace falta un brazo final sin guarda.
+
+**Brazos inalcanzables.** Si pones `_` primero, los brazos de debajo no se elegirán nunca. Rust lo compila, pero avisa: «warning: unreachable pattern», con la nota «no value can reach this» (ningún valor puede llegar aquí).
+
+**Cómo se ejecuta.** Un `match` sobre números se suele compilar a una cadena de comparaciones o, si los casos son muchos y seguidos, a una **tabla de saltos**: una lista de direcciones indexada por el valor, que salta directamente al brazo correcto.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="El comodín demasiado pronto">
+
+❌ El orden importa. Aquí el `_` se queda con todo, y `7` nunca se elige:
+
+```rust
+let texto = match n {
+    _ => "cualquiera",
+    7 => "siete",
+};
+```
+
+✅ Pon los casos concretos arriba y el `_` siempre **el último**. Y no ignores el aviso «unreachable pattern»: casi siempre es un brazo mal colocado.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m04/dia"
+  enunciado={"Completa el `match`: del 1 al 5 es `\"laborable\"`, el 6 o el 7 es `\"fin de semana\"` y cualquier otro número `\"no existe\"`. Usa un rango, `|` y `_`."}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `match b { true => 1, false => 0 }` (con `b: bool`) compila sin `_`?"
+  opciones={[
+    "Porque Rust añade un `_` automáticamente",
+    "Porque `true` y `false` son todos los valores posibles de un `bool`",
+    "Porque los `bool` no necesitan `match` exhaustivo",
+    "No compila: siempre hace falta `_`"
+  ]}
+  correcta={1}
+  explicacion="Exhaustivo significa cubrir todos los valores. Un `bool` solo tiene dos, y están los dos."
+  porque={[
+    "Rust nunca añade brazos por su cuenta: si faltara uno, daría error E0004.",
+    "",
+    "Todos los `match` deben ser exhaustivos, también con `bool`.",
+    "`_` solo hace falta cuando los demás brazos no cubren todo."
+  ]}
+/>
+
+<Pregunta
+  pregunta={"Con `n = 15`, ¿qué vale `match n { x if x % 3 == 0 => \"tres\", x if x % 5 == 0 => \"cinco\", _ => \"otro\" }`?"}
+  opciones={["`\"tres\"`", "`\"cinco\"`", "`\"tres\"` y `\"cinco\"`", "`\"otro\"`"]}
+  correcta={0}
+  explicacion="Los brazos se prueban en orden. 15 es múltiplo de 3, así que gana el primer brazo; el segundo ya no se mira."
+  porque={[
+    "",
+    "También es múltiplo de 5, pero el primer brazo que encaja gana.",
+    "Un `match` elige un único brazo.",
+    "`_` solo se elige si ningún brazo anterior encaja."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Qué evita la regla de exhaustividad?"
+  opciones={[
+    "Que el programa sea lento",
+    "Que exista un valor para el que el programa no sepa qué hacer",
+    "Que uses demasiados brazos",
+    "Que uses `if` dentro de un `match`"
+  ]}
+  correcta={1}
+  explicacion="Si un valor no tuviera brazo, el `match` no tendría resultado. Rust obliga a decidir qué pasa en todos los casos antes de ejecutar."
+  porque={[
+    "No tiene que ver con la velocidad.",
+    "",
+    "Puedes poner tantos brazos como quieras.",
+    "Las guardas son justamente un `if` dentro del `match`, y están permitidas."
+  ]}
+/>

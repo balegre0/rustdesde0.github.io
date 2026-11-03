@@ -1,0 +1,53 @@
+---
+title: "Macros de la biblioteca estándar"
+description: "Las macros de la biblioteca estándar: println!, format!, vec!, assert!, panic!, dbg!, todo!, matches!, write!, include_str!, env!, thread_local! y el resto, cada una con su ficha."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "std"]
+---
+**Ruta:** `std (macros exportadas en la raíz)`
+
+## Para qué sirve
+
+Las macros se reconocen por el `!`. A diferencia de las funciones, pueden recibir un número variable de argumentos y generar código al compilar (por ejemplo, comprobar el texto de formato de `println!`). Todas estas están disponibles en cualquier sitio sin `use`.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`println!, print!, eprintln! y eprint!`](/ref/std/macros/println/) | Escribir texto formateado en la consola. | 1.0 |
+| [`format!`](/ref/std/macros/format/) | Crea un String con texto formateado, igual que println! pero sin imprimir. | 1.0 |
+| [`vec!`](/ref/std/macros/vec/) | Crea un Vec. | 1.0 |
+| [`assert!, assert_eq! y assert_ne!`](/ref/std/macros/assert/) | Comprobar condiciones al ejecutar. | 1.0 |
+| [`panic!`](/ref/std/macros/panic/) | Detiene el hilo actual con un mensaje. | 1.0 |
+| [`dbg!`](/ref/std/macros/dbg/) | Imprime en stderr una expresión, su valor y dónde está, y devuelve el valor. | 1.32 |
+| [`todo!`](/ref/std/macros/todo/) | Marca código sin terminar. | 1.40 |
+| [`unreachable!`](/ref/std/macros/unreachable/) | Marca código que nunca debería ejecutarse; si se ejecuta, entra en pánico. | 1.0 |
+| [`matches!`](/ref/std/macros/matches/) | ¿Encaja este valor con este patrón? Devuelve un bool; admite | y condiciones if. | 1.42 |
+| [`write! y writeln!`](/ref/std/macros/write/) | Escribir texto formateado en cualquier destino. | 1.0 |
+| [`debug_assert!` y familia](/ref/std/macros/debug-assert/) | Como `assert!`, pero solo en *debug*. | 1.0 |
+| [`unimplemented!`](/ref/std/macros/unimplemented/) | Marca algo no implementado; entra en pánico. | 1.0 |
+| [`file!, line!, column!, module_path!`](/ref/std/macros/ubicacion/) | Dónde está escrita la macro, calculado al compilar. | 1.0 |
+| [`concat!` y `stringify!`](/ref/std/macros/concat-stringify/) | Unir literales y convertir código en texto, al compilar. | 1.0 |
+| [`env!` y `option_env!`](/ref/std/macros/env/) | Variables de entorno leídas al compilar. | 1.0 |
+| [`include_str!, include_bytes!, include!`](/ref/std/macros/include/) | Meter el contenido de un archivo en el programa al compilar. | 1.0 |
+| [`compile_error!`](/ref/std/macros/compile-error/) | Detener la compilación con un mensaje propio. | 1.20 |
+| [`format_args!`](/ref/std/macros/format-args/) | Texto formateado sin reservar memoria. | 1.0 |
+| [`thread_local!`](/ref/std/macros/thread-local/) | Variables propias de cada hilo. | 1.0 |
+| [`&raw`, `addr_of!`, `addr_of_mut!`](/ref/std/macros/addr-of/) | Punteros crudos sin pasar por una referencia. | 1.51 |
+| [`cfg!`](/ref/std/macros/cfg/) | Una condición de compilación como `bool`. | 1.0 |
+
+## Conceptos clave
+
+- **Lo que generan se puede ver**: `cargo expand` (una herramienta externa) muestra el código que produce cada macro.
+- **Tus propias macros** se escriben con `macro_rules!` o como macros procedurales.
+
+## Ver también
+
+- [Sintaxis de formato](/ref/std/fmt/sintaxis/)
+- [std::prelude](/ref/std/prelude/)
+
+## Aprende esto en
+
+- [Mundo 19 · Macros](/curso/19-macros/)
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)

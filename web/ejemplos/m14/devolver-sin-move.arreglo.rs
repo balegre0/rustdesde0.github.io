@@ -1,0 +1,9 @@
+fn sumador(n: i32) -> impl Fn(i32) -> i32 {
+    // `move`: el closure se lleva su propia copia de `n`.
+    move |x| x + n
+}
+
+fn main() {
+    let f = sumador(5);
+    println!("{}", f(1));
+}

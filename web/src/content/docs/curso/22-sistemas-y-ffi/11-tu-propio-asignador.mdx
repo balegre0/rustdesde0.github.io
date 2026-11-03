@@ -1,0 +1,83 @@
+---
+title: "Tu propio asignador"
+description: "Sustituye el asignador de todo el programa con #[global_allocator]: uno que cuenta reservas, y un asignador bump completo con alineación y compare_exchange."
+sidebar:
+  order: 11
+duracion: 15
+desde: "1.28"
+requiere: ["22-sistemas-y-ffi/10-no-std-y-alloc", "20-unsafe-y-ub"]
+tarjetas:
+  - p: "¿Qué dos métodos obligatorios tiene GlobalAlloc?"
+    r: "alloc(&self, Layout) -> *mut u8 y dealloc(&self, *mut u8, Layout). realloc y alloc_zeroed tienen implementación por defecto."
+  - p: "¿Cómo se redondea una dirección hacia arriba a un alineamiento potencia de dos?"
+    r: "(dir + alin - 1) & !(alin - 1), o dir.next_multiple_of(alin)."
+  - p: "¿Por qué Box::new(()) no reserva memoria?"
+    r: "Porque () ocupa 0 bytes: Box de un tipo de tamaño cero usa un puntero ficticio y no llama al asignador."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Cada `Vec`, `String` y `Box` de tu programa pide memoria al **asignador global**. Puedes sustituirlo por uno tuyo: para medir, para depurar o porque no hay sistema operativo que te dé uno.
+
+## La idea
+
+Un asignador es un tipo que implementa el trait **`GlobalAlloc`**, marcado con `#[global_allocator]` sobre un `static`:
+
+```rust
+unsafe impl GlobalAlloc for MiAsignador {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 { … }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) { … }
+}
+
+#[global_allocator]
+static GLOBAL: MiAsignador = MiAsignador;
+```
+
+El `Layout` dice **cuántos bytes** y con qué **alineación**. El asignador promete devolver un puntero a un bloque de ese tamaño, alineado, que nadie más esté usando (o un puntero nulo si no hay memoria). Es `unsafe` porque nadie puede comprobar esa promesa por ti.
+
+## Pruébalo
+
+Primero, uno que solo **cuenta** y delega en el del sistema:
+
+<Ejecutar ej="m22/contador-reservas" />
+
+Sorpresas interesantes: `String::from("ñandú")` reserva **7** bytes (la «ñ» y la «ú» ocupan dos); cinco `push` sin capacidad hacen **2** reservas (el vector empieza con capacidad 4 y luego la dobla); y ni `Box::new(())` ni un array en la pila reservan nada.
+
+Ahora uno **completo**: un asignador *bump* sobre un array de 64 KiB, seguro con varios hilos gracias a `compare_exchange`:
+
+<Ejecutar ej="m22/bump" />
+
+<Reto
+  ej="m22/alinear"
+  enunciado="Escribe `alinear_arriba(dir, alin)` **sin** `next_multiple_of`, solo con aritmética de bits: redondea `dir` al siguiente múltiplo de `alin` (que siempre es potencia de dos). Pista: `alin - 1` es una máscara con los bits bajos a 1."
+/>
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El asignador lo usa todo.** También `std` por dentro: el búfer de `stdout`, los nombres de los hilos… Por eso el *bump* lleva repartidos más bytes de los que reservó tu código. Y por eso un asignador **nunca** debe reservar memoria a través de sí mismo (por ejemplo, con `println!` dentro de `alloc`): entraría en un bucle infinito.
+
+**Por qué `compare_exchange_weak` en un bucle.** Dos hilos pueden pedir memoria a la vez. Cada uno calcula su trozo a partir de `siguiente` y trata de avanzarlo con un `compare_exchange`; si otro se le adelantó, vuelve a calcular con el valor nuevo. La versión `weak` puede fallar sin motivo en algunos procesadores, pero dentro de un bucle no importa y es más barata.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Olvidar la alineación">
+
+❌ Devolver `base + siguiente` sin redondear. Un `Vec<u64>` recibiría una dirección impar, y crear referencias a sus elementos sería comportamiento indefinido (y en algunos procesadores, un fallo inmediato).
+
+✅ Redondea **la dirección** (no el desplazamiento) al `layout.align()` antes de entregarla.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántas reservas hace `let mut v = Vec::new(); for i in 0..5u64 { v.push(i); }`?"
+  opciones={["2", "5", "1", "0"]}
+  correcta={0}
+  explicacion="El primer `push` reserva sitio para 4 elementos; el quinto no cabe y la capacidad se duplica a 8: una segunda reserva."
+  porque={["", "No reserva en cada `push`: crece por bloques.", "Con 5 elementos no basta la primera reserva de 4.", "`Vec::new()` no reserva, pero `push` sí."]}
+/>

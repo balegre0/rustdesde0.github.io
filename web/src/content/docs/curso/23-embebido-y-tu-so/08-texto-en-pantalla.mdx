@@ -1,0 +1,56 @@
+---
+title: "Texto en pantalla: el búfer VGA"
+description: "El modo texto VGA: una matriz de celdas de dos bytes (carácter y color) en la dirección 0xb8000. Cómo se escribe, se salta de línea y se desplaza la pantalla."
+sidebar:
+  order: 8
+duracion: 12
+requiere: ["23-embebido-y-tu-so/07-binario-autonomo"]
+tarjetas:
+  - p: "¿Dónde está el búfer de texto VGA y qué forma tiene?"
+    r: "En la dirección física 0xb8000: 25 filas × 80 columnas de celdas de 2 bytes (carácter ASCII de la página de códigos 437 y un byte de color)."
+  - p: "¿Por qué en blog_os la pantalla se escribe con `volatile`?"
+    r: "Porque el programa nunca vuelve a leer lo que escribe: el optimizador podría pensar que esas escrituras sobran y quitarlas."
+  - p: "¿Por qué la «ñ» no se ve bien en el modo texto VGA?"
+    r: "Porque el búfer espera un byte por carácter (de la página de códigos 437), y en UTF-8 la «ñ» ocupa dos bytes."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+Tu núcleo necesita decir algo. En un PC arrancado en modo texto, la forma más sencilla es escribir directamente en la **memoria de vídeo**.
+
+## La idea
+
+En modo texto VGA, la pantalla es una matriz de **25 filas × 80 columnas** que empieza en la dirección física **`0xb8000`**. Cada celda ocupa **2 bytes**:
+
+- el **carácter** (un byte de la página de códigos 437: el ASCII de siempre más símbolos de dibujo);
+- el **color**: 4 bits de color de texto y 4 de fondo.
+
+Escribir `b'H'` y `0x0f` (blanco sobre negro) en `0xb8000` hace aparecer una «H» blanca en la esquina. Un «escritor» de texto lleva la posición del cursor, salta de línea con `\n` y, cuando se llena la pantalla, **desplaza** todo una fila hacia arriba.
+
+## Pruébalo
+
+Una pantalla simulada, más pequeña (5 × 20), con la misma lógica:
+
+<Ejecutar ej="m23/vga" />
+
+Fíjate en la última línea: la «ñ» sale como **dos** cuadraditos. En UTF-8 ocupa dos bytes, y el búfer espera **uno** por carácter. El escritor de blog_os hace lo mismo: sustituye los bytes que no son ASCII imprimible por `■`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Volatile, otra vez.** En el núcleo real, la matriz de celdas es una referencia `&'static mut` a `0xb8000`, y cada celda se escribe con `write_volatile` (blog_os usa un pequeño tipo `Volatile`). El programa nunca vuelve a leer la pantalla, así que, sin `volatile`, el optimizador podría eliminar todas esas escrituras.
+
+**Un `println!` para tu núcleo.** blog_os implementa el trait `core::fmt::Write` para su escritor (solo hace falta `write_str`) y define sus propias macros `print!` y `println!` con `format_args!`. Así tienes el formato completo de Rust (`{}`, `{:?}`, `{:x}`) en tu núcleo, sin `std`. El escritor global se protege con un *spinlock* (`spin::Mutex`), porque todavía no hay hilos ni sistema operativo que dé un mutex.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántos bytes ocupa la pantalla de texto VGA completa?"
+  opciones={["2 000", "4 000", "8 000", "80"]}
+  correcta={1}
+  explicacion="25 × 80 = 2 000 celdas, de 2 bytes cada una: 4 000 bytes."
+  porque={["Ese es el número de celdas, no de bytes.", "", "Cada celda ocupa 2 bytes, no 4.", "80 son las columnas de una fila."]}
+/>

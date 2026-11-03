@@ -1,0 +1,88 @@
+---
+title: "E0184: Copy y Drop a la vez"
+description: "Un tipo implementa Copy y también Drop; Rust lo prohíbe."
+sidebar:
+  order: 19
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` the trait `Copy` cannot be implemented for this type; the type has a destructor ``
+
+## Qué significa
+
+Si un tipo tiene destructor (`Drop`), destruirlo hace algo importante (cerrar, liberar, avisar). Un tipo `Copy` se duplica en silencio cada vez que se asigna: ¿cuántas veces se ejecutaría el destructor? Para evitar esa confusión, un tipo no puede ser `Copy` y tener `Drop`.
+
+## Qué error evita
+
+Que el destructor se ejecute una vez por cada copia invisible, por ejemplo liberando varias veces el mismo recurso.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0184" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0184]: the trait `Copy` cannot be implemented for this type; the type has a destructor
+ --> E0184.rs:2:8
+  |
+1 | #[derive(Clone, Copy)]
+  |                 ---- in this derive macro expansion
+2 | struct Ficha(u32);
+  |        ^^^^^ `Copy` not allowed on types with destructors
+  |
+note: destructor declared here
+ --> E0184.rs:5:5
+  |
+5 |     fn drop(&mut self) {
+  |     ^^^^^^^^^^^^^^^^^^
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Derivar `Copy` en un tipo al que luego se le añade `impl Drop`.
+
+## Cómo arreglarlo
+
+Elige: o `Copy` sin `Drop`, o `Drop` con `Clone` (copias explícitas).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+#[derive(Clone)]
+struct Ficha(u32);
+
+impl Drop for Ficha {
+    fn drop(&mut self) {
+        println!("adiós, ficha {}", self.0);
+    }
+}
+
+fn main() {
+    let f = Ficha(1);
+    println!("{}", f.0);
+}
+```
+
+**Salida:**
+
+```text
+1
+adiós, ficha 1
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0184` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0204](/errores/e0204/): Copy no se puede implementar para este tipo
+- [E0040](/errores/e0040/): llamada explícita a drop()
+
+## Aprende esto en
+
+- [Mundo 06 · Ownership](/curso/06-ownership/)

@@ -1,0 +1,74 @@
+---
+title: "E0600: operador unario no aplicable"
+description: "Aplicas ! o - a un tipo que no lo admite."
+sidebar:
+  order: 55
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot apply unary operator `!` to type `String` ``
+
+## Qué significa
+
+`!x` es el trait `Not` y `-x` es `Neg`. `bool` y los enteros implementan `Not`; los números con signo, `Neg`. Un `String` no implementa ninguno: «negar un texto» no significa nada.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0600" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0600]: cannot apply unary operator `!` to type `String`
+   --> E0600.rs:3:19
+    |
+  3 |     let apagado = !activo;
+    |                   ^^^^^^^ cannot apply unary operator `!`
+    |
+note: `String` does not implement `Not`
+   --> /rustc/…/library/alloc/src/string.rs:353:1
+    |
+353 | pub struct String {
+    | ^^^^^^^^^^^^^^^^^ `String` is defined in another crate
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Usar `!` sobre algo que no es `bool` ni entero.
+- Usar `-` sobre un entero sin signo (`u32`): eso da otro error, porque no implementa `Neg`.
+
+## Cómo arreglarlo
+
+Usa un `bool` real (por ejemplo, una comparación: `!(activo == "sí")` o `activo != "sí"`), o implementa `Not`/`Neg` para tu tipo si tiene sentido.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let activo = true;
+    let apagado = !activo;
+    println!("{apagado}");
+}
+```
+
+**Salida:**
+
+```text
+false
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0600` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0369](/errores/e0369/): operador binario no aplicable
+- [E0308](/errores/e0308/): tipos que no coinciden
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)

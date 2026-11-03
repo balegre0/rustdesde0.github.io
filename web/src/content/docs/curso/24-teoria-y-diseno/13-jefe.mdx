@@ -1,0 +1,55 @@
+---
+title: "Jefe final: el vector que nunca está vacío"
+description: "Diseña un tipo NoVacio<T> cuyo primer elemento y máximo no necesiten Option, porque el tipo hace imposible estar vacío."
+sidebar:
+  order: 13
+duracion: 25
+requiere: ["24-teoria-y-diseno/12-disenar-con-tipos"]
+tarjetas:
+  - p: "¿Por qué `Vec::first` devuelve `Option<&T>`?"
+    r: "Porque el conjunto de valores de `Vec<T>` incluye el vector vacío. Un tipo que excluya ese valor (`NoVacio<T>`) puede devolver `&T` directamente."
+---
+
+import { Reto, Pregunta } from '~/components';
+
+`Vec::first()` devuelve `Option<&T>` porque un `Vec` **puede** estar vacío. Pero muchas veces sabes que no lo está, y aun así tienes que escribir `.unwrap()` por todas partes. Tu último reto es arreglarlo **con el tipo**: un vector que, por construcción, siempre tiene al menos un elemento.
+
+## El reto
+
+<Reto
+  ej="m24/jefe"
+  enunciado="Diseña `NoVacio<T>` para que sea **imposible** que esté vacío. Pista: guarda el primer elemento en un campo propio (`primero: T`) y el resto en un `Vec<T>`. Así, `primero()` y `maximo()` devuelven `&T` sin `Option`. El único sitio donde puede fallar algo es `desde_vec`, que devuelve `None` si le das un vector vacío."
+/>
+
+Fíjate en lo que has hecho: |`NoVacio<T>`| = |T| · |`Vec<T>`|, un producto que **no incluye** el vector vacío. La comprobación «¿está vacío?» ocurre **una sola vez**, en `desde_vec` (*parse, don't validate*), y a partir de ahí el tipo es la prueba.
+
+## Repaso relámpago
+
+<Pregunta
+  pregunta="¿Por qué `maximo` puede devolver `&T` y no `Option<&T>`?"
+  opciones={["Porque usa `unwrap` por dentro", "Porque el tipo garantiza que siempre hay al menos un elemento: `primero`", "Porque `T: PartialOrd`", "Por casualidad"]}
+  correcta={1}
+  explicacion="La garantía está en la forma del struct, no en una comprobación al ejecutar. No hay ningún `unwrap` ni ningún pánico posible."
+  porque={["La solución no usa ningún `unwrap`.", "", "`PartialOrd` permite comparar, pero no garantiza que haya elementos.", "Es diseño."]}
+/>
+
+<Pregunta
+  pregunta="Leído como conjunto, ¿qué valor de `Vec<T>` no tiene equivalente en `NoVacio<T>`?"
+  opciones={["El vector con un elemento", "El vector vacío", "Los vectores con elementos repetidos", "Ninguno"]}
+  correcta={1}
+  explicacion="`NoVacio<T>` es `Vec<T>` menos el vector vacío. Por eso `desde_vec` devuelve `Option`: es la única frontera entre los dos conjuntos."
+  porque={["Es `NoVacio::nuevo(x)`.", "", "Se pueden representar sin problema.", "El vacío no tiene equivalente."]}
+/>
+
+## Has terminado el curso
+
+Empezaste por las carpetas y la terminal. Has visto cómo funciona la memoria, qué hace el compilador con tu código, cómo garantiza Rust la seguridad sin coste al ejecutar, cómo se programan hilos, tareas asíncronas, macros, código `unsafe`, sistemas y microcontroladores, y las ideas que hay debajo de todo.
+
+Lo que viene ahora depende de ti:
+
+- **Construye algo tuyo.** Un intérprete, un emulador, un juego, un servidor, tu propio kernel. Es donde se fija todo lo aprendido.
+- **Sigue repasando.** Las tarjetas del curso te esperan en el [repaso](/repaso/), y los [problemas](/problemas/) y [quizzes](/quizzes/) siguen ahí.
+- **Lee código de otros.** La biblioteca estándar (con `rustup doc` y el botón *source*) es uno de los mejores códigos de Rust que existen.
+- **Contribuye.** Una documentación mejorada, un mensaje de error más claro, una verificación de `core`. El proyecto Rust lo hacen personas como tú.
+
+¡Enhorabuena!

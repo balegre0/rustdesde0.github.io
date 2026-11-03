@@ -1,0 +1,80 @@
+---
+title: "E0624: método privado"
+description: "Llamas desde fuera de su módulo a un método que no es pub."
+sidebar:
+  order: 66
+insignias: ["Nombres, módulos y visibilidad"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` method `calentar` is private ``
+
+## Qué significa
+
+Los métodos de un `impl` también son privados por defecto. `calentar` solo se puede llamar dentro del módulo `motor`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0624" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0624]: method `calentar` is private
+  --> E0624.rs:12:7
+   |
+ 4 |         fn calentar(&self) {
+   |         ------------------ private method defined here
+...
+12 |     m.calentar();
+   |       ^^^^^^^^ private method
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Olvidar `pub` en un método que se usa desde fuera.
+- Llamar a un método auxiliar interno de otro módulo.
+
+## Cómo arreglarlo
+
+Marca el método `pub fn`, o usa el método público que el módulo ofrece para eso.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+mod motor {
+    pub struct Motor;
+    impl Motor {
+        pub fn calentar(&self) {
+            println!("calentando");
+        }
+    }
+}
+
+fn main() {
+    let m = motor::Motor;
+    m.calentar();
+}
+```
+
+**Salida:**
+
+```text
+calentando
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0624` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0603](/errores/e0603/): elemento privado
+- [E0616](/errores/e0616/): campo privado
+- [E0599](/errores/e0599/): no existe ese método para el tipo
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

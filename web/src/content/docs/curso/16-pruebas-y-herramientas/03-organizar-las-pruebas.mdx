@@ -1,0 +1,172 @@
+---
+title: "Organizar las pruebas"
+description: "Pon las pruebas junto al código que prueban, prueba también lo privado y elige qué pruebas ejecutar en cada momento."
+sidebar:
+  order: 3
+duracion: 11
+desde: "1.0"
+requiere: ["16-pruebas-y-herramientas/02-cuando-una-prueba-falla"]
+tarjetas:
+  - p: "¿Qué significa `#[cfg(test)]` encima de `mod tests`?"
+    r: "Que ese módulo solo existe cuando se compila en modo prueba (`cargo test`). En `cargo build` se elimina entero, junto con todo lo que use solo él."
+  - p: "¿Puede una prueba unitaria llamar a una función privada?"
+    r: "Sí. El módulo `tests` es hijo del módulo que prueba, y un módulo hijo ve todo lo de sus antepasados, también lo privado. Por eso se escribe `use super::*;`."
+  - p: "¿Cómo ejecutas solo las pruebas cuyo nombre contiene «media»?"
+    r: "`cargo test media`. El filtro es una subcadena del nombre completo (`tests::media_de_dos`)."
+  - p: "¿Por qué no ves los `println!` de una prueba que pasa?"
+    r: "El arnés captura la salida de cada prueba y solo la enseña si falla. Para verla siempre: `cargo test -- --nocapture` (o `--show-output`)."
+---
+
+import { NoCompila, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Con tres pruebas da igual dónde las pongas. Con trescientas, no. Vas a ver la organización que usa todo el mundo en Rust y cómo ejecutar solo lo que te interesa.
+
+## Predice
+
+Este programa tiene un módulo de pruebas marcado con `#[cfg(test)]`, y `main` intenta usarlo. ¿Por qué no compila con un `rustc` normal?
+
+<NoCompila ej="m16/cfg-test" explicacion="`#[cfg(test)]` significa «compila esto solo si está activa la opción `test`». En un build normal (`cargo build`, `cargo run`) esa opción no está, así que el módulo `tests` se borra antes de compilar y `main` no lo encuentra: E0433. Las pruebas existen solo para `cargo test`." />
+
+## La idea
+
+La costumbre en Rust es poner las **pruebas unitarias** (*unit tests*, las que prueban una pieza pequeña) **en el mismo archivo** que el código, al final, dentro de un módulo llamado `tests`:
+
+```rust
+pub fn media(v: &[f64]) -> Option<f64> { /* … */ }
+
+fn suma_interna(v: &[f64]) -> f64 { /* … privada … */ }
+
+#[cfg(test)]
+mod tests {
+    use super::*; // trae todo lo del módulo padre, también lo privado
+
+    #[test]
+    fn media_de_dos() { /* … */ }
+
+    #[test]
+    fn suma_interna_de_vacio() {
+        assert_eq!(suma_interna(&[]), 0.0); // ✅ se puede probar lo privado
+    }
+}
+```
+
+Tres piezas, tres motivos. `#[cfg(test)]`: el módulo y todo lo que importe solo se compilan para `cargo test`, así no engordan tu programa. `mod tests`: agrupa las pruebas y les da un nombre (por eso salen como `tests::media_de_dos`). `use super::*`: el módulo `tests` es **hijo** del archivo, y las reglas de visibilidad que viste en el mundo 12 dicen que un hijo ve todo lo de su padre. Por eso puedes probar funciones privadas sin hacerlas públicas.
+
+## Pruébalo
+
+Cuando tienes muchas pruebas, no siempre quieres ejecutarlas todas. `cargo test` acepta un **filtro**: solo ejecuta las pruebas cuyo nombre completo contiene ese texto.
+
+```text title="cargo test media (salida real, recortada)"
+running 2 tests
+test tests::media_de_dos ... ok
+test tests::media_vacia_es_none ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+```
+
+Las otras cuatro aparecen como `filtered out`. Algunas opciones más que usarás a menudo (las que van tras `--` son para el programa de pruebas):
+
+| Comando | Qué hace |
+|---|---|
+| `cargo test media` | solo pruebas cuyo nombre contiene `media` |
+| `cargo test -q` | salida corta: un punto por prueba que pasa |
+| `cargo test -- --list` | lista las pruebas sin ejecutarlas |
+| `cargo test -- --nocapture` | muestra los `println!` de las pruebas mientras se ejecutan |
+| `cargo test -- --test-threads=1` | ejecuta las pruebas de una en una, sin hilos |
+| `cargo test -- --exact tests::media_de_dos` | solo la prueba con ese nombre exacto |
+
+Así se ve `cargo test -q media` (real):
+
+```text
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+```
+
+Y esta es la diferencia de `--nocapture` con una prueba que hace `println!("calculando triple(2)...")`. Sin la opción, el texto no aparece. Con ella (real):
+
+```text
+running 1 test
+test tests::triple_de_dos ... calculando triple(2)...
+ok
+```
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`cfg` actúa antes que todo lo demás.** La compilación condicional (*conditional compilation*) se resuelve justo después de leer el código: los elementos con un `cfg` falso se eliminan antes de resolver nombres o comprobar tipos. Por eso el error del principio es «no encuentro `tests`» (E0433) y no algo más sutil. `cargo test` pasa `--cfg test` al compilador; puedes usar el mismo truco para código auxiliar que solo usan las pruebas, como `#[cfg(test)] fn datos_de_ejemplo() -> Vec<f64>`.
+
+**Las pruebas se ejecutan en paralelo.** El arnés lanza varios hilos (tantos como núcleos tenga tu procesador, por defecto) y reparte las pruebas entre ellos. Por eso el orden de las líneas `test … ok` no tiene por qué coincidir con el del archivo, y por eso dos pruebas **no deben compartir estado**: si las dos escriben en el mismo archivo o variable global, el resultado dependerá de quién llegue antes. `--test-threads=1` lo evita, pero a costa de velocidad.
+
+**La salida se captura.** Cada prueba tiene su propio búfer para `print!` y `println!`. Si la prueba pasa, el búfer se tira; si falla, se imprime en la sección de fallos, junto al pánico. Así, cien pruebas que pasan no te llenan la pantalla.
+
+**Herramienta extra: cargo-nextest.** Es un ejecutor de pruebas alternativo (no viene con Rust; se instala aparte con `cargo install cargo-nextest` o un binario precompilado). Ejecuta cada prueba en su **propio proceso**, así que un pánico o un cuelgue en una no afecta a las demás, y suele ser más rápido en proyectos grandes. Se usa con `cargo nextest run`. No viene instalado en el entorno de este curso, así que aquí no ves su salida; su informe es distinto del de `cargo test`, pero las pruebas que escribes son exactamente las mismas.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Dos pruebas que pisan el mismo archivo">
+
+❌ Las dos pruebas usan `datos.txt`. Como se ejecutan a la vez en hilos distintos, a veces una lee lo que escribió la otra. La prueba falla «a ratos», que es el peor tipo de fallo:
+
+```rust
+#[test]
+fn guarda_uno() {
+    std::fs::write("datos.txt", "1").unwrap();
+    assert_eq!(std::fs::read_to_string("datos.txt").unwrap(), "1");
+}
+
+#[test]
+fn guarda_dos() {
+    std::fs::write("datos.txt", "2").unwrap();
+    assert_eq!(std::fs::read_to_string("datos.txt").unwrap(), "2");
+}
+```
+
+✅ Cada prueba usa **sus propios** recursos (aquí, un nombre de archivo distinto), o mejor aún, la función probada recibe los datos en vez de leer archivos:
+
+```rust
+#[test]
+fn guarda_uno() {
+    std::fs::write("datos_uno.txt", "1").unwrap();
+    assert_eq!(std::fs::read_to_string("datos_uno.txt").unwrap(), "1");
+}
+```
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["#[cfg(test)]", "mod tests {", "    use super::*;", "    #[test]", "    fn cero_es_par() {", "        assert!(es_par(0));", "    }", "}"]}
+  distractores={["#[cfg(tests)]", "mod tests;", "    use tests::*;"]}
+  explicacion="Primero el atributo `#[cfg(test)]` y el módulo; dentro, `use super::*` para ver la función del padre; después cada prueba con su propio `#[test]`. `#[cfg(tests)]` (en plural) nunca está activo; `mod tests;` (con punto y coma) buscaría el módulo en otro archivo, y `use tests::*` iría en la dirección contraria."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Escribes `cargo test suma` y hay pruebas llamadas `tests::suma_basica`, `tests::resta` y `tests::suma_negativa`. ¿Cuáles se ejecutan?"
+  opciones={["Ninguna: el filtro debe ser el nombre exacto", "`tests::suma_basica` y `tests::suma_negativa`", "Solo la primera que encuentre", "Las tres, porque todas están en `tests`"]}
+  correcta={1}
+  explicacion="El filtro es una **subcadena**: se ejecutan todas las pruebas cuyo nombre completo contiene `suma`. Para exigir el nombre exacto está `-- --exact`."
+  porque={["Eso solo ocurre con `--exact`.", "Correcto.", "Se ejecutan todas las que coinciden.", "`resta` no contiene `suma`."]}
+/>
+
+<Pregunta
+  pregunta="Tu prueba hace `println!` para depurar, pero al ejecutar `cargo test` no ves nada. ¿Por qué?"
+  opciones={["Porque `println!` no funciona dentro de las pruebas", "Porque el arnés captura la salida y solo la muestra si la prueba falla", "Porque las pruebas escriben en un archivo de registro", "Porque `#[cfg(test)]` desactiva `println!`"]}
+  correcta={1}
+  explicacion="La salida se guarda en un búfer por prueba. Si pasa, se descarta. Con `cargo test -- --nocapture` la ves en directo."
+  porque={["Funciona; solo que su salida se captura.", "Correcto.", "No se escribe en ningún archivo.", "`cfg(test)` decide qué se compila, no qué se imprime."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué conviene que tus pruebas no dependan unas de otras ni de su orden?"
+  opciones={["Porque Rust las ejecuta en orden alfabético inverso", "Porque se ejecutan en paralelo, en varios hilos, y el orden puede cambiar de una vez a otra", "Porque cada prueba se compila en un crate distinto", "No importa: siempre se ejecutan en el orden del archivo"]}
+  correcta={1}
+  explicacion="El arnés reparte las pruebas entre varios hilos. Si una prueba necesita que otra haya pasado antes, a veces funcionará y a veces no."
+  porque={["No hay ningún orden garantizado.", "Correcto.", "Las pruebas unitarias de un archivo van todas en el mismo programa de pruebas.", "El orden no está garantizado."]}
+/>

@@ -1,0 +1,1 @@
+{ "nota": "Tamaños de wasm32. En un PC de 64 bits, String ocupa 24 bytes y &str, 16." }

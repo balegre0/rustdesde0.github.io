@@ -1,0 +1,207 @@
+---
+title: "Atributos"
+description: "Sintaxis de los atributos y la lista completa de atributos integrados de Rust 1.99."
+sidebar:
+  order: 120
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Cada atributo tiene su **ficha** con ejemplo compilado (enlace «ficha» en cada fila). Un **atributo** es una anotación `#[…]` que da información extra al compilador sobre el elemento que tiene debajo: cómo compilarlo, qué avisos dar, qué código generar.
+
+## En una frase
+
+`#[atributo]` (externo) se aplica a lo que viene a continuación; `#![atributo]` (interno) se aplica a lo que lo contiene, normalmente el crate o módulo entero.
+
+## Sintaxis
+
+```text
+#[nombre]                       // palabra suelta: #[test]
+#[nombre = "valor"]             // clave = literal: #[path = "otro.rs"]
+#[nombre(lista, de = "cosas")]  // lista: #[derive(Debug, Clone)]
+#[unsafe(nombre…)]              // atributo inseguro (edición 2024)
+#![nombre…]                     // interno: al principio del archivo o bloque
+#[herramienta::nombre]          // de herramienta: rustfmt::, clippy::, diagnostic::
+```
+
+Pueden ir sobre elementos, campos, variantes, parámetros de funciones, expresiones de bloque y sentencias (no todos los atributos valen en todas partes).
+
+### Atributos inseguros
+
+Algunos atributos pueden causar comportamiento indefinido si se usan mal, porque afectan a los símbolos que ve el enlazador. Desde la edición 2024 se escriben dentro de `unsafe(…)`:
+
+- `#[unsafe(no_mangle)]` — exporta el símbolo con su nombre tal cual; si choca con otro símbolo, el resultado es indefinido;
+- `#[unsafe(export_name = "…")]`;
+- `#[unsafe(link_section = "…")]`;
+- `#[unsafe(naked)]` — función sin prólogo ni epílogo, cuyo cuerpo es solo `naked_asm!`.
+
+## Lista completa de atributos integrados
+
+### Compilación condicional
+
+| Atributo | Para qué |
+|---|---|
+| `cfg(predicado)` | incluye el elemento solo si se cumple el predicado: `unix`, `windows`, `target_os = "linux"`, `target_arch`, `target_pointer_width = "64"`, `target_endian`, `target_feature`, `target_has_atomic`, `debug_assertions`, `test`, `panic = "abort"`, `feature = "x"`, `true`/`false`; se combinan con `all()`, `any()`, `not()` · [ficha](/ref/lenguaje/atributos/cfg/) |
+| `cfg_attr(predicado, atributos…)` | añade atributos solo si se cumple el predicado · [ficha](/ref/lenguaje/atributos/cfg/) |
+
+La macro `cfg!(…)` evalúa lo mismo como un `bool`, y `cfg_select!` (1.95) elige entre bloques de código.
+
+### Pruebas
+
+| Atributo | Para qué |
+|---|---|
+| `test` | marca una función como prueba (`cargo test`) · [ficha](/ref/lenguaje/atributos/test/) |
+| `ignore` | la prueba no se ejecuta salvo que se pida · [ficha](/ref/lenguaje/atributos/test/) |
+| `should_panic`, `should_panic(expected = "…")` | la prueba pasa si hay pánico (con ese texto) · [ficha](/ref/lenguaje/atributos/test/) |
+
+### Derive
+
+| Atributo | Para qué |
+|---|---|
+| `derive(…)` | genera implementaciones: `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash`, `Default`, y derives de crates · [ficha](/ref/lenguaje/atributos/derive/) |
+| `automatically_derived` | marca las implementaciones generadas por `derive` · [ficha](/ref/lenguaje/atributos/derive/) |
+
+### Macros
+
+| Atributo | Para qué |
+|---|---|
+| `macro_export` | exporta una `macro_rules!` desde la raíz del crate · [ficha](/ref/lenguaje/atributos/macro_export/) |
+| `macro_use` | amplía el alcance de las macros de un módulo, o las importa de un `extern crate` · [ficha](/ref/lenguaje/atributos/macro_export/) |
+| `proc_macro` | define una macro procedural tipo función · [ficha](/ref/lenguaje/atributos/proc_macro/) |
+| `proc_macro_derive(Nombre, attributes(…))` | define una macro derive · [ficha](/ref/lenguaje/atributos/proc_macro/) |
+| `proc_macro_attribute` | define una macro atributo · [ficha](/ref/lenguaje/atributos/proc_macro/) |
+
+### Diagnósticos
+
+| Atributo | Para qué |
+|---|---|
+| `allow(lint)`, `warn(lint)`, `deny(lint)`, `forbid(lint)` | cambian el nivel de un aviso; `forbid` no se puede revertir más abajo · [ficha](/ref/lenguaje/atributos/lints/) |
+| `expect(lint)` | como `allow`, pero avisa si el aviso **no** aparece (1.81) · [ficha](/ref/lenguaje/atributos/lints/) |
+| `deprecated(since = "…", note = "…")` | avisa a quien use el elemento · [ficha](/ref/lenguaje/atributos/deprecated/) |
+| `must_use`, `must_use = "motivo"` | avisa si se ignora el valor (en funciones, tipos y traits) · [ficha](/ref/lenguaje/atributos/must_use/) |
+| `diagnostic::on_unimplemented(message = "…", label = "…", note = "…")` | personaliza el error cuando un tipo no implementa tu trait (1.78) · [ficha](/ref/lenguaje/atributos/diagnostic/) |
+| `diagnostic::do_not_recommend` | no sugerir esa implementación en los errores (1.85) · [ficha](/ref/lenguaje/atributos/diagnostic/) |
+
+### ABI, enlazado, símbolos y FFI
+
+| Atributo | Para qué |
+|---|---|
+| `link(name = "…", kind = "…")` | biblioteca nativa para un bloque `extern` · [ficha](/ref/lenguaje/atributos/link/) |
+| `link_name = "…"` | nombre del símbolo de una función o `static` externos · [ficha](/ref/lenguaje/atributos/link/) |
+| `link_ordinal(n)` | símbolo por número (Windows) · [ficha](/ref/lenguaje/atributos/link/) |
+| `no_link` | no enlazar un `extern crate` · [ficha](/ref/lenguaje/atributos/link/) |
+| `repr(…)` | layout: `C`, `transparent`, `u8`…`i128`, `packed(N)`, `align(N)` · [ficha](/ref/lenguaje/atributos/repr/) |
+| `crate_type = "…"` | tipo de crate: `bin`, `lib`, `rlib`, `dylib`, `cdylib`, `staticlib`, `proc-macro` · [ficha](/ref/lenguaje/atributos/crate_type/) |
+| `no_main` | no generar el símbolo `main` · [ficha](/ref/lenguaje/atributos/no_std/) |
+| `export_name = "…"` (inseguro) | nombre exportado del símbolo · [ficha](/ref/lenguaje/atributos/simbolos/) |
+| `link_section = "…"` (inseguro) | sección del archivo objeto · [ficha](/ref/lenguaje/atributos/simbolos/) |
+| `no_mangle` (inseguro) | no codificar el nombre del símbolo · [ficha](/ref/lenguaje/atributos/simbolos/) |
+| `used` | conservar un `static` aunque parezca no usarse · [ficha](/ref/lenguaje/atributos/simbolos/) |
+| `crate_name = "…"` | nombre del crate · [ficha](/ref/lenguaje/atributos/crate_type/) |
+
+### Generación de código
+
+| Atributo | Para qué |
+|---|---|
+| `inline`, `inline(always)`, `inline(never)` | sugerencia de expandir la función en cada llamada · [ficha](/ref/lenguaje/atributos/inline/) |
+| `cold` | la función casi nunca se llama · [ficha](/ref/lenguaje/atributos/cold/) |
+| `naked` (inseguro) | sin prólogo ni epílogo (1.88) · [ficha](/ref/lenguaje/atributos/naked/) |
+| `no_builtins` | no sustituir código por funciones integradas (como copias de memoria) · [ficha](/ref/lenguaje/atributos/otros-codegen/) |
+| `target_feature(enable = "…")` | compilar con instrucciones extra de la CPU; en funciones seguras desde 1.86 · [ficha](/ref/lenguaje/atributos/target_feature/) |
+| `track_caller` | `Location::caller()` y los pánicos informan del sitio de la llamada · [ficha](/ref/lenguaje/atributos/track_caller/) |
+| `instruction_set(…)` | juego de instrucciones de la función (por ejemplo, ARM o Thumb) · [ficha](/ref/lenguaje/atributos/otros-codegen/) |
+
+### Documentación
+
+| Atributo | Para qué |
+|---|---|
+| `doc = "…"`, `doc(hidden)`, `doc(alias = "…")`, `doc(inline)`… | documentación; `///` y `//!` son azúcar de `#[doc = "…"]` · [ficha](/ref/lenguaje/atributos/doc/) |
+
+### Preludios
+
+| Atributo | Para qué |
+|---|---|
+| `no_std` | el crate no enlaza `std`, solo `core` (y `alloc` si se pide) · [ficha](/ref/lenguaje/atributos/no_std/) |
+| `no_implicit_prelude` | el módulo no recibe ningún prelude · [ficha](/ref/lenguaje/atributos/no_implicit_prelude/) |
+
+### Módulos
+
+| Atributo | Para qué |
+|---|---|
+| `path = "archivo.rs"` | de qué archivo cargar un `mod` · [ficha](/ref/lenguaje/atributos/path/) |
+
+### Límites
+
+| Atributo | Para qué |
+|---|---|
+| `recursion_limit = "N"` | profundidad máxima de expansión de macros y otras recursiones (por defecto 128) · [ficha](/ref/lenguaje/atributos/limites/) |
+| `type_length_limit = "N"` | tamaño máximo de un tipo polimórfico · [ficha](/ref/lenguaje/atributos/limites/) |
+
+### Runtime
+
+| Atributo | Para qué |
+|---|---|
+| `panic_handler` | la función que se ejecuta en un pánico (en `no_std`) · [ficha](/ref/lenguaje/atributos/panic_handler/) |
+| `global_allocator` | el asignador de memoria global · [ficha](/ref/lenguaje/atributos/global_allocator/) |
+| `windows_subsystem = "windows"` | ejecutable de Windows sin consola · [ficha](/ref/lenguaje/atributos/windows_subsystem/) |
+
+### Features
+
+| Atributo | Para qué |
+|---|---|
+| `feature(…)` | activa características inestables; **solo** en el compilador nightly · [ficha](/ref/lenguaje/atributos/feature/) |
+
+### Sistema de tipos
+
+| Atributo | Para qué |
+|---|---|
+| `non_exhaustive` | en un struct, enum o variante: otros crates no pueden construirlo con todos sus campos ni hacer `match` sin `_` o `..` · [ficha](/ref/lenguaje/atributos/non_exhaustive/) |
+
+### Depurador
+
+| Atributo | Para qué |
+|---|---|
+| `debugger_visualizer(…)` | incrusta un archivo que describe cómo mostrar un tipo en el depurador (1.71) · [ficha](/ref/lenguaje/atributos/depurador/) |
+| `collapse_debuginfo(…)` | cómo se ven las llamadas a macros en la información de depuración (1.79) · [ficha](/ref/lenguaje/atributos/depurador/) |
+
+### Atributos de herramientas
+
+`#[rustfmt::skip]` (no formatear), `#[clippy::…]` (avisos de Clippy) y el espacio de nombres `diagnostic::`. El compilador los acepta sin conocerlos. [Ficha](/ref/lenguaje/atributos/herramientas/).
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/atributos-varios" />
+
+Salida (en el navegador, donde los punteros son de 32 bits):
+
+```text
+1.99 Version { mayor: 0, menor: 0 } true
+4
+no 64 bits
+línea 49
+true
+Lento
+```
+
+## Errores típicos
+
+<NoCompila ej="ref-lenguaje/atributos-error" />
+
+En la edición 2024: `error: unsafe attribute used without unsafe`, con la ayuda `wrap the attribute in unsafe(...)`.
+
+<NoCompila ej="ref-lenguaje/atributos-must-use" />
+
+Con `#![deny(unused_must_use)]`: `error: unused return value of calcular that must be used`.
+
+## Desde
+
+Rust 1.0. Atributos inseguros `#[unsafe(…)]`: 1.82, obligatorios en la edición 2024. Ver cada fila para los añadidos.
+
+## Ver también
+
+- [Macros](/ref/lenguaje/macros/) · [Layout de tipos](/ref/lenguaje/layout-de-tipos/) (`repr`) · [`extern`](/ref/lenguaje/palabras-clave/extern/) · [`unsafe`](/ref/lenguaje/palabras-clave/unsafe/)
+
+## Aprende esto en
+
+- [Mundo 16 · Pruebas y herramientas](/curso/16-pruebas-y-herramientas/) · [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)

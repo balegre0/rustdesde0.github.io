@@ -1,0 +1,88 @@
+---
+title: "Funciones asociadas y Self"
+description: "Escribe constructores como Punto::new y entiende la diferencia entre una función del tipo y un método del valor."
+sidebar:
+  order: 4
+duracion: 10
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones/03-metodos-e-impl"]
+tarjetas:
+  - p: "¿Qué es una función asociada?"
+    r: "Una función dentro de un `impl` que no tiene parámetro `self`. Pertenece al tipo, no a un valor, y se llama con `Tipo::funcion(...)`."
+  - p: "¿Por qué no compila `p.new(1, 2)` si `new` no tiene `self`?"
+    r: "Porque sin `self` no es un método: no se puede llamar con punto (E0599). Se escribe `Punto::new(1, 2)`."
+  - p: "¿Es `new` una palabra especial en Rust?"
+    r: "No. Es solo una convención para el constructor principal. Puedes tener tantos constructores como quieras, con el nombre que quieras."
+  - p: "¿Qué es `Self` dentro de un `impl Tipo`?"
+    r: "Un alias del propio tipo. `Self { x, y }` construye un `Tipo` y `-> Self` devuelve un `Tipo`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a escribir **constructores**: funciones que fabrican valores de tu tipo, como `Punto::new(3, 4)`.
+
+## Predice
+
+<Predice
+  ej="m09/asociadas-predice"
+  opciones={["`(3, 4) y (0, 0)`", "No compila: `new` es una palabra reservada", "No compila: `origen` no tiene parámetros", "`(3, 4) y (3, 4)`"]}
+  correcta={0}
+  explicacion="`new` y `origen` no reciben `self`: son funciones del tipo `Punto`. `origen` reutiliza `new` con `Self::new(0, 0)`."
+  porque={["Correcto.", "`new` no es especial en Rust; es una costumbre.", "Una función asociada puede no tener ningún parámetro.", "`o` se construye con `origen()`, que da (0, 0)."]}
+/>
+
+## La idea
+
+Dentro de un `impl` puedes poner dos clases de funciones:
+
+- **Métodos**: tienen `self` (en alguna de sus tres formas). Se llaman sobre un valor: `rect.area()`.
+- **Funciones asociadas** (*associated functions*): **no** tienen `self`. Pertenecen al tipo y se llaman con dos puntos dobles: `Punto::new(3, 4)`. Las has usado desde el principio: `String::from("hola")` y `Vec::new()` son funciones asociadas.
+
+Rust **no tiene constructores especiales** ni argumentos con valor por defecto. Lo que hay es una costumbre: la función que fabrica el valor «normal» se llama `new`, y las alternativas llevan nombres que explican qué hacen (`desde_fahrenheit`, `origen`, `clasico`). Si crear el valor puede fallar, el constructor devuelve `Option<Self>` (o `Result`, en el mundo 10) en vez de dar un valor roto.
+
+## Pruébalo
+
+<Ejecutar ej="m09/asociadas" />
+
+El paso 1 muestra otra cosa que se puede asociar a un tipo: una **constante asociada** (`const CERO_ABSOLUTO`), que se lee con `Temperatura::CERO_ABSOLUTO` o, dentro del `impl`, con `Self::CERO_ABSOLUTO`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Para el compilador, un método y una función asociada son la misma cosa: funciones cuyo nombre completo es `Temperatura::new`, `Temperatura::describir`… La única diferencia es que el primer parámetro de un método se llama `self`, y eso habilita la sintaxis con punto. Por eso puedes llamar a un método «a lo largo»: `Temperatura::describir(&t)`.
+
+Un constructor que devuelve `Self` **no reserva nada especial**: construye el struct en su marco de pila y lo devuelve por valor, como cualquier otra función. El compilador suele colocarlo directamente donde lo espera quien llama, sin copias de más.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m09/new-como-metodo"
+  explicacion="`new` no tiene `self`, así que no es un método: no se puede llamar con un punto sobre un valor (E0599). El propio rustc lo dice: «this is an associated function, not a method», y te propone `Punto::new(5, 6)`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m09/dado"
+  enunciado="Escribe `Dado::new(caras: u32) -> Self` y `Dado::clasico() -> Self` (un dado de 6 caras, usando `Self::new`). Descomenta `main`. Debe imprimir `dado de 20 caras` y `dado de 6 caras`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estas es una función asociada y no un método?"
+  opciones={["`fn vacio() -> Self`", "`fn len(&self) -> usize`", "`fn limpiar(&mut self)`", "`fn into_bytes(self) -> Vec<u8>`"]}
+  correcta={0}
+  porque={["Correcto: no tiene `self`.", "Tiene `&self`: es un método.", "Tiene `&mut self`: es un método.", "Tiene `self`: es un método que consume el valor."]}
+/>
+
+<Pregunta
+  pregunta="Quieres un constructor de `Email` que rechace textos sin `@`. ¿Qué firma es la más honesta?"
+  opciones={["`fn new(texto: &str) -> Option<Self>`", "`fn new(texto: &str) -> Self`, y si no hay `@` devuelvo un email vacío", "`fn new(&self, texto: &str)`", "`fn new(texto: &str) -> bool`"]}
+  correcta={0}
+  explicacion="El tipo de retorno dice la verdad: puede no haber email. Quien llama está obligado a tratar el `None`."
+  porque={["Correcto.", "Un «email vacío» es un valor inválido disfrazado de válido; los errores aparecen lejos de su causa.", "Un constructor no puede pedir un `self` que todavía no existe.", "Así no obtienes el email, solo un sí o un no."]}
+/>

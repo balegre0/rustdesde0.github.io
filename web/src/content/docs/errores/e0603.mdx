@@ -1,0 +1,79 @@
+---
+title: "E0603: elemento privado"
+description: "Usas desde fuera de un módulo una función, tipo o constante que no es pub."
+sidebar:
+  order: 57
+insignias: ["Nombres, módulos y visibilidad"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` function `saldo_secreto` is private ``
+
+## Qué significa
+
+Todo lo que defines en un módulo es **privado** por defecto: solo lo ve ese módulo y sus hijos. Para usarlo desde fuera hay que marcarlo `pub`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0603" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0603]: function `saldo_secreto` is private
+ --> E0603.rs:8:27
+  |
+8 |     println!("{}", banco::saldo_secreto());
+  |                           ^^^^^^^^^^^^^ private function
+  |
+note: the function `saldo_secreto` is defined here
+ --> E0603.rs:2:5
+  |
+2 |     fn saldo_secreto() -> u32 {
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Olvidar `pub` en funciones de un módulo.
+- Usar un elemento interno de un crate externo que no lo exporta.
+
+## Cómo arreglarlo
+
+Marca el elemento con `pub` (o `pub(crate)` si solo debe verse dentro de tu crate). Si no es tuyo, busca la función pública equivalente.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+mod banco {
+    pub fn saldo_secreto() -> u32 {
+        1000
+    }
+}
+
+fn main() {
+    println!("{}", banco::saldo_secreto());
+}
+```
+
+**Salida:**
+
+```text
+1000
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0603` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0616](/errores/e0616/): campo privado
+- [E0624](/errores/e0624/): método privado
+- [E0432](/errores/e0432/): importación sin resolver
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

@@ -1,0 +1,126 @@
+---
+title: "Devolver valores"
+description: "Haz que tus funciones calculen y devuelvan un resultado con ->, la última expresión del cuerpo y return para salir antes."
+sidebar:
+  order: 3
+duracion: 10
+desde: "1.0"
+requiere: ["05-funciones-y-la-pila/02-parametros"]
+tarjetas:
+  - p: "¿Cómo se indica el tipo que devuelve una función?"
+    r: "Con `->` después de los paréntesis: `fn cuadrado(x: i32) -> i32`."
+  - p: "¿Qué valor devuelve una función si no usas `return`?"
+    r: "El de la última expresión de su cuerpo (sin `;`), porque el cuerpo es un bloque."
+  - p: "¿Para qué sirve `return`?"
+    r: "Para salir de la función antes de llegar al final, entregando un valor."
+  - p: "¿Qué devuelve una función sin `->`?"
+    r: "`()`. Escribir `fn f()` es lo mismo que `fn f() -> ()`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a hacer que tus funciones **respondan**: que calculen algo y te lo devuelvan para usarlo donde quieras.
+
+## Predice
+
+<Predice
+  ej="m05/devolver"
+  opciones={[
+    "`cuadrado(cuadrado(3)) = 9`",
+    "`cuadrado(cuadrado(3)) = 81`",
+    "No compila: no se puede llamar a una función dentro de los paréntesis de otra",
+    "`cuadrado(cuadrado(3)) = 18`"
+  ]}
+  correcta={1}
+  explicacion="Primero se evalúa la llamada de dentro: `cuadrado(3)` vale 9. Después, `cuadrado(9)` vale 81. Una llamada es una expresión y se puede usar donde se pueda usar un valor."
+  porque={[
+    "9 es solo el resultado de la llamada interior; luego se eleva al cuadrado otra vez.",
+    "",
+    "Sí se puede: el argumento puede ser cualquier expresión, también otra llamada.",
+    "Eso sería sumar dos veces 9; aquí se multiplica 9 por 9."
+  ]}
+/>
+
+## La idea
+
+Para que una función devuelva algo, escribes **el tipo de lo que devuelve** detrás de una flecha: `fn cuadrado(x: i32) -> i32`. ¿Y cómo se devuelve el valor? El cuerpo de una función es un **bloque**, y ya sabes (mundo 04) que un bloque vale su **última expresión sin `;`**. Así que basta con terminar el cuerpo con `x * x`.
+
+A veces quieres salir **antes** de llegar al final: por ejemplo, si la entrada es un caso especial. Para eso está `return valor;`, que sale de la función en ese mismo instante. Lo habitual en Rust es usar `return` solo para estas **salidas tempranas** y dejar que la última expresión haga el trabajo normal.
+
+¿Y las funciones de las lecciones anteriores, que no tenían `->`? Devolvían `()`, el valor «nada». `fn saludar()` es lo mismo que `fn saludar() -> ()`.
+
+## Pruébalo
+
+<Ejecutar ej="m05/devolver" />
+
+1. `cuadrado` y `es_par` terminan en una expresión: ese es su resultado. Fíjate en que `n % 2 == 0` ya es un `bool`: no hace falta `if`.
+2. `precio_entrada` usa `return 0;` para el caso especial (menores de 4) y un `if` como expresión para el resto.
+3. Una llamada puede ir dentro de un `println!`, de otra llamada o de cualquier expresión.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Dónde se deja el resultado.** Al volver, la función deja el valor de retorno donde quien la llamó lo espera: si es pequeño (un entero, un `bool`), en un **registro** de la CPU; si es grande, en un espacio que quien llama ha reservado antes en **su** marco de pila. Así el valor sobrevive aunque el marco de la función desaparezca. Lo verás en la lección 6.
+
+**El compilador revisa todos los caminos.** Una función con `-> i32` tiene que devolver un `i32` por **cada** camino posible: cada `return` y la expresión final. Si algún camino llega al final sin valor, no compila. Es la misma regla del mundo 04 («todos los caminos dan un valor del mismo tipo»), aplicada a funciones.
+
+**`return` es una expresión de tipo `!`.** `return 0` nunca produce un valor «ahí» (el programa ya se ha ido), así que su tipo es `!`, el tipo «nunca», que encaja con cualquier otro. Por eso puedes escribir `let x = if mal { return 0 } else { 5 };`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Devolver un valor sin haber declarado el tipo de retorno:
+
+<NoCompila
+  ej="m05/falta-tipo-retorno"
+  explicacion="Sin `->`, la función promete devolver `()`. Pero su cuerpo termina en `x * 2`, un `i32`. La pista lo dice: «try adding a return type: `-> i32`»."
+/>
+
+Dejar un camino sin valor:
+
+<NoCompila
+  ej="m05/rama-sin-valor"
+  explicacion="¿Qué devuelve `signo(0)`? Ni `n > 0` ni `n < 0` son verdad, así que el `if` llega al final sin valor y vale `()`. El arreglo añade el caso que faltaba, y de paso cambia los `return` por expresiones finales, que es lo habitual."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m05/maximo"
+  enunciado="Escribe `maximo(a: i32, b: i32) -> i32`, que devuelve el mayor de dos números, y `maximo3(a, b, c)`, que devuelve el mayor de tres **llamando a `maximo`**."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué devuelve `fn f() -> i32 { return 1; 2 }`?"
+  opciones={["`1`", "`2`", "`3`", "No compila"]}
+  correcta={0}
+  explicacion="`return 1;` sale de la función inmediatamente. La línea `2` no se ejecuta nunca (el compilador avisa de que es código inalcanzable)."
+  porque={[
+    "",
+    "`2` sería el valor si no hubiera `return` antes.",
+    "Una función devuelve un único valor; no se suman.",
+    "Compila, aunque con un aviso de código inalcanzable."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Qué firma es correcta para una función que dice si un número es positivo?"
+  opciones={[
+    "`fn es_positivo(n: i32) -> bool`",
+    "`fn es_positivo(n: i32): bool`",
+    "`fn es_positivo(n) -> bool`",
+    "`fn es_positivo -> bool (n: i32)`"
+  ]}
+  correcta={0}
+  explicacion="Parámetros con tipo entre paréntesis y, después, `->` con el tipo de retorno."
+  porque={[
+    "",
+    "El tipo de retorno va tras `->`, no tras `:`.",
+    "Falta el tipo del parámetro.",
+    "Los parámetros van justo después del nombre."
+  ]}
+/>

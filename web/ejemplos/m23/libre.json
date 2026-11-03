@@ -1,0 +1,1 @@
+{ "plataforma": "local", "flags": "--crate-type lib", "nota": "Biblioteca no_std: compila para cualquier destino, incluido un microcontrolador." }

@@ -1,0 +1,1 @@
+{ "nota": "Direcciones reales de la memoria del navegador (wasm32): la pila ocupa el primer MiB y crece hacia abajo desde 0x100000. En un PC de 64 bits las direcciones y el tamaño de cada marco son otros, pero la pila también crece hacia abajo." }

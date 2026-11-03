@@ -1,0 +1,101 @@
+---
+title: "Read"
+description: "El trait de las fuentes de bytes: read, read_to_string, read_exact y bytes."
+sidebar:
+  order: 3
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::io::Read`
+
+## Sinopsis
+
+```rust
+pub trait Read {
+    // ... y 15 métodos provistos (con implementación por defecto)
+}
+```
+
+## Qué hace
+
+`Read` tiene un método obligatorio, `read`, que llena (en parte) un búfer y dice cuántos bytes ha puesto. Los demás métodos se construyen sobre él. Lo implementan `File`, `Stdin`, `TcpStream`, `&[u8]` (leer de memoria)…
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`read`](#read) | Lee **hasta** `buf.len()` bytes y devuelve cuántos leyó (puede ser menos; `0` = fin). | 1.0 |
+| [`read_to_string`](#read_to_string) | Lee todo lo que queda y lo añade a un `String` (debe ser UTF-8). | 1.0 |
+| [`read_to_end`](#read_to_end) | Lee todo lo que queda y lo añade a un `Vec<u8>`. | 1.0 |
+| [`read_exact`](#read_exact) | Lee exactamente `buf.len()` bytes o devuelve error. | 1.6 |
+| [`bytes`](#bytes) | Iterador de bytes (lento sin búfer). | 1.0 |
+
+### `read`
+
+```rust
+fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error>
+```
+
+Lee **hasta** `buf.len()` bytes y devuelve cuántos leyó (puede ser menos; `0` = fin).
+
+### `read_to_string`
+
+```rust
+fn read_to_string(&mut self, buf: &mut String) -> Result<usize, Error>
+```
+
+Lee todo lo que queda y lo añade a un `String` (debe ser UTF-8).
+
+### `read_to_end`
+
+```rust
+fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize, Error>
+```
+
+Lee todo lo que queda y lo añade a un `Vec<u8>`.
+
+### `read_exact`
+
+```rust
+fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Error>
+```
+
+Lee exactamente `buf.len()` bytes o devuelve error.
+
+### `bytes`
+
+```rust
+fn bytes(self) -> Bytes<Self>
+where
+    Self: Sized,
+```
+
+Iterador de bytes (lento sin búfer).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/io-read" />
+
+**Salida:**
+
+```text
+11 bytes: "hola\nmundo\n"
+3 [97, 98, 99]
+["a", "b"]
+["c", "d"]
+```
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `read_exact` (1.6).
+
+## Ver también
+
+- [BufRead](/ref/std/io/bufread/)
+- [File](/ref/std/fs/file/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)

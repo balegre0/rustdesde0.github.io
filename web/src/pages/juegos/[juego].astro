@@ -1,0 +1,19 @@
+---
+import Practica from '../../components/paginas/Practica.astro';
+import Juego from '../../components/islas/Juego';
+import { itemsCompila, itemsPredice } from '../../lib/practica';
+export function getStaticPaths() {
+  return [
+    { params: { juego: 'compila' }, props: { titulo: '¿Compila? · 60 s', desc: '¿Compila o no compila? Tantos como puedas en 60 segundos.' } },
+    { params: { juego: 'predice' }, props: { titulo: 'Predice la salida · 60 s', desc: '¿Qué imprime? Tantos como puedas en 60 segundos.' } },
+  ];
+}
+const juego = Astro.params.juego as 'compila' | 'predice';
+const { titulo, desc } = Astro.props;
+const items = juego === 'compila' ? itemsCompila() : itemsPredice();
+---
+<Practica titulo={titulo} descripcion={desc} ancho="normal" buscable={false}>
+  <nav class="rdc-migas" aria-label="Migas de pan"><a href="/juegos/">Juegos</a></nav>
+  <Juego client:load juego={juego} items={items} />
+  <p class="rdc-nota-pie">Todos los programas son ejemplos del curso: lo que dice el juego (compila, no compila, qué imprime) salió de compilarlos y ejecutarlos de verdad con rustc 1.99.1.</p>
+</Practica>

@@ -1,0 +1,123 @@
+---
+title: "Constantes y static"
+description: "Declara valores fijos con const y valores globales con static, entiende en qué se diferencian y por qué static mut exige unsafe."
+sidebar:
+  order: 13
+duracion: 12
+desde: "1.0"
+requiere: ["03-valores-y-tipos/02-mut", "03-valores-y-tipos/12-string-y-str"]
+tarjetas:
+  - p: "¿Qué dos cosas exige siempre una `const`?"
+    r: "Un tipo escrito (`const MAX: u8 = 3;`) y un valor que se pueda calcular al compilar."
+  - p: "¿En qué se diferencia una `const` de un `static`?"
+    r: "La `const` es un valor que se copia en cada sitio donde se usa; el `static` es un sitio fijo de memoria, con una única dirección, que vive todo el programa."
+  - p: "¿Qué hace falta para modificar un `static mut`?"
+    r: "Un bloque `unsafe` (error E0133 si no), porque varios hilos podrían tocarlo a la vez."
+  - p: "¿Qué convención de nombres siguen las constantes y los static?"
+    r: "MAYÚSCULAS con guiones bajos: `SEGUNDOS_POR_HORA`."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Algunos valores no cambian nunca: los segundos de una hora, el número máximo de vidas. Hoy vas a declararlos como **constantes**, y vas a conocer su primo, el `static`, que tiene una dirección fija en la memoria.
+
+## Predice
+
+<NoCompila ej="m03/const-sin-tipo" explicacion="Una `const` no infiere su tipo: hay que escribirlo siempre. El compilador te propone `: i32`." />
+
+¿Por qué no compila? Con `let` el tipo es opcional, pero el error dice «falta el tipo del ítem `const`». Las constantes son parte de la «superficie» del programa, visibles desde cualquier función, y Rust exige que su tipo esté escrito y no adivinado.
+
+## La idea
+
+Una **constante** (*constant*) se declara con `const`, en **mayúsculas**, **con su tipo** y con un valor que el compilador pueda calcular **al compilar**:
+
+```rust
+const SEGUNDOS_POR_HORA: u32 = 60 * 60;
+```
+
+Puede ir fuera de cualquier función (al principio del archivo) o dentro de una. Nunca cambia: no existe `const mut`.
+
+Un **`static`** se parece mucho: también lleva tipo, mayúsculas y un valor calculable al compilar. La diferencia es qué es cada uno:
+
+- Una **`const`** es un **valor**. El compilador lo pega allí donde lo uses, como si hubieras escrito el número a mano.
+- Un **`static`** es un **sitio**: un hueco fijo de memoria, con una única dirección, que existe durante todo el programa.
+
+En la práctica, usa `const` para casi todo. `static` es para cuando necesitas que el dato tenga **un solo sitio** (por ejemplo, un texto grande que no quieres duplicar o un dato global que se comparte).
+
+## Pruébalo
+
+<Ejecutar ej="m03/constantes" />
+
+Salida real:
+
+```text
+¡Bienvenida!
+Un día tiene 86400 segundos
+Empiezas con 3 vidas
+[0, 0, 0, 0]
+```
+
+Fíjate en el paso 3: el tamaño de un array tiene que conocerse al compilar, y una `const` sirve justo para eso (`[0; N]`). Una variable `let` no serviría.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Valor copiado frente a sitio fijo">
+Cuando escribes `24 * SEGUNDOS_POR_HORA`, el compilador sustituye la constante por `3600` y, de hecho, calcula `86400` antes de que el programa exista. En el ejecutable no hay ningún «sitio» llamado `SEGUNDOS_POR_HORA`.
+
+Un `static` sí tiene sitio: vive en una zona del ejecutable que se carga en memoria al arrancar (no en la pila ni en el montón) y su dirección es siempre la misma:
+
+<Ejecutar ej="m03/static-direccion" />
+
+```text
+static: misma dirección = true
+const: 7 7
+```
+
+¿Y un `static` que se pueda cambiar? Existe, `static mut`, pero es peligroso: como es global, varias partes del programa (incluso varios hilos a la vez) podrían leerlo y escribirlo al mismo tiempo, y eso es una **carrera de datos** (*data race*), comportamiento indefinido. Por eso Rust exige `unsafe` para tocarlo:
+
+<NoCompila ej="m03/static-mut" explicacion="E0133: usar un `static mut` es inseguro y necesita un bloque `unsafe`. La nota lo explica: los static mutables pueden ser modificados por varios hilos." />
+
+Además, desde la **edición 2024**, crear una referencia `&` a un `static mut` es un error (lint `static_mut_refs`, «creating a shared reference to mutable static»). Lo correcto para datos globales que cambian son tipos seguros como los atómicos o `Mutex`, que verás en el Mundo 17.
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m03/const-mut" explicacion="E0070: una constante no es un sitio donde se pueda escribir; es un valor. Asignarle algo es como escribir `100 = 200`. Si necesitas cambiarlo, es una variable `let mut`." />
+
+<Trampa titulo="Confundir const con «una variable que no cambio»">
+❌ `const total: i32 = precio * cantidad;` dentro de `main`, con `precio` y `cantidad` variables. No compila: el valor de una `const` tiene que poder calcularse **al compilar**, y esas variables solo existen al ejecutar.
+
+✅ Para un valor calculado al ejecutar que no va a cambiar, usa `let` (que ya es inmutable). `const` es para valores fijos conocidos de antemano: límites, tamaños, factores de conversión.
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["const MAX_JUGADORES: usize = 4;", "static NOMBRE_JUEGO: &str = \"Rustáceos\";", "fn main() {", "    let marcador = [0; MAX_JUGADORES];", "    println!(\"{NOMBRE_JUEGO}: {:?}\", marcador);", "}"]}
+  distractores={["const max_jugadores = 4;", "let mut MAX_JUGADORES: usize = 4;"]}
+  explicacion="La constante lleva tipo y mayúsculas, y puede usarse como tamaño de array. El `static` guarda un texto con una única dirección. Los distractores olvidan el tipo (o las mayúsculas) o usan una variable donde hace falta un valor conocido al compilar."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estas declaraciones es correcta?"
+  opciones={["`const LIMITE = 10;`", "`const LIMITE: u32 = 10;`", "`const mut LIMITE: u32 = 10;`", "`let const LIMITE: u32 = 10;`"]}
+  correcta={1}
+  explicacion="`const`, nombre en mayúsculas, dos puntos, tipo y valor."
+  porque={["A una `const` le falta el tipo: no lo infiere.", "", "No existe `const mut`: una constante nunca cambia.", "`let` y `const` son dos formas distintas de declarar; no se combinan."]}
+/>
+
+<Pregunta
+  pregunta="Usas una `const` de 1 MB de datos en diez sitios del programa. ¿Qué puede pasar?"
+  opciones={["Nada: siempre ocupa 1 MB", "El valor puede acabar copiado en cada sitio donde se usa", "No compila", "Se guarda en el montón"]}
+  correcta={1}
+  explicacion="Una `const` se pega donde se usa. Para datos grandes que deben existir una sola vez, `static`."
+  porque={["Eso describe a un `static`, que tiene un único sitio.", "", "Compila; solo es poco eficiente.", "Ni `const` ni `static` viven en el montón."]}
+/>
+
+<Respuesta
+  pregunta="¿Qué palabra clave hace falta para leer o escribir un `static mut`?"
+  respuestas={["unsafe"]}
+  explicacion="Un bloque `unsafe { ... }`: el compilador no puede garantizar que nadie más lo esté usando a la vez."
+/>

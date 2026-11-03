@@ -1,0 +1,108 @@
+---
+title: "Closures move en hilos"
+description: "Entender por qué thread::spawn exige 'static, qué hace move y cómo devolver la propiedad desde el hilo."
+sidebar:
+  order: 2
+duracion: 10
+desde: "1.0"
+requiere: ["17-concurrencia/01-hilos-y-join", "14-closures-e-iteradores/02-captura"]
+tarjetas:
+  - p: "¿Por qué thread::spawn exige que el closure sea 'static?"
+    r: "Porque el hilo puede seguir vivo después de que termine la función que lo creó; un préstamo de una variable local quedaría colgando (uso tras liberar)."
+  - p: "¿Qué hace move delante de un closure?"
+    r: "Obliga al closure a capturar por valor: se queda con la propiedad de las variables que usa (o con una copia si son Copy)."
+  - p: "¿Cómo recuperas un valor que moviste a un hilo?"
+    r: "Haciendo que el closure lo devuelva: join() te entrega ese valor y la propiedad vuelve al hilo que espera."
+  - p: "¿Qué error da usar una variable después de moverla a un hilo?"
+    r: "E0382, «borrow of moved value»: la propiedad ya es del hilo."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a entender el error más común al empezar con hilos y por qué la solución es una sola palabra: `move`.
+
+## Predice
+
+<NoCompila ej="m17/sin-move" explicacion="El closure usa `nombre` por referencia (solo lo lee). Pero `thread::spawn` exige `'static`: el hilo podría seguir vivo después de que `main` libere `nombre`, y entonces leería memoria liberada. El compilador te propone la solución exacta: añadir `move`." />
+
+## La idea
+
+Un closure **captura** las variables que usa de la forma más ligera posible (mundo 14): si solo las lee, se lleva un **préstamo compartido**. Para un closure normal eso es perfecto. Para un hilo, es un peligro: el compilador no sabe cuánto va a durar el hilo. Podría seguir corriendo cuando la función que lo lanzó ya ha terminado y sus variables locales ya no existen. Leer a través de ese préstamo sería un **uso tras liberar**.
+
+Por eso `spawn` exige `F: 'static`: «este closure no contiene préstamos que puedan caducar». La forma de cumplirlo es escribir **`move`** delante del closure. Con `move`, el closure captura **por valor**: se lleva la **propiedad** de cada variable que usa. El dato viaja con el hilo y vive tanto como él.
+
+Que el dato sea del hilo tiene una consecuencia: ya no es de `main`. Si quieres recuperarlo, haz que el closure lo **devuelva**; `join()` te lo entregará y la propiedad volverá contigo.
+
+## Pruébalo
+
+<Ejecutar ej="m17/move-devolver" />
+
+1. `move` lleva `lista` al hilo; `main` ya no puede usarla.
+2. El hilo la ordena y la devuelve como resultado del closure.
+3. `join()` nos da `[1, 2, 3, 4, 5]` y `lista` vuelve a ser nuestra (en una variable nueva con el mismo nombre).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Qué es `'static` aquí.** `T: 'static` no significa «vive para siempre». Significa «**no contiene préstamos con una vida limitada**». Un `String`, un `Vec<i32>` o un `i32` son `'static` aunque se destruyan dentro de un segundo, porque son dueños de lo que tienen. Un `&String` que apunta a una variable de `main` no lo es.
+
+**Qué hay dentro del closure.** Un closure `move` es un struct anónimo con un campo por variable capturada. Para `move || { lista.sort(); lista }`, ese struct tiene un campo `lista: Vec<i32>`: 3 `usize` (puntero, capacidad y longitud). `spawn` mueve ese struct a la memoria del hilo nuevo. El buffer del heap **no se copia**: solo viajan los tres `usize`, y la propiedad pasa con ellos.
+
+**Copia frente a movimiento.** Si la variable es `Copy` (un `i32`, un `char`…), `move` copia el valor y el original sigue siendo usable en `main`. Por eso en la lección anterior `id` se pudo usar dentro del hilo sin perderlo: era un `i32`.
+
+**Lo que evita.** Sin la regla `'static`, este programa sería posible: `main` crea un `String`, lanza un hilo que lo lee por referencia y termina; el `String` se libera y el hilo lee bytes que ya no son suyos. La regla convierte ese uso tras liberar en un error de compilación.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Mover y seguir usando">
+
+❌ Mover un valor al hilo y después usarlo en `main`:
+
+<NoCompila ej="m17/usar-tras-move" explicacion="Tras `move`, `datos` pertenece al hilo. Usarlo en main sería tener dos dueños del mismo Vec a la vez, en hilos distintos." />
+
+✅ Si los dos necesitáis el dato, dale al hilo **su propia copia** (`clone()` antes del `move`) o, si el dato es grande y solo se lee, compártelo con `Arc` (lección 4). Si solo el hilo lo necesita y luego tú, haz que el hilo lo devuelva.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m17/reto-move" enunciado="El programa no compila. Arréglalo para que el hilo cuente las letras de todas las palabras y main pueda seguir usando `palabras` después. Debe imprimir `2 palabras, 7 letras`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estos tipos NO cumple `'static`?"
+  opciones={["`String`", "`Vec<u8>`", "`&'a str` con `'a` una vida local", "`i32`"]}
+  correcta={2}
+  explicacion="`'static` como bound significa «sin préstamos que caduquen». Los tipos dueños de sus datos lo cumplen; un préstamo con vida local, no."
+  porque={["Es dueño de su texto.", "Es dueño de sus bytes.", "Correcto: es un préstamo atado a una vida concreta.", "Es un valor sin préstamos."]}
+/>
+
+<Pregunta
+  pregunta="Escribes `let n = 5; thread::spawn(move || n * 2);` y después imprimes `n` en main. ¿Compila?"
+  opciones={[
+    "No: n se movió al hilo (E0382)",
+    "Sí: n es i32, que es Copy, así que move copió el valor",
+    "No: falta join",
+    "Sí, pero imprime 10"
+  ]}
+  correcta={1}
+  explicacion="Con tipos `Copy`, capturar por valor es copiar. El original sigue en main."
+  porque={["E0382 solo aparece con tipos que no son Copy.", "Correcto.", "join no es obligatorio para compilar.", "El hilo trabaja con su copia; n sigue valiendo 5."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué viaja realmente al otro hilo cuando mueves un `Vec<i32>` de un millón de elementos?"
+  opciones={[
+    "Los cuatro millones de bytes de los elementos",
+    "Solo el puntero, la capacidad y la longitud; el buffer del heap se queda donde está",
+    "Una copia del Vec",
+    "Nada: el hilo lee el Vec de main"
+  ]}
+  correcta={1}
+  explicacion="Mover es copiar los bytes del valor (24 bytes en 64 bits) y dejar de usar el original. El heap es común a todo el proceso, así que el buffer no necesita moverse."
+  porque={["Mover no duplica el heap.", "Correcto.", "Eso sería clone().", "El hilo es ahora el dueño; main ya no puede usarlo."]}
+/>

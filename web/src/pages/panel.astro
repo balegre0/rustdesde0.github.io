@@ -1,0 +1,14 @@
+---
+// /panel/ — tus estadísticas (solo en este navegador): racha, preguntas, acierto por tema, problemas, marcas.
+import Practica from '../components/paginas/Practica.astro';
+import Panel from '../components/islas/Panel';
+import { preguntas, problemas, quizzes, nombreTema } from '../lib/practica';
+const temas = Object.fromEntries(preguntas.map((p) => [p.id, p.tema]));
+const nombres = Object.fromEntries([...new Set(preguntas.map((p) => p.tema))].map((t) => [t, nombreTema(t)]));
+const totales = { preguntas: preguntas.length, problemas: problemas.length };
+const qz = quizzes.map((q) => ({ id: q.id, titulo: q.titulo, total: q.preguntas.length }));
+---
+<Practica titulo="Tu panel" descripcion="Tu racha, tus aciertos por tema, problemas resueltos y mejores marcas. Solo en tu navegador, sin cuentas." ancho="normal" buscable={false}>
+  <p class="rdc-lead">Todo esto se guarda solo en este navegador: no hay cuentas ni clasificaciones. Lo que importa es tu evolución.</p>
+  <Panel client:only="preact" temas={temas} nombres={nombres} totales={totales} quizzes={qz} />
+</Practica>

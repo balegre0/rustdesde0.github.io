@@ -1,0 +1,38 @@
+---
+title: "Mundo 18 · Async"
+description: "Esperar sin bloquear: futures, poll, wakers, Pin y ejecutores, construidos a mano y ejecutados en tu navegador."
+sidebar:
+  order: 0
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+En el mundo anterior aprendiste a hacer varias cosas **a la vez** con hilos. Este mundo resuelve otro problema: hacer muchas cosas que pasan casi todo su tiempo **esperando** (la red, el disco, un temporizador) sin gastar un hilo por cada una.
+
+La herramienta se llama **async** (*asíncrono*). En Rust no es magia: es un trait (`Future`), una función que se llama una y otra vez (`poll`) y un objeto que avisa cuando merece la pena volver a llamarla (`Waker`). Lo vas a construir todo con tus manos, pieza a pieza, y cada pieza se ejecuta aquí mismo, en el navegador, sin hilos.
+
+## Qué vas a conseguir
+
+Al terminar sabrás leer cualquier código async de Rust y explicar qué pasa por debajo: qué ocupa en memoria un future, por qué existe `Pin`, qué hace un ejecutor como Tokio, qué significa «cancelar» y por qué algunas funciones async no se pueden cancelar sin perder datos.
+
+## Lecciones
+
+1. [Por qué async](./01-por-que-async/) — esperar no es trabajar.
+2. [El trait `Future` y `poll`](./02-future-y-poll/) — tu primer future, sondeado a mano.
+3. [El `Waker`](./03-waker/) — «vuelve a llamarme».
+4. [Tu primer ejecutor](./04-ejecutor/) — `block_on` en 30 líneas.
+5. [`async fn` es una máquina de estados](./05-maquina-de-estados/) — los bytes de verdad (120 frente a 24).
+6. [`.await`, bloques y closures async](./06-await/) — componer futures.
+7. [`Pin` a fondo](./07-pin/) — por qué un future no se puede mover.
+8. [Ejecutores y Tokio](./08-ejecutores-y-tokio/) — colas de tareas, reactores y el ecosistema.
+9. [`join`, `select` y cancelación](./09-join-select-cancelacion/) — esperar a todos, al primero, y soltar el resto.
+10. [Async en traits y el debate de los colores](./10-traits-y-colores/) — lo estable, lo que falta y por qué se discute.
+11. [Jefe: un runtime con reloj](./11-jefe/) — tu propio ejecutor con temporizadores.
+
+## Antes de empezar
+
+Necesitas closures y traits (mundos 13 y 14), punteros inteligentes como `Box`, `Rc` y `Arc` (mundo 15), y `Send`/`Sync` del mundo 17. Si `impl Trait`, `Box<dyn Trait>` o `Arc<Mutex<T>>` te suenan raros, repásalos primero: aquí se usan sin pararse.
+
+<Aside type="tip">
+Async es, según las encuestas oficiales, la parte de Rust con la que más gente pelea. No es porque sea difícil de usar, sino porque casi nadie la ve por dentro. Tú la vas a ver por dentro.
+</Aside>

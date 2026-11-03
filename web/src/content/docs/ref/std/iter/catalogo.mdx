@@ -1,0 +1,81 @@
+---
+title: "Iterator: todos los métodos"
+description: "Catálogo completo de los métodos estables de Iterator (y de DoubleEndedIterator y ExactSizeIterator), agrupados por para qué sirven, más las funciones que crean iteradores."
+sidebar:
+  order: 3
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+Todos los métodos de esta página existen en Rust estable 1.99: se comprobaron compilando un programa que los llama uno a uno. Los **adaptadores** devuelven otro iterador y no hacen nada hasta que algo los consume; los **consumidores** recorren el iterador y devuelven un resultado.
+
+## Adaptadores (perezosos)
+
+| Método | Qué hace |
+|---|---|
+| `map(f)` | aplica `f` a cada elemento |
+| `filter(p)` | deja pasar los que cumplen `p` |
+| `filter_map(f)` | `map` + quitar los `None` |
+| `flat_map(f)` | `f` devuelve algo iterable; se aplana |
+| `flatten()` | aplana un iterador de iterables (o de `Option`/`Result`) |
+| `enumerate()` | pares `(índice, elemento)` |
+| `zip(otro)` | pares con otro iterador; termina con el más corto |
+| `chain(otro)` | uno detrás de otro |
+| `take(n)`, `skip(n)` | los primeros `n` / saltar `n` |
+| `take_while(p)`, `skip_while(p)` | mientras se cumpla `p` |
+| `map_while(f)` | `map` mientras `f` devuelva `Some` (1.57) |
+| `step_by(n)` | uno de cada `n` |
+| `scan(estado, f)` | como `fold`, pero emite cada paso |
+| `peekable()` | permite mirar el siguiente con `peek` sin consumirlo |
+| `fuse()` | tras el primer `None`, siempre `None` |
+| `inspect(f)` | mirar cada elemento al pasar (para depurar) |
+| `rev()` | al revés (necesita `DoubleEndedIterator`) |
+| `cycle()` | repetir sin fin (necesita `Clone`) |
+| `copied()`, `cloned()` | de `&T` a `T` |
+| `by_ref()` | usar el iterador sin consumirlo entero |
+
+## Consumidores
+
+| Método | Devuelve |
+|---|---|
+| `collect()` | cualquier colección (`Vec`, `String`, `HashMap`…, o `Result<Vec<_>, E>`) |
+| `count()`, `sum()`, `product()` | cuántos, la suma, el producto |
+| `fold(inicio, f)` | acumulado con valor inicial |
+| `reduce(f)` | acumulado empezando por el primero; `None` si vacío (1.51) |
+| `try_fold`, `try_for_each` | como `fold`/`for_each`, pero se detienen en el primer error o `None` |
+| `for_each(f)` | ejecutar `f` en cada uno |
+| `last()`, `nth(n)` | el último / el enésimo |
+| `min()`, `max()` | el menor / mayor (`Ord`) |
+| `min_by_key`, `max_by_key`, `min_by`, `max_by` | con clave o comparación propias |
+| `find(p)`, `find_map(f)` | el primero que cumple / primer `Some` |
+| `position(p)`, `rposition(p)` | índice del primero / último que cumple |
+| `any(p)`, `all(p)` | ¿alguno? ¿todos? |
+| `partition(p)` | dos colecciones: los que cumplen y los que no |
+| `unzip()` | de pares a dos colecciones |
+| `cmp`, `partial_cmp`, `eq`, `ne`, `lt`, `le`, `gt`, `ge` | comparar con otro iterador, elemento a elemento |
+| `is_sorted()`, `is_sorted_by`, `is_sorted_by_key` | ¿está ordenado? (1.82) |
+| `size_hint()` | cotas del número de elementos que quedan |
+
+**De `DoubleEndedIterator`**: `next_back`, `nth_back`, `rfold`, `rfind`. **De `ExactSizeIterator`**: `len`.
+
+## Crear iteradores
+
+| Función | Qué produce |
+|---|---|
+| `iter::once(x)` | un solo elemento |
+| `iter::repeat(x)` | `x` sin fin |
+| `iter::repeat_n(x, n)` | `x`, `n` veces (1.82) |
+| `iter::empty()` | ninguno |
+| `iter::from_fn(f)` | llama a `f` hasta que devuelva `None` |
+| `iter::successors(primero, f)` | cada elemento calculado a partir del anterior |
+| `iter::zip(a, b)` | como `a.zip(b)`, pero simétrico (1.59) |
+
+## Ejemplo
+
+Los métodos menos conocidos, en acción:
+
+<Ejecutar ej="ref-std/cat-iterator" />
+
+## Ver también
+
+[Adaptadores](/ref/std/iter/adaptadores/) · [El trait Iterator](/ref/std/iter/iterator/) · [Mundo 14](/curso/14-closures-e-iteradores/)

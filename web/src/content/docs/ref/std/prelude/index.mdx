@@ -1,0 +1,65 @@
+---
+title: "std::prelude"
+description: "Lo que todo programa ve sin escribir use: Option, Result, Vec, String, Box, los traits básicos y más."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::prelude`
+
+## Para qué sirve
+
+El **preludio** (*prelude*) es una lista corta de nombres que el compilador importa **automáticamente** en cada módulo. Por eso puedes escribir `Vec::new()`, `Some(3)` o `x.clone()` sin ningún `use`. Todo lo demás de la biblioteca estándar hay que importarlo (`use std::collections::HashMap;`).
+
+Cada **edición** del lenguaje tiene su preludio (`std::prelude::rust_2015`, `rust_2018`, `rust_2021`, `rust_2024`). Tu crate usa el de su edición; en la edición 2024 es `std::prelude::rust_2024`. Las ediciones solo **añaden** nombres: la 2021 trajo `TryFrom`, `TryInto` y `FromIterator`, y la 2024, `Future` e `IntoFuture`.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Option, Some, None`](/ref/std/option/option/) | Un valor que puede no estar. | 1.0 |
+| [`Result, Ok, Err`](/ref/std/result/result/) | El resultado de algo que puede fallar. | 1.0 |
+| [`Vec`](/ref/std/vec/vec/) | Lista que crece. | 1.0 |
+| [`String`](/ref/std/string/string/) | Texto UTF-8 con propiedad. | 1.0 |
+| [`Box`](/ref/std/boxed/box/) | Un valor en el montón. | 1.0 |
+| `ToString` | `.to_string()` para todo lo que implementa `Display`. | 1.0 |
+| `ToOwned` | `.to_owned()`: de prestado a propio (`&str` → `String`). | 1.0 |
+| `Clone` | `.clone()`: copia explícita. | 1.26 |
+| [`Copy, Send, Sync, Sized, Unpin`](/ref/std/marker/) | Traits marcador. | 1.0 |
+| [`Drop, drop`](/ref/std/ops/drop/) | Destructores; `drop(x)` destruye ya. | 1.13 |
+| [`Fn, FnMut, FnOnce`](/ref/std/ops/fn/) | Lo que se puede llamar (closures, funciones). | 1.35 |
+| [`From, Into, TryFrom, TryInto`](/ref/std/convert/from/) | Conversiones (TryFrom/TryInto desde la edición 2021). | 1.24 |
+| [`AsRef, AsMut`](/ref/std/convert/asref/) | Préstamos baratos de un tipo a otro. | 1.7 |
+| [`Iterator, IntoIterator, DoubleEndedIterator, ExactSizeIterator, Extend, FromIterator`](/ref/std/iter/iterator/) | Iteradores (FromIterator desde la edición 2021). | 1.0 |
+| [`PartialEq, Eq, PartialOrd, Ord`](/ref/std/cmp/ord/) | Comparaciones. | 1.0 |
+| `Default` | Valor por defecto: `T::default()`. | 1.9 |
+| [`Future, IntoFuture`](/ref/std/future/) | Async (en el preludio desde la edición 2024). | 1.36 |
+| [`Las macros (println!, vec!, format!...)`](/ref/std/macros/) | Las macros de std se ven en todo el crate sin importarlas. | — |
+
+## Conceptos clave
+
+- **No es magia**: es un módulo normal, `std::prelude::rust_2024`, y el compilador añade por ti algo equivalente a `use std::prelude::rust_2024::*;` al principio de cada módulo.
+- **Tus nombres ganan**: si defines tu propio `Result`, tapa al del preludio dentro de ese módulo.
+- **Los tipos primitivos** (`i32`, `bool`, `str`, `char`…) no vienen del preludio: son parte del lenguaje.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/prelude-sin-use" />
+
+**Salida:**
+
+```text
+Some("Ana") Ok(42) 2
+```
+
+## Ver también
+
+- [Biblioteca estándar: core, alloc y std](/ref/std/)
+- [Macros](/ref/std/macros/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

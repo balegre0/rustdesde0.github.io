@@ -1,0 +1,98 @@
+---
+title: "BTreeMap, HashSet y BTreeSet"
+description: "Mapas con las claves siempre ordenadas, rangos de claves, y conjuntos para guardar cada valor una sola vez, con unión, intersección y diferencia."
+sidebar:
+  order: 9
+duracion: 13
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/08-hashmap"]
+tarjetas:
+  - p: "¿En qué se diferencia BTreeMap de HashMap?"
+    r: "BTreeMap mantiene las claves ordenadas (recorrido en orden, rangos, primera y última); HashMap no tiene orden pero suele ser más rápido. BTreeMap exige K: Ord; HashMap, K: Hash + Eq."
+  - p: "¿Qué devuelve set.insert(x) en un HashSet?"
+    r: "true si x no estaba (y lo añade); false si ya estaba."
+  - p: "¿Cómo se obtienen las claves de un BTreeMap entre 9 y 15, ambas incluidas?"
+    r: "mapa.range(9..=15)."
+  - p: "¿En qué orden ordena un BTreeMap<&str, _> las claves con tildes?"
+    r: "Por bytes (UTF-8): las letras con tilde, como «Á», van después de todas las letras sin tilde."
+---
+
+import { Ejecutar, Predice, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+El `HashMap` de la lección anterior no tiene orden. Muchas veces lo necesitas: una agenda alfabética, un historial por horas, un ranking. Y otras veces no quieres pares clave–valor, sino solo **saber si algo está**. Para eso hay cuatro colecciones más.
+
+## Predice
+
+<Predice
+  ej="m11/btree-predice"
+  opciones={["`{\"Ana\": 9, \"Luis\": 6, \"Zoe\": 8}` y `3`", "`{\"Zoe\": 8, \"Ana\": 9, \"Luis\": 6}` y `3`", "`{\"Ana\": 9, \"Luis\": 6, \"Zoe\": 8}` y `6`", "El orden cambia en cada ejecución"]}
+  correcta={0}
+  explicacion="`BTreeMap` ordena por clave, se inserten como se inserten. `HashSet` guarda cada valor una vez: de `3, 1, 3, 2, 1, 3` quedan 3."
+  porque={["", "Ese sería el orden de inserción, y un `BTreeMap` no lo guarda.", "Los repetidos no cuentan dos veces en un conjunto.", "Eso le pasa a `HashMap`, no a `BTreeMap`."]}
+/>
+
+## La idea
+
+| Colección | Guarda | Orden | Exige |
+|---|---|---|---|
+| `HashMap<K, V>` | pares | ninguno | `K: Hash + Eq` |
+| **`BTreeMap<K, V>`** | pares | **por clave** | `K: Ord` |
+| **`HashSet<T>`** | valores únicos | ninguno | `T: Hash + Eq` |
+| **`BTreeSet<T>`** | valores únicos | **ordenados** | `T: Ord` |
+
+Lo que solo tienen las versiones `BTree`:
+
+- recorrer en orden (y al revés, con `.iter().rev()`);
+- **rangos**: `mapa.range(9..=15)`;
+- primero y último: `first_key_value()`, `last_key_value()`, `pop_first()`.
+
+Los **conjuntos** responden «¿está?» (`contains`) y saben combinarse:
+
+| Operación | Método | Resultado |
+|---|---|---|
+| en los dos | `a.intersection(&b)` | ∩ |
+| en alguno | `a.union(&b)` | ∪ |
+| en `a` pero no en `b` | `a.difference(&b)` | ∖ |
+
+## Pruébalo
+
+<Ejecutar ej="m11/btree-y-sets" />
+
+Fíjate en la agenda: «Álvaro» sale el **último**. El orden de los `&str` es por **bytes** de UTF-8, y la «Á» (bytes `0xC3 0x81`) va después de cualquier letra ASCII. Para un orden alfabético «de diccionario» en español hace falta una biblioteca de *collation* (por ejemplo, `icu_collator`).
+
+Y `insert` de un `HashSet` devuelve si el valor era nuevo: así se detectan repetidos en una sola pasada.
+
+<Reto
+  ej="m11/ranking"
+  enunciado="Muestra el ranking de mayor a menor puntuación usando un `BTreeMap<u32, &str>` (puntos → nombre) y recorriéndolo al revés. Debe imprimir `300 Luis`, `250 Zoe` y `120 Ana`."
+/>
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Un árbol B, no un árbol binario.** `BTreeMap` guarda las claves en nodos de hasta 11 elementos, ordenados dentro de cada nodo. Al tener muchos elementos por nodo, aprovecha muy bien la caché del procesador: buscar cuesta O(log n) pero con pocos saltos de memoria.
+
+**`HashSet<T>` es un `HashMap<T, ()>`.** Literalmente: por dentro es un mapa cuyo valor es `()`, que ocupa 0 bytes. Lo mismo `BTreeSet<T>` con `BTreeMap<T, ()>`.
+
+**¿Cuál es más rápido?** Para buscar e insertar, normalmente `HashMap` (O(1) en promedio), aunque calcular el hash tiene un coste fijo. Con claves pequeñas y pocos elementos, `BTreeMap` puede ganar. Si necesitas orden, la pregunta ni se plantea.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Un HashSet de tus propios tipos">
+
+<NoCompila ej="m11/set-sin-hash" explicacion="Para guardar un valor en un conjunto de hash hay que poder calcular su hash y compararlo con igualdad total. Arreglo: `#[derive(Debug, PartialEq, Eq, Hash)]`. Para un `BTreeSet`, deriva también `PartialOrd` y `Ord`." />
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tienes dos listas de alumnos y quieres los que están en las dos, ordenados. ¿Qué usas?"
+  opciones={["Dos `BTreeSet` y `intersection`", "Dos `Vec` y un doble bucle", "Un `HashMap<String, bool>`", "Un `VecDeque`"]}
+  correcta={0}
+  explicacion="La intersección de conjuntos es justo esa operación, y `BTreeSet` la devuelve ya ordenada."
+  porque={["", "Funciona, pero es O(n·m) y hay que quitar repetidos a mano.", "Se puede, pero es reinventar un conjunto.", "No ofrece operaciones de conjuntos."]}
+/>

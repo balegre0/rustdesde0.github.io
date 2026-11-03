@@ -1,0 +1,1 @@
+{ "nota": "En el navegador (wasm32) el puntero mide 32 bits, así que se imprime «no 64 bits»." }

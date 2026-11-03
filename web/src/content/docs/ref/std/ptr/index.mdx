@@ -1,0 +1,65 @@
+---
+title: "std::ptr"
+description: "Punteros crudos (*const T, *mut T): crearlos, compararlos, leer y escribir a través de ellos con unsafe, y NonNull."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::ptr`
+
+## Para qué sirve
+
+Los **punteros crudos** (`*const T` y `*mut T`) son direcciones de memoria sin las garantías de las referencias: pueden ser nulos, colgantes, estar desalineados o tener alias con préstamos exclusivos. **Crearlos es seguro**; **leer o escribir a través de ellos** requiere `unsafe` ([E0133](/errores/e0133/)), porque eres tú quien garantiza que son válidos. Se usan para FFI y para construir estructuras de datos de bajo nivel.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| `null, null_mut` | Un puntero nulo. | 1.0 |
+| `read, write` | Leer o escribir a través de un puntero (`unsafe`). | 1.0 |
+| `copy, copy_nonoverlapping` | Copiar memoria (`unsafe`). | 1.0 |
+| `swap` | Intercambiar dos valores apuntados (`unsafe`). | 1.0 |
+| `eq` | ¿Apuntan a la misma dirección? | 1.17 |
+| `NonNull` | Un `*mut T` que nunca es nulo (y deja nicho para `Option`). | 1.25 |
+| `drop_in_place` | Ejecuta el destructor del valor apuntado (`unsafe`). | None |
+| `addr_of!, addr_of_mut!` | Crear punteros sin pasar por una referencia (hoy se escribe `&raw const` / `&raw mut`). | 1.51 |
+
+**Ficha detallada:** [Punteros crudos y NonNull](/ref/std/ptr/punteros-crudos/)
+
+## Conceptos clave
+
+- **`&raw const x` y `&raw mut x`** (estables desde Rust 1.82) crean punteros sin crear antes una referencia.
+- **Procedencia** (*provenance*): un puntero no es solo un número; recuerda de qué asignación de memoria viene. Convertir enteros en punteros y viceversa tiene reglas; los métodos `addr`, `with_addr` y `map_addr` las respetan.
+- **Comprueba tu `unsafe` con Miri**: ejecuta el programa en un intérprete que detecta muchos casos de comportamiento indefinido.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/ptr-basico" />
+
+**Salida:**
+
+```text
+false
+true
+11
+22
+true None
+[3, 2, 1]
+```
+
+## Seguridad
+
+Para leer o escribir a través de un puntero (`*p`, `ptr::read`, `ptr::write`), el puntero debe ser **válido**: no nulo, alineado, apuntando a memoria viva del tipo correcto e inicializada (para leer), y sin violar las reglas de alias (no escribir mientras existe un `&T` a lo mismo, ni acceder mientras hay un `&mut T` activo). Incumplir cualquiera es comportamiento indefinido. Escribe junto a cada bloque `unsafe` un comentario `// SEGURIDAD:` que explique por qué se cumplen.
+
+## Ver también
+
+- [std::mem](/ref/std/mem/)
+- [Box::into_raw](/ref/std/boxed/box/)
+- [E0133](/errores/e0133/)
+
+## Aprende esto en
+
+- [Mundo 20 · Unsafe y comportamiento indefinido](/curso/20-unsafe-y-ub/)
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)

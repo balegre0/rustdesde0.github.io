@@ -1,0 +1,90 @@
+---
+title: "Lifetimes en impl"
+description: "En los métodos de un struct con lifetime, devolver &str ata el resultado a self por elisión. Para devolver lo que el struct tiene prestado, escribe 'a."
+sidebar:
+  order: 7
+duracion: 12
+desde: "1.0"
+requiere: ["08-lifetimes/06-structs-con-referencias"]
+tarjetas:
+  - p: "¿Qué significa `impl<'a> Cursor<'a>`?"
+    r: "Que los métodos de dentro valen para un `Cursor` con cualquier lifetime `'a`, y que dentro puedes nombrar `'a`."
+  - p: "En `fn siguiente(&mut self) -> Option<&str>`, ¿a qué queda atado el resultado?"
+    r: "Al préstamo de `self` (regla 3 de la elisión): mientras uses el resultado, el cursor sigue prestado en exclusiva."
+  - p: "¿Cómo devuelves un trozo del texto prestado sin atarlo a `self`?"
+    r: "Escribiendo la lifetime del struct en la salida: `fn siguiente(&mut self) -> Option<&'a str>`."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Los structs con referencias suelen tener métodos. Aquí aparece el error de lifetimes más frecuente en código real, y lo provoca la regla 3 de la elisión haciendo **justo lo que dice**.
+
+## Predice
+
+<NoCompila ej="m08/p-impl-lifetime-elidido" explicacion={"`siguiente` devuelve un trozo del texto, que es de `datos`, no del cursor. Aun así, guardar `x` y llamar otra vez a `siguiente` falla. ¿A qué ha atado la regla 3 de la elisión el resultado?"} />
+
+## La idea
+
+Los métodos se escriben dentro de un bloque `impl` (lo verás a fondo en el mundo 09). Si el struct tiene lifetime, el bloque la declara:
+
+```rust
+impl<'a> Cursor<'a> {
+    fn siguiente(&mut self) -> Option<&'a str> { … }
+}
+```
+
+`impl<'a>` dice «para cualquier `'a`»; `Cursor<'a>` dice «estos métodos son de un cursor que tiene prestado algo durante `'a`». Dentro, `'a` es un nombre que puedes usar.
+
+Ahora el detalle. Si escribes la salida **sin** lifetime, `-> Option<&str>`, la regla 3 la ata a **`&mut self`**: «lo que devuelvo vive lo que dure este préstamo del cursor». Como el préstamo es exclusivo, mientras guardes una palabra el cursor sigue prestado y no puedes volver a llamar a `siguiente`: E0499.
+
+Pero las palabras no salen **del cursor**: salen **del texto** que el cursor tiene prestado, que vive `'a`. Hay que decirlo:
+
+```rust
+fn siguiente(&mut self) -> Option<&'a str>
+```
+
+Ahora el resultado está atado al texto, no al cursor. Puedes guardar todas las palabras que quieras y seguir avanzando.
+
+## Pruébalo
+
+<Ejecutar ej="m08/p-impl-lifetime" />
+
+La única diferencia con el ejemplo que no compila es `&'a str` en la firma de `siguiente`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Dos lifetimes en juego.** En `fn siguiente(&mut self) -> …` hay dos: la del préstamo de `self` (anónima, digamos `'s`) y la `'a` del struct. La firma completa es `fn siguiente<'s>(&'s mut Cursor<'a>) -> Option<&'? str>`. La elisión pone `'s` en el hueco; tú quieres `'a`. Como `Cursor<'a>` tiene prestado algo durante `'a`, el compilador sabe que `'a` dura al menos lo que `'s` (se escribe `'a: 's`). Devolver `'a` es devolver **más**, y más es mejor para quien llama.
+
+**Así funcionan los iteradores.** El trait `Iterator` (mundo 14) tiene un método `fn next(&mut self) -> Option<Self::Item>`. Para un iterador sobre `&'a [T]`, `Item` es `&'a T`: atado a la colección, no al iterador. Por eso puedes hacer `let v: Vec<&T> = iter.collect();`. Tu `Cursor` es un iterador hecho a mano.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Arreglar E0499 con clone() o con to_string()">
+
+❌ Convertir cada palabra en `String` (`Some(resto[..fin].to_string())`) para que el compilador se calle. Funciona, pero copia cada palabra al heap.
+
+✅ Antes de copiar, pregúntate **de dónde sale** lo que devuelves. Si sale de los datos prestados y no del propio struct, la lifetime correcta es la del struct (`'a`), no la de `self`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`impl<'a> Lector<'a> { fn todo(&self) -> &str { self.texto } }` con `texto: &'a str`. ¿Qué es cierto?"
+  opciones={["No compila", "Compila, y el resultado queda atado al préstamo de `self`", "Compila, y el resultado queda atado a `'a`", "Da E0106"]}
+  correcta={1}
+  explicacion="Compila: devolver `self.texto` (que dura `'a`, más que `self`) como algo que dura lo de `self` es devolver de menos, y eso siempre se permite. Pero quien llama no podrá usar el resultado más allá del `Lector`. Con `-> &'a str`, sí podría."
+  porque={["`'a` dura al menos lo que el préstamo de `self`, así que cumple.", "", "Eso pasaría si escribieras `-> &'a str`.", "La regla 3 rellena la salida."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué guardar dos resultados de `siguiente(&mut self) -> Option<&str>` da E0499?"
+  opciones={["Porque `Option` no se puede guardar", "Porque cada resultado mantiene vivo un préstamo exclusivo del cursor", "Porque el texto se mueve", "Porque falta `mut` en el cursor"]}
+  correcta={1}
+  explicacion="Por la regla 3, cada resultado vive lo que el `&mut self` de su llamada. Dos resultados vivos = dos préstamos exclusivos vivos del mismo cursor."
+  porque={["`Option` se guarda como cualquier valor.", "", "El texto nunca se mueve: solo se presta.", "El cursor sí es `mut` en el ejemplo."]}
+/>

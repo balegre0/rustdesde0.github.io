@@ -1,0 +1,41 @@
+---
+title: "Mundo 17 · Concurrencia"
+description: "Hacer varias cosas a la vez con hilos sin carreras de datos: Send, Sync, Mutex, canales, atómicos y el modelo de memoria."
+sidebar:
+  order: 0
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Hasta ahora tus programas hacían **una cosa detrás de otra**. Tu ordenador, en cambio, tiene varios núcleos capaces de trabajar **a la vez**. Este mundo te enseña a usarlos con **hilos** (*threads*).
+
+La concurrencia tiene fama de ser la parte más peligrosa de la programación: dos hilos que tocan el mismo dato a la vez pueden corromperlo en silencio. Eso se llama **carrera de datos** (*data race*) y es **comportamiento indefinido**. En Rust seguro, **una carrera de datos no compila**. Vas a ver exactamente por qué: no es magia, es ownership + préstamos + dos traits, `Send` y `Sync`.
+
+También vas a ver lo que Rust **no** te regala: un programa sin carreras de datos puede bloquearse para siempre o dar un resultado lógico equivocado. Seguro no significa correcto.
+
+## Qué vas a conseguir
+
+Sabrás lanzar hilos y esperarlos, prestarles datos con hilos con ámbito, compartir estado con `Arc<Mutex<T>>`, comunicar hilos con canales, leer una tabla de `Ordering` (`Relaxed`, `Acquire`, `Release`, `SeqCst`) y explicar por qué cada error del compilador que aparece en este mundo evita un fallo real.
+
+## Lecciones
+
+1. [Hilos y `join`](./01-hilos-y-join/) — lanzar trabajo en paralelo y esperarlo.
+2. [Closures `move` en hilos](./02-move-en-hilos/) — por qué el hilo quiere la propiedad.
+3. [Hilos con ámbito](./03-hilos-con-ambito/) — `thread::scope` y préstamos entre hilos.
+4. [`Send` y `Sync`](./04-send-y-sync/) — los dos traits que hacen el trabajo sucio.
+5. [Carreras de datos: imposibles en Rust seguro](./05-carreras-de-datos/) — qué son y por qué no compilan.
+6. [`Mutex` y `Arc<Mutex<T>>`](./06-mutex/) — candados, guards y envenenamiento.
+7. [`RwLock`, `Condvar` y `LazyLock`](./07-rwlock-y-condvar/) — muchos lectores, esperar avisos, inicializar una vez.
+8. [Canales](./08-canales/) — compartir memoria comunicándose.
+9. [Atómicos y `Ordering`](./09-atomicos-y-ordering/) — el modelo de memoria con pruebas de tornasol.
+10. [Interbloqueos: seguro no es correcto](./10-interbloqueos/) — lo que Rust no puede evitar.
+11. [Paralelismo de datos y Rayon](./11-paralelismo-y-rayon/) — repartir un trabajo grande entre todos los núcleos.
+12. [Jefe: tu propia piscina de hilos](./12-jefe/) — un *thread pool* con apagado ordenado.
+
+## Antes de empezar
+
+Necesitas closures y `move` (mundo 14), `Rc`, `RefCell` y `Arc` (mundo 15) y los traits y genéricos con *bounds* (mundo 13). Si `F: FnOnce() + 'static` te parece jeroglífico, repasa esos mundos primero.
+
+<Aside type="caution" title="Los hilos no existen en tu navegador">
+Los ejemplos de este curso se ejecutan en tu navegador compilados a WebAssembly (`wasm32-wasip1`), y ahí **no hay hilos**: `thread::spawn` entra en pánico. Por eso los ejemplos con hilos se ejecutan en el **Rust Playground** (un servidor oficial de Rust; tu código se envía a play.rust-lang.org). Los que no necesitan hilos (`Mutex` en un hilo, canales, atómicos, simuladores de intercalaciones) sí corren aquí mismo.
+</Aside>

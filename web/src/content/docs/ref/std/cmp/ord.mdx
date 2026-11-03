@@ -1,0 +1,161 @@
+---
+title: "PartialEq, Eq, PartialOrd y Ord"
+description: "Los traits de comparación: igualdad (==), orden (<, >) y el enum Ordering que devuelve cmp."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::cmp::{PartialEq, Eq, PartialOrd, Ord, Ordering}` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub trait PartialEq<Rhs = Self>
+where
+    Rhs: ?Sized,
+{
+    // Required method
+    fn eq(&self, other: &Rhs) -> bool;
+
+    // Provided method
+    fn ne(&self, other: &Rhs) -> bool { ... }
+}
+
+pub trait Eq: PartialEq { }
+
+pub trait PartialOrd<Rhs = Self>: PartialEq<Rhs>
+where
+    Rhs: ?Sized,
+{
+    // Required method
+    fn partial_cmp(&self, other: &Rhs) -> Option<Ordering>;
+
+    // ... y 4 métodos provistos (con implementación por defecto)
+}
+
+pub trait Ord: Eq + PartialOrd {
+    // Required method
+    fn cmp(&self, other: &Self) -> Ordering;
+
+    // ... y 3 métodos provistos (con implementación por defecto)
+}
+
+#[repr(i8)]
+pub enum Ordering {
+    Less = -1,
+    Equal = 0,
+    Greater = 1,
+}
+```
+
+## Qué hace
+
+| Trait | Da | Promete |
+|---|---|---|
+| `PartialEq` | `==`, `!=` | nada más (puede haber valores no iguales a sí mismos, como `NaN`) |
+| `Eq` | — | que `a == a` siempre (necesario para claves de `HashMap`) |
+| `PartialOrd` | `<`, `<=`, `>`, `>=`, `partial_cmp` | un orden que puede tener valores no comparables |
+| `Ord` | `cmp`, `max`, `min`, `clamp` | un orden **total**: cualquier par se puede comparar |
+
+Lo normal es derivarlos todos: `#[derive(PartialEq, Eq, PartialOrd, Ord)]`. `cmp` devuelve un `Ordering`, que se puede encadenar con `then` para comparar por varios criterios.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`cmp`](#cmp) | Compara y devuelve `Less`, `Equal` o `Greater`. | 1.0 |
+| [`max`](#max) | El mayor de los dos. | 1.21 |
+| [`clamp`](#clamp) | Ajusta el valor al intervalo `[min, max]`. | 1.50 |
+| [`partial_cmp`](#partial_cmp) | Como `cmp`, pero devuelve `Option<Ordering>` (`None` si no se pueden comparar). | 1.0 |
+| [`then`](#then) | Si el resultado es `Equal`, usa el segundo criterio. | 1.17 |
+| [`reverse`](#reverse) | Invierte el resultado. | 1.0 |
+
+### `cmp`
+
+```rust
+fn cmp(&self, other: &Self) -> Ordering
+```
+
+Compara y devuelve `Less`, `Equal` o `Greater`.
+
+### `max`
+
+```rust
+fn max(self, other: Self) -> Self
+where
+    Self: Sized,
+```
+
+El mayor de los dos.
+
+### `clamp`
+
+```rust
+fn clamp(self, min: Self, max: Self) -> Self
+where
+    Self: Sized,
+```
+
+Ajusta el valor al intervalo `[min, max]`.
+
+### `partial_cmp`
+
+```rust
+fn partial_cmp(&self, other: &Rhs) -> Option<Ordering>
+```
+
+Como `cmp`, pero devuelve `Option<Ordering>` (`None` si no se pueden comparar).
+
+### `then`
+
+```rust
+pub const fn then(self, other: Ordering) -> Ordering
+```
+
+Si el resultado es `Equal`, usa el segundo criterio.
+
+### `reverse`
+
+```rust
+pub const fn reverse(self) -> Ordering
+```
+
+Invierte el resultado.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/cmp-ord" />
+
+**Salida:**
+
+```text
+Less Equal Greater
+true Less
+Version { mayor: 2, menor: 0 }
+["Ana", "Eva", "Luis"]
+[3, 2, 1]
+None Less
+4 10
+true
+Alumno { nombre: "Ana", nota: 9 }
+```
+
+## Pánicos
+
+`clamp` entra en pánico si `min > max`.
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `max` (1.21), `clamp` (1.50), `then` (1.17).
+
+## Ver también
+
+- [Hash (para HashMap)](/ref/std/hash/)
+- [slice: sort_by](/ref/std/slice/)
+- [E0369](/errores/e0369/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

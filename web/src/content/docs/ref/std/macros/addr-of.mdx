@@ -1,0 +1,41 @@
+---
+title: "&raw, addr_of! y addr_of_mut!"
+description: "Crear un puntero crudo a un lugar sin pasar por una referencia: para campos desalineados, memoria sin inicializar o registros de hardware."
+sidebar:
+  order: 20
+insignias: ["Desde 1.51", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::ptr::addr_of`, `std::ptr::addr_of_mut`; sintaxis `&raw const` y `&raw mut` (1.82)
+
+## Sinopsis
+
+```rust
+&raw const lugar     // *const T
+&raw mut lugar       // *mut T
+ptr::addr_of!(lugar)       // lo mismo que &raw const
+ptr::addr_of_mut!(lugar)   // lo mismo que &raw mut
+```
+
+## Qué hace
+
+`&lugar as *const T` crea **primero una referencia** y luego la convierte. Pero crear una referencia exige que el lugar esté alineado y contenga un valor válido. En algunos casos eso no se cumple:
+
+- campos de un struct `#[repr(packed)]` (pueden estar desalineados);
+- memoria todavía sin inicializar (`MaybeUninit`);
+- registros de hardware, que no deben tratarse como memoria normal.
+
+`&raw const` y `&raw mut` crean el puntero **directamente**, sin referencia intermedia, y no son `unsafe` (lo `unsafe` es usar el puntero después).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-addr-of" />
+
+## Desde
+
+`addr_of!`: Rust 1.51. Sintaxis `&raw`: 1.82.
+
+## Ver también
+
+[`#[repr(packed)]`](/ref/lenguaje/atributos/repr/) · [`std::ptr`](/ref/std/ptr/) · [Mundo 20 · Unsafe](/curso/20-unsafe-y-ub/)

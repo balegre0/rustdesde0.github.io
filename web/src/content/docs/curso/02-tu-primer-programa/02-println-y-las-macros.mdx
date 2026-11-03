@@ -1,0 +1,111 @@
+---
+title: "println! y qué es una macro"
+description: "Descubre por qué println! lleva una exclamación, qué es una macro y por qué un hueco de más se detecta antes de ejecutar."
+sidebar:
+  order: 2
+duracion: 12
+desde: "1.0"
+requiere: ["02-tu-primer-programa/01-fn-main"]
+tarjetas:
+  - p: "¿Qué indica el `!` en `println!`?"
+    r: "Que es una macro, no una función: código que genera más código durante la compilación."
+  - p: "¿Cuándo se comprueba que el número de `{}` coincide con el de argumentos de `println!`?"
+    r: "Al compilar. Si no coinciden, el programa no llega a existir."
+  - p: "¿Qué error da escribir `println(\"Hola\")` sin `!`?"
+    r: "E0423: no existe una función `println`; el compilador sugiere añadir `!` porque hay una macro con ese nombre."
+  - p: "¿En qué se convierte por dentro una llamada a `println!`?"
+    r: "En una llamada a una función de std (`std::io::_print`) con los argumentos ya preparados por `format_args!`."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+`println!` es lo que más vas a escribir en tus primeros meses. Hoy aprendes a meterle valores dentro y, sobre todo, qué significa ese signo de exclamación que lo diferencia de casi todo lo demás.
+
+## Predice
+
+Cada par de llaves `{}` es un **hueco** que se rellena con el siguiente argumento. ¿Qué imprime la primera línea?
+
+<Predice
+  ej="m02/huecos"
+  opciones={["`{} + {} = {}`", "`2 + 3 = 5`", "`2 + 3 = 2 + 3`", "`5 + 5 = 5`"]}
+  correcta={1}
+  explicacion="Los huecos se rellenan en orden: el primero con `2`, el segundo con `3` y el tercero con el **resultado** de `2 + 3`, que Rust calcula antes de imprimir."
+  porque={["Las llaves no se imprimen tal cual: son huecos que se rellenan.", "", "Fuera de las comillas, `2 + 3` es un cálculo, no un texto: se imprime su resultado.", "Cada hueco toma un argumento distinto, en orden."]}
+/>
+
+## La idea
+
+`println!` recibe primero un texto entre comillas, la **cadena de formato** (*format string*), y después, separados por comas, los valores que van en cada hueco `{}`. Al final escribe un salto de línea (de ahí el `ln`, de *line*).
+
+El `!` dice que `println!` es una **macro** (*macro*): no es una función que se llama mientras el programa corre, sino una regla que **escribe código por ti mientras se compila**. El compilador ve `println!("{} + {}", 2, 3)` y lo sustituye por el código, más largo y menos cómodo, que de verdad imprime. A eso se le llama **expandir** la macro (*macro expansion*).
+
+¿Por qué una macro y no una función? Por dos motivos. Primero, una función de Rust tiene un número fijo de parámetros, y `println!` acepta cero, uno o veinte valores. Segundo, y más importante: como la macro trabaja **al compilar**, puede leer tu cadena de formato y comprobar que cada hueco tiene su valor. Si te equivocas, te enteras antes de que el programa exista.
+
+## Pruébalo
+
+<Ejecutar ej="m02/huecos" />
+
+Salida real:
+
+```text
+2 + 3 = 5
+Rust tiene 4 letras
+Fin
+```
+
+Ahora mira qué pasa si pones dos huecos y solo un valor:
+
+<NoCompila ej="m02/faltan-argumentos" explicacion="La macro cuenta los huecos de la cadena (2) y los argumentos (1) y se niega a seguir. Este error no tiene código E0xxx porque lo produce la propia macro de formato." />
+
+El mensaje real: «2 positional arguments in format string, but there is 1 argument» (la cadena de formato tiene 2 argumentos posicionales, pero hay 1 argumento). Debajo, las marcas `^^` señalan los dos huecos y `--` el único argumento. Pulsa «Ver arreglo»: con `30, 175` imprime `Tengo 30 años y mido 175 cm`.
+
+## Bajo el capó
+
+<BajoElCapo titulo="En qué se convierte println!">
+La expansión de `println!` pasa por otra macro, `format_args!`, que analiza la cadena de formato y prepara los argumentos, y termina en una llamada a una función normal de la biblioteca estándar. Puedes comprobarlo pidiendo a `rustc` el **MIR** (la representación intermedia que verás en la lección del viaje de `rustc`) de un programa con `println!("{}", 2 + 3)`. En Rust 1.99.1, entre otras cosas, aparece:
+
+```text
+_1 = std::io::_print(move _2) -> [return: bb4, unwind unreachable];
+```
+
+Es decir: tu `println!` acaba siendo `std::io::_print(...)`. Esa función tiene un guion bajo delante porque es un detalle interno: no está pensada para que la llames tú. Justo antes, en el mismo MIR, la cadena de formato aparece ya convertida en una pequeña plantilla de bytes (`b"\xc0\x01\n\x00"`). Ese formato interno **cambia entre versiones** del compilador; lo que no cambia es la idea: la cadena se analiza **una vez, al compilar**, y en ejecución solo se rellenan los huecos.
+</BajoElCapo>
+
+## Trampa típica
+
+Olvidar el `!`. Sin él, Rust busca una **función** llamada `println`, y no existe:
+
+<NoCompila ej="m02/sin-exclamacion" explicacion="E0423: no hay ninguna función `println`. La nota dice que existe una macro con ese nombre «en otro espacio de nombres», y el `help:` te enseña exactamente dónde poner el `!`." />
+
+Fíjate en lo útil que es el mensaje: «a macro named `println` exists in another namespace» (existe una macro llamada `println` en otro espacio de nombres) y, debajo, el arreglo marcado con un `+` justo donde falta el `!`.
+
+## Tu turno
+
+<Reto
+  ej="m02/reto-tabla"
+  enunciado="Imprime las tres primeras líneas de la tabla del 7 (`7 x 1 = 7`, `7 x 2 = 14`, `7 x 3 = 21`). Usa tres huecos por línea y deja que Rust haga la multiplicación con `*`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `println!` es una macro y no una función?"
+  opciones={["Porque imprime más rápido", "Porque acepta cualquier número de argumentos y comprueba la cadena de formato al compilar", "Porque las funciones no pueden escribir en pantalla", "Por costumbre: podría ser una función igual"]}
+  correcta={1}
+  explicacion="Una función tiene un número fijo de parámetros y no puede leer tu cadena de formato antes de ejecutarse. La macro sí: trabaja en compilación."
+  porque={["La velocidad no es el motivo; al final llama a una función normal.", "", "Las funciones sí pueden escribir: `std::io::_print` es una función.", "Una función normal no podría comprobar los huecos al compilar."]}
+/>
+
+<Pregunta
+  pregunta='Escribes `println!("{} y {}", 1, 2, 3);` (tres valores, dos huecos). ¿Qué pasa?'
+  opciones={["Imprime `1 y 2` e ignora el 3", "Imprime `1 y 2 3`", "No compila: sobra un argumento", "Compila pero da un pánico al ejecutar"]}
+  correcta={2}
+  explicacion="La comprobación funciona en las dos direcciones: un hueco sin valor o un valor sin hueco son errores de compilación."
+  porque={["Rust no ignora argumentos en silencio: un argumento sin usar suele ser un despiste.", "Los valores solo aparecen dentro de los huecos.", "", "El fallo se detecta antes de ejecutar, al compilar."]}
+/>
+
+<Respuesta
+  pregunta="¿Cómo se llama el proceso por el que el compilador sustituye `println!(…)` por el código que de verdad imprime?"
+  respuestas={["expansión", "expandir", "expansión de macros", "expansion"]}
+  explicacion="Expansión de macros (*macro expansion*). Ocurre muy pronto en la compilación, antes de comprobar los tipos."
+/>

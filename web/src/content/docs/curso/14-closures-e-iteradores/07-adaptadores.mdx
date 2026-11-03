@@ -1,0 +1,111 @@
+---
+title: "Adaptadores: map, filter y compañía"
+description: "Encadena transformaciones sobre un iterador como piezas de una tubería."
+sidebar:
+  order: 7
+duracion: 14
+desde: "1.0"
+requiere: ["14-closures-e-iteradores/06-iter-iter-mut-into-iter"]
+tarjetas:
+  - p: "¿Qué es un adaptador de iterador?"
+    r: "Un método que toma un iterador y devuelve OTRO iterador (perezoso) que transforma, filtra o combina: `map`, `filter`, `enumerate`, `zip`, `take`, `skip`, `chain`, `flat_map`, `rev`…"
+  - p: "¿Por qué en `v.iter().filter(|x| …)` el parámetro `x` es `&&i32`?"
+    r: "`iter()` entrega `&i32`, y `filter` presta cada elemento a su closure: `&` de `&i32`. Se desmonta con `|&&x|` o se compara con `**x`."
+  - p: "¿Dónde se para `zip` si los dos iteradores tienen distinta longitud?"
+    r: "En el más corto: en cuanto uno de los dos devuelve `None`."
+  - p: "¿Qué tipo tiene `v.iter().filter(f).map(g)`?"
+    r: "`Map<Filter<slice::Iter<'_, T>, F>, G>`: structs anidados, uno por adaptador, con los closures dentro."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a construir **tuberías**: un iterador al que le encadenas pasos, cada uno haciendo una sola cosa, para expresar «los pares, al cuadrado, los dos primeros» en una línea.
+
+## Predice
+
+<Predice
+  ej="m14/predice-cadena"
+  opciones={["`[9, 36]`", "`[3, 6]`", "`[9, 36, 81]`", "`[1, 4]`"]}
+  correcta={0}
+  explicacion="De 1 a 10, los múltiplos de 3 son 3, 6, 9. Al cuadrado: 9, 36, 81. `take(2)` se queda con los dos primeros."
+  porque={["Correcto.", "Falta el `map` que eleva al cuadrado.", "`take(2)` corta en dos elementos.", "El `filter` va antes que el `map`: se filtra 1..=10, no sus cuadrados."]}
+/>
+
+## La idea
+
+Un **adaptador** (*iterator adapter*) es un método que recibe un iterador y devuelve **otro iterador**. No calcula nada todavía (pereza); solo añade un paso a la receta. Los más usados:
+
+| Adaptador | Qué hace | Ejemplo |
+|---|---|---|
+| `map(f)` | transforma cada elemento | `[3, 8]` → `[6, 16]` con `\|x\| x * 2` |
+| `filter(p)` | deja pasar los que cumplen `p` | quedarse con los `> 3` |
+| `enumerate()` | añade la posición: `(i, x)` | `(0, 3), (1, 8)…` |
+| `zip(otro)` | empareja con otro iterador | `("Ana", 3), ("Leo", 8)…` |
+| `take(n)` / `skip(n)` | los primeros `n` / sáltate `n` | |
+| `chain(otro)` | uno detrás de otro | `1, 2` y luego `8, 9` |
+| `flat_map(f)` | cada elemento da varios, y se aplanan | palabras → letras |
+| `rev()` | al revés (si el iterador sabe ir hacia atrás) | |
+
+Se leen de izquierda a derecha, como una frase: «de `v`, filtra los mayores que 3, multiplícalos por 2». Cada pieza es pequeña y fácil de comprobar por separado.
+
+## Pruébalo
+
+<Ejecutar ej="m14/adaptadores" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Cada adaptador es un **struct genérico** que envuelve al anterior. `filter` devuelve un `Filter<I, P>` que guarda el iterador `I` y el closure `P`; su `next()` llama al `next()` de dentro hasta encontrar uno que cumpla `P`. Puedes ver el tipo real con un truco: pedirle al compilador que la cadena sea `()` y leer el error.
+
+```text
+error[E0308]: mismatched types
+  = note: expected struct `Map<Filter<std::slice::Iter<'_, {integer}>, {closure@tipo-de-cadena.rs:4:30: 4:33}>, {closure@tipo-de-cadena.rs:4:47: 4:50}>`
+          found unit type `()`
+```
+
+(Extracto del error real de `m14/tipo-de-cadena`.) Son **muñecas rusas**: `Map` contiene un `Filter` que contiene un `slice::Iter`, y cada closure va guardado dentro de su adaptador. No hay listas intermedias en memoria: cuando el consumidor pide un elemento, la petición baja por las muñecas y el elemento sube transformado.
+
+Como todo son tipos concretos (genéricos, no `dyn`), el compilador conoce la cadena entera y puede fundirla en un solo bucle. Lo comprobarás con el ensamblador dentro de dos lecciones.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m14/filter-doble-ref"
+  explicacion="`iter()` entrega `&i32` y `filter` le pasa al closure una referencia a cada elemento: `x` es `&&i32`, y comparar `&&i32` con `3` no encaja (E0308, «expected `&&_`, found integer»). Arreglos: el patrón `|&&x| x > 3` (como hace el arreglo) o `|x| **x > 3`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m14/numerar"
+  enunciado="Completa `numerar` con una sola cadena de adaptadores: quita los nombres vacíos, numera los demás **desde 1** y devuelve un `Vec<String>` como `1. Ana`. Salida esperada: `1. Ana`, `2. Leo`, `3. Zoë` y `[]`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Quieres, de `nombres: Vec<&str>`, una lista de cadenas `«1. Ana», «2. Leo»…` numeradas desde 1. ¿Qué cadena usas?"
+  opciones={["`nombres.iter().enumerate().map(|(i, n)| format!(\"{}. {n}\", i + 1))`", "`nombres.iter().map(|n| format!(\"{i}. {n}\")).enumerate()`", "`nombres.iter().zip(1..).map(|i, n| format!(\"{i}. {n}\"))`", "`nombres.enumerate().map(|(i, n)| format!(\"{i}. {n}\"))`"]}
+  correcta={0}
+  explicacion="`enumerate` añade la posición (desde 0, por eso `i + 1`) **antes** del `map` que la usa."
+  porque={["Correcto.", "Dentro de ese `map` aún no existe `i`: el `enumerate` va después.", "`zip(1..)` serviría, pero el closure recibe UNA tupla: `|(n, i)|`, no dos parámetros.", "Un `Vec` no es un iterador: falta `.iter()`."]}
+/>
+
+<Pregunta
+  pregunta={'¿Cuántos elementos tiene `[1, 2, 3].iter().zip(["a", "b"]).count()`?'}
+  opciones={["2", "3", "5", "No compila: distinta longitud"]}
+  correcta={0}
+  explicacion="`zip` se para en cuanto uno de los dos se acaba. Lo comprobamos ejecutándolo: imprime 2."
+  porque={["Correcto.", "No hay pareja para el 3.", "`zip` empareja, no concatena (eso es `chain`).", "La longitud distinta está permitida."]}
+/>
+
+<Pregunta
+  pregunta="`v.iter().map(|x| x * 2)` — ¿cuándo se multiplica el primer elemento?"
+  opciones={["Cuando un consumidor pida el primer elemento con `next()`", "Al escribir `.map(...)`", "Al compilar", "Nunca: `map` solo funciona con `collect`"]}
+  correcta={0}
+  explicacion="Los adaptadores son perezosos: solo añaden un paso a la receta."
+  porque={["Correcto.", "Crear el `Map` no ejecuta el closure.", "Se ejecuta al correr el programa, no al compilar.", "Cualquier consumidor sirve: `for`, `sum`, `count`…"]}
+/>

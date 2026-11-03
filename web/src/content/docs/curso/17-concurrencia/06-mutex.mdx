@@ -1,0 +1,132 @@
+---
+title: "Mutex y Arc<Mutex<T>>"
+description: "Compartir un dato que varios hilos modifican: el candado que envuelve el dato, el guard que lo suelta solo y qué significa que un Mutex esté envenenado."
+sidebar:
+  order: 6
+duracion: 13
+desde: "1.0"
+requiere: ["17-concurrencia/05-carreras-de-datos", "15-punteros-inteligentes/10-arc"]
+tarjetas:
+  - p: "¿Qué devuelve Mutex::lock?"
+    r: "Un LockResult<MutexGuard<T>>: si el candado no está envenenado, un guard que da acceso exclusivo al T y suelta el candado al destruirse."
+  - p: "¿Qué significa que un Mutex esté envenenado?"
+    r: "Que un hilo entró en pánico mientras tenía el candado: el dato podría haber quedado a medias, y lock() devuelve Err para avisarte."
+  - p: "¿Por qué `let _ = m.lock().unwrap();` no deja el candado tomado?"
+    r: "Porque `_` no enlaza: el guard se destruye en esa misma línea. rustc lo rechaza con el lint let_underscore_lock."
+  - p: "¿Para qué sirve el Arc en Arc<Mutex<T>>?"
+    r: "Para que varios hilos (con thread::spawn) sean dueños del MISMO Mutex; el Mutex aporta la exclusión mutua."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a usar la herramienta clásica para que varios hilos modifiquen el mismo dato sin carreras: el **candado**.
+
+## Predice
+
+Este ejemplo corre en tu navegador: un `Mutex` funciona con un solo hilo, y así se ve bien cuándo está tomado.
+
+<Predice
+  ej="m17/mutex-un-hilo"
+  opciones={[
+    "¿libre? true / ¿libre ahora? true",
+    "¿libre? false / ¿libre ahora? true",
+    "¿libre? false / ¿libre ahora? false",
+    "Se queda bloqueado en try_lock"
+  ]}
+  correcta={1}
+  explicacion="Mientras el guard `g` vive, el candado está tomado y `try_lock` falla (devuelve Err sin esperar). Al cerrar el bloque, `g` se destruye y su Drop suelta el candado."
+  porque={[
+    "Dentro del bloque el guard sigue vivo.",
+    "Correcto.",
+    "El guard ya se destruyó al salir del bloque.",
+    "try_lock nunca espera: si no puede, devuelve un error enseguida."
+  ]}
+/>
+
+## La idea
+
+Un **`Mutex<T>`** (*mutual exclusion*, exclusión mutua) es un candado que **envuelve** el dato. No es un candado al lado del dato, como una nota que dice «no tocar»: el `T` está **dentro**, y la única puerta para llegar a él es `lock()`. Así es imposible olvidarse de tomar el candado.
+
+`lock()` espera hasta que el candado esté libre, lo toma y te devuelve un **guard** (`MutexGuard<T>`). El guard se comporta como un préstamo exclusivo del `T`: con `*g` lees y escribes. Y cuando el guard se destruye (al acabar su ámbito), su `Drop` **suelta el candado**. Mientras tanto, cualquier otro hilo que llame a `lock()` espera.
+
+Para que varios hilos lanzados con `thread::spawn` usen el mismo `Mutex`, todos tienen que ser dueños de él: lo metes en un `Arc` (mundo 15). Esa es la pareja más famosa de la concurrencia en Rust: **`Arc<Mutex<T>>`**. El `Arc` resuelve «¿quién es el dueño?»; el `Mutex` resuelve «¿quién puede escribir ahora?». Con `thread::scope` no necesitas el `Arc`: basta con prestar `&Mutex<T>`.
+
+## Pruébalo
+
+<Ejecutar ej="m17/arc-mutex-contador" />
+
+1. Cada hilo recibe un clon del `Arc`: mismo `Mutex`, contador de referencias + 1.
+2. `*c.lock().unwrap() += 1` toma el candado, lee, suma, escribe y, al acabar la sentencia, el guard temporal se destruye y suelta el candado.
+3. Ninguna suma se pierde: el resultado es `contador = 8000` en todas las ejecuciones. Compara con el simulador de la lección anterior: el candado convierte «leer, sumar, escribir» en un bloque que nadie puede interrumpir.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por dentro.** Un `Mutex<T>` de la biblioteca estándar es, conceptualmente, un estado del candado (un entero atómico), una marca de envenenamiento y el dato dentro de un `UnsafeCell<T>`, la única forma legal en Rust de mutar algo detrás de un `&` (mundo 20). Cuando el candado está libre, tomarlo es **una sola operación atómica**, sin llamar al sistema operativo. Solo si está ocupado, el hilo pide al sistema que lo duerma hasta que se libere (en Linux con un *futex*; en Windows con `WaitOnAddress`).
+
+**`lock` necesita solo `&self`.** Mira la firma: `pub fn lock(&self) -> LockResult<MutexGuard<'_, T>>`. Con un préstamo **compartido** del Mutex consigues acceso **exclusivo** al `T`. Es mutabilidad interior, como `RefCell`, pero la comprobación la hace el candado (esperando) en lugar de un contador (entrando en pánico).
+
+**Envenenamiento.** Si un hilo entra en pánico con el candado tomado, el dato podría haber quedado a medias. El `Mutex` se marca como **envenenado** (*poisoned*) y, desde entonces, `lock()` devuelve `Err(PoisonError)`. No pierdes el dato: `PoisonError::into_inner()` te da el guard igualmente, y `clear_poison()` quita la marca. Por eso casi todo el mundo escribe `lock().unwrap()`: si alguien entró en pánico con el dato a medias, es razonable entrar en pánico también.
+
+<Ejecutar ej="m17/envenenado" />
+
+**El guard no es `Send`.** Ya lo viste en la lección 4: el candado se suelta en el mismo hilo que lo tomó.
+
+**Si el mismo hilo lo pide dos veces.** La documentación no garantiza qué pasa (puede bloquearse para siempre o entrar en pánico). Lo verás en la lección 10.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="El guard que vive demasiado poco (o demasiado)">
+
+❌ Querer «tener el candado» con `let _ = ...`:
+
+<NoCompila ej="m17/guard-vida" explicacion="El patrón `_` no enlaza nada, así que el guard se destruye en esa misma línea y el candado se suelta al instante. Es un error tan común que rustc lo rechaza por defecto con el lint `let_underscore_lock`. Con `let _g` (pulsa «Ver arreglo») el guard vive hasta el final del bloque: `¿libre? false`." />
+
+❌ El error contrario: tomar el candado al principio de una función larga y no soltarlo hasta el final. Todos los demás hilos esperan mientras haces cálculos que no necesitan el dato.
+
+✅ Haz la **sección crítica** lo más corta posible: toma el guard en un bloque `{ }` (o con `drop(g)`), copia o actualiza lo necesario y suéltalo antes de seguir.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m17/reto-banco" enunciado="Lanza 4 hilos con `thread::spawn`; el hilo `i` (de 1 a 4) ingresa `i * 10` en la cuenta compartida (`Arc<Mutex<i64>>`). Guarda las manijas en `manijas`. Debe imprimir `saldo = 100`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué no puedes olvidarte de tomar el candado antes de tocar el dato de un `Mutex<T>`?"
+  opciones={[
+    "Porque el compilador lo comprueba con un lint",
+    "Porque el T está dentro del Mutex y la única forma de llegar a él es lock()",
+    "Porque Mutex toma el candado automáticamente al leer",
+    "Sí puedes olvidarte"
+  ]}
+  correcta={1}
+  explicacion="El diseño hace que el error no se pueda escribir: el dato no es accesible por otro camino (salvo `get_mut` con `&mut Mutex`, que ya demuestra que nadie más lo comparte)."
+  porque={["No hace falta lint: es el sistema de tipos.", "Correcto.", "No hay acceso implícito: hay que llamar a lock().", "No en Rust seguro."]}
+/>
+
+<Pregunta
+  pregunta="Un hilo entra en pánico con el candado tomado. ¿Qué devuelve después `lock()` en otro hilo?"
+  opciones={[
+    "Se bloquea para siempre",
+    "`Err(PoisonError)`, del que puedes sacar el guard con `into_inner()`",
+    "`Ok` con el dato tal como quedó",
+    "El programa termina"
+  ]}
+  correcta={1}
+  explicacion="El candado se libera durante el desenrollado del pánico (el guard se destruye), pero queda la marca de envenenado."
+  porque={["El guard se destruye al desenrollar, así que el candado queda libre.", "Correcto.", "Te avisa con Err precisamente porque el dato podría estar a medias.", "Solo terminaría si haces unwrap sobre ese Err."]}
+/>
+
+<Pregunta
+  pregunta="Usas `thread::scope` y quieres que 4 hilos sumen en el mismo contador. ¿Qué necesitas como mínimo?"
+  opciones={["`Arc<Mutex<i32>>`", "`Mutex<i32>` prestado con `&`", "`Rc<RefCell<i32>>`", "`&mut i32` en cada hilo"]}
+  correcta={1}
+  explicacion="Con hilos con ámbito puedes prestar; el Arc solo hace falta cuando cada hilo tiene que ser dueño (thread::spawn, 'static)."
+  porque={["Funciona, pero el Arc sobra con scope.", "Correcto.", "Ni Rc es Send ni RefCell es Sync.", "No puede haber cuatro préstamos exclusivos a la vez."]}
+/>

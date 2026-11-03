@@ -1,0 +1,94 @@
+---
+title: "Git: guarda cada paso"
+description: "Git guarda fotos de tu proyecto (commits) para volver atrás cuando algo se rompe. Las cinco órdenes que necesitas: status, add, commit, log y diff."
+sidebar:
+  order: 9
+duracion: 12
+requiere: ["00-el-taller/08-cargo-toml"]
+tarjetas:
+  - p: "¿Qué es un *commit*?"
+    r: "Una foto guardada del proyecto en un momento dado, con un mensaje que explica qué cambió."
+  - p: "Las órdenes básicas de Git, en orden:"
+    r: "`git status` (qué ha cambiado), `git add .` (preparar), `git commit -m \"mensaje\"` (guardar), `git log` (historia) y `git diff` (ver cambios)."
+  - p: "¿Por qué `target` no se guarda en Git?"
+    r: "Porque se genera al compilar: guardar archivos generados solo ocupa espacio. El `.gitignore` de Cargo la excluye."
+  - p: "¿Cómo deshaces los cambios de un archivo que no has guardado en un commit?"
+    r: "`git restore archivo` lo deja como estaba en el último commit."
+---
+
+import { Pregunta, Ordena, Trampa } from '~/components';
+
+Vas a romper tu código. Muchas veces. Git hace que no importe: guarda **fotos** de tu proyecto y te deja volver a cualquiera de ellas.
+
+## La idea
+
+**Git** es un sistema de **control de versiones**: guarda la historia de los cambios de una carpeta. Cada foto guardada se llama **commit** y lleva un mensaje que explica qué cambió.
+
+`cargo new` ya creó un **repositorio** de Git en tu proyecto (por eso existe `.gitignore`). Solo necesitas instalar Git:
+
+```powershell
+winget install --id Git.Git
+```
+
+y decirle quién eres (una sola vez):
+
+```powershell
+git config --global user.name "Tu nombre"
+git config --global user.email "tu@correo.com"
+```
+
+## Las cinco órdenes
+
+```powershell
+git status                        # ¿qué ha cambiado desde la última foto?
+git add .                         # prepara todos los cambios para la foto
+git commit -m "Saludo en español" # hace la foto, con un mensaje
+git log --oneline                 # la historia de fotos
+git diff                          # qué líneas has cambiado (antes de add)
+```
+
+El ritmo de trabajo es: **cambiar → probar → `add` → `commit`**. Haz un commit cada vez que algo funcione, aunque sea pequeño. Un buen mensaje dice **qué** hace el cambio: «Pide el nombre al usuario», no «cambios».
+
+Si estropeas un archivo y quieres volver a como estaba en el último commit:
+
+```powershell
+git restore src\main.rs
+```
+
+## Pruébalo
+
+En tu proyecto `hola`:
+
+1. `git status`: verás `Cargo.toml` y `src/` como nuevos (*untracked*).
+2. `git add .` y `git commit -m "Proyecto inicial"`.
+3. Cambia el texto de `main.rs`. `git diff` te mostrará la línea quitada (−) y la añadida (+).
+4. `git commit -am "Saludo en español"` (`-a` añade los archivos ya conocidos).
+5. `git log --oneline`: dos fotos.
+
+Fíjate en que `target` nunca aparece en `git status`: el `.gitignore` la excluye.
+
+<Trampa titulo="Commits gigantes">
+
+❌ Trabajar una tarde entera y hacer un solo commit «todo». Si algo se rompió por el camino, no sabrás cuándo.
+
+✅ Commits pequeños y frecuentes. Si un cambio rompe algo, vuelves al commit anterior y has perdido cinco minutos, no una tarde.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena las órdenes para guardar un cambio en `main.rs` y comprobar que quedó en la historia."
+  lineas={["git status", "git add .", "git commit -m \"Pide el nombre\"", "git log --oneline"]}
+  explicacion="Primero miras qué ha cambiado, lo preparas, haces la foto y compruebas la historia."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué no aparece la carpeta `target` en `git status`?"
+  opciones={["Porque está vacía", "Porque el `.gitignore` que crea Cargo la excluye", "Porque Git no ve carpetas", "Porque está en otra unidad"]}
+  correcta={1}
+  explicacion="`target` contiene archivos generados; no tiene sentido guardarlos en la historia."
+  porque={["Tiene cientos de archivos después de compilar.", "", "Git ve las carpetas por los archivos que contienen.", "Está dentro del proyecto."]}
+/>

@@ -1,0 +1,112 @@
+---
+title: "impl Trait: «algo que implementa X»"
+description: "Acepta y devuelve tipos sin escribir su nombre, y entiende qué préstamos captura el tipo devuelto en la edición 2024."
+sidebar:
+  order: 4
+duracion: 13
+desde: "1.26"
+requiere: ["13-traits-y-genericos/03-monomorfizacion"]
+tarjetas:
+  - p: "¿Qué significa `impl Display` en un argumento?"
+    r: "Un genérico sin nombre: «cualquier tipo que implemente `Display`». `fn f(x: impl Display)` equivale a `fn f<T: Display>(x: T)`."
+  - p: "¿Qué significa `-> impl Iterator<Item = u32>` en el retorno?"
+    r: "La función devuelve **un** tipo concreto que implementa `Iterator`, pero no dice cuál. Quien llama solo puede usarlo como iterador. Es un tipo opaco."
+  - p: "¿Puede una función `-> impl Display` devolver `42` en una rama y `\"hola\"` en otra?"
+    r: "No: `impl Trait` es UN tipo fijo, elegido al compilar (E0308). Para elegir el tipo al ejecutar hace falta `Box<dyn Display>`."
+  - p: "¿Qué captura `-> impl Trait` en la edición 2024 y cómo se limita?"
+    r: "Todos los parámetros genéricos en ámbito, incluidos los tiempos de vida de los argumentos. Se limita con `+ use<…>`; `use<>` vacío = no captura nada."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a aprender a decir «te doy un iterador» o «dame algo que se pueda mostrar» sin escribir el nombre exacto del tipo, que a veces ni siquiera tiene nombre.
+
+## Predice
+
+<Predice
+  ej="m13/impl-arg"
+  opciones={["`[[5][cinco]]`", "`[5][cinco]`", "No compila: `entre_corchetes` no acepta a la vez un número y un texto", "`[5cinco]`"]}
+  correcta={0}
+  explicacion="`a` es `[5]` y `b` es `[cinco]`. `c` mete la unión de los dos (`[5][cinco]`) entre otros corchetes. Cada llamada usa una copia distinta de la función: para `i32`, para `&str` y para `String`."
+  porque={["Correcto.", "Falta el último par de corchetes: `c` envuelve otra vez el texto.", "`impl Display` en un argumento es un genérico: acepta cualquier tipo con `Display`.", "Los corchetes de `a` y `b` siguen dentro del texto."]}
+/>
+
+## La idea
+
+**En un argumento**, `impl Trait` es simplemente un genérico abreviado. Estas dos firmas son equivalentes:
+
+```rust
+fn entre_corchetes(x: impl Display) -> String
+fn entre_corchetes<T: Display>(x: T) -> String
+```
+
+**En el retorno**, significa algo distinto e importante: «devuelvo **un** tipo concreto que implementa este trait, pero no te digo cuál». Se llama **tipo opaco** (*opaque type*). Es imprescindible cuando el tipo es imposible de escribir: un closure tiene un tipo sin nombre, y una cadena de iteradores tiene un tipo larguísimo (`Filter<RangeInclusive<u32>, {closure}>`). Con `-> impl Iterator<Item = u32>` el que llama sabe lo justo: que puede iterar y obtener `u32`.
+
+Ojo: **opaco no es variable**. La función devuelve siempre el mismo tipo, decidido al compilar. Por eso no puedes devolver un entero en una rama y un texto en otra, aunque los dos implementen `Display`. Para eso existe `dyn Trait`, en la lección siguiente.
+
+## Pruébalo
+
+<Ejecutar ej="m13/impl-retorno" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+El compilador sí sabe cuál es el tipo opaco: lo usa para monomorfizar y optimizar igual que con un genérico normal. Solo te lo **oculta** a ti, el que llama. Eso tiene una ventaja de diseño: puedes cambiar la implementación (por ejemplo, de `filter` a un bucle propio) sin romper a nadie, porque la firma no menciona el tipo.
+
+Un tipo opaco puede contener préstamos de los argumentos. Si `pares_hasta` recibiera `&[u32]` y devolviera un iterador sobre ese slice, el iterador tendría que vivir menos que el slice. Para saber cuánto vive, el compilador decide qué parámetros **captura** el tipo opaco. En la **edición 2024** la regla es sencilla: **captura todos** los parámetros genéricos en ámbito, también los tiempos de vida de las referencias que recibe, los use o no.
+
+Cuando eso es demasiado, lo limitas con la sintaxis de **captura precisa** `+ use<…>` (estable desde Rust 1.82): `use<'a, T>` lista lo que captura, y `use<>` vacío dice «no captura nada». Mira la trampa: es exactamente ese caso.
+
+Los traits también pueden tener métodos que devuelven `impl Trait` (estable desde 1.75), con las mismas reglas de captura.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m13/impl-dos-tipos"
+  explicacion="`impl Display` es **un** tipo concreto. La rama `if` devuelve un entero y la `else` un `&str`: son dos tipos (E0308). El compilador sugiere el arreglo: `Box<dyn Display>`, donde el tipo se elige al ejecutar."
+/>
+
+<Trampa titulo="El tipo devuelto se queda con el préstamo (edición 2024)">
+
+<NoCompila
+  ej="m13/captura-2024"
+  explicacion="`medidor` solo guarda un número, pero en la edición 2024 su `impl Fn` **captura** el tiempo de vida de `&v`. Para el compilador, `f` sigue prestando `v`, así que `v.push(4)` choca con ese préstamo (E0502: préstamo exclusivo mientras hay uno compartido; evita que alguien modifique datos que otro está leyendo). La nota del error lo explica, y el arreglo es `+ use<>`: «este tipo no captura nada»."
+/>
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m13/reto-contador"
+  enunciado="Completa `multiplos(k, cuantos)` para que devuelva un iterador con los `cuantos` primeros múltiplos de `k` (empezando por `k`). Con `multiplos(3, 5)` debe salir `[3, 6, 9, 12, 15]`. Pista: un rango, `map` y un closure `move`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué diferencia hay entre `fn f(x: impl Display)` y `fn f() -> impl Display`?"
+  opciones={["En el argumento elige el tipo quien llama; en el retorno lo elige la función, y lo oculta", "Ninguna: los dos son genéricos normales", "El de retorno puede devolver tipos distintos en cada llamada", "El del argumento usa una vtable"]}
+  correcta={0}
+  explicacion="Argumento: genérico (el que llama decide `T`). Retorno: tipo opaco (la función decide y lo esconde)."
+  porque={["Correcto.", "En el retorno quien llama no puede elegir el tipo.", "Siempre devuelve el mismo tipo, fijado al compilar.", "Ninguno de los dos usa vtable: los dos se resuelven al compilar."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué una función que devuelve un closure necesita `-> impl Fn(i32) -> i32` (o un `Box`)?"
+  opciones={["Porque cada closure tiene un tipo único sin nombre, imposible de escribir", "Porque los closures solo existen dentro de la función", "Porque `Fn` es una palabra reservada", "Porque los closures siempre van en el heap"]}
+  correcta={0}
+  explicacion="El compilador inventa un tipo nuevo para cada closure. `impl Fn` es la forma de nombrarlo sin conocer su nombre."
+  porque={["Correcto.", "Con `move`, el closure se puede devolver sin problema.", "`Fn` es un trait de la biblioteca estándar.", "Un closure es un valor normal, en la pila; solo va al heap si lo metes en un `Box`."]}
+/>
+
+<Pregunta
+  pregunta="En la edición 2024, `fn f(v: &Vec<i32>) -> impl Fn() -> usize` devuelve un closure que no usa `v`. ¿El resultado mantiene prestado `v`?"
+  opciones={["Sí, porque `impl Trait` captura todos los tiempos de vida en ámbito; `+ use<>` lo evita", "No, el compilador ve que el closure no usa `v`", "Solo en modo debug", "Solo si el closure lleva `move`"]}
+  correcta={0}
+  explicacion="La captura se decide por la **firma**, no por el cuerpo. Así cambiar el cuerpo no rompe a quien llama."
+  porque={["Correcto.", "Las firmas no dependen del cuerpo; por eso existe `use<…>`.", "Los préstamos se comprueban igual en debug y en release.", "`move` decide qué guarda el closure, no lo que captura el tipo opaco de la firma."]}
+/>

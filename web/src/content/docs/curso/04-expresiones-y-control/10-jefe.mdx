@@ -1,0 +1,126 @@
+---
+title: "Jefe: el árbitro"
+description: "Combina bloques, if, loop, while, for, etiquetas y match en programas completos, y demuestra que sabes leer cada valor que producen."
+sidebar:
+  order: 10
+duracion: 15
+desde: "1.65"
+requiere: ["04-expresiones-y-control/09-patrones-de-bucle"]
+tarjetas:
+  - p: "¿Qué tienen en común las reglas E0308, E0317, E0571 y E0004?"
+    r: "Todas exigen que cada camino posible del programa produzca un valor, y del mismo tipo."
+  - p: "¿Qué bucle eliges para «repetir N veces / por cada elemento», «mientras se cumpla algo» y «hasta encontrar algo y devolverlo»?"
+    r: "`for`, `while` y `loop` con `break valor`, respectivamente."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Es hora de juntarlo todo. En este jefe lees un programa completo, arreglas errores reales y escribes dos programas desde casi cero.
+
+## Predice
+
+<Predice
+  ej="m04/arbitro"
+  pregunta="El árbitro puntúa 6 rondas: [12, -3, 0, 25, 7, -10]. ¿Qué dice la línea del total?"
+  opciones={[
+    "`total = 31: ganas`",
+    "`total = 44: ganas`",
+    "`total = 31: pierdes`",
+    "`total = 13: pierdes`"
+  ]}
+  correcta={0}
+  explicacion="12 − 3 + 0 + 25 + 7 − 10 = 31, y 31 ≥ 30, así que el `if` vale «ganas». Las penalizaciones restan porque `total += puntos` suma números negativos."
+  porque={[
+    "",
+    "44 es la suma sin contar los negativos; pero `total += puntos` suma también −3 y −10.",
+    "31 ≥ 30: la condición del `if` es verdadera.",
+    "Los negativos restan 13, pero la suma total es 31."
+  ]}
+/>
+
+## La idea
+
+Repaso en tres frases:
+
+- **Todo produce un valor.** Bloques, `if`, `match`, `loop` y bloques etiquetados son expresiones; el `;` convierte una expresión en sentencia y su valor se pierde.
+- **Cada bucle tiene su trabajo.** `for` para recorrer algo conocido (un rango, un array); `while` cuando sabes la condición para seguir; `loop` cuando quieres repetir hasta encontrar algo y devolverlo con `break valor`.
+- **Todos los caminos cuentan.** El compilador revisa cada camino posible: cada rama de un `if`, cada valor de un `match`, cada salida de un bucle. Si en alguno no hay valor, o el tipo no encaja, te lo dice antes de ejecutar.
+
+## Pruébalo
+
+<Ejecutar ej="m04/arbitro" />
+
+1. El `for` usa un rango `0..rondas.len()`: las posiciones válidas del array, ni una más.
+2. El `match` combina un valor (`0`), una guarda (`p if p < 0`), un rango (`1..=9`) y `_`. ¿Por qué no hace falta un brazo para 10 o más? Porque `_` los recoge.
+3. `{puntos:>3}` alinea el número a la derecha en 3 posiciones: por eso las columnas cuadran.
+4. El `loop` final calcula cuántas rondas de 7 puntos faltan para llegar a 100: de 31 a 101 hay 70, o sea 10 rondas.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué el `match` del árbitro es exhaustivo.** El tipo de `puntos` es `i32` (de −2 147 483 648 a 2 147 483 647). `0` cubre el cero; la guarda no cuenta para la exhaustividad; `1..=9` cubre nueve valores; y `_` cubre todos los demás, incluidos los negativos. Por eso, aunque la guarda desapareciera, el programa seguiría compilando: los negativos caerían en `_` y dirían «¡excelente!». Moraleja: el compilador garantiza que **hay** respuesta para todo, no que la respuesta sea la que tú querías. Lo segundo es trabajo tuyo (y de las pruebas, mundo 16).
+
+**El orden de los brazos con guarda.** La guarda `p if p < 0` está antes que `_` a propósito. Si la pusieras detrás, nunca se elegiría.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Tres errores de este mundo. Para cada uno, intenta decir **qué valor no existiría** si Rust lo dejara pasar, y luego mira el arreglo.
+
+<NoCompila ej="m04/bloque-punto-y-coma" explicacion="El bloque termina en `;`, así que no tiene valor (`()`), y `area` necesitaba un `i32`." />
+
+<NoCompila ej="m04/if-tipos-distintos" explicacion="`mensaje` sería un número o un texto según el día: imposible darle un tipo." />
+
+<NoCompila ej="m04/while-break-valor" explicacion="Si el `while` terminara porque `n` llega a 100, `primero` no tendría valor." />
+
+## Tu turno
+
+<Reto
+  ej="m04/fizzbuzz"
+  enunciado="El clásico: para cada número del 1 al 15 imprime `FizzBuzz` si es múltiplo de 3 y de 5, `Fizz` si solo lo es de 3, `Buzz` si solo lo es de 5, y el número en otro caso. Pista: haz `match` sobre la tupla `(n % 3, n % 5)`; el patrón `(0, _)` significa «primero 0, el segundo me da igual». Para convertir el número en texto: `n.to_string()`."
+/>
+
+<Reto
+  ej="m04/primos"
+  enunciado="Imprime en una línea los primos del 2 al 30, separados por espacios (debe salir `2 3 5 7 11 13 17 19 23 29 `). Pon una etiqueta al `for` exterior y usa `continue 'etiqueta` en cuanto encuentres un divisor."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Quieres pedir una contraseña hasta que sea correcta y quedarte con el número de intentos. ¿Qué bucle encaja mejor?"
+  opciones={[
+    "`for i in 0..3`",
+    "`loop` con `break intentos`",
+    "`while` con `break intentos`",
+    "Ninguno: hace falta recursión"
+  ]}
+  correcta={1}
+  explicacion="No sabes cuántas vueltas harán falta y quieres que el bucle entregue un valor: es el trabajo de `loop` + `break valor`."
+  porque={[
+    "Un `for` con rango fijo da exactamente 3 vueltas; la persona podría necesitar más (o menos).",
+    "",
+    "`while` no admite `break` con valor (E0571).",
+    "Un bucle lo resuelve; la recursión (mundo 05) no es necesaria."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál de estos programas compila?"
+  opciones={[
+    "`let x: u8 = 3; let t = match x { 0..=9 => \"cifra\" };`",
+    "`let t = if true { 1 } else { \"uno\" };`",
+    "`let t = 'b: { break 'b 1; };`",
+    "`let mut i = 0; let t = while i < 3 { i += 1; break i; };`"
+  ]}
+  correcta={2}
+  explicacion="Un bloque etiquetado puede salir con `break 'b valor`. Los demás violan una regla: `match` no exhaustivo (E0004), ramas de tipos distintos (E0308) y `break` con valor en `while` (E0571)."
+  porque={[
+    "Faltan los valores 10..=255 de `u8`: E0004.",
+    "Un entero y un `&str` no pueden ser el mismo tipo: E0308.",
+    "",
+    "`while` no puede entregar valor con `break`: E0571."
+  ]}
+/>

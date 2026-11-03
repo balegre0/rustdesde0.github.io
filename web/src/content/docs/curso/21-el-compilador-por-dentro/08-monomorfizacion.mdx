@@ -1,0 +1,147 @@
+---
+title: "Monomorfización"
+description: "Mira en el ensamblador real cómo una función genérica se convierte en una copia por tipo, y aprende qué ganas y qué pagas por ello."
+sidebar:
+  order: 8
+duracion: 12
+desde: "1.0"
+requiere: ["21-el-compilador-por-dentro/06-el-solver-de-traits", "13-traits-y-genericos"]
+tarjetas:
+  - p: "¿Qué es la monomorfización?"
+    r: "Generar una copia concreta de cada función genérica por cada combinación de tipos con la que se usa (`mayor::<u8>`, `mayor::<f64>`…)."
+  - p: "¿Qué ganas y qué pagas con la monomorfización?"
+    r: "Ganas llamadas directas que se pueden inlinear y optimizar para cada tipo. Pagas más código (binario más grande) y más tiempo de compilación."
+  - p: "¿En qué se diferencia `fn f(x: &dyn Debug)` de `fn f<T: Debug>(x: T)`?"
+    r: "La versión `dyn` tiene una sola copia y llama a los métodos a través de la vtable; la genérica tiene una copia por tipo con llamadas directas."
+  - p: "¿Qué truco usa `std` para que una función genérica no genere mucho código?"
+    r: "Una función externa genérica que solo convierte el argumento (`p.as_ref()`) y llama a una función interna NO genérica que hace todo el trabajo."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Escribes una función genérica una vez. El compilador la escribe **muchas veces**: una por cada tipo con el que la usas. Esa es la razón de que los genéricos de Rust sean tan rápidos… y de que los proyectos grandes tarden en compilar.
+
+## Predice
+
+<Pregunta
+  pregunta="Un programa llama a `fn describe<T: Debug>(x: T)` con un `u8`, con un `&str` y con un `Vec<f64>`. ¿Cuántas copias de `describe` hay en el binario (antes de que el optimizador las inlinee)?"
+  opciones={["Una, que sirve para todos los tipos", "Tres, una por tipo", "Ninguna: las genéricas se interpretan", "Depende de la edición"]}
+  correcta={1}
+  explicacion="La monomorfización genera `describe::<u8>`, `describe::<&str>` y `describe::<Vec<f64>>`. Cada copia sabe exactamente qué tipo maneja."
+  porque={["Una sola copia es lo que pasa con `dyn Debug`, no con genéricos.", "", "Rust no interpreta código en tiempo de ejecución.", "La monomorfización no depende de la edición."]}
+/>
+
+## La idea
+
+Después de construir el MIR de todas las funciones, el **recolector de monomorfización** (`rustc_monomorphize::collector`) parte de `main` (o de las funciones exportadas de una biblioteca) y recorre todo lo que se puede llegar a llamar. Cada vez que encuentra una llamada a una función genérica con tipos concretos, por ejemplo `mayor::<u8>`, añade esa **instancia** a la lista. Cada instancia se traduce por separado a código máquina, con `T` sustituido por el tipo real.
+
+Ventajas: dentro de `mayor::<u8>` el compilador sabe que compara bytes y emite una comparación de bytes; dentro de `mayor::<f64>`, una instrucción de coma flotante. Las llamadas son **directas** y el optimizador puede **inlinearlas** (copiar el cuerpo en el sitio de la llamada) y simplificar. Por eso un iterador con tres adaptadores puede quedar igual que un bucle escrito a mano.
+
+Costes: **más código**. Cada copia ocupa espacio en el binario y, sobre todo, cada copia es trabajo para LLVM, que es la fase más cara de la compilación. Un genérico muy usado con muchos tipos multiplica el tiempo de compilación. La alternativa es `dyn Trait`: **una** copia, y las llamadas pasan por una tabla de punteros (la vtable, lección 11), más difíciles de optimizar.
+
+## Pruébalo
+
+`std::any::type_name` te dice qué `T` concreto tiene cada copia. Compara con la versión `dyn`, que no sabe el tipo:
+
+<Ejecutar ej="m21/monomorfizacion" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Con este código:
+
+```rust
+pub fn mayor<T: PartialOrd>(a: T, b: T) -> T { if a > b { a } else { b } }
+#[unsafe(no_mangle)] pub fn usa_u8(a: u8, b: u8) -> u8 { mayor(a, b) }
+#[unsafe(no_mangle)] pub fn usa_f64(a: f64, b: f64) -> f64 { mayor(a, b) }
+```
+
+`rustc --edition 2024 --crate-type lib --emit=asm -C opt-level=1 -C llvm-args=-x86-asm-syntax=intel` (rustc 1.99.1, x86-64 Windows) produce, entre otras líneas:
+
+```text
+_RINvCsQRxP6z4OUx_4mono5mayordEB2_:
+	maxsd	xmm0, xmm1
+	ret
+
+_RINvCsQRxP6z4OUx_4mono5mayorhEB2_:
+	movzx	ecx, cl
+	movzx	eax, dl
+	cmp	cl, al
+	cmova	eax, ecx
+	ret
+```
+
+Dos copias de `mayor`, con código **totalmente distinto**: para `f64`, la instrucción de máximo de coma flotante `maxsd`; para `u8`, comparar bytes (`cmp`) y mover condicionalmente (`cmova`). Los nombres son símbolos con el formato de *mangling* v0 de Rust: `5mayor` es el nombre (5 letras) y la letra que sigue codifica el tipo del argumento genérico: `d` es `f64` y `h` es `u8`. Herramientas como `rustfilt` los traducen a `mono::mayor::<f64>`.
+
+Además, en `usa_u8` y `usa_f64` el optimizador **inlineó** la copia correspondiente: su cuerpo es idéntico al de `mayor`, sin ninguna llamada.
+
+**Medir el coste.** La herramienta `cargo llvm-lines` cuenta cuántas líneas de LLVM IR genera cada función genérica y cuántas copias tiene; es la forma de encontrar qué genérico está inflando tu compilación.
+
+**El truco de `std`.** Muchas funciones de la biblioteca estándar aceptan `P: AsRef<Path>` pero hacen esto:
+
+```rust
+pub fn abrir<P: AsRef<std::path::Path>>(p: P) -> std::io::Result<std::fs::File> {
+    fn interna(p: &std::path::Path) -> std::io::Result<std::fs::File> {
+        std::fs::File::open(p)
+    }
+    interna(p.as_ref())
+}
+```
+
+La parte genérica (y por tanto copiada) es una sola línea; el trabajo real está en `interna`, que existe **una sola vez**. Comodidad para quien llama, sin coste de tamaño.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Pensar que `dyn` siempre es lento y los genéricos siempre son mejores">
+
+❌ «Uso genéricos en todas partes porque son más rápidos.»
+
+✅ Los genéricos son más rápidos **en la llamada**, pero cada tipo añade una copia. En código que no es crítico (manejo de errores, configuración, ramas poco frecuentes), `dyn Trait` compila más rápido, ocupa menos y la diferencia en ejecución no se nota. Elige midiendo, no por dogma.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Tienes `fn guarda<T: Display>(x: T)` y la llamas con 40 tipos distintos en tu programa. La compilación es lenta y el binario grande. ¿Qué cambio reduce más el código generado sin cambiar quién la llama?"
+  opciones={[
+    "Añadir `#[inline]` a `guarda`",
+    "Dejar `guarda` genérica pero que solo haga `guarda_interna(&x)`, con `fn guarda_interna(x: &dyn Display)` haciendo todo el trabajo",
+    "Cambiar `T: Display` por `T: Debug`",
+    "Compilar en modo debug"
+  ]}
+  correcta={1}
+  explicacion="La parte genérica queda en una línea (40 copias diminutas) y todo el trabajo se compila una vez. Es la misma idea que el truco de `std`, usando `dyn` para el interior."
+  porque={["`#[inline]` hace que la función se pueda copiar en más sitios: suele **aumentar** el código.", "", "Cambiar el trait no cambia el número de copias.", "Debug compila más rápido porque optimiza menos, pero sigue generando 40 copias."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Desde dónde empieza a recorrer el programa el recolector de monomorfización en un binario?"
+  opciones={["Desde la primera función del archivo", "Desde `main` (y lo que esté exportado)", "Desde todas las funciones genéricas", "Desde el `Cargo.toml`"]}
+  correcta={1}
+  explicacion="Solo genera lo que se puede **alcanzar**. Una función genérica que nunca se llama con tipos concretos no produce ninguna copia."
+  porque={["El orden en el archivo no importa.", "", "Una genérica no se puede compilar sin saber su `T`.", "Cargo organiza crates; el recorrido lo hace rustc sobre el código."]}
+/>
+
+<Pregunta
+  pregunta="En el ensamblador de arriba, ¿por qué `mayor::<f64>` y `mayor::<u8>` tienen instrucciones distintas?"
+  opciones={[
+    "Porque una está optimizada y la otra no",
+    "Porque cada copia se compila con su tipo concreto: comparar `f64` y comparar `u8` son operaciones distintas para la CPU",
+    "Por un error del compilador",
+    "Porque `PartialOrd` se implementa en ensamblador"
+  ]}
+  correcta={1}
+  explicacion="Esa es la esencia de la monomorfización: cada copia es código especializado para su tipo."
+  porque={["Las dos se compilaron con el mismo nivel de optimización.", "", "Es el comportamiento esperado.", "`PartialOrd` está escrito en Rust; las instrucciones las elige LLVM según el tipo."]}
+/>
+
+## Para saber más
+
+- [Vtables por dentro](/curso/21-el-compilador-por-dentro/11-vtables/), la alternativa con una sola copia.
+- *The Rust Performance Book*, capítulo «Compile Times»: https://nnethercote.github.io/perf-book/compile-times.html

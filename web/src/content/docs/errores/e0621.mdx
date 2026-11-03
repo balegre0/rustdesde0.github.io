@@ -1,0 +1,77 @@
+---
+title: "E0621: se necesita un tiempo de vida explícito"
+description: "Una función guarda un parámetro referencia en un sitio que exige un tiempo de vida que el parámetro no declara."
+sidebar:
+  order: 65
+insignias: ["Tiempos de vida"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` explicit lifetime required in the type of `texto` ``
+
+## Qué significa
+
+`lista` guarda referencias que viven `'a`. Meter `texto` en ella exige que `texto` viva **al menos** `'a`. Pero el tipo de `texto` es `&str` con un tiempo de vida anónimo, que podría ser más corto. rustc te pide que lo digas explícitamente.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0621" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0621]: explicit lifetime required in the type of `texto`
+ --> E0621.rs:2:5
+  |
+2 |     lista.push(texto);
+  |     ^^^^^^^^^^^^^^^^^ lifetime `'a` required
+  |
+help: add explicit lifetime `'a` to the type of `texto`
+  |
+1 | fn guardar<'a>(lista: &mut Vec<&'a str>, texto: &'a str) {
+  |                                                  ++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Insertar en una colección `Vec<&'a T>` un parámetro declarado como `&T`.
+- Asignar un parámetro `&T` a un campo `&'a T` de un struct.
+
+## Cómo arreglarlo
+
+Usa el mismo tiempo de vida en el parámetro: `texto: &'a str`. La ayuda de rustc enseña exactamente dónde añadirlo.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn guardar<'a>(lista: &mut Vec<&'a str>, texto: &'a str) {
+    lista.push(texto);
+}
+
+fn main() {
+    let mut lista = Vec::new();
+    guardar(&mut lista, "hola");
+    println!("{lista:?}");
+}
+```
+
+**Salida:**
+
+```text
+["hola"]
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0621` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0106](/errores/e0106/): falta un especificador de tiempo de vida
+- [E0521](/errores/e0521/): un dato prestado escapa de la función
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/)

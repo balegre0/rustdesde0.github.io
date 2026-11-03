@@ -1,0 +1,34 @@
+---
+title: "Mundo 05 · Funciones y la pila"
+description: "Parte tus programas en funciones con parámetros y valores de retorno, entiende la recursión y mira por dentro la pila: dónde vive cada dato y cuánto ocupa."
+sidebar:
+  order: 0
+---
+
+Una **función** es un trozo de programa con nombre que puedes usar todas las veces que quieras. Con funciones, un programa largo se convierte en piezas pequeñas que se entienden solas.
+
+Pero en este mundo no te quedarás en la superficie. Cada vez que llamas a una función, la máquina reserva un espacio en la **pila** (*stack*) para sus datos, y lo libera al volver. Vas a ver ese espacio con direcciones de memoria reales, medir cuánto ocupa cada valor y descubrir que algunos datos no caben en la pila y viven en otro sitio: el **heap**.
+
+Esa pregunta, «¿dónde vive cada dato y quién lo libera?», es exactamente la que responde el mundo 06, *ownership*. Este mundo es su cimiento.
+
+## Lecciones
+
+1. [Tu primera función](/curso/05-funciones-y-la-pila/01-tu-primera-funcion/) — definir y llamar.
+2. [Parámetros](/curso/05-funciones-y-la-pila/02-parametros/) — darle datos a una función.
+3. [Devolver valores](/curso/05-funciones-y-la-pila/03-devolver-valores/) — `->`, la última expresión y `return`.
+4. [Sentencias y expresiones](/curso/05-funciones-y-la-pila/04-sentencias-y-expresiones/) — la trampa del `;` final (E0308).
+5. [Recursión](/curso/05-funciones-y-la-pila/05-recursion/) — funciones que se llaman a sí mismas.
+6. [Marcos de pila](/curso/05-funciones-y-la-pila/06-marcos-de-pila/) — lo que pasa en memoria en cada llamada.
+7. [¿Dónde vive cada valor?](/curso/05-funciones-y-la-pila/07-donde-vive-cada-valor/) — pila, heap y el propio programa.
+8. [Funciones como valores](/curso/05-funciones-y-la-pila/08-funciones-como-valores/) — guardar, pasar y devolver funciones.
+9. [¿Cuánta pila cabe?](/curso/05-funciones-y-la-pila/09-cuanta-pila-cabe/) — recursión profunda y desbordamiento de pila.
+10. [Jefe: la calculadora de fracciones](/curso/05-funciones-y-la-pila/10-jefe/) — todo junto.
+
+## Lo que el compilador vigila en este mundo
+
+| Error | Qué evita |
+|---|---|
+| [E0425](/errores/e0425/) | Llamar a una función que no existe (o con el nombre mal escrito). |
+| [E0061](/errores/e0061/) | Llamar con un número de argumentos distinto del que la función necesita. |
+| [E0308](/errores/e0308/) | Pasar o devolver un valor del tipo equivocado; y el `;` que «se come» el valor de retorno. |
+| [E0317](/errores/e0317/) | Una función que, por algún camino, terminaría sin devolver nada. |

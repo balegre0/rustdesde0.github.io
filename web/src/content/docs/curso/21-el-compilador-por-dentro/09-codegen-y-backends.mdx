@@ -1,0 +1,163 @@
+---
+title: "Codegen: LLVM, noalias y otros backends"
+description: "Lee el LLVM IR real que genera rustc, descubre la promesa `noalias` que lleva cada `&mut` y conoce los backends Cranelift y GCC."
+sidebar:
+  order: 9
+duracion: 13
+desde: "1.54"
+requiere: ["21-el-compilador-por-dentro/08-monomorfizacion", "07-prestamos"]
+tarjetas:
+  - p: "¿Qué es LLVM IR?"
+    r: "El lenguaje intermedio de LLVM: instrucciones de bajo nivel con tipos simples (`i32`, `ptr`) que LLVM optimiza y convierte en código máquina para cada CPU."
+  - p: "¿Qué significa el atributo `noalias` que rustc pone a los `&mut`?"
+    r: "Que, mientras dura la función, ningún otro puntero accede a esa memoria. Permite al optimizador no volver a leer valores que ya conoce."
+  - p: "¿Por qué crear dos `&mut` al mismo valor es comportamiento indefinido aunque uses `unsafe`?"
+    r: "Porque rustc ya le prometió a LLVM que no hay aliasing (`noalias`); el optimizador genera código que da resultados incorrectos si la promesa se rompe."
+  - p: "¿Qué es Cranelift en rustc?"
+    r: "Un backend alternativo a LLVM, pensado para compilar más rápido en desarrollo (debug), a cambio de optimizar menos. Se instala en nightly con el componente `rustc-codegen-cranelift`."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa, Historia } from '~/components';
+
+Tras la monomorfización, cada función concreta se traduce del MIR al lenguaje de un **backend** de generación de código (*codegen*). El backend por defecto es **LLVM**. Aquí verás el IR real que recibe y una de las razones por las que Rust puede ser más rápido de lo que parece: la información que le pasa sobre tus préstamos.
+
+## Predice
+
+<Ejecutar ej="m21/noalias" />
+
+<Pregunta
+  pregunta="El programa de arriba imprime `con_crudos(p, p) = 2`. Si `con_crudos` devolviera siempre 1 sin leer `*a` (como hace la versión optimizada de `con_refs`), ¿qué pasaría?"
+  opciones={[
+    "Nada: el resultado sería el mismo",
+    "Devolvería 1 aunque `*a` vale 2 en ese momento: un resultado falso",
+    "No compilaría",
+    "El programa entraría en pánico"
+  ]}
+  correcta={1}
+  explicacion="Con `p, p`, `a` y `b` son el mismo `i32`: escribir 2 por `b` cambia `*a`. Solo es correcto omitir la lectura cuando se **sabe** que no hay aliasing. Eso es exactamente lo que garantiza un `&mut`."
+  porque={["Con aliasing, `*a` ya no es 1 cuando se lee.", "", "Compilaría: es una optimización, no un cambio de tipos.", "No hay ninguna comprobación que provoque un pánico."]}
+/>
+
+## La idea
+
+`rustc_codegen_ssa` es una capa común que recorre el MIR optimizado y llama a un **backend** a través de traits (`CodegenBackend`, `BuilderMethods`). El backend `rustc_codegen_llvm` traduce cada función a **LLVM IR**, y LLVM la optimiza y la convierte en código máquina. rustc 1.99.1 trae su propia copia de LLVM, la versión 23.1.1 (`rustc -vV` lo dice).
+
+LLVM no sabe nada de ownership ni de préstamos. Pero rustc le pasa **atributos** sacados de tus tipos. El más importante: cada parámetro `&mut T` se marca `noalias`, que significa «durante esta función, nadie más accede a esta memoria». Con eso LLVM puede quitar lecturas repetidas, reordenar escrituras y vectorizar bucles. Un `&T` sin mutabilidad interior también se marca `noalias` y de solo lectura.
+
+Esta es la otra cara de la regla de exclusividad del mundo 7. La regla no solo evita errores de aliasing con mutación; **también es información** que el compilador convierte en velocidad. Y explica por qué romperla con `unsafe` (crear dos `&mut` al mismo sitio) es comportamiento indefinido aunque no «se note»: el optimizador ya generó código que confía en la promesa.
+
+## Pruébalo
+
+El compilador no te deja ni intentar romper la promesa en código seguro:
+
+<NoCompila ej="m21/mismo-dos-veces" explicacion="E0499: dos `&mut x` vivos a la vez. Si se permitiera, `con_refs` devolvería 1 aunque `x` acabara valiendo 2. El «Ver arreglo» usa dos variables distintas." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`rustc --edition 2024 --crate-type lib --emit=llvm-ir -O` sobre las dos funciones (`con_refs` y `con_crudos`, con `#[unsafe(no_mangle)]` para que el nombre se vea limpio). Salida real de rustc 1.99.1:
+
+```text
+define noundef i32 @con_refs(ptr noalias nofree noundef writeonly align 4 captures(none) dereferenceable(4) initializes((0, 4)) %a, ptr noalias nofree noundef writeonly align 4 captures(none) dereferenceable(4) initializes((0, 4)) %b) unnamed_addr #1 !guid !5 {
+start:
+  store i32 1, ptr %a, align 4
+  store i32 2, ptr %b, align 4
+  ret i32 1
+}
+
+define noundef i32 @con_crudos(ptr nofree noundef captures(none) initializes((0, 4)) %a, ptr nofree noundef writeonly captures(none) initializes((0, 4)) %b) unnamed_addr #0 !guid !3 {
+start:
+  store i32 1, ptr %a, align 4
+  store i32 2, ptr %b, align 4
+  %_0 = load i32, ptr %a, align 4, !noundef !4
+  ret i32 %_0
+}
+```
+
+Compara las dos firmas. `con_refs` lleva en cada puntero: `noalias` (exclusivo), `align 4` (alineado, porque una referencia siempre lo está), `dereferenceable(4)` (se pueden leer 4 bytes sin comprobar nada, porque una referencia nunca es nula ni colgante) y `noundef` (no contiene basura). Los punteros crudos no llevan casi nada de eso. Resultado: `con_refs` termina en `ret i32 1`; `con_crudos` tiene que hacer `load` de `%a`.
+
+El ensamblador x86-64 que sale de ahí (`--emit=asm`, sintaxis Intel):
+
+```text
+con_crudos:
+	mov	dword ptr [rcx], 1
+	mov	dword ptr [rdx], 2
+	mov	eax, dword ptr [rcx]
+	ret
+
+con_refs:
+	mov	dword ptr [rcx], 1
+	mov	dword ptr [rdx], 2
+	mov	eax, 1
+	ret
+```
+
+Por qué es comportamiento indefinido crear una referencia inválida **aunque no la uses**: el atributo `dereferenceable` permite a LLVM adelantar lecturas de esa memoria donde le convenga. Si la referencia apunta a basura, esa lectura puede ocurrir igualmente.
+
+**Otros backends.** rustc puede usar otros backends en lugar de LLVM:
+
+- **Cranelift** (`rustc_codegen_cranelift`): genera código más rápido, optimizando menos; pensado para el ciclo «editar, compilar, probar» en debug. La hoja de ruta 2026 del proyecto incluye dejarlo listo para producción. En nightly existe el componente `rustc-codegen-cranelift` (lo comprobamos en el manifiesto de la nightly de noviembre de 2026): `rustup component add rustc-codegen-cranelift --toolchain nightly`, y se activa por perfil de Cargo con la opción inestable `codegen-backend`.
+- **rustc_codegen_gcc**: usa GCC (vía `libgccjit`) como backend, útil para arquitecturas que LLVM no soporta.
+- **gccrs** es otra cosa: un **compilador de Rust nuevo**, escrito dentro de GCC desde cero (parser, tipos, todo). En 2026 avanza hacia compilar `core` y las partes en Rust del kernel Linux, pero aún no es de uso general. Tener una segunda implementación es una de las presiones para escribir una especificación de Rust (mundo 24).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Mientras no lo use a la vez, puedo tener dos &mut en unsafe»">
+
+❌ Fabricar dos `&mut T` al mismo valor con punteros crudos y «tener cuidado» al usarlos.
+
+✅ La promesa `noalias` se rompe al **crear** las dos referencias vivas, no solo al usarlas mal. Si necesitas varios caminos de escritura a la misma memoria, usa punteros crudos todo el rato (`*mut T`), o tipos con mutabilidad interior (`Cell`, `RefCell`, `UnsafeCell`), que existen justamente para quitar esa promesa. Miri detecta estas violaciones.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="¿Cuál de estos parámetros recibe `noalias` en el LLVM IR que genera rustc?"
+  opciones={["`x: *mut i32`", "`x: &mut i32`", "`x: &Cell<i32>`", "`x: usize`"]}
+  correcta={1}
+  explicacion="`&mut T` garantiza acceso exclusivo. Los punteros crudos no garantizan nada, y `&Cell<T>` permite mutar a través de referencias compartidas, así que no puede ser `noalias`."
+  porque={["Un puntero crudo puede tener alias: rustc no promete nada.", "", "`Cell` contiene un `UnsafeCell`, que desactiva las promesas de aliasing.", "`noalias` es un atributo de punteros, no de enteros."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace `dereferenceable(4)` en un parámetro de LLVM IR?"
+  opciones={[
+    "Comprueba en tiempo de ejecución que el puntero es válido",
+    "Le dice a LLVM que puede leer 4 bytes de ese puntero en cualquier momento sin riesgo",
+    "Limita el valor a 4",
+    "Marca el parámetro como opcional"
+  ]}
+  correcta={1}
+  explicacion="Es una promesa, no una comprobación. Por eso una referencia a memoria inválida es UB aunque el programa no la lea explícitamente."
+  porque={["LLVM no inserta comprobaciones: confía en el atributo.", "", "Habla del tamaño de memoria accesible, no del valor.", "No tiene nada que ver con opcionalidad."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué diferencia hay entre `rustc_codegen_gcc` y gccrs?"
+  opciones={[
+    "Ninguna, son dos nombres para lo mismo",
+    "`rustc_codegen_gcc` es rustc con GCC como backend; gccrs es un compilador de Rust completamente nuevo dentro de GCC",
+    "gccrs es más rápido y ya sustituye a rustc",
+    "`rustc_codegen_gcc` compila Rust a C"
+  ]}
+  correcta={1}
+  explicacion="Uno reutiliza todo rustc y cambia solo la última etapa; el otro reimplementa el lenguaje entero."
+  porque={["Son proyectos distintos con objetivos distintos.", "", "gccrs todavía no es de uso general.", "Genera código máquina mediante GCC, no código fuente de otro lenguaje."]}
+/>
+
+<Historia titulo="La optimización que se apagó y encendió varias veces">
+
+`noalias` en los `&mut` es una idea de los primeros días, pero destapó errores en LLVM, que casi nunca recibía tanta información de aliasing. Entre 2015 y 2021 se desactivó y reactivó varias veces mientras se corregían esos errores, hasta quedar activado de forma estable en Rust 1.54. Rust ayudó así a arreglar LLVM para todos.
+
+</Historia>
+
+## Para saber más
+
+- Mundo 20 (unsafe y UB), para las reglas de aliasing en código `unsafe`.
+- *rustc-dev-guide*, capítulo «Code generation»: https://rustc-dev-guide.rust-lang.org/backend/codegen.html

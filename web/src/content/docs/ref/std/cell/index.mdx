@@ -1,0 +1,37 @@
+---
+title: "std::cell"
+description: "Mutabilidad interior en un solo hilo: Cell, RefCell, OnceCell y LazyCell."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+**Ruta:** `std::cell`
+
+## Para qué sirve
+
+Normalmente, para modificar algo necesitas un préstamo exclusivo (`&mut`). Los tipos de este módulo permiten **modificar a través de un préstamo compartido** (`&T`): es la **mutabilidad interior** (*interior mutability*). Siguen respetando la regla «o varios lectores o un escritor», pero la comprueban de otra forma (copiando valores, o contando préstamos al ejecutar). Todos son para **un solo hilo** (no son `Sync`); entre hilos se usan `Mutex`, `RwLock` y atómicos.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Cell`](/ref/std/cell/cell/) | Cambiar un valor `Copy` sin préstamos: `get` y `set`. | 1.0 |
+| [`RefCell`](/ref/std/cell/refcell/) | Préstamos comprobados al ejecutar: `borrow` y `borrow_mut`. | 1.0 |
+| [`OnceCell`](/ref/std/cell/oncecell/) | Un valor que se escribe una sola vez. | 1.70 |
+| `LazyCell` | Un valor que se calcula la primera vez que se usa. | 1.80 |
+| `UnsafeCell` | La pieza básica sobre la que se construyen todos los demás (`unsafe`). | 1.0 |
+
+## Conceptos clave
+
+- **Por qué es seguro**: `Cell` nunca presta su contenido (solo copia hacia dentro y hacia fuera), así que no puede haber referencias colgantes. `RefCell` cuenta los préstamos activos y **entra en pánico** si se viola la regla.
+- **`UnsafeCell` es la única puerta**: modificar algo a través de `&T` sin pasar por un `UnsafeCell` (directa o indirectamente) es comportamiento indefinido.
+- **Combinación típica**: `Rc<RefCell<T>>` (varios dueños que modifican, en un hilo).
+
+## Ver también
+
+- [std::rc](/ref/std/rc/)
+- [std::sync (versiones para hilos)](/ref/std/sync/)
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

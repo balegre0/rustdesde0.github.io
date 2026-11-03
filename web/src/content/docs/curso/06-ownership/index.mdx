@@ -1,0 +1,45 @@
+---
+title: "Mundo 06 · Ownership"
+description: "La idea central de Rust: cada valor tiene un único dueño, que lo libera al terminar. Así desaparecen la doble liberación y el uso tras liberar, sin coste al ejecutar."
+sidebar:
+  order: 0
+---
+
+En el mundo 05 te quedó una pregunta abierta: la pila se limpia sola, pero **¿quién devuelve la memoria del heap, y cuándo?** Este mundo es la respuesta de Rust, y es la idea que lo hace distinto: la **propiedad** (*ownership*).
+
+Te lo decimos claro: este es el mundo donde más gente se atasca. Es normal. Por eso está partido en lecciones cortas, cada una con **una sola idea**, y cada regla viene con **el error de memoria que evita**. Al borrow checker se le gana entendiéndolo, no peleando con él.
+
+## Cómo leer las tablas de permisos
+
+En muchas lecciones verás una tabla como esta. Cada fila es una línea del programa y muestra qué puede hacer cada variable **después** de esa línea:
+
+- **R** (*read*): puedes **leer** el valor.
+- **W** (*write*): puedes **modificarlo**.
+- **O** (*own*): eres su **dueño**: puedes **moverlo** a otro sitio o **liberarlo**.
+- Un **`-`** en una posición significa que ese permiso no está (o se ha perdido).
+
+Así, `RWO` es «lo puedo todo», `R-O` es «soy dueño pero no puedo modificarlo» (la variable no es `mut`) y `---` es «ya no puedo usarla». El compilador comprueba estos permisos en cada línea; cuando una línea necesita un permiso que no tienes, no compila.
+
+## Lecciones
+
+1. [¿Quién limpia?](/curso/06-ownership/01-quien-limpia/) — el problema del heap y las tres reglas.
+2. [Un solo dueño](/curso/06-ownership/02-un-solo-dueno/) — dueños, ámbitos y permisos.
+3. [Ámbito y `drop`](/curso/06-ownership/03-ambito-y-drop/) — cuándo se libera y en qué orden.
+4. [Mover](/curso/06-ownership/04-mover/) — la propiedad cambia de manos (E0382).
+5. [¿Por qué no copiar sin más?](/curso/06-ownership/05-por-que-no-copiar/) — la doble liberación.
+6. [`Copy`](/curso/06-ownership/06-copy/) — los tipos que se copian solos.
+7. [`Clone`](/curso/06-ownership/07-clone/) — la copia profunda, explícita y con precio.
+8. [Mover a funciones](/curso/06-ownership/08-mover-a-funciones/) — pasar un argumento es asignar.
+9. [Devolver la propiedad](/curso/06-ownership/09-devolver-la-propiedad/) — y por qué esto pide algo mejor.
+10. [Ownership y colecciones](/curso/06-ownership/10-ownership-y-colecciones/) — `Vec`, `push`, `for` y E0507.
+11. [Mover en bucles y ramas](/curso/06-ownership/11-mover-en-bucles-y-ramas/) — lo que el compilador sigue camino a camino.
+12. [Jefe: la fila del cine](/curso/06-ownership/12-jefe/) — todo junto.
+
+## Lo que el compilador vigila en este mundo
+
+| Error | Qué te impide hacer | Qué fallo de memoria evita |
+|---|---|---|
+| [E0382](/errores/e0382/) | Usar una variable cuyo valor ya se movió | Uso tras liberar y doble liberación |
+| [E0507](/errores/e0507/) | Sacar (mover) un valor de dentro de algo que no posees | Que un `Vec` libere un elemento que ya no es suyo |
+| [E0184](/errores/e0184/) | Que un tipo con `Drop` sea `Copy` | Doble liberación de un recurso |
+| [E0425](/errores/e0425/) | Nombrar una variable fuera de su ámbito | Usar algo que ya se liberó |

@@ -1,0 +1,34 @@
+---
+title: "compile_error!"
+description: "Detiene la compilación con un mensaje propio. Se usa con #[cfg] para avisar de configuraciones no soportadas y dentro de macros."
+sidebar:
+  order: 17
+insignias: ["Desde 1.20", "core"]
+---
+import { NoCompila } from '~/components';
+
+**Ruta:** `std::compile_error`
+
+## Sinopsis
+
+```rust
+compile_error!("mensaje");
+```
+
+## Qué hace
+
+Si el compilador llega a procesar la macro, la compilación **falla** con tu mensaje. Por eso casi siempre va detrás de un `#[cfg(...)]` (para rechazar plataformas o combinaciones de features que no soportas) o dentro de una `macro_rules!` (para dar un error claro cuando la usan mal).
+
+## Ejemplo
+
+<NoCompila ej="ref-std/macros-compile-error" />
+
+Sin ninguna de las dos features, el compilador muestra el mensaje y se detiene.
+
+## Desde
+
+Rust 1.20.
+
+## Ver también
+
+[`#[cfg]`](/ref/lenguaje/atributos/cfg/) · [Features](/curso/12-modulos-crates-y-cargo/07-features/)

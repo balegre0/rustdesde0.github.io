@@ -1,0 +1,73 @@
+---
+title: "async"
+description: "Palabra clave estricta (desde la edición 2018): crea funciones, bloques y closures que devuelven un futuro."
+sidebar:
+  order: 3
+desde: "1.39"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`async` convierte una función, un bloque o una closure en algo que **devuelve un futuro** (*future*): un cálculo que todavía no ha ocurrido y que avanzará cuando alguien lo sondee.
+
+## Sinopsis
+
+```text
+async fn nombre(parámetros) -> T { … }      // devuelve impl Future<Output = T>
+async { … }          async move { … }        // bloque async
+async |args| expr    async move |args| expr  // closure async (1.85)
+```
+
+## Qué hace
+
+### Uso 1 · Funciones async
+
+`async fn f() -> T` no devuelve un `T`, sino un valor de un tipo anónimo que implementa `Future<Output = T>`. **Llamarla no ejecuta el cuerpo**: solo crea el futuro. El cuerpo corre cuando el futuro se sondea (*poll*), normalmente al hacer `.await` sobre él.
+
+Por dentro, el compilador convierte el cuerpo en una **máquina de estados**: cada `.await` es un punto donde la función puede pausarse y guardar sus variables vivas dentro del propio futuro.
+
+### Uso 2 · Bloques async
+
+`async { … }` crea un futuro anónimo en el sitio. Con `async move { … }` el bloque se queda con la propiedad de las variables que usa, en vez de tomarlas prestadas.
+
+### Uso 3 · Closures async
+
+`async |x| …` es una closure que, al llamarla, devuelve un futuro. Puede tomar prestado de lo que captura dentro del futuro. Sus traits son `AsyncFn`, `AsyncFnMut` y `AsyncFnOnce`.
+
+La biblioteca estándar **no incluye ejecutor** (el código que sondea los futuros hasta el final). En programas reales se usa un crate; el ejemplo trae uno mínimo para poder ejecutarse.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-async" />
+
+Salida:
+
+```text
+futuro creado
+calculando el doble de 21
+42
+hola desde un bloque async
+5
+```
+
+Fíjate en el orden: «futuro creado» sale **antes** que «calculando…», porque llamar a `doble(21)` no ejecutó nada.
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-async-error" />
+
+`error[E0308]: mismatched types` con la nota `expected u32, found future`: una función async devuelve el futuro, no el valor. Hay que esperarlo con `.await` (dentro de código async) o pasarlo a un ejecutor.
+
+## Desde
+
+Rust 1.39 (funciones y bloques). Closures async desde Rust 1.85. `async fn` dentro de traits desde Rust 1.75. Es palabra clave estricta desde la edición 2018; en la edición 2015 era un identificador normal.
+
+## Ver también
+
+- [`await`](/ref/lenguaje/palabras-clave/await/) · [`move`](/ref/lenguaje/palabras-clave/move/)
+- [Ediciones](/ref/ediciones/): `Future` e `IntoFuture` entran en el prelude en 2024.
+
+## Aprende esto en
+
+- [Mundo 18 · Async](/curso/18-async/)

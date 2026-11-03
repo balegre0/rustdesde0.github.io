@@ -1,0 +1,119 @@
+---
+title: "Structs: datos con nombre"
+description: "Crea tu primer tipo propio, agrupa datos que van juntos y descubre cómo los coloca Rust en memoria."
+sidebar:
+  order: 1
+duracion: 12
+desde: "1.0"
+requiere: ["06-ownership", "07-prestamos"]
+tarjetas:
+  - p: "¿Qué hace falta para cambiar un campo de un struct?"
+    r: "Que la variable que guarda el struct entero sea `mut`. En Rust no se marca un campo suelto como mutable: la mutabilidad es de la variable (del dueño)."
+  - p: "¿Qué hace `..otro` al crear un struct?"
+    r: "Es la sintaxis de actualización: rellena los campos que faltan copiándolos (o moviéndolos) desde `otro`. Si mueve un campo como `String`, `otro` deja de poder usarse entero."
+  - p: "¿Garantiza Rust que los campos de un struct normal están en memoria en el orden en que los escribiste?"
+    r: "No. Con la representación por defecto (`repr(Rust)`) el compilador puede reordenarlos para ahorrar relleno. Con `#[repr(C)]` sí se respeta el orden."
+  - p: "¿Qué es el relleno (padding)?"
+    r: "Bytes vacíos que el compilador mete entre campos o al final para que cada campo empiece en una dirección múltiplo de su alineamiento."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a crear tu primer **tipo propio**: un molde con nombre que junta varios datos que siempre van juntos.
+
+## Predice
+
+Un **struct** (*structure*, «estructura») es un tipo con **campos** (*fields*): cada campo tiene un nombre y un tipo. La sintaxis `..ana` significa «el resto de campos, cógelos de `ana`».
+
+<Predice
+  ej="m09/structs-predice"
+  opciones={["`Luis tiene 3 vidas y 120 puntos`", "`Luis tiene 0 vidas y 0 puntos`", "No compila: falta dar `vidas` y `puntos`", "`Ana tiene 3 vidas y 120 puntos`"]}
+  correcta={0}
+  explicacion="`..ana` rellena `vidas` y `puntos` con los valores de `ana`. El nombre lo hemos dado nosotros, así que se usa `Luis`."
+  porque={["Es lo que ocurre: los campos que no escribes se toman de `ana`.", "Rust no inventa valores «por defecto» para los campos: o los das tú, o salen de `..ana`.", "Con `..ana` sí están todos: los que faltan vienen de `ana`.", "El campo `nombre` lo escribimos explícitamente; `..ana` solo rellena los que faltan."]}
+/>
+
+## La idea
+
+Imagina una ficha de biblioteca: **título**, **número de páginas**, **¿leído?**. Son tres datos distintos, pero describen *una sola cosa*. Un struct le da nombre a esa ficha:
+
+```rust
+struct Libro {
+    titulo: String,
+    paginas: u32,
+    leido: bool,
+}
+```
+
+Esto **no crea ningún libro**: solo define el molde (el tipo `Libro`). Para tener un libro de verdad escribes `Libro { titulo: …, paginas: …, leido: … }` dando **todos** los campos. No hay campos «vacíos» ni valores inventados: si te falta uno, no compila.
+
+Dos reglas que ya conoces del mundo de propiedad se aplican igual aquí. Primera: **el struct es el dueño de sus campos**. Cuando el `Libro` se destruye, su `String` también. Segunda: **la mutabilidad es de la variable**, no de cada campo. Si quieres cambiar `libro.leido`, la variable `libro` tiene que ser `let mut`.
+
+## Pruébalo
+
+<Ejecutar ej="m09/structs" />
+
+Fíjate en el paso 5: `Libro { titulo, paginas, leido: false }`. Cuando una variable se llama igual que el campo, puedes escribir solo el nombre. Se llama **atajo de inicialización** (*field init shorthand*).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un struct en memoria es simplemente sus campos uno detrás de otro… **pero no necesariamente en el orden en que los escribiste**.
+
+Cada tipo tiene un **alineamiento** (*alignment*): un `u32` quiere empezar en una dirección múltiplo de 4; un `u16`, múltiplo de 2; un `u8`, en cualquiera. Si los campos se colocan en orden `a: u8, b: u32, c: u16`, hacen falta huecos de **relleno** (*padding*) para respetar esos múltiplos:
+
+```text
+repr(C) — en el orden escrito (12 bytes):
+byte:  0    1  2  3   4  5  6  7   8  9   10 11
+      [a ][relleno ][     b      ][  c  ][relleno]
+
+repr(Rust) — el compilador reordena (8 bytes):
+byte:  0  1  2  3   4  5   6   7
+      [     b     ][  c  ][a ][r]
+```
+
+<Ejecutar ej="m09/structs-tamano" titulo="Medir con size_of" />
+
+La representación por defecto, `repr(Rust)`, **solo garantiza** que cada campo está bien alineado y que no se solapan; el orden queda libre para que el compilador ahorre bytes. `#[repr(C)]` promete el orden de declaración (se usa al hablar con código de fuera de Rust, en el mundo 22). Los números de arriba son de **wasm32**, la plataforma donde se ejecuta este navegador; en un PC x86-64 salen los mismos (8 y 12) porque aquí no hay campos del tamaño de un puntero.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m09/campo-sin-mut"
+  explicacion="Rust no deja marcar un solo campo como `mut`. La variable `c` es la dueña del struct entero, y es ella la que necesita `let mut`. Así, mirando una sola línea (`let c = …`) sabes que nada dentro de `c` va a cambiar."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m09/rectangulo"
+  enunciado="Define un struct `Rectangulo` con los campos `ancho` y `alto` (`u32`), crea uno de 8 × 5 y muestra exactamente `Área: 40`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tienes `let p = Libro { … };` y escribes `p.paginas = 10;`. ¿Qué pasa?"
+  opciones={["No compila (E0594): `p` no es `mut`", "Compila: los campos numéricos siempre se pueden cambiar", "Compila, pero da un pánico al ejecutar", "No compila porque `paginas` debería declararse `mut paginas: u32`"]}
+  correcta={0}
+  explicacion="La mutabilidad pertenece a la variable dueña. Hay que escribir `let mut p`."
+  porque={["Correcto: es el error E0594 que viste en la trampa.", "Que un tipo sea `Copy` o numérico no cambia nada: sin `mut` no hay escritura.", "Rust lo detecta al compilar; nunca llega a ejecutarse.", "Esa sintaxis no existe: los campos no llevan `mut`."]}
+/>
+
+<Pregunta
+  pregunta="`struct S { a: u8, b: u32, c: u16 }` ocupa 8 bytes, y con `#[repr(C)]` ocupa 12. ¿Por qué?"
+  opciones={["Con `repr(Rust)` el compilador puede reordenar los campos y ahorrar relleno", "`repr(C)` añade 4 bytes de cabecera a todo struct", "`repr(Rust)` comprime los números", "En `repr(C)` un `u8` ocupa 4 bytes"]}
+  correcta={0}
+  porque={["Exacto: poniendo `b`, `c`, `a` solo queda 1 byte de relleno al final.", "No hay cabecera: los 4 bytes de más son relleno entre y tras los campos.", "Rust nunca comprime: un `u32` siempre ocupa 4 bytes.", "Un `u8` ocupa 1 byte en cualquier representación; lo que cambia es el relleno."]}
+/>
+
+<Pregunta
+  pregunta={'Escribes `let b = Libro { titulo: String::from("B"), ..a };`, donde `a` es otro `Libro`. ¿Puedes seguir usando `a.titulo` después?'}
+  opciones={["Sí: `titulo` lo diste tú, así que de `a` solo se copiaron `paginas` y `leido` (que son `Copy`)", "No: `..a` mueve siempre el struct entero", "No: `..a` copia también el título y lo mueve", "Sí, pero solo si `Libro` implementa `Clone`"]}
+  correcta={0}
+  explicacion="`..a` solo toma los campos que faltan. Aquí faltan dos campos `Copy`, que se copian; `a` queda intacto. Si faltara un campo `String`, ese campo sí se movería y `a` quedaría parcialmente movido."
+  porque={["Correcto.", "Solo se usan los campos que faltan, no el struct entero.", "El título lo escribiste tú; `..a` no lo toca.", "`..a` no llama a `clone`: copia los campos `Copy` y mueve los demás."]}
+/>

@@ -1,0 +1,1 @@
+{ "plataforma": "playground", "perfiles": ["debug"], "nota": "En el Playground termina con «thread 'main' has overflowed its stack» y la señal SIGABRT; en Windows, con el error STATUS_STACK_OVERFLOW." }

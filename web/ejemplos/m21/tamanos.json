@@ -1,0 +1,1 @@
+{ "nota": "En el navegador (wasm32) usize y los punteros miden 4 bytes; en un PC de 64 bits miden 8. La lección muestra las dos tablas." }

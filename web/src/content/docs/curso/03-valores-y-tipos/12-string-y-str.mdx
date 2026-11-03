@@ -1,0 +1,148 @@
+---
+title: "Texto: String y &str (primera mirada)"
+description: "Distingue el texto fijo (&str) del texto que crece (String), descubre por qué \"año\".len() vale 4 y por qué no puedes escribir texto[0]."
+sidebar:
+  order: 12
+duracion: 15
+desde: "1.0"
+requiere: ["03-valores-y-tipos/09-bool-y-char", "01-la-maquina/10-texto-en-bytes-utf8", "01-la-maquina/11-pila-y-heap"]
+tarjetas:
+  - p: "¿Qué tipo tiene un literal de texto como `\"hola\"`?"
+    r: "`&str`: una vista a texto UTF-8 guardado dentro del propio programa."
+  - p: "¿Cuánto vale `\"año\".len()` y por qué?"
+    r: "4: `len()` cuenta bytes, y la ñ ocupa 2 bytes en UTF-8. Para contar caracteres, `.chars().count()` (3)."
+  - p: "¿Por qué no compila `texto[0]`?"
+    r: "Porque en UTF-8 un carácter ocupa de 1 a 4 bytes: «el byte 0» no es «el carácter 0». Error E0277."
+  - p: "¿Qué pasa con `&\"año\"[0..2]`?"
+    r: "Pánico: el byte 2 cae en mitad de la ñ («is not a char boundary»)."
+  - p: "¿Cuánto ocupan `&str` y `String` en un PC de 64 bits?"
+    r: "`&str`: 16 bytes (puntero + longitud). `String`: 24 bytes (puntero + capacidad + longitud). El texto en sí está en otro sitio."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+La pregunta más votada de Rust en Stack Overflow es la diferencia entre `String` y `str`. Hoy la vas a entender en su forma básica, con una palabra muy nuestra: **año**. Volverás al texto a fondo en el Mundo 11.
+
+## Predice
+
+<Predice
+  ej="m03/texto"
+  opciones={["`\"año\": 3 bytes, 3 caracteres`", "`\"año\": 4 bytes, 3 caracteres`", "`\"año\": 3 bytes, 4 caracteres`", "`\"año\": 12 bytes, 3 caracteres`"]}
+  correcta={1}
+  explicacion="El texto se guarda en UTF-8: `a` y `o` ocupan 1 byte cada una, pero la `ñ` ocupa 2. Total: 4 bytes. `len()` cuenta **bytes**; `chars().count()` cuenta caracteres."
+  porque={["`len()` no cuenta letras: cuenta bytes, y la ñ ocupa dos.", "", "Es al revés: hay más bytes que caracteres.", "12 serían 3 `char` de 4 bytes; pero un texto no guarda `char`, guarda UTF-8."]}
+/>
+
+## La idea
+
+Rust tiene dos tipos principales de texto, y los dos guardan siempre **UTF-8 válido**:
+
+- **`&str`** (se lee «referencia a str» o «string slice»): una **vista** a un texto que vive en otro sitio. Los literales entre comillas dobles son `&str`: `let saludo = "hola";`. El texto `hola` está guardado **dentro del propio programa**, y `saludo` solo lo señala. No se puede modificar.
+- **`String`**: un texto **propio**, que puede crecer. Se crea con `String::from("...")` y se amplía con `push_str` (añade texto) o `push` (añade un `char`). Necesita `mut` para cambiar.
+
+Como UTF-8 usa de 1 a 4 bytes por carácter, **`len()` cuenta bytes, no letras**. Para recorrer o contar caracteres se usa `.chars()`. Y por la misma razón **no** se puede escribir `texto[0]`: el byte 0 puede no ser un carácter completo.
+
+## Pruébalo
+
+<Ejecutar ej="m03/texto" />
+
+Salida real:
+
+```text
+hola, Begoña Ibáñez!
+"año": 4 bytes, 3 caracteres
+bytes: [97, 195, 177, 111]
+[a] [ñ] [o] 
+```
+
+Los bytes de verdad son `97` (`a`), `195 177` (la `ñ`, que en hexadecimal es `c3 b1`) y `111` (`o`). Y `chars()` los vuelve a juntar en tres caracteres.
+
+Sí puedes **cortar** un texto por un rango de **bytes**, siempre que no partas un carácter:
+
+<Ejecutar ej="m03/corte" />
+
+```text
+a
+añ
+
+thread 'main' (1) panicked at ejemplos/m03/corte.rs:8:28:
+end byte index 2 is not a char boundary; it is inside 'ñ' (bytes 1..3 of string)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+```
+
+`0..1` es la `a`; `0..3` es `añ`. Pero `0..2` acabaría en mitad de la ñ (que ocupa los bytes 1 y 2), y Rust prefiere un pánico a darte medio carácter roto.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Tres sitios donde puede vivir el texto">
+Ni un `&str` ni un `String` **contienen** el texto: guardan una pequeña «ficha» que dice dónde está.
+
+- Un **`&str`** es un **puntero gordo** (*fat pointer*): la dirección del primer byte + la longitud en bytes. Dos números `usize`.
+- Un **`String`** es tres números: la dirección de un trozo de memoria en el **montón** (*heap*), cuánto cabe ahí (**capacidad**, *capacity*) y cuánto se usa (**longitud**). Cuando haces `push_str` y no cabe, pide un trozo más grande y copia el texto.
+
+<Ejecutar ej="m03/tamanos-texto" />
+
+Salida real **en el navegador**:
+
+```text
+&str   ocupa 8 bytes
+String ocupa 12 bytes
+usize  ocupa 4 bytes
+len = 4, capacity = 4
+```
+
+En el navegador cada `usize` mide 4 bytes: `&str` = 2 × 4 = 8 y `String` = 3 × 4 = 12. En tu PC de 64 bits serían **16** y **24** (comprobado compilando para `x86_64-pc-windows-msvc`). El texto `año` (4 bytes) no cuenta en ninguno de los dos: está en el programa (para el literal) o en el montón (para el `String`).
+
+```text
+pila                           montón
+saludo: &str  [ptr | len=4] ──► (en el programa) 61 c3 b1 6f
+s: String     [ptr | cap=4 | len=4] ──► 61 c3 b1 6f
+```
+
+Esta diferencia, «el `String` es **dueño** de su texto en el montón y el `&str` solo lo **mira**», es exactamente lo que estudiarás en los Mundos 6 y 7 (ownership y préstamos).
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m03/indice-texto" explicacion="E0277: un `str` no se puede indexar con un entero. Los índices de texto son rangos de bytes. El propio error te sugiere `.chars().nth()` o `.bytes().nth()`." />
+
+La nota del compilador dice «los índices de un string son rangos de `usize`» y te remite al capítulo 8 del libro oficial. La versión arreglada usa `palabra.chars().next()` y imprime `Some('a')`.
+
+<Trampa titulo="«len() es el número de letras»">
+❌ `if nombre.len() > 10 { ... }` para limitar un nombre a 10 letras. «Begoña Ibáñez» tiene 13 caracteres pero `len()` dice 16.
+
+✅ Si lo que te importa son caracteres, `nombre.chars().count()`. Si es espacio en memoria o bytes que enviar, `len()`.
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m03/contar"
+  enunciado={'Añade " come piña" a `frase` con `push_str` e imprime la frase, su número de bytes y de caracteres: `El niño come piña: 19 bytes, 17 caracteres`.'}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta={'¿Cuánto vale `"ñoño".len()`?'}
+  opciones={["4", "6", "8", "16"]}
+  correcta={1}
+  explicacion="Dos ñ de 2 bytes y dos o de 1 byte: 2 + 1 + 2 + 1 = 6."
+  porque={["4 son los caracteres, no los bytes.", "", "Solo las ñ ocupan 2; las o ocupan 1.", "Un texto guarda UTF-8, no `char` de 4 bytes."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál de estos textos se puede ampliar con `push_str`?"
+  opciones={["`let s = \"hola\";`", "`let mut s = \"hola\";`", "`let mut s = String::from(\"hola\");`", "`let s = String::from(\"hola\");`"]}
+  correcta={2}
+  explicacion="Solo un `String` es dueño de su texto y puede hacerlo crecer, y para cambiarlo hace falta `mut`."
+  porque={["Un literal es un `&str`: una vista a texto fijo.", "`mut` permitiría que `s` señale a otro texto, pero un `&str` no tiene `push_str`.", "", "Es un `String`, pero sin `mut` no se puede modificar."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `texto[0]` no compila?"
+  opciones={["Porque los textos empiezan en el índice 1", "Porque en UTF-8 un carácter puede ocupar varios bytes, y el byte 0 no siempre es un carácter entero", "Porque los textos no se pueden leer", "Porque hay que escribir `texto(0)`"]}
+  correcta={1}
+  explicacion="Rust no te deja creer que «el byte 0» y «el primer carácter» son lo mismo. Te obliga a elegir: `.chars()` para caracteres, `.bytes()` o `.as_bytes()` para bytes."
+  porque={["En Rust todo se cuenta desde 0.", "", "Se leen con `chars()`, `bytes()` o rangos.", "Esa sintaxis sería una llamada a función, no un índice."]}
+/>

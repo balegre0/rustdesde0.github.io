@@ -1,0 +1,353 @@
+# Banco de preguntas del mundo 23 — Embebido y tu sistema operativo (CONTENIDO.md §7.1).
+# Código citado: ejemplos/m23/*.rs (simulaciones ejecutables en wasm32-wasip1), rustc 1.99.1.
+
+- id: m23-capas-std
+  titulo: "core, alloc, std"
+  mundo: 23-embebido-y-tu-so
+  tema: no_std
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál de estos se puede usar en un crate `#![no_std]` sin `alloc`?"
+  opciones: ["`Option<&str>`", "`Vec<u8>`", "`String`", "`println!`"]
+  correcta: 0
+  solucion: |
+    `Option` y `&str` están en `core`. `Vec` y `String` necesitan un asignador (`alloc`); `println!` necesita un sistema operativo (`std`).
+  etiquetas: ["no_std", "core"]
+
+- id: m23-sin-heap
+  titulo: "Formatear sin heap"
+  mundo: 23-embebido-y-tu-so
+  tema: no_std
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m23/libre-prueba
+  opciones: ["`164`, `«4096»` y `«0»`", "`164`, `«4096»` y `«»`", "`4`, `«4096»` y `«0»`", "No compila: hace falta `String`"]
+  correcta: 0
+  solucion: |
+    La suma de los bytes de «hola» (104 + 111 + 108 + 97 = 420) da la vuelta en un `u8`: 420 − 256 = 164. `a_texto` escribe las cifras al final de un búfer prestado y devuelve el trozo usado; con 0 el `loop` escribe al menos una cifra.
+  etiquetas: ["no_std", "wrapping_add"]
+
+- id: m23-volatile
+  titulo: "Por qué volatile"
+  mundo: 23-embebido-y-tu-so
+  tema: registros
+  dificultad: media
+  tipo: opcion
+  enunciado: "Escribes 1 y luego 0 en el registro de un pin para generar un pulso. Sin `write_volatile`, ¿qué puede hacer el optimizador?"
+  opciones:
+    - "Quitar la primera escritura (la segunda la sobrescribe) y el pulso no existiría"
+    - "Nada: siempre respeta las escrituras"
+    - "Cambiar el orden de los bits"
+    - "Añadir más escrituras"
+  correcta: 0
+  solucion: |
+    Para memoria normal, una escritura sobrescrita enseguida no tiene efecto visible. En un registro sí: era el pulso.
+  etiquetas: ["volatile", "MMIO"]
+
+- id: m23-volatile-no-sync
+  titulo: "volatile no sincroniza"
+  mundo: 23-embebido-y-tu-so
+  tema: registros
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Sirve `volatile` para compartir una variable entre el programa principal y una interrupción?"
+  opciones:
+    - "No: no da atomicidad ni orden. Para eso, atómicos o secciones críticas"
+    - "Sí, es su uso principal"
+    - "Solo en ARM"
+    - "Solo con `static mut`"
+  correcta: 0
+  solucion: |
+    `volatile` solo garantiza que el acceso ocurre. No impide que una interrupción lo corte a medias ni ordena otros accesos.
+  etiquetas: ["volatile", "atómicos"]
+
+- id: m23-registros-bits
+  titulo: "Encender el pin 13"
+  mundo: 23-embebido-y-tu-so
+  tema: registros
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué hace `out | (1 << 13)` sobre el valor de un registro de salida?"
+  opciones:
+    - "Pone a 1 el bit 13 y deja los demás como estaban"
+    - "Pone el registro entero a 13"
+    - "Pone a 0 el bit 13"
+    - "Pone a 1 los 13 primeros bits"
+  correcta: 0
+  solucion: |
+    Leer–modificar–escribir con una máscara cambia un solo pin sin tocar los otros 31. El ejemplo `m23/registros` lo hace con `read_volatile` y `write_volatile`.
+  etiquetas: ["bits", "MMIO"]
+
+- id: m23-embedded-hal
+  titulo: "Un driver para todos los chips"
+  mundo: 23-embebido-y-tu-so
+  tema: hal
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Escribes un controlador para un sensor I2C. ¿Contra qué lo escribes para que funcione en cualquier microcontrolador?"
+  opciones: ["Los traits de `embedded-hal`", "El PAC de tu chip", "Las direcciones de los registros", "El BSP de tu placa"]
+  correcta: 0
+  solucion: |
+    `embedded-hal` 1.0 define `I2c`, `SpiBus`, `OutputPin`, `DelayNs`… y cada HAL los implementa para su chip.
+  etiquetas: ["embedded-hal"]
+
+- id: m23-led-generico
+  titulo: "Un LED genérico"
+  mundo: 23-embebido-y-tu-so
+  tema: hal
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m23/hal
+  opciones: ["`P0.13: 6 cambios, ahora bajo`", "`P0.13: 3 cambios, ahora alto`", "`P0.13: 6 cambios, ahora alto`", "No compila: `Led` no sabe qué placa es"]
+  correcta: 0
+  solucion: |
+    Cada parpadeo son dos cambios (alto y bajo); tres parpadeos, seis cambios, y el último deja el pin bajo.
+  etiquetas: ["genéricos", "traits"]
+
+- id: m23-singleton
+  titulo: "Un periférico, un dueño"
+  mundo: 23-embebido-y-tu-so
+  tema: hal
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué `Peripherals::take()` devuelve `Some` solo la primera vez?"
+  opciones:
+    - "Para que exista un único valor dueño de los periféricos: el ownership impide que dos partes del programa configuren el mismo hardware"
+    - "Porque los periféricos se agotan"
+    - "Por rendimiento"
+    - "Porque es un error de diseño"
+  correcta: 0
+  solucion: |
+    Es el patrón singleton con ownership: después de `take`, los periféricos se mueven a quien los use.
+  etiquetas: ["ownership", "PAC"]
+
+- id: m23-typestate-pin
+  titulo: "Un pin de entrada"
+  mundo: 23-embebido-y-tu-so
+  tema: hal
+  dificultad: media
+  tipo: opcion
+  enunciado: "En un HAL con typestate, ¿qué pasa si llamas a `set_high()` en un `Pin<Input>`?"
+  opciones: ["No compila: ese tipo no tiene el método", "Pánico al ejecutar", "El pin se convierte en salida", "No hace nada"]
+  correcta: 0
+  solucion: |
+    El modo del pin forma parte del tipo; convertirlo (`into_push_pull_output`) consume el pin y devuelve otro tipo. Cuesta 0 bytes.
+  etiquetas: ["typestate"]
+
+- id: m23-interrupcion-swap
+  titulo: "Leer y borrar a la vez"
+  mundo: 23-embebido-y-tu-so
+  tema: interrupciones
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué el ejemplo usa `BOTON_PULSADO.swap(false, Acquire)` en vez de un `load` seguido de un `store(false)`?"
+  opciones:
+    - "Porque si una interrupción llegara entre el `load` y el `store`, esa pulsación se borraría sin atenderla"
+    - "Porque `load` no existe en los atómicos"
+    - "Por estilo"
+    - "Porque es más lento"
+  correcta: 0
+  solucion: |
+    `swap` es una única operación atómica. El ejemplo `m23/interrupcion` imprime `pulsaciones: 4 · atendidas: 4`.
+  etiquetas: ["atómicos", "interrupciones"]
+
+- id: m23-rtic
+  titulo: "RTIC"
+  mundo: 23-embebido-y-tu-so
+  tema: interrupciones
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué usa RTIC como planificador de tareas?"
+  opciones:
+    - "El controlador de interrupciones del hardware (el NVIC en Cortex-M), con prioridades calculadas al compilar"
+    - "Un sistema operativo de tiempo real"
+    - "Hilos de `std`"
+    - "Un ejecutor async"
+  correcta: 0
+  solucion: |
+    Cada tarea declara los recursos que usa, y RTIC deduce qué protección hace falta (techo de prioridad), sin planificador en software.
+  etiquetas: ["RTIC"]
+
+- id: m23-ejecutor
+  titulo: "Un ejecutor mínimo"
+  mundo: 23-embebido-y-tu-so
+  tema: async
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Cuántos sondeos hace el ejecutor del ejemplo? (Primer futuro: 2 ticks; segundo: 3 ticks.)"
+  ej: m23/ejecutor
+  opciones: ["`… en 6 sondeos`", "`… en 5 sondeos`", "`… en 2 sondeos`", "`… en 7 sondeos`"]
+  correcta: 0
+  solucion: |
+    El primer futuro da `Pending` dos veces; en el tercer sondeo termina y el `async` pasa al segundo en ese mismo sondeo, que da `Pending` tres veces más; el sexto termina todo: 3 + 3 = 6.
+  etiquetas: ["async", "ejecutor", "Poll"]
+
+- id: m23-embassy-dormir
+  titulo: "Cuando no hay nada que hacer"
+  mundo: 23-embebido-y-tu-so
+  tema: async
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué hace Embassy cuando ninguna tarea puede avanzar?"
+  opciones: ["Duerme la CPU hasta la siguiente interrupción", "Sondea sin parar", "Crea un hilo", "Termina el programa"]
+  correcta: 0
+  solucion: |
+    Ahorra energía; la interrupción que llegue despierta a la tarea que la esperaba (a través de su `Waker`).
+  etiquetas: ["Embassy"]
+
+- id: m23-rust-lld
+  titulo: "Sin Build Tools"
+  mundo: 23-embebido-y-tu-so
+  tema: herramientas
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué compilar para `thumbv7em-none-eabihf` funciona en Windows aunque falten las Build Tools de Visual Studio?"
+  opciones:
+    - "Porque esos targets se enlazan con `rust-lld`, que viene con Rust"
+    - "Porque no hace falta enlazar"
+    - "Porque el chip lleva Windows"
+    - "No funciona"
+  correcta: 0
+  solucion: |
+    `link.exe` solo hace falta para generar ejecutables de Windows.
+  etiquetas: ["rust-lld", "targets"]
+
+- id: m23-defmt
+  titulo: "defmt"
+  mundo: 23-embebido-y-tu-so
+  tema: herramientas
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué `defmt` ocupa tan poco en la placa?"
+  opciones:
+    - "Porque el texto de los mensajes se queda en el ejecutable de tu PC; la placa solo envía un índice y los valores"
+    - "Porque comprime el texto"
+    - "Porque no imprime nada"
+    - "Porque usa el heap"
+  correcta: 0
+  solucion: |
+    probe-rs reconstruye el mensaje completo en tu terminal.
+  etiquetas: ["defmt", "probe-rs"]
+
+- id: m23-start
+  titulo: "El punto de entrada"
+  mundo: 23-embebido-y-tu-so
+  tema: kernel
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué `_start` lleva `#[unsafe(no_mangle)]` y `extern \"C\"`?"
+  opciones:
+    - "Porque el cargador de arranque busca el símbolo `_start` por su nombre y lo llama con la convención de C"
+    - "Por rendimiento"
+    - "Porque `main` está prohibido en Rust"
+    - "Para que se ejecute en paralelo"
+  correcta: 0
+  solucion: |
+    Sin `no_mangle`, el símbolo tendría un nombre codificado y el cargador no lo encontraría. Y devuelve `!` porque no tiene a quién volver.
+  etiquetas: ["no_main", "_start"]
+
+- id: m23-vga-celda
+  titulo: "La pantalla de texto"
+  mundo: 23-embebido-y-tu-so
+  tema: kernel
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "La pantalla de texto VGA tiene 25 × 80 celdas de 2 bytes. ¿Cuántos bytes ocupa en total? (Solo el número.)"
+  respuestas: ["4000", "4 000"]
+  solucion: |
+    25 × 80 = 2 000 celdas × 2 bytes = 4 000 bytes, a partir de la dirección `0xb8000`.
+  etiquetas: ["VGA"]
+
+- id: m23-vga-enye
+  titulo: "La ñ en VGA"
+  mundo: 23-embebido-y-tu-so
+  tema: kernel
+  dificultad: media
+  tipo: opcion
+  enunciado: "En el ejemplo `m23/vga`, la última línea empieza por `■■` donde debía haber una «ñ». ¿Por qué dos cuadraditos?"
+  opciones:
+    - "Porque en UTF-8 la «ñ» ocupa dos bytes, el escritor va byte a byte y ninguno de los dos es ASCII imprimible"
+    - "Porque la pantalla no tiene esa letra y la dibuja dos veces"
+    - "Porque es un error de la simulación"
+    - "Porque `ñ` es un carácter de control"
+  correcta: 0
+  solucion: |
+    El búfer VGA espera un byte por carácter (página de códigos 437). El escritor de blog_os sustituye por `■` lo que no es ASCII imprimible.
+  etiquetas: ["UTF-8", "VGA"]
+
+- id: m23-doble-fallo
+  titulo: "El triple fallo"
+  mundo: 23-embebido-y-tu-so
+  tema: kernel
+  dificultad: media
+  tipo: opcion
+  enunciado: "En x86_64, ¿qué pasa si ocurre una excepción al atender un fallo doble y no hay forma de manejarla?"
+  opciones: ["Un triple fallo: la máquina se reinicia", "La CPU la ignora", "Se ejecuta el `panic_handler`", "Se apaga la pantalla"]
+  correcta: 0
+  solucion: |
+    Por eso blog_os da al fallo doble una pila propia (con la TSS): así se puede atender aunque la pila normal se haya desbordado.
+  etiquetas: ["IDT", "excepciones"]
+
+- id: m23-paginacion-indices
+  titulo: "Partir una dirección"
+  mundo: 23-embebido-y-tu-so
+  tema: memoria
+  dificultad: dificil
+  tipo: predice
+  enunciado: "Para la dirección `0x0000_0000_0000_1234`, ¿qué índices y desplazamiento calcula el ejemplo?"
+  ej: m23/paginacion
+  opciones:
+    - "`P4=0 P3=0 P2=0 P1=1 desplazamiento=0x234`"
+    - "`P4=1 P3=2 P2=3 P1=4 desplazamiento=0x000`"
+    - "`P4=0 P3=0 P2=0 P1=0 desplazamiento=0x1234`"
+    - "`P4=0 P3=0 P2=1 P1=0 desplazamiento=0x234`"
+  correcta: 0
+  solucion: |
+    Los 12 bits bajos (`0x234`) son el desplazamiento; el siguiente bloque de 9 bits vale 1 (el `1` de `0x1234`), y los demás, 0.
+  etiquetas: ["paginación"]
+
+- id: m23-tlb
+  titulo: "La TLB"
+  mundo: 23-embebido-y-tu-so
+  tema: memoria
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "El núcleo cambia una entrada de la tabla de páginas. ¿Qué más tiene que hacer?"
+  opciones:
+    - "Invalidar esa traducción en la TLB (`invlpg`), o la CPU seguiría usando la vieja"
+    - "Reiniciar la CPU"
+    - "Nada"
+    - "Copiar la tabla"
+  correcta: 0
+  solucion: |
+    La TLB es una caché de traducciones recientes, que evita recorrer las cuatro tablas en cada acceso.
+  etiquetas: ["TLB", "paginación"]
+
+- id: m23-bump
+  titulo: "El asignador bump"
+  mundo: 23-embebido-y-tu-so
+  tema: memoria
+  dificultad: media
+  tipo: predice
+  enunciado: "En el ejemplo, ¿en qué desplazamiento empieza la reserva de 8 bytes alineados a 8, justo después de una de 3 bytes?"
+  ej: m23/asignador
+  opciones: ["`8`", "`3`", "`4`", "`0`"]
+  correcta: 0
+  solucion: |
+    Los 3 primeros bytes ocupan 0–2; el siguiente múltiplo de 8 es el 8. Entre 3 y 7 queda un hueco por la alineación.
+  etiquetas: ["asignador", "alineación"]
+
+- id: m23-rust-linux
+  titulo: "Rust en Linux"
+  mundo: 23-embebido-y-tu-so
+  tema: ecosistema
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿En qué versión del núcleo de Linux entró Rust en la rama principal?"
+  opciones: ["6.1 (diciembre de 2022)", "5.0", "7.0", "Todavía no ha entrado"]
+  correcta: 0
+  solucion: |
+    Entró como experimento en 6.1; en 2025 los mantenedores decidieron que deja de serlo. Android 16 ya incluye código del núcleo en Rust (ashmem).
+  etiquetas: ["Rust for Linux"]

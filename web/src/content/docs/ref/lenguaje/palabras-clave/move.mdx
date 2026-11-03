@@ -1,0 +1,62 @@
+---
+title: "move"
+description: "Palabra clave estricta: hace que una closure o un bloque async se quede con la propiedad de lo que usa."
+sidebar:
+  order: 23
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`move` delante de una closure (o de un bloque `async`) la obliga a **quedarse con la propiedad** de las variables que usa, en vez de tomarlas prestadas.
+
+## Sinopsis
+
+```text
+move |parámetros| cuerpo
+async move { … }
+async move |parámetros| cuerpo
+```
+
+## Qué hace
+
+Sin `move`, una closure captura cada variable de la forma **más ligera** que le basta: préstamo compartido si solo la lee, préstamo exclusivo si la modifica, y por valor solo si la consume. Con `move`, **todo** lo capturado entra por valor:
+
+- Si el tipo es `Copy` (como `i32`), la closure se lleva **una copia** y el original sigue usable.
+- Si no lo es (como `String` o `Vec`), el valor se **mueve** dentro de la closure y la variable original ya no se puede usar.
+
+`move` decide **cómo se captura**, no qué traits implementa la closure: una closure `move` que solo lee lo capturado sigue siendo `Fn`.
+
+Se necesita cuando la closure tiene que **sobrevivir** a la función donde se crea: al devolverla, al guardarla o al enviarla a otro hilo (`thread::spawn(move || …)`). Si tomara prestada una variable local, ese préstamo apuntaría a memoria ya liberada: **uso tras liberar**.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-move" />
+
+Salida:
+
+```text
+hola, Ada
+Ada sigue disponible
+suma = 6
+15
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-move-error" />
+
+`error[E0373]: closure may outlive the current function, but it borrows n, which is owned by the current function`. La ayuda propone exactamente añadir `move`.
+
+## Desde
+
+Rust 1.0. Desde la edición 2021, las closures capturan **campos** concretos (`p.x`) en lugar de la variable entera.
+
+## Ver también
+
+- [`async`](/ref/lenguaje/palabras-clave/async/) · [`fn`](/ref/lenguaje/palabras-clave/fn/) · [Ediciones](/ref/ediciones/): captura disjunta (2021).
+
+## Aprende esto en
+
+- [Mundo 14 · Closures e iteradores](/curso/14-closures-e-iteradores/) · [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

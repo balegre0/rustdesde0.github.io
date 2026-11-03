@@ -1,0 +1,1555 @@
+# Preguntas «no-compila» de las fichas de errores (CONTENIDO.md §7.1). Código y errores verificados con rustc 1.99.1, ed. 2024.
+
+- id: err-e0004-1
+  titulo: "El ámbar olvidado"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0004
+  opciones:
+    - "El `match` no cubre `Semaforo::Ambar` (E0004)"
+    - "Los enums no se pueden recorrer en un `for`"
+    - "Falta `#[derive(Debug)]`"
+    - "`match` debe terminar en `;`"
+  correcta: 0
+  solucion: |
+    Un `match` debe cubrir todas las variantes.
+    - Recorrer un array de enums es válido.
+    - No se imprime con `{:?}`.
+    - El `;` va tras el `let`, y ya está.
+  etiquetas: ["E0004", "match"]
+
+- id: err-e0005-1
+  titulo: "Un let optimista"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0005
+  opciones:
+    - "`let Some(n)` no encaja si el valor es `None`, y `let` no tiene alternativa (E0005)"
+    - "`Option` no se puede desestructurar"
+    - "Falta `mut n`"
+    - "Hay que escribir `let n = Some(quiza);`"
+  correcta: 0
+  solucion: |
+    Usa `let ... else`, `if let` o `match`.
+    - `Option` se desestructura en patrones que admiten fallo.
+    - `mut` no tiene que ver.
+    - Eso crearía un `Option<Option<i32>>`.
+  etiquetas: ["E0005", "let else"]
+
+- id: err-e0015-1
+  titulo: "Una constante con memoria"
+  mundo: 04-expresiones-y-control
+  tema: otros
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0015
+  opciones:
+    - "`String::from` no es una `const fn`: no se puede llamar al compilar (E0015)"
+    - "Las constantes no pueden ser textos"
+    - "Las constantes se escriben en minúsculas"
+    - "Falta `static`"
+  correcta: 0
+  solucion: |
+    Usa `const SALUDO: &str = "hola";`.
+    - Pueden ser `&str`.
+    - Se escriben en MAYÚSCULAS por convención, y eso no da error.
+    - Con `static` pasa lo mismo.
+  etiquetas: ["E0015", "const"]
+
+- id: err-e0023-1
+  titulo: "Un rectángulo sin alto"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0023
+  opciones:
+    - "La variante tiene dos campos y el patrón solo uno (E0023)"
+    - "Las variantes no pueden tener dos valores"
+    - "Falta el brazo `_`"
+    - "Hay que escribir `Forma::Rect { ancho }`"
+  correcta: 0
+  solucion: |
+    Nombra los dos o usa `_`/`..`.
+    - Una variante puede llevar varios valores.
+    - Con una sola variante, el `match` ya es exhaustivo.
+    - Las llaves son para variantes con campos con nombre.
+  etiquetas: ["E0023", "patrones"]
+
+- id: err-e0029-1
+  titulo: "Textos en un rango"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0029
+  opciones:
+    - "Los patrones de rango solo admiten números y `char`, no `&str` (E0029)"
+    - "Falta el brazo `_`"
+    - "Los rangos en patrones se escriben `..` sin `=`"
+    - "No se puede hacer `match` con textos"
+  correcta: 0
+  solucion: |
+    Usa `match nombre.chars().next() { Some('a'..='m') => ... }`.
+    - El `_` ya está.
+    - `..=` es la forma correcta en patrones.
+    - `match` con textos literales (`"ana" =>`) sí funciona; con rangos, no.
+  etiquetas: ["E0029", "patrones"]
+
+- id: err-e0038-1
+  titulo: "Duplicar a ciegas"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0038
+  opciones:
+    - "`duplicar` devuelve `Self`, que no se conoce a través de `dyn Clonable` (E0038)"
+    - "`Box` no puede contener traits"
+    - "Falta `#[derive(Clone)]`"
+    - "Los `Vec` no pueden contener `Box`"
+  correcta: 0
+  solucion: |
+    Arreglo: devolver `Box<dyn Clonable>`.
+    - `Box<dyn Trait>` es la forma normal de los objetos de trait.
+    - Derivar no cambia la firma del trait.
+    - Un `Vec<Box<...>>` es habitual.
+  etiquetas: ["E0038", "dyn"]
+
+- id: err-e0040-1
+  titulo: "Cerrar a mano"
+  mundo: 06-ownership
+  tema: traits
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0040
+  opciones:
+    - "No se puede llamar a `drop()` como método; hay que usar la función `drop(a)` (E0040)"
+    - "`Archivo` no implementa `Drop`"
+    - "`a` debería ser `mut`"
+    - "`drop` solo existe para `String`"
+  correcta: 0
+  solucion: |
+    El compilador llama al destructor solo; `drop(a)` mueve `a` y lo destruye una vez.
+    - `Archivo` sí implementa `Drop`.
+    - `mut` no lo arregla.
+    - `drop` sirve para cualquier valor.
+  etiquetas: ["E0040", "Drop"]
+
+- id: err-e0046-1
+  titulo: "Una figura a medias"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0046
+  opciones:
+    - "El `impl` no define `nombre`, que el trait exige (E0046)"
+    - "Los traits no pueden tener dos métodos"
+    - "`area` debe devolver `f32`"
+    - "Falta `pub` en el trait"
+  correcta: 0
+  solucion: |
+    Todo método sin cuerpo por defecto es obligatorio.
+    - Un trait puede tener muchos métodos.
+    - La firma de `area` coincide.
+    - Dentro del mismo módulo no hace falta `pub`.
+  etiquetas: ["E0046", "traits"]
+
+- id: err-e0053-1
+  titulo: "Escalar con el tipo equivocado"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0053
+  opciones:
+    - "El parámetro `factor` es `i32` en el `impl` y `f64` en el trait (E0053)"
+    - "No se pueden multiplicar `f64`"
+    - "Los traits no admiten parámetros"
+    - "Falta `pub fn`"
+  correcta: 0
+  solucion: |
+    Las firmas deben coincidir exactamente.
+    - Multiplicar `f64` es normal.
+    - Los métodos de traits pueden tener parámetros.
+    - Los métodos de un `impl` de trait no llevan `pub`.
+  etiquetas: ["E0053", "traits"]
+
+- id: err-e0061-1
+  titulo: "Saludar, ¿cuántas veces?"
+  mundo: 05-funciones-y-la-pila
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0061
+  opciones:
+    - "`saludar` pide dos argumentos y solo recibe uno (E0061)"
+    - "`veces` vale `1` por defecto"
+    - "`for _ in` no es válido"
+    - "Falta `return`"
+  correcta: 0
+  solucion: |
+    No hay argumentos por defecto en Rust.
+    - No existen valores por defecto en parámetros.
+    - `_` ignora la variable del bucle: es válido.
+    - La función no devuelve nada.
+  etiquetas: ["E0061", "funciones"]
+
+- id: err-e0063-1
+  titulo: "Un jugador sin vidas"
+  mundo: 09-structs-enums-y-patrones
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0063
+  opciones:
+    - "Falta dar valor al campo `vidas` (E0063)"
+    - "`vidas` vale `0` automáticamente"
+    - "`u8` no se puede usar en structs"
+    - "Hay que poner los campos en orden alfabético"
+  correcta: 0
+  solucion: |
+    Todos los campos deben inicializarse.
+    - Rust no rellena con ceros.
+    - `u8` es un tipo normal.
+    - El orden de los campos al crear da igual.
+  etiquetas: ["E0063", "struct"]
+
+- id: err-e0070-1
+  titulo: "Al revés"
+  mundo: 03-valores-y-tipos
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0070
+  opciones:
+    - "`1` no es un lugar: no se le puede asignar nada (E0070)"
+    - "`x` no es `mut`"
+    - "Falta `let`"
+    - "Los literales son `const` y hay que declararlos"
+  correcta: 0
+  solucion: |
+    A la izquierda de `=` va una variable, un campo o similar.
+    - Aunque `x` fuera `mut`, `1 = x` seguiría siendo inválido.
+    - `let` declara, no arregla esto.
+    - Los literales no se declaran.
+  etiquetas: ["E0070"]
+
+- id: err-e0072-1
+  titulo: "La lista infinita"
+  mundo: 15-punteros-inteligentes
+  tema: tipos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0072
+  opciones:
+    - "`Lista` se contiene a sí misma y su tamaño sería infinito; hace falta `Box<Lista>` (E0072)"
+    - "Los enums no pueden tener datos"
+    - "Falta el caso `Fin`"
+    - "Los enums recursivos no existen en Rust"
+  correcta: 0
+  solucion: |
+    Un `Box` tiene tamaño fijo y rompe el ciclo.
+    - Los enums pueden llevar datos en sus variantes.
+    - `Fin` ya está.
+    - Con `Box` sí existen.
+  etiquetas: ["E0072", "Box"]
+
+- id: err-e0080-1
+  titulo: "Un tamaño que no cabe"
+  mundo: 03-valores-y-tipos
+  tema: otros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0080
+  opciones:
+    - "`200 + 100` desborda un `u8` (máximo 255) y la constante no se puede calcular (E0080)"
+    - "Las constantes no admiten sumas"
+    - "El programa compila y entra en pánico al ejecutar"
+    - "`u8` no existe"
+  correcta: 0
+  solucion: |
+    Las `const` se evalúan al compilar, así que el desbordamiento es un error de compilación.
+    - Las sumas se permiten.
+    - No llega a ejecutarse: falla antes.
+    - `u8` es el entero sin signo de 8 bits.
+  etiquetas: ["E0080", "overflow", "const"]
+
+- id: err-e0106-1
+  titulo: "¿La más larga de quién?"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0106
+  opciones:
+    - "La función devuelve una referencia y hay dos de entrada: hay que indicar con `'a` de cuál puede venir (E0106)"
+    - "No se pueden comparar longitudes de `&str`"
+    - "Las funciones no pueden devolver `&str`"
+    - "Hay que escribir `-> String` obligatoriamente"
+  correcta: 0
+  solucion: |
+    Con dos referencias de entrada no hay elisión posible. `<'a>` en las tres referencias lo resuelve.
+    - `len()` funciona sobre `&str`.
+    - Devolver `&str` es normal con su tiempo de vida.
+    - `String` también funcionaría, pero obligaría a copiar el texto: no es obligatorio.
+  etiquetas: ["E0106", "lifetimes", "elisión"]
+
+- id: err-e0117-1
+  titulo: "Mostrar algo que no es tuyo"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0117
+  opciones:
+    - "Ni `Display` ni `Vec<u8>` son de tu crate: lo prohíbe la regla huérfana (E0117)"
+    - "`Vec<u8>` no se puede imprimir"
+    - "Falta `#[derive(Display)]`"
+    - "`write!` no funciona en `fmt`"
+  correcta: 0
+  solucion: |
+    Arreglo: un *newtype* propio, `struct Bytes(Vec<u8>)`.
+    - `Vec<u8>` se imprime con `{:?}`.
+    - `Display` no se puede derivar.
+    - `write!` es justo lo que se usa en `fmt`.
+  etiquetas: ["E0117", "orphan"]
+
+- id: err-e0119-1
+  titulo: "Dos formas de describir un 5"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0119
+  opciones:
+    - "La implementación genérica para todo `T: Debug` ya incluye `i32` (E0119)"
+    - "Los traits no admiten genéricos"
+    - "`format!` no acepta `{:?}`"
+    - "Hay que poner `pub` en las dos implementaciones"
+  correcta: 0
+  solucion: |
+    Un tipo solo puede tener una implementación de cada trait.
+    - Los traits genéricos son normales.
+    - `{:?}` funciona con `Debug`.
+    - La visibilidad no influye.
+  etiquetas: ["E0119", "coherencia"]
+
+- id: err-e0133-1
+  titulo: "Leer por un puntero crudo"
+  mundo: 20-unsafe-y-ub
+  tema: otros
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0133
+  opciones:
+    - "Desreferenciar un puntero crudo requiere un bloque `unsafe` (E0133)"
+    - "`&raw const` no existe"
+    - "Los punteros crudos no se pueden crear en código seguro"
+    - "Falta `mut` en `x`"
+  correcta: 0
+  solucion: |
+    Crear el puntero es seguro; leerlo, no. Envuelve `*p` en `unsafe`.
+    - `&raw const` es estable desde 1.82.
+    - Crearlos sí es seguro.
+    - Solo se lee.
+  etiquetas: ["E0133", "unsafe"]
+
+- id: err-e0184-1
+  titulo: "Una ficha que se despide"
+  mundo: 06-ownership
+  tema: traits
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0184
+  opciones:
+    - "`Ficha` es `Copy` y además implementa `Drop`, y eso está prohibido (E0184)"
+    - "`Drop` no puede imprimir"
+    - "Los structs de tupla no pueden ser `Copy`"
+    - "Falta `pub`"
+  correcta: 0
+  solucion: |
+    Un tipo con destructor no puede copiarse en silencio. Quita `Copy`.
+    - `drop` puede hacer cualquier cosa, también imprimir.
+    - Un struct de tupla de `u32` sí puede ser `Copy` (si no tiene `Drop`).
+    - La visibilidad no influye.
+  etiquetas: ["E0184", "Copy", "Drop"]
+
+- id: err-e0204-1
+  titulo: "Un usuario fotocopiable"
+  mundo: 06-ownership
+  tema: traits
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0204
+  opciones:
+    - "`nombre: String` no es `Copy`, así que `Usuario` tampoco puede serlo (E0204)"
+    - "`Copy` y `Clone` no se pueden derivar juntos"
+    - "Los structs nunca pueden ser `Copy`"
+    - "Falta `mut`"
+  correcta: 0
+  solucion: |
+    Un tipo es `Copy` solo si todos sus campos lo son.
+    - `Clone, Copy` juntos es lo normal (Copy exige Clone).
+    - Un struct con solo números sí puede ser `Copy`.
+    - `mut` no tiene que ver.
+  etiquetas: ["E0204", "Copy"]
+
+- id: err-e0261-1
+  titulo: "Una vista sin fecha"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0261
+  opciones:
+    - "`'a` se usa en el campo pero no se declara en `struct Vista<'a>` (E0261)"
+    - "Los structs no pueden guardar referencias"
+    - "`'a` es una palabra reservada"
+    - "Hay que usar `'static` siempre en structs"
+  correcta: 0
+  solucion: |
+    Los tiempos de vida se declaran como los genéricos.
+    - Los structs pueden guardar referencias si declaran su tiempo de vida.
+    - `'a` es un nombre cualquiera.
+    - `'static` solo valdría para textos que viven todo el programa.
+  etiquetas: ["E0261", "lifetimes"]
+
+- id: err-e0277-1
+  titulo: "Imprimir un punto"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0277
+  opciones:
+    - "`Punto` no implementa `Display`, que es lo que pide `{}` (E0277)"
+    - "Los structs no se pueden imprimir de ninguna forma"
+    - "Falta `mut` en `p`"
+    - "`println!` solo acepta textos"
+  correcta: 0
+  solucion: |
+    Implementa `Display`, o deriva `Debug` e imprime con `{:?}`.
+    - Se pueden imprimir en cuanto implementan el trait.
+    - Imprimir no modifica.
+    - `println!` acepta todo lo que implemente el trait del formato.
+  etiquetas: ["E0277", "Display"]
+
+- id: err-e0277-2
+  titulo: "Una interrogación fuera de sitio"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila el segundo ejemplo de la ficha (`fn leer() -> i32` con `?`)?"
+  ej: errores/E0277-interrogacion
+  opciones:
+    - "`?` solo se puede usar en funciones que devuelven `Result` u `Option`, y `leer` devuelve `i32` (E0277)"
+    - "`parse` no puede fallar"
+    - "`?` solo funciona con `Option`"
+    - "Hay que escribir `parse::<i32>()`"
+  correcta: 0
+  solucion: |
+    `?` devuelve el error al que llama, así que la función debe poder devolver un error. Arreglo: `-> Result<i32, ParseIntError>` y `Ok(n)`.
+    - `parse` puede fallar: por eso devuelve `Result`.
+    - `?` funciona con `Result` y con `Option`.
+    - El tipo ya se conoce por la anotación `n: i32`.
+  etiquetas: ["E0277", "?"]
+
+- id: err-e0282-1
+  titulo: "Una lista de… ¿qué?"
+  mundo: 03-valores-y-tipos
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0282
+  opciones:
+    - "Nada indica el tipo de los elementos de `lista` (E0282)"
+    - "`Vec::new()` necesita una capacidad"
+    - "Un `Vec` vacío no tiene `len()`"
+    - "Falta `mut`"
+  correcta: 0
+  solucion: |
+    Arreglo: `let lista: Vec<String> = Vec::new();`.
+    - `new()` no recibe nada (`with_capacity` sí).
+    - `len()` de un vector vacío es `0`.
+    - Solo se lee la longitud.
+  etiquetas: ["E0282", "inferencia"]
+
+- id: err-e0283-1
+  titulo: "Una suma sin tipo"
+  mundo: 14-closures-e-iteradores
+  tema: tipos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0283
+  opciones:
+    - "`sum()` puede devolver varios tipos y nada dice cuál es `total` (E0283)"
+    - "No se pueden sumar `u32`"
+    - "`split` devuelve números"
+    - "`map` no admite closures"
+  correcta: 0
+  solucion: |
+    Arreglo: `let total: u32` o `.sum::<u32>()`.
+    - Sumar `u32` está implementado.
+    - `split` devuelve `&str`.
+    - `map` está hecho para closures.
+  etiquetas: ["E0283", "inferencia", "iteradores"]
+
+- id: err-e0308-1
+  titulo: "El doble de un texto"
+  mundo: 03-valores-y-tipos
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0308
+  opciones:
+    - "`doble` espera un `i32` y recibe un `&str` (E0308)"
+    - "`\"21\"` es un número y Rust lo convierte solo"
+    - "Falta `return` en `doble`"
+    - "`n * 2` puede desbordar"
+  correcta: 0
+  solucion: |
+    Rust nunca convierte texto en número automáticamente: usa `texto.parse()`.
+    - `"21"` entre comillas es un `&str`.
+    - La última expresión sin `;` ya es el valor devuelto.
+    - El desbordamiento se comprueba al ejecutar, no al compilar.
+  etiquetas: ["E0308", "tipos"]
+
+- id: err-e0369-1
+  titulo: "Sumar dinero"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0369
+  opciones:
+    - "`Dinero` no implementa `Add`, que es lo que usa `+` (E0369)"
+    - "Los `u64` no se pueden sumar"
+    - "Falta `mut` en `total`"
+    - "Hay que escribir `a.centimos + b`"
+  correcta: 0
+  solucion: |
+    Arreglo: `impl Add for Dinero` con `type Output`.
+    - Los `u64` sí se suman: los structs, no.
+    - `total` no se modifica.
+    - `u64 + Dinero` tampoco existe.
+  etiquetas: ["E0369", "operadores"]
+
+- id: err-e0373-1
+  titulo: "Una closure con equipaje prestado"
+  mundo: 14-closures-e-iteradores
+  tema: lifetimes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0373
+  opciones:
+    - "La closure toma prestado `base`, que muere al terminar `contador`; falta `move` (E0373)"
+    - "Las funciones no pueden devolver closures"
+    - "`impl Fn() -> u32` debería ser `fn() -> u32`"
+    - "`base` tendría que ser `static`"
+  correcta: 0
+  solucion: |
+    `move || base + 1` copia `base` dentro de la closure.
+    - Devolver closures con `impl Fn` es normal.
+    - Un puntero `fn` no puede capturar variables.
+    - No hace falta una `static`: basta con `move`.
+  etiquetas: ["E0373", "closures", "move"]
+
+- id: err-e0381-1
+  titulo: "Un total por si acaso"
+  mundo: 04-expresiones-y-control
+  tema: ownership
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0381
+  opciones:
+    - "Si `hay_datos` es `false`, `total` nunca recibe valor (E0381)"
+    - "No se puede declarar una variable sin valor"
+    - "`total` debería ser `mut`"
+    - "El compilador sabe que `hay_datos` es `false` y avisa de código muerto"
+  correcta: 0
+  solucion: |
+    Hay un camino sin asignación. Arreglo: rama `else` o `let total = if ... else ...`.
+    - Declarar sin valor está permitido si se asigna antes de usar.
+    - Una sola asignación no necesita `mut`.
+    - El compilador no evalúa la condición: revisa todos los caminos.
+  etiquetas: ["E0381"]
+
+- id: err-e0382-1
+  titulo: "Hola dos veces"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0382
+  opciones:
+    - "`saludo` se movió a `otro` y ya no se puede usar (E0382)"
+    - "`println!` no acepta variables de tipo `String`"
+    - "Falta `mut` en `let saludo`"
+    - "No se pueden tener dos variables con el mismo texto"
+  correcta: 0
+  solucion: |
+    `let otro = saludo;` **mueve** la propiedad: `saludo` deja de ser válida. rustc dice `borrow of moved value: saludo`.
+    - `println!` acepta cualquier `String` sin problema.
+    - `mut` sirve para modificar, y aquí nadie modifica nada.
+    - Dos variables pueden guardar textos iguales: el problema es compartir **un mismo** valor.
+  etiquetas: ["E0382", "move"]
+
+- id: err-e0382-2
+  titulo: "¿Copia o movimiento?"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Este programa no compila. ¿Qué cambio lo arregla manteniendo las dos variables utilizables?"
+  ej: errores/E0382
+  opciones:
+    - "Cambiar `let otro = saludo;` por `let otro = saludo.clone();`"
+    - "Cambiar `let otro = saludo;` por `let mut otro = saludo;`"
+    - "Imprimir `otro` antes que `saludo`"
+    - "Declarar `saludo` como `const`"
+  correcta: 0
+  solucion: |
+    `clone()` crea un `String` nuevo con su propia memoria; así cada variable es dueña de lo suyo.
+    - `mut` no cambia quién es el dueño.
+    - El orden de los `println!` da igual: `saludo` ya se movió en la línea 3.
+    - `const` no admite `String::from` (no es una función `const`).
+  etiquetas: ["E0382", "clone"]
+
+- id: err-e0384-1
+  titulo: "Perder una vida"
+  mundo: 03-valores-y-tipos
+  tema: ownership
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0384
+  opciones:
+    - "`vidas` no es `mut` y se le asigna un valor nuevo (E0384)"
+    - "No se puede imprimir una variable dos veces"
+    - "`2` y `3` son de tipos distintos"
+    - "Hay que usar `vidas -= 1`"
+  correcta: 0
+  solucion: |
+    Las variables son inmutables salvo que pongas `mut`.
+    - Imprimir varias veces no la cambia.
+    - Los dos literales son `i32`.
+    - `vidas -= 1` también es una asignación y da el mismo error.
+  etiquetas: ["E0384", "mut"]
+
+- id: err-e0392-1
+  titulo: "Una etiqueta sin usar"
+  mundo: 13-traits-y-genericos
+  tema: tipos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0392
+  opciones:
+    - "`T` no aparece en ningún campo de `Id` (E0392)"
+    - "Los structs genéricos no pueden tener campos `u64`"
+    - "Hay que escribir `Id<T: Clone>`"
+    - "`size_of` no se puede llamar con genéricos"
+  correcta: 0
+  solucion: |
+    Arreglo: `_tipo: PhantomData<T>` (0 bytes).
+    - Los campos pueden ser de cualquier tipo.
+    - Un límite no hace que `T` se use.
+    - `size_of::<Id<String>>()` es válido.
+  etiquetas: ["E0392", "PhantomData"]
+
+- id: err-e0407-1
+  titulo: "Un adiós que sobra"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0407
+  opciones:
+    - "`adios` no está declarado en el trait `Saludo` (E0407)"
+    - "Un struct no puede tener dos métodos"
+    - "Falta `&mut self` en `adios`"
+    - "`Robot` necesita campos"
+  correcta: 0
+  solucion: |
+    En un `impl Trait for Tipo` solo va lo del trait. Pon `adios` en `impl Robot`.
+    - Un tipo puede tener muchos métodos.
+    - `&self` es correcto.
+    - Un struct unitario puede implementar traits.
+  etiquetas: ["E0407", "traits"]
+
+- id: err-e0408-1
+  titulo: "Texto o número, a la vez"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0408
+  opciones:
+    - "`t` solo existe en una alternativa y `n` en la otra (E0408)"
+    - "No se puede usar `|` en un `match`"
+    - "Falta el brazo `_`"
+    - "`String` e `i32` no pueden estar en el mismo enum"
+  correcta: 0
+  solucion: |
+    Cada alternativa de un `|` debe ligar las mismas variables. Separa los brazos.
+    - `|` en patrones es válido.
+    - Las dos variantes ya están cubiertas.
+    - Un enum puede llevar datos de tipos distintos en cada variante.
+  etiquetas: ["E0408", "patrones"]
+
+- id: err-e0423-1
+  titulo: "Un punto sin coordenadas"
+  mundo: 09-structs-enums-y-patrones
+  tema: modulos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0423
+  opciones:
+    - "`Punto` es un tipo con campos; hay que crearlo con `Punto { x: ..., y: ... }` (E0423)"
+    - "Hay que escribir `Punto()`"
+    - "Falta `#[derive(Default)]`"
+    - "Los structs se crean con `new Punto`"
+  correcta: 0
+  solucion: |
+    Un struct con campos se construye escribiendo sus campos.
+    - `Punto()` sería para un struct de tupla.
+    - `Default` permitiría `Punto::default()`, pero no `Punto` a secas.
+    - En Rust no existe la palabra `new` como operador.
+  etiquetas: ["E0423", "struct"]
+
+- id: err-e0425-1
+  titulo: "Una letra bailada"
+  mundo: 02-tu-primer-programa
+  tema: modulos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0425
+  opciones:
+    - "`puntuacoin` no existe: es una errata de `puntuacion` (E0425)"
+    - "Las variables no se pueden imprimir sin `{:?}`"
+    - "`7` debe escribirse `7i32`"
+    - "Falta `mut`"
+  correcta: 0
+  solucion: |
+    rustc incluso sugiere el nombre parecido.
+    - `{}` imprime enteros.
+    - El tipo se infiere.
+    - Nadie modifica la variable.
+  etiquetas: ["E0425"]
+
+- id: err-e0428-1
+  titulo: "Dos puntos iguales"
+  mundo: 12-modulos-crates-y-cargo
+  tema: modulos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0428
+  opciones:
+    - "Hay dos `struct Punto` en el mismo módulo (E0428)"
+    - "Los structs sin campos no existen"
+    - "`main` no puede estar vacío"
+    - "Falta `pub`"
+  correcta: 0
+  solucion: |
+    Cada nombre de tipo es único en su módulo.
+    - `struct Punto;` (unitario) es válido.
+    - `main` vacío es válido.
+    - La visibilidad no tiene que ver.
+  etiquetas: ["E0428"]
+
+- id: err-e0432-1
+  titulo: "Colecciones en otro idioma"
+  mundo: 12-modulos-crates-y-cargo
+  tema: modulos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0432
+  opciones:
+    - "El módulo se llama `std::collections`; `std::colecciones` no existe (E0432)"
+    - "`use` solo funciona con crates externos"
+    - "`HashMap` hay que importarlo con `mod`"
+    - "Los `use` deben ir dentro de `main`"
+  correcta: 0
+  solucion: |
+    Los nombres de `std` están en inglés.
+    - `use` funciona con `std` y con módulos propios.
+    - `mod` declara módulos, no importa.
+    - `use` puede ir arriba del archivo.
+  etiquetas: ["E0432", "use"]
+
+- id: err-e0433-1
+  titulo: "El mapa perdido"
+  mundo: 11-colecciones-y-texto
+  tema: modulos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0433
+  opciones:
+    - "`HashMap` no está en el preludio: falta `use std::collections::HashMap;` (E0433)"
+    - "`HashMap` no existe en la biblioteca estándar"
+    - "Los mapas no admiten claves `&str`"
+    - "Falta indicar los tipos de clave y valor"
+  correcta: 0
+  solucion: |
+    Solo lo del preludio se usa sin importar.
+    - Existe, en `std::collections`.
+    - `&str` es una clave válida.
+    - Los tipos se infieren del `insert`.
+  etiquetas: ["E0433", "use"]
+
+- id: err-e0499-1
+  titulo: "Dos manos en el mismo marcador"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0499
+  opciones:
+    - "`a` y `b` son dos préstamos exclusivos de `puntos` vivos a la vez (E0499)"
+    - "No se puede sumar con `+=` a través de una referencia"
+    - "`puntos` debería ser `u64`"
+    - "Hay que escribir `*a = *a + 1`"
+  correcta: 0
+  solucion: |
+    Mientras `a` se siga usando (línea 5), `b` no puede existir. rustc: `cannot borrow puntos as mutable more than once at a time`.
+    - `*a += 1` es válido con un `&mut i32`.
+    - El tipo entero no tiene nada que ver.
+    - `*a = *a + 1` es lo mismo y da el mismo error.
+  etiquetas: ["E0499", "&mut"]
+
+- id: err-e0502-1
+  titulo: "El primero de la lista"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0502
+  opciones:
+    - "`primero` toma prestado `lista` y `push` necesita un préstamo exclusivo mientras `primero` sigue vivo (E0502)"
+    - "No se puede indexar un `Vec` con `[0]`"
+    - "`push` solo acepta valores de tipo `usize`"
+    - "`vec!` crea un vector de tamaño fijo"
+  correcta: 0
+  solucion: |
+    `push` podría mover los datos a otra zona de memoria y `primero` apuntaría a memoria liberada. rustc: `cannot borrow lista as mutable because it is also borrowed as immutable`.
+    - Indexar con `[0]` es válido.
+    - `push` acepta el tipo de los elementos (`i32`).
+    - `vec!` crea un `Vec`, que puede crecer.
+  etiquetas: ["E0502", "&", "&mut"]
+
+- id: err-e0502-2
+  titulo: "Arreglar sin clonar"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Cuál de estos cambios hace que compile?"
+  ej: errores/E0502
+  opciones:
+    - "`let primero = lista[0];` (copiar el `i32` en vez de tomarlo prestado)"
+    - "`let primero = &mut lista[0];`"
+    - "`let primero = &lista[0..1];`"
+    - "`let mut primero = &lista[0];`"
+  correcta: 0
+  solucion: |
+    `i32` es `Copy`: `lista[0]` copia el número y no queda ningún préstamo vivo.
+    - `&mut lista[0]` sería un préstamo exclusivo: choca igual con `push` (E0499).
+    - `&lista[0..1]` sigue siendo un préstamo compartido.
+    - `mut` en la variable no cambia el préstamo.
+  etiquetas: ["E0502", "Copy"]
+
+- id: err-e0503-1
+  titulo: "Mirar de reojo"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0503
+  opciones:
+    - "Se lee `valor` mientras `exclusivo` (un `&mut valor`) todavía se va a usar (E0503)"
+    - "No se puede sumar `1` a un `i32`"
+    - "`copia` debería ser `mut`"
+    - "Los préstamos exclusivos solo valen para `String`"
+  correcta: 0
+  solucion: |
+    Mientras el `&mut` está vivo, nadie más toca el valor, ni para leer. Mueve la lectura antes del `&mut`.
+    - Sumar es válido.
+    - `copia` no se modifica.
+    - `&mut` vale para cualquier tipo.
+  etiquetas: ["E0503", "&mut"]
+
+- id: err-e0505-1
+  titulo: "Consumido con testigos"
+  mundo: 06-ownership
+  tema: prestamos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0505
+  opciones:
+    - "`nombre` se mueve a `consumir` mientras `r` todavía lo toma prestado (E0505)"
+    - "`consumir` debería devolver un `String`"
+    - "No se puede crear una referencia a un `String`"
+    - "Falta `mut` en `let nombre`"
+  correcta: 0
+  solucion: |
+    `consumir` se queda con el `String` y lo destruye al terminar; `r` apuntaría a memoria liberada. rustc: `cannot move out of nombre because it is borrowed`.
+    - Que la función devuelva algo no cambia que el préstamo siga vivo.
+    - `&String` es perfectamente válido.
+    - Nadie modifica `nombre`.
+  etiquetas: ["E0505", "move"]
+
+- id: err-e0506-1
+  titulo: "Cambiar de nivel con alguien mirando"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0506
+  opciones:
+    - "Se asigna `nivel = 2` mientras `r` (un `&nivel`) se sigue usando después (E0506)"
+    - "`nivel` no es `mut`"
+    - "No se puede imprimir una referencia"
+    - "Un entero no se puede tomar prestado"
+  correcta: 0
+  solucion: |
+    `r` se usa en el `println!` final, así que su préstamo cubre la asignación. rustc: `cannot assign to nivel because it is borrowed`.
+    - `nivel` sí es `mut`.
+    - `println!` imprime referencias sin problema.
+    - Cualquier valor se puede tomar prestado.
+  etiquetas: ["E0506"]
+
+- id: err-e0507-1
+  titulo: "Lo que hay en la caja"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0507
+  opciones:
+    - "`r` es un préstamo compartido y `r.contenido` intenta mover el `String` fuera de él (E0507)"
+    - "No se puede acceder a campos a través de una referencia"
+    - "`Caja` necesita `#[derive(Debug)]`"
+    - "Hay que escribir `(*r).contenido`"
+  correcta: 0
+  solucion: |
+    Un préstamo no permite llevarse el valor. Arreglos: `&r.contenido`, `r.contenido.clone()` o `mem::take` con `&mut`.
+    - Leer campos a través de `&` sí se puede, si no los mueves (o si son `Copy`).
+    - `Debug` solo hace falta para imprimir con `{:?}`.
+    - `(*r).contenido` es lo mismo y da el mismo error.
+  etiquetas: ["E0507", "move", "&"]
+
+- id: err-e0508-1
+  titulo: "El primero de la fila"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0508
+  opciones:
+    - "`nombres[0]` intentaría mover un `String` fuera del array (E0508)"
+    - "Los arrays no se pueden indexar con `[0]`"
+    - "Los arrays no pueden contener `String`"
+    - "Falta indicar el tipo de `primero`"
+  correcta: 0
+  solucion: |
+    Indexar da un lugar dentro del array; moverlo dejaría un hueco. Usa `&nombres[0]` o `.clone()`.
+    - Indexar arrays es normal.
+    - Un array puede guardar cualquier tipo.
+    - El tipo se infiere bien: el problema es el movimiento.
+  etiquetas: ["E0508"]
+
+- id: err-e0509-1
+  titulo: "Desmontar un registro"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0509
+  opciones:
+    - "`Registro` implementa `Drop`, así que no se le pueden sacar campos moviéndolos (E0509)"
+    - "Los structs no se pueden desestructurar con `let`"
+    - "`Drop` obliga a que todos los campos sean `Copy`"
+    - "Falta `mut` en `let r`"
+  correcta: 0
+  solucion: |
+    `drop` necesitará el struct entero; moverle un campo lo dejaría a medias. Usa `mem::take(&mut r.texto)`.
+    - Desestructurar con `let` es válido en tipos sin `Drop`.
+    - `Drop` no exige nada a los campos.
+    - `mut` no basta: el patrón sigue moviendo.
+  etiquetas: ["E0509", "Drop"]
+
+- id: err-e0515-1
+  titulo: "Un regalo que se evapora"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0515
+  opciones:
+    - "`s` se destruye al terminar `crear`, y la referencia devuelta apuntaría a nada (E0515)"
+    - "Las funciones no pueden devolver `String`"
+    - "Falta poner `'static` en `&'a String`"
+    - "`String::from` no se puede usar dentro de funciones"
+  correcta: 0
+  solucion: |
+    Ninguna anotación de tiempo de vida puede alargar la vida de `s`. Devuelve `String`.
+    - Devolver `String` es justo el arreglo.
+    - `'static` no hace que `s` viva más: daría el mismo error.
+    - `String::from` funciona en cualquier función.
+  etiquetas: ["E0515", "lifetimes"]
+
+- id: err-e0521-1
+  titulo: "Un saludo que quiere vivir para siempre"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0521
+  opciones:
+    - "La closure lleva un `&str` prestado del parámetro, pero se le exige `'static` (E0521)"
+    - "`move` no se puede usar con texto"
+    - "Las closures no se pueden meter en una `Box`"
+    - "Falta `#[derive(Clone)]`"
+  correcta: 0
+  solucion: |
+    El `&str` solo vale durante la llamada a `preparar`; `'static` pide «para siempre». Arreglo: `let propio = nombre.to_string();` y mover eso.
+    - `move` funciona con cualquier tipo.
+    - `Box<dyn Fn()>` es la forma normal de guardar closures.
+    - No hay ningún tipo propio que derivar.
+  etiquetas: ["E0521", "'static"]
+
+- id: err-e0525-1
+  titulo: "Despedirse dos veces"
+  mundo: 14-closures-e-iteradores
+  tema: traits
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0525
+  opciones:
+    - "La closure mueve `nombre` fuera de sí, así que solo es `FnOnce` y se pide `Fn` (E0525)"
+    - "Las closures `move` no pueden llamarse más de una vez nunca"
+    - "`F: Fn()` no acepta closures guardadas en variables"
+    - "`println!` no se puede usar dentro de una closure"
+  correcta: 0
+  solucion: |
+    Consumir lo capturado gasta la closure. Arreglo: `let prestado = &nombre;`.
+    - `move` decide **cómo se captura**, no cuántas veces se llama: una closure `move` que solo mira sigue siendo `Fn`.
+    - Da igual que esté en una variable.
+    - `println!` funciona en cualquier sitio.
+  etiquetas: ["E0525", "FnOnce"]
+
+- id: err-e0560-1
+  titulo: "¿Qué edad?"
+  mundo: 09-structs-enums-y-patrones
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0560
+  opciones:
+    - "`Jugador` no tiene un campo `edad` (E0560)"
+    - "Los campos numéricos deben ser `u8`"
+    - "Falta `mut`"
+    - "Hay que crear el struct con `Jugador::new`"
+  correcta: 0
+  solucion: |
+    Solo existen los campos declarados.
+    - Cualquier tipo numérico vale.
+    - No se modifica nada.
+    - La sintaxis literal es correcta.
+  etiquetas: ["E0560", "struct"]
+
+- id: err-e0594-1
+  titulo: "Subir sin permiso"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0594
+  opciones:
+    - "`n` es `&i32` (solo lectura) y `*n += 1` intenta escribir (E0594)"
+    - "No se puede usar `*` con enteros"
+    - "Las funciones no pueden modificar sus parámetros"
+    - "Falta devolver el valor con `return`"
+  correcta: 0
+  solucion: |
+    Para escribir hace falta `&mut i32` y llamar con `subir(&mut x)`.
+    - `*n` es válido: lee el valor apuntado.
+    - Con `&mut` sí pueden modificar lo que reciben.
+    - No hace falta devolver nada si modificas a través de `&mut`.
+  etiquetas: ["E0594", "&"]
+
+- id: err-e0596-1
+  titulo: "Una lista que no crece"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0596
+  opciones:
+    - "`push` necesita `&mut lista`, y `lista` no es `mut` (E0596)"
+    - "`Vec::new()` crea un vector de capacidad cero que nunca puede crecer"
+    - "Hay que indicar el tipo `Vec<i32>`"
+    - "`push` solo existe en arrays"
+  correcta: 0
+  solucion: |
+    Arreglo: `let mut lista`.
+    - Un `Vec` vacío crece en cuanto haces `push`.
+    - El tipo se infiere del `push(1)`.
+    - `push` es de `Vec`; los arrays tienen tamaño fijo.
+  etiquetas: ["E0596", "mut"]
+
+- id: err-e0597-1
+  titulo: "Fuera del bloque"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0597
+  opciones:
+    - "`x` se destruye al cerrar el bloque, pero `r` se usa después (E0597)"
+    - "`r` no tiene tipo"
+    - "No se puede declarar `let r;` sin valor"
+    - "Los bloques `{ }` no pueden contener `let`"
+  correcta: 0
+  solucion: |
+    rustc: `x does not live long enough`. El préstamo tendría que durar hasta el `println!`.
+    - El tipo de `r` se infiere de `&x`.
+    - `let r;` y asignar más tarde es válido.
+    - Los bloques pueden declarar variables (que mueren al cerrar el bloque).
+  etiquetas: ["E0597", "lifetimes"]
+
+- id: err-e0599-1
+  titulo: "Un contador sin botón"
+  mundo: 09-structs-enums-y-patrones
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0599
+  opciones:
+    - "`Contador` no tiene ningún método `incrementar` (E0599)"
+    - "Los structs no pueden tener métodos"
+    - "Falta `mut` en `c`"
+    - "Hay que llamar a `Contador::incrementar(c)`"
+  correcta: 0
+  solucion: |
+    No hay ningún `impl Contador` con ese método. Hay que escribirlo.
+    - Los métodos se añaden con `impl`.
+    - `c` ya es `mut`: no es el problema.
+    - La sintaxis de ruta da el mismo error si el método no existe.
+  etiquetas: ["E0599", "impl"]
+
+- id: err-e0600-1
+  titulo: "Negar un texto"
+  mundo: 03-valores-y-tipos
+  tema: traits
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0600
+  opciones:
+    - "`!` no se puede aplicar a un `String` (E0600)"
+    - "Falta `mut` en `activo`"
+    - "`!` solo funciona dentro de `if`"
+    - "`\"sí\"` lleva tilde y no se admite"
+  correcta: 0
+  solucion: |
+    `!` es para `bool` y enteros. Compara si quieres un `bool`: `activo != "sí"`.
+    - `mut` no tiene que ver.
+    - `!` funciona en cualquier expresión.
+    - Los textos son UTF-8: la tilde es válida.
+  etiquetas: ["E0600"]
+
+- id: err-e0601-1
+  titulo: "¿Por dónde empiezo?"
+  mundo: 02-tu-primer-programa
+  tema: otros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0601
+  opciones:
+    - "Falta `fn main()`: el programa no tiene punto de entrada (E0601)"
+    - "`println!` no se puede usar fuera de `main`"
+    - "Las funciones deben empezar por mayúscula"
+    - "Hay que poner `pub fn principal`"
+  correcta: 0
+  solucion: |
+    Todo binario empieza en `main`.
+    - `println!` se puede usar en cualquier función.
+    - Las funciones se escriben en `snake_case`.
+    - `pub` no la convierte en el punto de entrada.
+  etiquetas: ["E0601", "main"]
+
+- id: err-e0603-1
+  titulo: "El saldo secreto"
+  mundo: 12-modulos-crates-y-cargo
+  tema: modulos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0603
+  opciones:
+    - "`saldo_secreto` no es `pub`, así que no se ve fuera de `banco` (E0603)"
+    - "Los módulos no pueden tener funciones"
+    - "Falta `use banco;`"
+    - "Hay que llamar con `banco.saldo_secreto()`"
+  correcta: 0
+  solucion: |
+    Lo de un módulo es privado salvo que lleve `pub`.
+    - Los módulos contienen funciones.
+    - La ruta `banco::...` ya basta.
+    - Las rutas usan `::`, no `.`.
+  etiquetas: ["E0603", "pub"]
+
+- id: err-e0605-1
+  titulo: "Una lista convertida en número"
+  mundo: 03-valores-y-tipos
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0605
+  opciones:
+    - "`as` no puede convertir un `Vec<u8>` en `u32` (E0605)"
+    - "Hay que usar `as usize`"
+    - "Los vectores de `u8` son números en Rust"
+    - "Falta `mut`"
+  correcta: 0
+  solucion: |
+    `as` es solo para primitivos. Quizá querías `lista.len() as u32`.
+    - `as usize` falla igual.
+    - Un `Vec` es un struct con puntero, longitud y capacidad.
+    - No se modifica nada.
+  etiquetas: ["E0605", "as"]
+
+- id: err-e0606-1
+  titulo: "Convertir una flecha"
+  mundo: 03-valores-y-tipos
+  tema: tipos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0606
+  opciones:
+    - "`x` es `&u8`; hay que leer el valor con `*x` antes de `as` (E0606)"
+    - "`u8` no se puede convertir a `u32`"
+    - "Las referencias no se pueden guardar en variables"
+    - "Hay que usar `into()` obligatoriamente"
+  correcta: 0
+  solucion: |
+    Arreglo: `*x as u32`.
+    - `u8 as u32` es válido: el problema es la referencia.
+    - Guardar referencias es normal.
+    - `into()` también serviría (`u32::from(*x)`), pero no es obligatorio.
+  etiquetas: ["E0606", "as"]
+
+- id: err-e0608-1
+  titulo: "La posición cero de un número"
+  mundo: 03-valores-y-tipos
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0608
+  opciones:
+    - "Un `u32` no se puede indexar con `[0]` (E0608)"
+    - "Los índices empiezan en 1"
+    - "Hay que escribir `edad.0`"
+    - "Falta convertir a `usize`"
+  correcta: 0
+  solucion: |
+    Solo se indexan colecciones.
+    - Los índices empiezan en 0 en las colecciones.
+    - `.0` es para tuplas.
+    - El índice ya es un literal válido.
+  etiquetas: ["E0608"]
+
+- id: err-e0609-1
+  titulo: "La tercera dimensión"
+  mundo: 09-structs-enums-y-patrones
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0609
+  opciones:
+    - "`Punto` no tiene campo `z` (E0609)"
+    - "Los campos se leen con `p[z]`"
+    - "Hay que derivar `Debug`"
+    - "`p` no es `mut`"
+  correcta: 0
+  solucion: |
+    Solo existen `x` e `y`.
+    - Los campos se leen con `.`.
+    - `{}` sobre un `i32` no necesita `Debug`.
+    - Leer no requiere `mut`.
+  etiquetas: ["E0609"]
+
+- id: err-e0614-1
+  titulo: "Una estrella de más"
+  mundo: 07-prestamos
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0614
+  opciones:
+    - "`n` es un `u32`, no una referencia: no se puede usar `*n` (E0614)"
+    - "`*` es la multiplicación y le falta un operando"
+    - "Hay que escribir `&n + 1`"
+    - "`u32` no admite sumas"
+  correcta: 0
+  solucion: |
+    `*` solo desreferencia referencias y punteros.
+    - Delante de un valor es desreferencia, no multiplicación.
+    - `&n + 1` suma una referencia y funciona por otras razones, pero no es lo que se pretendía.
+    - `u32` se suma sin problema.
+  etiquetas: ["E0614", "*"]
+
+- id: err-e0616-1
+  titulo: "Mirar la cuenta ajena"
+  mundo: 12-modulos-crates-y-cargo
+  tema: modulos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0616
+  opciones:
+    - "El campo `saldo` es privado del módulo `cuenta` (E0616)"
+    - "`Cuenta::nueva` no es pública"
+    - "Los structs `pub` tienen todos sus campos públicos"
+    - "Falta `mut` en `c`"
+  correcta: 0
+  solucion: |
+    Los campos son privados aunque el struct sea `pub`. Arreglo: método `pub fn saldo(&self)`.
+    - `nueva` sí es `pub`.
+    - La visibilidad es campo a campo.
+    - Solo se lee; `mut` no hace falta.
+  etiquetas: ["E0616", "pub"]
+
+- id: err-e0618-1
+  titulo: "Llamar a un número"
+  mundo: 05-funciones-y-la-pila
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0618
+  opciones:
+    - "`precio` es un entero y no se puede llamar como una función (E0618)"
+    - "Los paréntesis multiplican en Rust"
+    - "Falta declarar `total` como `mut`"
+    - "`precio` debería ser `u32`"
+  correcta: 0
+  solucion: |
+    Para multiplicar se usa `*`.
+    - Los paréntesis tras un nombre son siempre una llamada.
+    - `total` no se modifica.
+    - El tipo entero no cambia nada.
+  etiquetas: ["E0618"]
+
+- id: err-e0621-1
+  titulo: "Guardar sin fecha de caducidad"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0621
+  opciones:
+    - "`texto` tiene un tiempo de vida anónimo y la lista exige `'a` (E0621)"
+    - "`push` no acepta `&str`"
+    - "`Vec::new()` necesita el tipo explícito"
+    - "No se puede pasar `&mut Vec` a una función"
+  correcta: 0
+  solucion: |
+    Arreglo: `texto: &'a str`.
+    - `push` acepta `&'a str` en esa lista.
+    - El tipo se infiere de la función.
+    - Pasar `&mut Vec` es lo normal para modificar una lista ajena.
+  etiquetas: ["E0621", "lifetimes"]
+
+- id: err-e0624-1
+  titulo: "Un motor que no arranca"
+  mundo: 12-modulos-crates-y-cargo
+  tema: modulos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0624
+  opciones:
+    - "El método `calentar` no es `pub` (E0624)"
+    - "`Motor` es un struct sin campos y no puede tener métodos"
+    - "Hay que escribir `motor::Motor::new()`"
+    - "Falta `&mut self`"
+  correcta: 0
+  solucion: |
+    Los métodos son privados por defecto.
+    - Un struct unitario puede tener métodos.
+    - `motor::Motor` ya crea el valor (es unitario).
+    - `&self` basta: no modifica nada.
+  etiquetas: ["E0624", "pub"]
+
+- id: err-e0658-1
+  titulo: "Un bloque del futuro"
+  mundo: 21-el-compilador-por-dentro
+  tema: otros
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0658
+  opciones:
+    - "Los bloques `try { }` aún no son estables en Rust 1.99.1 (E0658)"
+    - "`?` no se puede usar con `parse`"
+    - "Falta indicar el tipo de error"
+    - "`try` no es una palabra del lenguaje"
+  correcta: 0
+  solucion: |
+    Solo funcionan en *nightly* con `#![feature(try_blocks)]`. Alternativa: una función con `?`.
+    - `?` funciona con `Result`.
+    - El tipo está anotado en `r`.
+    - `try` es una palabra reservada para esto.
+  etiquetas: ["E0658", "nightly"]
+
+- id: err-e0716-1
+  titulo: "Palabras de un texto fantasma"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0716
+  opciones:
+    - "El `String` es un temporal que muere al final de la sentencia, y `palabras` apunta dentro de él (E0716)"
+    - "`split` no se puede usar con `String`"
+    - "`collect` no sabe en qué colección recoger"
+    - "Un `Vec<&str>` no se puede imprimir con `{:?}`"
+  correcta: 0
+  solucion: |
+    Guarda el `String` en una variable para que viva hasta el final del bloque.
+    - `split` funciona sobre `String` (a través de `&str`).
+    - El tipo `Vec<&str>` está anotado, así que `collect` sabe qué crear.
+    - `Vec<&str>` implementa `Debug`.
+  etiquetas: ["E0716", "temporales"]
+
+- id: err-e0728-1
+  titulo: "Esperar en main"
+  mundo: 18-async
+  tema: otros
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0728
+  opciones:
+    - "`main` no es `async`, así que dentro no se puede usar `.await` (E0728)"
+    - "`async fn` no puede devolver `u32`"
+    - "Falta `use std::future::Future;`"
+    - "`.await` se escribe `await()`"
+  correcta: 0
+  solucion: |
+    `.await` solo existe dentro de código `async`, y hace falta un ejecutor para arrancar.
+    - Una `async fn` puede devolver cualquier tipo.
+    - No hace falta importar `Future` para usar `.await`.
+    - Es una palabra clave postfija: `.await` sin paréntesis.
+  etiquetas: ["E0728", "async"]
+
+- id: err-e0746-1
+  titulo: "Un animal de tamaño desconocido"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/E0746
+  opciones:
+    - "`dyn Animal` no tiene tamaño conocido; hay que devolver `Box<dyn Animal>` o `impl Animal` (E0746)"
+    - "Los traits no se pueden devolver de ninguna forma"
+    - "`Perro` debería tener campos"
+    - "Falta `pub trait`"
+  correcta: 0
+  solucion: |
+    El tamaño del retorno debe conocerse al compilar.
+    - Con `Box` o `impl` sí se puede.
+    - Un struct sin campos implementa traits sin problema.
+    - La visibilidad no influye.
+  etiquetas: ["E0746", "dyn"]
+
+- id: err-vida-insuficiente-1
+  titulo: "Para siempre es mucho tiempo"
+  mundo: 08-lifetimes
+  tema: lifetimes
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: errores/vida-insuficiente
+  opciones:
+    - "La closure contiene `x` (vida `'1`) y se exige `'static`: el compilador dice `lifetime may not live long enough`"
+    - "Las closures no se pueden devolver en una `Box`"
+    - "Falta `mut` en la closure"
+    - "`println!` no puede usarse en closures `move`"
+  correcta: 0
+  solucion: |
+    La promesa `'static` es mayor que la vida de `x`. Arreglos: `+ '_` o copiar el valor (`let copia = *x;`).
+    - Devolver `Box<dyn Fn()>` es habitual.
+    - La closure no modifica nada.
+    - `println!` funciona dentro de closures.
+  etiquetas: ["lifetimes", "'static"]

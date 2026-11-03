@@ -1,0 +1,128 @@
+---
+title: "¿Quién libera el heap?"
+description: "Descubre los tres errores clásicos con la memoria del heap y la regla con la que Rust los evita: cada dato tiene un dueño."
+sidebar:
+  order: 12
+duracion: 12
+desde: "1.0"
+requiere: ["01-la-maquina/11-pila-y-heap"]
+tarjetas:
+  - p: "¿Qué es una fuga de memoria?"
+    r: "Memoria del heap que nadie devuelve. El programa sigue funcionando, pero gasta cada vez más memoria."
+  - p: "¿Qué es una doble liberación?"
+    r: "Devolver dos veces el mismo hueco del heap. Puede corromper el asignador y el programa entero."
+  - p: "¿Qué es un uso tras liberar?"
+    r: "Leer o escribir en memoria del heap que ya se devolvió, y que quizá ya usa otro dato."
+  - p: "¿Cuándo libera Rust la memoria del heap de un valor?"
+    r: "Cuando su dueño se acaba, normalmente al llegar a la `}` del bloque donde se creó. El compilador inserta esa liberación por ti."
+  - p: "Si escribes `let b = a;` con `a` un `String`, ¿quién es el dueño?"
+    r: "`b`. El valor se mueve: `a` deja de poder usarse, y así solo hay un dueño que libere la memoria una vez (error E0382 si usas `a`)."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Historia } from '~/components';
+
+Vas a ver el problema que Rust resuelve mejor que nadie: quién devuelve la memoria del heap, y cuándo.
+
+## Predice
+
+Este programa crea tres valores llamados «a», «b» y «c». Cada uno imprime un mensaje justo cuando Rust lo libera. Las llaves `{ }` crean un **bloque**: una zona del programa con principio y fin. ¿En qué orden salen los mensajes?
+
+<Predice
+  ej="m01/orden-de-liberar-predice"
+  opciones={["`fin del bloque`, `libero b`, `fin de main`, `libero c`, `libero a`", "`fin del bloque`, `fin de main`, `libero a`, `libero b`, `libero c`", "`libero a`, `libero b`, `libero c`, `fin del bloque`, `fin de main`", "`fin del bloque`, `libero b`, `fin de main`, `libero a`, `libero c`"]}
+  correcta={0}
+  explicacion="`b` se libera al cerrar **su** bloque. Al final de `main` quedan `a` y `c`, y se liberan en orden **inverso** al de su creación: primero `c`, luego `a`. Como una pila de platos: el último que pusiste es el primero que quitas."
+  porque={["Correcto.", "`b` no espera al final de `main`: se libera al cerrar el bloque donde nació.", "Nada se libera al crearse: se libera cuando su dueño se acaba.", "Al final del bloque se liberan en orden inverso: `c` se creó después de `a`, así que se libera antes."]}
+/>
+
+## La idea
+
+En la lección anterior viste que el heap se pide al asignador y queda ocupado **hasta que alguien lo devuelva**. Ese «alguien» es el gran problema. Si se hace mal, hay tres errores clásicos:
+
+- **Fuga de memoria** (*memory leak*): nadie lo devuelve nunca. El programa gasta más y más memoria.
+- **Doble liberación** (*double free*): dos partes del programa creen que el hueco es suyo, y las dos lo devuelven. El asignador se corrompe.
+- **Uso tras liberar** (*use after free*): una parte devuelve el hueco y otra sigue usándolo. Ahí quizá ya vive otro dato. Es de los fallos de seguridad más graves que existen.
+
+Rust lo resuelve con una regla: **cada valor tiene exactamente un dueño** (*owner*). Cuando el dueño se acaba (normalmente, al llegar a la `}` de su bloque), Rust **libera** (*drop*) el valor y devuelve su memoria del heap. Tú no escribes la liberación; la escribe el compilador. Así nunca se olvida (no hay fuga), nunca se hace dos veces (no hay doble liberación) y nadie puede usar el valor después (no hay uso tras liberar).
+
+A esto se le llama **propiedad** (*ownership*), y es el corazón de Rust. Tendrá su propio mundo; aquí solo ves la idea.
+
+## Pruébalo
+
+Este programa crea un tipo `Avisador` que guarda un `String` (en el heap) e imprime un mensaje justo antes de liberarlo. No te preocupes por cómo se hace eso: mira **cuándo** sale cada mensaje.
+
+<Ejecutar ej="m01/quien-libera" />
+
+Salida real:
+
+```text
+dentro del bloque
+  -> libero el heap de «dos»
+fin de main
+  -> libero el heap de «tres»
+  -> libero el heap de «uno»
+```
+
+`dos` se libera al cerrar su bloque. `tres` se **mueve** a `_otro` en el paso 3: cambia de dueño, pero sigue habiendo uno solo, así que se libera **una** vez, cuando `_otro` se acaba. Nadie escribió «libera esto»: lo hizo Rust en cada `}`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+¿Qué pasaría si `let b = a;` **copiara** la ficha de un `String`? Habría dos fichas en la pila, con el mismo puntero, apuntando a las **mismas** letras del heap:
+
+```text
+     PILA                       HEAP
+  a: [ptr, 4, 4] ──┐      ┌───┬───┬───┬───┐
+                   ├─────▶│ h │ o │ l │ a │
+  b: [ptr, 4, 4] ──┘      └───┴───┴───┴───┘
+```
+
+Al final del bloque, `a` y `b` liberarían el mismo hueco: una doble liberación. Por eso Rust no copia: **mueve**. Copia los bytes de la ficha y, a partir de ahí, considera que `a` ya no vale. Solo `b` liberará las letras.
+
+Liberar no es magia: al compilar, `rustc` inserta en cada `}` la llamada que devuelve la memoria al asignador. Si miras el ensamblador de un programa que crea y suelta un `Box`, verás una llamada a una función interna de Rust llamada `__rust_dealloc`. No hay ningún proceso extra vigilando tu memoria mientras el programa corre: todo se decide al compilar.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Usar un `String` después de haberlo movido no compila:
+
+<NoCompila
+  ej="m01/dos-duenos"
+  explicacion="`let b = a;` mueve el `String`: ahora el dueño es `b`. Si Rust dejara usar `a`, habría dos fichas con el mismo puntero y, al final, dos liberaciones del mismo hueco. El error E0382 (*borrow of moved value*) lo evita. Si de verdad quieres dos textos, pide una copia explícita con `clone()`: otro hueco del heap, con su propio dueño."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m01/liberar-reto"
+  enunciado="Mete UNA línea dentro de un bloque `{ }` para que el programa imprima exactamente, en este orden: `adiós primero`, `fin`, `adiós segundo` (cada uno en su línea)."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Un programa pide memoria del heap y nunca la devuelve. ¿Cómo se llama ese error?"
+  opciones={["Fuga de memoria", "Doble liberación", "Uso tras liberar", "Desbordamiento"]}
+  correcta={0}
+  porque={["Correcto.", "Eso es devolverla **dos** veces.", "Eso es usarla **después** de devolverla.", "El desbordamiento es un número que no cabe en su tipo (lección 6)."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué evita que un `String` se libere dos veces?"
+  opciones={["Que siempre tiene un único dueño, y al moverlo el anterior deja de valer", "Que Rust comprueba mientras el programa corre si ya se liberó", "Que los `String` nunca se liberan", "Que el asignador ignora la segunda liberación"]}
+  correcta={0}
+  porque={["Correcto: un dueño, una liberación.", "No hay comprobaciones al ejecutar: el compilador lo decide todo antes.", "Se liberan, automáticamente, cuando su dueño se acaba.", "Liberar dos veces corrompe el asignador; por eso hay que impedirlo antes."]}
+/>
+
+<Pregunta
+  pregunta="Al final de un bloque quedan `x` (creada primero) e `y` (creada después). ¿En qué orden se liberan?"
+  opciones={["Primero `y`, luego `x`", "Primero `x`, luego `y`", "A la vez", "Depende de cuánto ocupen"]}
+  correcta={0}
+  porque={["Correcto: en orden inverso al de creación.", "Es al revés: la última en crearse es la primera en liberarse.", "Se liberan una detrás de otra, en un orden fijo.", "El tamaño no importa; importa el orden de creación."]}
+/>
+
+<Historia titulo="Por qué esto importa tanto">
+Rust nació con una meta muy concreta: escribir programas rápidos **sin errores de memoria**, los que acabas de ver. La forma habitual de evitarlos es que el programador libere a mano (y se equivoque a veces) o que un proceso vigile la memoria mientras el programa corre (y cueste tiempo). Rust eligió un tercer camino: que el compilador sepa siempre quién es el dueño de cada dato. En el Mundo 2 conocerás la historia de cómo empezó todo.
+</Historia>

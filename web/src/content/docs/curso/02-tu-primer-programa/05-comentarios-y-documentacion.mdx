@@ -1,0 +1,137 @@
+---
+title: "Comentarios y documentación"
+description: "Escribe notas que el compilador ignora y documentación que Cargo convierte en una web, y aprende cuándo usar cada una."
+sidebar:
+  order: 5
+duracion: 10
+desde: "1.0"
+requiere: ["02-tu-primer-programa/02-println-y-las-macros"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre `//` y `///`?"
+    r: "`//` es un comentario normal, que el compilador descarta. `///` es un comentario de documentación del elemento que viene **debajo**."
+  - p: "¿Para qué sirve `//!`?"
+    r: "Documenta el elemento que lo **contiene**; al principio de un archivo, documenta el crate o el módulo entero."
+  - p: "¿Qué comando genera la documentación HTML de tu proyecto?"
+    r: "`cargo doc` (con `--no-deps` para no documentar las dependencias y `--open` para abrirla en el navegador)."
+  - p: "¿Qué error da un `///` que no tiene nada debajo que documentar?"
+    r: "E0585: «found a documentation comment that doesn't document anything»."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+El código lo lee el compilador, pero también lo leen personas: tú dentro de tres semanas, por ejemplo. Hoy aprendes a dejar notas que el compilador ignora y a escribir documentación de verdad, la que Cargo convierte en una página web.
+
+## Predice
+
+Este programa tiene un `println!` comentado y un texto que parece un comentario. ¿Cuántas líneas imprime?
+
+<Predice
+  ej="m02/comentarios"
+  opciones={["4: `Uno`, `Dos`, `Tres` y `Cuatro`", "3: `Uno`, `Tres` y `Cuatro /* esto no es un comentario */`", "3: `Uno`, `Tres` y `Cuatro`", "2: `Uno` y `Tres`"]}
+  correcta={1}
+  explicacion="La línea de `Dos` empieza con `//`, así que el compilador no la ve. Y `/* … */` **dentro de las comillas** no es un comentario: es parte del texto, y se imprime tal cual."
+  porque={["Un `println!` que va detrás de `//` no existe para el compilador.", "", "Dentro de unas comillas no hay comentarios: todo es texto.", "La última línea sí se ejecuta: el `/*` está dentro del texto."]}
+/>
+
+## La idea
+
+Un **comentario** (*comment*) es texto para personas que el compilador descarta. Hay dos formas:
+
+- `//` hasta el final de la línea. Es la forma normal en Rust; también sirve para «apagar» una línea de código sin borrarla.
+- `/* … */` puede ocupar varias líneas. En Rust estos bloques **se anidan**: `/* fuera /* dentro */ todavía fuera */` es un solo comentario.
+
+Además existen los **comentarios de documentación** (*doc comments*), que no se descartan: se guardan y sirven para generar la documentación.
+
+- `///` documenta lo que viene **justo debajo** (una función, por ejemplo).
+- `//!` documenta lo que lo **contiene**. Al principio de `main.rs`, documenta el programa entero.
+
+Dentro de ellos se escribe en **Markdown**: `# Título`, `` `código` ``, listas… Es el mismo formato con el que está escrita la documentación oficial de Rust.
+
+## Pruébalo
+
+<Ejecutar ej="m02/comentarios" />
+
+Salida real:
+
+```text
+Uno
+Tres
+Cuatro /* esto no es un comentario */
+```
+
+Y los comentarios de bloque anidados, en acción:
+
+<Ejecutar ej="m02/bloques-anidados" titulo="Comentarios de bloque anidados" />
+
+```text
+Los comentarios de bloque se anidan
+```
+
+Ahora un programa documentado. `fn saludar(nombre: &str)` es una función que recibe un texto; las funciones con parámetros llegan en el mundo 5, de momento fíjate en los comentarios:
+
+<Ejecutar ej="m02/documentado" />
+
+```text
+¡Hola, Ana!
+¡Hola, Luis!
+```
+
+Si copias este programa en `src/main.rs` de un proyecto llamado `saludos` y ejecutas `cargo doc --no-deps`, Cargo genera la web de documentación. Salida real (la ruta está abreviada):
+
+```text
+ Documenting saludos v0.1.0 (…\saludos)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.23s
+   Generated …\saludos\target\doc\saludos\index.html
+```
+
+La portada muestra el texto del `//!` («Un programa diminuto para practicar la documentación») y hay una página `fn.saludar.html` con el texto del `///`. Con `cargo doc --open` se abre directamente en el navegador. `cargo doc` no necesita el enlazador, así que funciona aunque todavía no hayas resuelto la trampa de `link.exe`.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Qué hace el compilador con cada comentario">
+El primer paso de `rustc` es partir tu texto en **tokens** (palabras sueltas como `fn`, `main`, `(`, `"hola"`). En ese paso, los comentarios normales **desaparecen**: no llegan a ninguna fase posterior y no ocupan ni un byte del programa final.
+
+Los comentarios de documentación, en cambio, se convierten en un **atributo** (*attribute*): `/// Hola` es otra forma de escribir `#[doc = " Hola"]` (fíjate en el espacio inicial, que se conserva). Puedes comprobarlo: si escribes `#[doc = "Documentada con el atributo."]` encima de una función, `cargo doc` muestra ese texto igual que si hubieras usado `///`.
+
+Como un atributo tiene que estar pegado a algo, un `///` que no tiene nada debajo es un error, y no un simple comentario ignorado. Lo vas a ver ahora.
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m02/doc-suelto" explicacion="E0585: el `///` está al final de `main`, sin nada debajo que documentar. El `help:` lo explica: los comentarios de documentación van antes de lo que documentan; si querías un comentario normal, usa `//`." />
+
+El mensaje real: «found a documentation comment that doesn't document anything» (se encontró un comentario de documentación que no documenta nada). El arreglo es cambiar `///` por `//`.
+
+## Tu turno
+
+Ordena un programa documentado: primero la documentación del programa entero, luego la de la función, luego la función.
+
+<Ordena
+  lineas={["//! Calcula cosas útiles.", "/// Imprime la respuesta.", "fn respuesta() {", "    println!(\"42\");", "}"]}
+  distractores={["/// Calcula cosas útiles.  (al final del archivo)"]}
+  explicacion="`//!` va arriba y documenta lo que lo contiene (el archivo). `///` va justo encima de lo que documenta. Un `///` al final del archivo, sin nada debajo, sería el error E0585."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace el compilador con un comentario `//` normal?"
+  opciones={["Lo guarda en el ejecutable por si acaso", "Lo descarta al partir el código en tokens", "Lo convierte en documentación", "Lo ejecuta si contiene código"]}
+  correcta={1}
+  explicacion="Los comentarios normales desaparecen en el primer paso, el análisis léxico. No influyen ni en la velocidad ni en el tamaño del programa."
+  porque={["No ocupan nada en el programa final.", "", "Eso solo lo hacen `///` y `//!`.", "El código comentado no existe para el compilador; por eso se usa para «apagar» líneas."]}
+/>
+
+<Pregunta
+  pregunta="¿Compila este comentario? `/* uno /* dos */ tres */`"
+  opciones={["No: el primer `*/` cierra el comentario y `tres */` es código inválido", "Sí: en Rust los comentarios de bloque se anidan", "Solo en la edición 2015", "Solo si va dentro de `main`"]}
+  correcta={1}
+  explicacion="Rust lleva la cuenta de los `/*` abiertos: el comentario termina cuando se cierra el último. Lo puedes comprobar con el ejemplo `bloques-anidados`."
+  porque={["Esa sería la regla si los bloques no se anidaran, pero en Rust sí se anidan.", "", "El anidamiento funciona igual en todas las ediciones.", "Los comentarios pueden ir en cualquier parte del archivo."]}
+/>
+
+<Respuesta
+  pregunta="¿Qué tres caracteres usas para documentar la función que está justo debajo?"
+  respuestas={["///"]}
+  explicacion="`///`. Para documentar el archivo o el elemento que contiene el comentario se usa `//!`."
+/>

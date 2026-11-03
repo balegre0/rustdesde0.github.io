@@ -1,0 +1,110 @@
+---
+title: "Rc: varios dueños"
+description: "Compartes un mismo valor entre varios dueños con Rc, ves crecer y bajar su contador y entiendes por qué no te deja modificarlo."
+sidebar:
+  order: 5
+duracion: 12
+desde: "1.0"
+requiere: ["15-punteros-inteligentes/03-deref", "15-punteros-inteligentes/04-drop"]
+tarjetas:
+  - p: "¿Qué hace `Rc::clone(&a)`?"
+    r: "Suma 1 al contador de referencias fuertes y devuelve otro `Rc` que apunta al MISMO valor. No copia el valor."
+  - p: "¿Cuándo se libera el valor de un `Rc`?"
+    r: "Cuando el contador de referencias fuertes llega a 0, es decir, cuando muere el último `Rc` que apunta a él."
+  - p: "¿Por qué no puedes hacer `rc.push(4)` sobre un `Rc<Vec<i32>>`?"
+    r: "`Rc` solo implementa `Deref`, no `DerefMut`: da préstamos compartidos. Mutar algo con varios dueños sería aliasing con mutación. Error E0596."
+  - p: "¿Rc se puede enviar a otro hilo?"
+    r: "No. Su contador no es atómico, así que `Rc` no es `Send`. Para hilos existe `Arc`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a hacer que un mismo valor tenga **varios dueños** a la vez y a ver con números cuándo se libera.
+
+## Predice
+
+<Predice
+  ej="m15/rc-cuenta"
+  pregunta="Creamos `a`, la clonamos en `b` y, dentro de un bloque, en `c`. ¿Cuánto vale el contador justo después del bloque?"
+  opciones={["1", "2", "3", "0: el bloque liberó el texto"]}
+  correcta={1}
+  explicacion="Dentro del bloque hay tres dueños (`a`, `b`, `c`). Al cerrarse, `c` muere y el contador baja a 2. El texto sigue vivo porque `a` y `b` lo mantienen."
+  porque={["Solo murió `c`; `b` sigue siendo dueña.", "Correcto.", "Ese era el valor dentro del bloque.", "El texto solo se libera cuando el contador llega a 0."]}
+/>
+
+## La idea
+
+Hasta ahora cada valor tenía **un único dueño**. Pero hay datos que de verdad pertenecen a varios: un nodo de un grafo al que apuntan varias aristas, una configuración que leen varias partes del programa, una foto que está en tres álbumes. Si uno de ellos fuera el dueño, ¿qué pasa cuando muere y los demás siguen usándola? Sería un **uso tras liberar**.
+
+`Rc<T>` (*reference counted*, «con contador de referencias») resuelve esto: guarda el valor en el heap junto a un **contador**. `Rc::clone(&a)` no copia el valor: suma 1 al contador y te da otro puntero al mismo sitio. Cada vez que un `Rc` muere, su `Drop` resta 1. Cuando el contador llega a **0**, el último en irse libera el valor. Nadie lo libera antes de tiempo y nadie lo libera dos veces.
+
+El precio: con varios dueños, **nadie puede modificar**. `Rc` implementa `Deref` (puedes leer) pero no `DerefMut`. Si dos dueños pudieran cambiar el valor mientras el otro lo lee, tendrías **aliasing con mutación**, justo lo que prohíben las reglas de préstamo. Para mutar algo compartido necesitarás mutabilidad interior (lección 8).
+
+## Pruébalo
+
+<Ejecutar ej="m15/rc-cuenta" />
+
+`Rc::ptr_eq` compara **direcciones**, no contenidos: confirma que `a` y `b` son el mismo texto, no dos copias iguales.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`Rc::new(String::from("compartido"))` reserva en el heap un bloque con **dos contadores y el valor** (x86-64):
+
+```text
+PILA                        HEAP (bloque RcInner)
+┌──────────────┐            ┌───────────────────────────┐
+│ a: Rc ●──────┼───────────►│ strong: usize = 2         │  8 B
+├──────────────┤      ┌────►│ weak:   usize = 1         │  8 B (1 «implícito» compartido por los fuertes)
+│ b: Rc ●──────┼──────┘     │ valor: String (ptr,cap,len)│ 24 B ──► "compartido" (otro bloque)
+└──────────────┘            └───────────────────────────┘
+```
+
+Cada `Rc` en la pila mide **8 bytes** (un puntero; comprobado con `size_of::<Rc<i32>>() == 8`). El segundo contador, `weak`, es para la lección siguiente.
+
+`Rc::clone` es una suma (`strong += 1`) y una comprobación de desbordamiento: si el contador llegara al máximo, el programa aborta, porque un contador que diera la vuelta permitiría liberar demasiado pronto. El `Drop` de `Rc` resta 1; si llega a 0, destruye el valor, y si además `weak` llega a 0, devuelve el bloque al asignador.
+
+Ese contador es un `Cell<usize>` normal, **no atómico**. Si dos hilos hicieran `clone` a la vez, podrían perder una suma (una **carrera de datos**) y liberar antes de tiempo. Por eso `Rc` no es `Send` ni `Sync` y el compilador no deja que cruce entre hilos (lección 10).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m15/rc-mut"
+  explicacion="`lista` y `otra` son dueñas del mismo `Vec`. Si `lista` pudiera hacer `push`, el Vec podría reasignar su memoria mientras `otra` lo está leyendo. El compilador lo impide: `Rc` no implementa `DerefMut`. La salida es `Rc<RefCell<Vec<i32>>>` (lección 9) o, mejor, repensar quién es el dueño."
+/>
+
+<Trampa titulo="Escribir a.clone() y creer que copias el valor">
+
+❌ `let b = a.clone();` con `a: Rc<String>` parece copiar el texto. No lo hace, pero quien lee el código lo duda.
+
+✅ Escribe `Rc::clone(&a)`: deja claro que solo sumas al contador. Es la convención de la comunidad.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m15/r-rc"
+  enunciado="Crea un `Vec` con tres `Rc` que apunten a la misma `foto`. Pista: `(0..3).map(|_| Rc::clone(&foto)).collect()`. Debe imprimir `álbumes = 3` y `dueños = 4`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuánta memoria nueva para el texto reserva `Rc::clone(&a)` si `a: Rc<String>`?"
+  opciones={["Una copia completa del texto", "Ninguna: solo suma 1 al contador", "Un bloque nuevo con su propio contador", "Depende de la longitud del texto"]}
+  correcta={1}
+  explicacion="`Rc::clone` devuelve otro puntero al mismo bloque y suma 1 a `strong`."
+  porque={["Eso haría `String::clone`, no `Rc::clone`.", "Correcto.", "El bloque es el mismo: comparten contador.", "Siempre cuesta lo mismo: una suma."]}
+/>
+
+<Pregunta
+  pregunta="Tienes `Rc<Vec<i32>>` y necesitas añadir un elemento. ¿Qué es lo correcto?"
+  opciones={["Usar `unsafe` para quitar el `Rc`", "Llamar a `push` igualmente: es un aviso, no un error", "Repensar si de verdad hacen falta varios dueños, o usar mutabilidad interior", "Hacer `Rc::clone` y modificar el clon"]}
+  correcta={2}
+  explicacion="`Rc` solo da acceso compartido. Si necesitas mutar, o hay un único dueño claro, o necesitas `RefCell` dentro."
+  porque={["Mutar a través de un `Rc` con `unsafe` es comportamiento indefinido.", "Es un error (E0596), no un aviso.", "Correcto.", "El clon apunta al mismo Vec: el problema es idéntico."]}
+/>

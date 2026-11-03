@@ -1,0 +1,1 @@
+{ "nota": "En el navegador (wasm32-wasip1) un pánico aborta el programa: no se ejecutan los Drop. En tu PC, por defecto, el pánico desenrolla la pila y sí los ejecuta." }

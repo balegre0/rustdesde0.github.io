@@ -1,0 +1,58 @@
+---
+title: "La especificación de Rust"
+description: "¿Tiene Rust especificación? La Reference, la FLS (donada por Ferrous Systems y adoptada por el proyecto en 2025), los modelos formales y la certificación de compiladores para sistemas críticos."
+sidebar:
+  order: 10
+duracion: 11
+requiere: ["24-teoria-y-diseno/09-verificacion"]
+tarjetas:
+  - p: "¿Qué es la Rust Reference?"
+    r: "El documento oficial que describe el lenguaje construcción a construcción. Es la referencia principal, aunque históricamente se consideró descriptiva e incompleta."
+  - p: "¿Qué es la FLS?"
+    r: "La especificación del lenguaje escrita por Ferrous Systems para certificar su compilador Ferrocene. La donaron al proyecto Rust, que la adoptó en 2025; la mantiene el equipo de especificación."
+  - p: "¿Qué diferencia hay entre una especificación descriptiva y una prescriptiva?"
+    r: "La descriptiva documenta lo que hace el compilador. La prescriptiva dice lo que debe hacer: si el compilador hace otra cosa, el compilador está mal."
+  - p: "¿Para qué sirve un compilador cualificado como Ferrocene?"
+    r: "Para usar Rust en sistemas críticos (coches, trenes, equipos médicos): normas como ISO 26262 o IEC 61508 exigen herramientas cualificadas contra una especificación."
+---
+
+import { Pregunta, BajoElCapo } from '~/components';
+
+Durante años, la respuesta honesta a «¿tiene Rust especificación?» fue «más o menos». Hoy es más interesante, y entenderla te dice mucho de cómo se construye un lenguaje.
+
+## La idea
+
+Hay varios documentos, con propósitos distintos:
+
+| Documento | Qué es |
+|---|---|
+| **The Rust Reference** | La descripción oficial del lenguaje, construcción a construcción. Es la que más consultarás. |
+| **FLS** (*Ferrocene Language Specification*) | Una especificación con estilo industrial: frases numeradas y trazables, pensadas para certificar herramientas. |
+| **The Rustonomicon** | Guía del código `unsafe`: lo que tienes que garantizar tú. |
+| **MiniRust**, **a-mir-formality** | Modelos formales y ejecutables de la semántica y del sistema de tipos, en desarrollo. |
+
+La **FLS** tiene una historia peculiar. La escribió la empresa Ferrous Systems (2022–2023) porque la necesitaba: su compilador **Ferrocene** (un `rustc` con pruebas y documentación adicionales) quería **cualificarse** para la norma de automoción ISO 26262, y no se puede cualificar una herramienta contra «lo que haga `rustc`». En 2025 la **donaron al proyecto Rust**, que la adoptó; ahora la mantiene el **equipo de especificación** (*t-spec*), y la especificación oficial del lenguaje se formará a partir de ella y de la Reference.
+
+## Descriptiva o prescriptiva
+
+Una especificación **descriptiva** documenta lo que hace el compilador: si los dos discrepan, se cambia el documento. Una **prescriptiva** dice lo que **debe** hacer: si discrepan, el fallo es del compilador. Rust ha ido pasando de lo primero a lo segundo. Que exista un segundo compilador (**gccrs**, el *frontend* de Rust dentro de GCC, en desarrollo) aumenta la presión para que la especificación mande.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Sistemas críticos.** Las normas de seguridad funcional (ISO 26262 para coches, IEC 61508 para la industria, IEC 62304 para equipos médicos, DO-178C para aviones) exigen que las herramientas que generan el software estén **cualificadas**: hay que demostrar que hacen lo que su especificación dice. Ferrocene está cualificado para ISO 26262 (hasta ASIL D, el nivel más alto) e IEC 61508 (hasta SIL 4) desde 2023. La **biblioteca** es otra cuestión: el código de `core` que acaba dentro del producto se certifica aparte, y se ha ido haciendo por partes.
+
+**El ecosistema crítico.** La Rust Foundation creó en 2024 el **Safety-Critical Rust Consortium**, con empresas de automoción, aviónica e industria, para escribir guías de codificación (al estilo de las que existen para otros lenguajes en estos sectores) y pedir al proyecto lo que les falta, como medir la cobertura **MC/DC** que exigen algunas normas.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué necesitaba Ferrous Systems escribir la FLS?"
+  opciones={["Para enseñar Rust", "Para poder cualificar su compilador para normas de seguridad funcional, que exigen una especificación contra la que comprobarlo", "Para sustituir a la Reference", "Para cambiar el lenguaje"]}
+  correcta={1}
+  explicacion="Cualificar una herramienta es demostrar que cumple una especificación. Sin especificación, no hay nada contra lo que comprobar."
+  porque={["No es un documento didáctico.", "", "Hoy las dos conviven y se integran.", "Describe el lenguaje existente; no lo cambia."]}
+/>

@@ -1,0 +1,140 @@
+---
+title: "Una referencia por dentro"
+description: "Una referencia es una dirección de memoria que el compilador sabe que es válida. El operador * la sigue; el punto la sigue solo."
+sidebar:
+  order: 2
+duracion: 10
+desde: "1.0"
+requiere: ["07-prestamos/01-prestar"]
+tarjetas:
+  - p: "¿Qué guarda, en memoria, una variable de tipo `&String`?"
+    r: "Una dirección: dónde está el `String` prestado. Mide lo que un `usize` (4 bytes en el navegador, 8 en un PC de 64 bits)."
+  - p: "¿Qué hace `*r` si `r` es una referencia?"
+    r: "Desreferencia: sigue la dirección y da el valor que hay al otro lado."
+  - p: "¿Por qué `r.len()` funciona sin escribir `(*r).len()`?"
+    r: "Porque el operador punto desreferencia automáticamente las veces que haga falta (auto-deref)."
+  - p: "¿Qué compara `&a == &b`?"
+    r: "Los valores a los que apuntan, no las direcciones. Para comparar direcciones se usa `std::ptr::eq`."
+  - p: "¿Qué garantiza una referencia que una dirección cualquiera no garantiza?"
+    r: "Que nunca es nula, que está alineada y que apunta a un valor vivo y válido de su tipo durante todo el tiempo que se usa."
+---
+
+import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa, Ordena } from '~/components';
+
+Vas a abrir una referencia y mirar dentro. Spoiler: es una dirección de memoria, como las del mundo 01. Lo especial no es lo que guarda, sino lo que el compilador **garantiza** sobre ella.
+
+## Predice
+
+<Predice
+  ej="m07/desreferenciar"
+  pregunta="¿Qué imprime la última línea, `&a == &b`, si `a` y `b` son dos variables distintas que valen 7?"
+  opciones={["`true`", "`false`, porque están en direcciones distintas", "No compila: no se pueden comparar referencias", "Depende de la máquina"]}
+  correcta={0}
+  explicacion="Comparar dos referencias compara **los valores** a los que apuntan. `a` y `b` viven en sitios distintos, pero las dos valen 7."
+  porque={["", "Eso sería comparar direcciones, que se hace con `std::ptr::eq`. `==` compara valores.", "Las referencias se comparan si el tipo de dentro se puede comparar.", "La comparación de valores no depende de dónde estén."]}
+/>
+
+## La idea
+
+Una referencia es una **dirección de memoria**: el número de la casilla donde empieza el valor prestado. Hasta aquí, nada nuevo respecto al mundo 01.
+
+Lo nuevo son las **garantías**. El compilador te promete que una referencia:
+
+1. **nunca es nula** (siempre apunta a algo);
+2. está **alineada** para su tipo;
+3. apunta a un valor **vivo y válido** durante todo el tiempo que la usas.
+
+La tercera promesa es la que cumple el comprobador de préstamos. Las dos primeras las cumple el propio lenguaje: en Rust seguro no hay forma de fabricar una referencia sin un valor detrás.
+
+Para llegar al valor hay que **seguir la flecha**. Eso se llama **desreferenciar** (*dereference*) y se escribe con `*`:
+
+```rust
+let r = &x;     // r guarda la dirección de x
+let y = *r + 1; // *r es «el valor al otro lado de r»
+```
+
+En la práctica escribirás `*` menos de lo que crees, porque el **punto** (`.`) desreferencia solo: `r.len()` significa `(*r).len()`. A esto se le llama **auto-deref**. `println!` y `==` también miran a través de la referencia.
+
+## Pruébalo
+
+Primero, la dirección. `{:p}` imprime la dirección que guarda una referencia:
+
+<Ejecutar ej="m07/direcciones" />
+
+`r` guarda exactamente la dirección donde vive `s`. Una referencia mide 4 bytes en el navegador (8 en tu PC): una dirección. La ficha del `String` mide 12 (24 en tu PC). Prestar es siempre más barato que mover un `String`, y muchísimo más barato que clonarlo.
+
+Ahora, seguir la flecha:
+
+<Ejecutar ej="m07/desreferenciar" />
+
+`rs.len()`, `(*rs).len()` y `s.len()` dan lo mismo: las dos primeras son la misma operación escrita de dos maneras.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El dibujo** (direcciones del navegador):
+
+```text
+  PILA de main
+  0xfffc4  s ┌──────────────┐        HEAP
+             │ ptr  ────────┼──────► ┌───┬───┬───┬───┐
+             │ cap  4       │        │ h │ o │ l │ a │
+             │ len  4       │        └───┴───┴───┴───┘
+             └──────────────┘
+             ▲
+  r ┌────────┼─────┐
+    │ 0xfffc4      │   r apunta a la ficha de s, no al texto
+    └──────────────┘
+```
+
+`r` no apunta al texto del heap, sino a **la ficha** de `s`, en la pila. Para leer el texto a través de `r` hay dos saltos: de `r` a la ficha y de la ficha al heap. El optimizador suele quitar el primero cuando puede.
+
+**Por qué `&String` no es la mejor firma.** Como ves, `&String` obliga a dar dos saltos. En la lección 9 verás `&str`, que apunta directamente al texto y además acepta literales. Es lo que se usa casi siempre para leer texto.
+
+**Las garantías se las pasa a LLVM.** Al generar código, `rustc` marca las referencias como `nonnull`, `align N` y `dereferenceable(N)`. Con eso el optimizador puede, por ejemplo, adelantar una lectura sin miedo a que la dirección sea nula. Lo verás en el mundo 21.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Esperar que == compare direcciones">
+
+❌ Pensar que `&a == &b` responde «¿son la misma variable?». Responde «¿valen lo mismo?».
+
+✅ Si de verdad quieres saber si dos referencias apuntan **al mismo sitio**, usa `std::ptr::eq(r1, r2)`. Lo necesitarás pocas veces, y casi siempre en estructuras de datos avanzadas.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena las líneas para que el programa imprima `10` y luego `11`."
+  lineas={[
+    "let x = 10;",
+    "let r = &x;",
+    "println!(\"{}\", *r);",
+    "let y = *r + 1;",
+    "println!(\"{y}\");"
+  ]}
+  distractores={["let y = r + &1;"]}
+  explicacion="Primero existe `x`, luego se presta y, con `*r`, se lee lo que hay al otro lado. `*r + 1` suma al valor, no a la dirección."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En un PC de 64 bits, ¿cuántos bytes mide una variable de tipo `&String`?"
+  opciones={["24, como la ficha del `String`", "8: una dirección", "Lo que mida el texto", "0: el compilador la elimina siempre"]}
+  correcta={1}
+  explicacion="Una referencia a un tipo de tamaño conocido es una dirección, y una dirección mide un `usize`: 8 bytes en 64 bits (4 en el navegador)."
+  porque={["Esos 24 bytes son la ficha a la que apunta, no la referencia.", "", "El texto está en el heap; la referencia ni siquiera apunta a él directamente.", "A veces el optimizador la elimina, pero el tipo mide 8 bytes."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál de estas cosas NO puede pasarle a una referencia en Rust seguro?"
+  opciones={["Que apunte a un valor de la pila", "Que apunte a un valor del heap", "Que sea nula", "Que se copie a otra variable"]}
+  correcta={2}
+  explicacion="Las referencias nunca son nulas. Para «puede que no haya nada» Rust usa `Option<&T>`, que verás en el mundo 09 (y que, gracias a esta garantía, ocupa lo mismo que `&T`)."
+  porque={["Prestar una variable local de la pila es lo más normal.", "También puede apuntar al heap, por ejemplo a un elemento de un `Vec`.", "", "Las referencias compartidas se copian, como verás en la lección 7."]}
+/>

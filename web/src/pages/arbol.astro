@@ -1,0 +1,115 @@
+---
+// /arbol/ — árbol de progreso: los 25 mundos en orden y sus lecciones, coloreados por estado.
+// Las dependencias salen de `requiere` (frontmatter) y del orden de los mundos. Nada se bloquea: solo se sugiere.
+import Practica from '../components/paginas/Practica.astro';
+import { mundos } from '../lib/lecciones';
+import { MUNDOS, TITULOS_MUNDO } from '../lib/practica';
+
+const ms = await mundos();
+const porSlug = new Map(ms.map((m) => [m.slug, m]));
+const todas = new Map(ms.flatMap((m) => m.lecciones).map((l) => [l.id, l]));
+const lista = [...new Set([...MUNDOS, ...ms.map((m) => m.slug)])].sort().map((slug) => {
+  const m = porSlug.get(slug);
+  const n = Number(slug.slice(0, 2));
+  const t = slug.replace(/^\d+-/, '').replace(/-/g, ' ');
+  return {
+    slug, numero: Number.isFinite(n) ? n : null, titulo: m?.titulo ?? TITULOS_MUNDO[slug] ?? t.charAt(0).toUpperCase() + t.slice(1), href: m?.href ?? null,
+    lecciones: (m?.lecciones ?? []).map((l) => ({ id: l.id, href: l.href, titulo: l.titulo, requiere: l.requiere.map((r) => r.replace(/^\/?(curso\/)?|\/$/g, '')).filter((r) => todas.has(r)) })),
+  };
+});
+const total = lista.reduce((s, m) => s + m.lecciones.length, 0);
+---
+<Practica titulo="Árbol de progreso" descripcion="Mapa de los 25 mundos de «Rust desde cero» y sus lecciones, con lo que llevas hecho y lo que te toca después." ancho="normal">
+  <div class="rdc-arbol-cab">
+    <p class="rdc-lead">De la máquina al diseño del lenguaje. Cada cuadro es una lección; el orden sugerido sale de lo que cada lección pide haber hecho antes. Nada está bloqueado: el árbol solo te sugiere el orden.</p>
+    <p class="rdc-arbol-resumen"><span data-hechas>0</span> de {total} lecciones · siguiente sugerida: <a data-siguiente href="/curso/">—</a></p>
+    <ul class="rdc-arbol-leyenda" aria-label="Leyenda">
+      <li><span class="rdc-nodo-muestra" data-estado="hecha" aria-hidden="true">✓</span> Completada</li>
+      <li><span class="rdc-nodo-muestra" data-estado="disponible" aria-hidden="true"></span> Lista para hacer</li>
+      <li><span class="rdc-nodo-muestra" data-estado="pendiente" aria-hidden="true"></span> Mejor después de sus requisitos</li>
+    </ul>
+  </div>
+  <ol class="rdc-arbol" data-arbol>
+    {lista.map((m, mi) => (
+      <li class="rdc-arbol-mundo" data-mundo={m.slug} data-vacio={m.lecciones.length ? undefined : 'true'}>
+        <span class="rdc-arbol-raiz" aria-hidden="true">{m.numero ?? '·'}</span>
+        <div class="rdc-arbol-cuerpo">
+          <h2 class="rdc-arbol-titulo">
+            {m.href ? <a href={m.href}>{m.titulo}</a> : <span>{m.titulo}</span>}
+            <span class="rdc-arbol-cuenta">{m.lecciones.length ? <><span data-cuenta-mundo>0</span>/{m.lecciones.length}</> : 'próximamente'}</span>
+          </h2>
+          {m.lecciones.length > 0 && (
+            <ol class="rdc-arbol-lecciones" aria-label={`Lecciones del mundo ${m.numero}`}>
+              {m.lecciones.map((l, li) => (
+                <li>
+                  <a class="rdc-nodo" href={l.href} data-leccion={l.id} data-requiere={JSON.stringify(l.requiere.length ? l.requiere : li > 0 ? [m.lecciones[li - 1].id] : [])} data-fila={mi} data-col={li}
+                     aria-label={`${m.numero}.${li + 1} ${l.titulo}`} title={l.titulo + (l.requiere.length ? ` · requiere: ${l.requiere.map((r) => todas.get(r)?.titulo).join(', ')}` : '')}>
+                    <span class="rdc-nodo-num" aria-hidden="true">{li + 1}</span>
+                    <span class="rdc-nodo-titulo">{l.titulo}</span>
+                    <span class="rdc-sr" data-estado-txt></span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </li>
+    ))}
+  </ol>
+</Practica>
+
+<script>
+  import { leer, EVENTO } from '../runtime/progreso';
+  const nodos = [...document.querySelectorAll<HTMLAnchorElement>('[data-leccion]')];
+  function pintar() {
+    const p = leer();
+    let hechas = 0;
+    let sugerida: HTMLAnchorElement | null = null;
+    for (const a of nodos) {
+      const id = a.dataset.leccion!;
+      const req: string[] = JSON.parse(a.dataset.requiere || '[]');
+      const hecha = !!p.lecciones[id];
+      const lista = req.every((r) => p.lecciones[r]);
+      const estado = hecha ? 'hecha' : lista ? 'disponible' : 'pendiente';
+      a.dataset.estado = estado;
+      a.querySelector('[data-estado-txt]')!.textContent = hecha ? ' — completada' : lista ? ' — lista para hacer' : ' — mejor después de sus requisitos';
+      if (hecha) hechas++;
+      else if (!sugerida && lista) sugerida = a;
+    }
+    for (const m of document.querySelectorAll<HTMLElement>('[data-mundo]')) {
+      const ls = [...m.querySelectorAll<HTMLElement>('[data-leccion]')];
+      const n = ls.filter((x) => x.dataset.estado === 'hecha').length;
+      const c = m.querySelector('[data-cuenta-mundo]');
+      if (c) c.textContent = String(n);
+      m.dataset.estado = !ls.length ? 'vacio' : n === ls.length ? 'completo' : n > 0 ? 'empezado' : 'nuevo';
+    }
+    document.querySelector('[data-hechas]')!.textContent = String(hechas);
+    const s = document.querySelector<HTMLAnchorElement>('[data-siguiente]')!;
+    for (const a of nodos) a.removeAttribute('data-sugerida');
+    if (sugerida) { s.href = sugerida.href; s.textContent = sugerida.getAttribute('title')!.split(' · ')[0]; sugerida.dataset.sugerida = 'true'; }
+    else s.textContent = nodos.length ? 'todo hecho' : 'aún no hay lecciones';
+  }
+  pintar();
+  window.addEventListener(EVENTO, pintar);
+  // Teclado: flechas para moverse entre lecciones (← → dentro del mundo, ↑ ↓ entre mundos)
+  document.querySelector('[data-arbol]')!.addEventListener('keydown', (e) => {
+    const ev = e as KeyboardEvent;
+    const a = (ev.target as HTMLElement).closest<HTMLAnchorElement>('[data-leccion]');
+    if (!a || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(ev.key)) return;
+    ev.preventDefault();
+    const f = Number(a.dataset.fila), c = Number(a.dataset.col);
+    const filas = [...new Set(nodos.map((n) => Number(n.dataset.fila)))].sort((x, y) => x - y);
+    const en = (fila: number) => nodos.filter((n) => Number(n.dataset.fila) === fila);
+    let destino: HTMLAnchorElement | undefined;
+    if (ev.key === 'ArrowLeft') destino = en(f)[c - 1];
+    if (ev.key === 'ArrowRight') destino = en(f)[c + 1];
+    if (ev.key === 'Home') destino = nodos[0];
+    if (ev.key === 'End') destino = nodos[nodos.length - 1];
+    if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
+      const k = filas.indexOf(f) + (ev.key === 'ArrowUp' ? -1 : 1);
+      const fila = en(filas[k] ?? -1);
+      destino = fila[Math.min(c, fila.length - 1)];
+    }
+    destino?.focus();
+  });
+</script>

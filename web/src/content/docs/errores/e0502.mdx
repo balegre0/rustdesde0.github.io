@@ -1,0 +1,80 @@
+---
+title: "E0502: préstamo exclusivo mientras hay uno compartido"
+description: "Intentas modificar (o pedir &mut de) un valor mientras sigue vivo un préstamo compartido (&) de él."
+sidebar:
+  order: 40
+insignias: ["Préstamos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot borrow `lista` as mutable because it is also borrowed as immutable ``
+
+## Qué significa
+
+Mientras exista un **préstamo compartido** (`&T`), el valor queda «congelado»: se puede leer, pero no modificar. `lista.push(4)` necesita `&mut lista`, y `primero` (que es `&lista[0]`) todavía se usa después.
+
+## Qué error evita
+
+`push` puede quedarse sin sitio y mover todos los elementos a un bloque de memoria nuevo, liberando el viejo. `primero` seguiría apuntando al bloque viejo: un **uso tras liberar**. La regla «o varios lectores, o un solo escritor» lo hace imposible.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0502" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0502]: cannot borrow `lista` as mutable because it is also borrowed as immutable
+ --> E0502.rs:4:5
+  |
+3 |     let primero = &lista[0];
+  |                    ----- immutable borrow occurs here
+4 |     lista.push(4);
+  |     ^^^^^^^^^^^^^ mutable borrow occurs here
+5 |     println!("{primero}");
+  |                ------- immutable borrow later used here
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Guardar una referencia a un elemento (`&v[0]`, `v.first()`, `v.iter()`) y luego llamar a `push`, `insert`, `clear`…
+- Modificar una colección mientras la recorres con `for x in &v`.
+- Llamar a un método `&mut self` pasando como argumento algo prestado del mismo valor.
+
+## Cómo arreglarlo
+
+Termina de usar el préstamo compartido antes de modificar, o copia/clona el dato que necesitas (`let primero = lista[0];` copia un `i32`). Para modificar mientras recorres, usa índices, `retain`, o recoge primero los cambios y aplícalos después.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let mut lista = vec![1, 2, 3];
+    let primero = lista[0]; // copiamos el i32 en vez de tomarlo prestado
+    lista.push(4);
+    println!("{primero} {lista:?}");
+}
+```
+
+**Salida:**
+
+```text
+1 [1, 2, 3, 4]
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0502` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0499](/errores/e0499/): dos préstamos exclusivos a la vez
+- [E0506](/errores/e0506/): asignar a un valor prestado
+- [E0505](/errores/e0505/): mover un valor que está prestado
+
+## Aprende esto en
+
+- [Mundo 07 · Préstamos](/curso/07-prestamos/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

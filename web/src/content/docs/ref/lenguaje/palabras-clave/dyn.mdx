@@ -1,0 +1,63 @@
+---
+title: "dyn"
+description: "Palabra clave estricta (desde la edición 2018): tipo de objeto trait, con despacho dinámico."
+sidebar:
+  order: 9
+desde: "1.27"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`dyn Trait` es el tipo «**algún** valor que implementa `Trait`, decidido al ejecutar». Permite guardar valores de tipos distintos en una misma colección.
+
+## Sinopsis
+
+```text
+dyn Trait                      // objeto trait (tipo sin tamaño conocido)
+dyn Trait + Send + 'a          // con auto traits extra y un límite de tiempo de vida
+&dyn Trait   &mut dyn Trait   Box<dyn Trait>   Rc<dyn Trait>   // siempre detrás de un puntero
+```
+
+## Qué hace
+
+`dyn Trait` es un tipo de **tamaño dinámico** (*DST*): el compilador no sabe cuántos bytes ocupa, así que siempre se usa detrás de un puntero. Ese puntero es **ancho** (*wide pointer*): guarda dos direcciones:
+
+1. dónde están los datos;
+2. dónde está la **vtable**, una tabla generada por el compilador con el tamaño, la alineación, la función que destruye el valor y un puntero por cada método.
+
+Llamar a un método a través de `dyn` es **despacho dinámico**: se busca la función en la vtable al ejecutar. La alternativa (genéricos o `impl Trait`) es el despacho estático: una copia del código por tipo, sin búsqueda.
+
+No todos los traits sirven. Un trait es **compatible con dyn** (*dyn compatible*) si, entre otras cosas, sus métodos no devuelven `Self` ni tienen parámetros de tipo genéricos (salvo los marcados `where Self: Sized`).
+
+Desde Rust 1.86 existe la **conversión hacia arriba** (*upcasting*): un `&dyn Sub` se convierte en `&dyn Super` si `Super` es supertrait de `Sub`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-dyn" />
+
+Salida:
+
+```text
+4
+3
+2 punteros
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-dyn-error" />
+
+`error[E0038]: the trait Duplicar is not dyn compatible`, con la nota de que `duplicar` usa `Self` en su tipo de retorno.
+
+## Desde
+
+Rust 1.27. En la edición 2015 los objetos trait se escribían sin `dyn` (`Box<Trait>`) y `dyn` era una palabra clave débil; desde la edición 2018 es estricta y, en 2021, omitirla es un error.
+
+## Ver también
+
+- [`trait`](/ref/lenguaje/palabras-clave/trait/) · [`impl`](/ref/lenguaje/palabras-clave/impl/) · [Layout de tipos](/ref/lenguaje/layout-de-tipos/): punteros anchos y vtables. · [Coerciones](/ref/lenguaje/coerciones/): de `&T` a `&dyn Trait`.
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

@@ -1,0 +1,125 @@
+---
+title: "Fn, FnMut y FnOnce"
+description: "Aprende los tres traits de llamada, cómo elige el compilador cuál implementa tu closure y qué pide cada función que recibe uno."
+sidebar:
+  order: 3
+duracion: 13
+desde: "1.0"
+requiere: ["14-closures-e-iteradores/02-captura", "13-traits-y-genericos"]
+tarjetas:
+  - p: "¿Qué closures implementan `FnOnce`?"
+    r: "Todos: cualquier closure se puede llamar al menos una vez. Los que mueven algo fuera de su entorno SOLO implementan `FnOnce`."
+  - p: "¿Qué recibe cada trait al llamar: `Fn`, `FnMut`, `FnOnce`?"
+    r: "`Fn::call(&self)`, `FnMut::call_mut(&mut self)`, `FnOnce::call_once(self)`: préstamo compartido, exclusivo o el closure entero."
+  - p: "Si una función pide `F: FnOnce()`, ¿qué closures acepta? ¿Y si pide `F: Fn()`?"
+    r: "`FnOnce` acepta cualquiera. `Fn` solo acepta los que no modifican ni consumen lo capturado. Pedir menos acepta más."
+  - p: "¿Qué error sale si pasas un closure que modifica una variable a una función que pide `Fn`?"
+    r: "E0594: «cannot assign to … as it is a captured variable in a `Fn` closure». El compilador sugiere cambiar el bound a `FnMut`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Vas a entender los tres traits que hacen «llamable» a un closure, **`Fn`**, **`FnMut`** y **`FnOnce`**, y a leer los errores que salen cuando una función pide uno y le das otro.
+
+## Predice
+
+<Predice
+  ej="m14/jerarquia"
+  opciones={["`20` / `1` / `3`", "No compila: `ejecutar_una` solo acepta closures `FnOnce`, y `solo_lee` es `Fn`", "No compila: `modifica` necesita `mut`", "`20` / `0` / `3`"]}
+  correcta={0}
+  explicacion="Pedir `FnOnce` es pedir lo mínimo («que se pueda llamar una vez»), y **todo** closure lo cumple. Además, `modifica` se mueve dentro de la función, que lo llama como dueña: no hace falta `let mut`."
+  porque={["Correcto.", "Todo `Fn` es también `FnMut` y `FnOnce`.", "La variable `modifica` no se llama en `main`: se mueve a `ejecutar_una`.", "`modifica` incrementa `n` (de 0 a 1) y devuelve el nuevo valor."]}
+/>
+
+## La idea
+
+Cuando llamas a un closure, ¿qué necesita de sí mismo para ejecutarse? Hay tres respuestas, y cada una es un trait:
+
+| Trait | El cuerpo… | Para llamarlo hace falta | Se puede llamar |
+|---|---|---|---|
+| `Fn` | solo lee lo capturado | `&self` (préstamo compartido) | muchas veces, incluso a la vez |
+| `FnMut` | modifica lo capturado | `&mut self` (préstamo exclusivo) | muchas veces, de una en una |
+| `FnOnce` | consume lo capturado | `self` (el closure entero) | una vez |
+
+**No eliges tú**: el compilador mira el cuerpo y le implementa al closure todos los traits que puede. Un closure que solo lee es `Fn`, y por eso también `FnMut` y `FnOnce`. Uno que modifica es `FnMut` y `FnOnce`. Uno que mueve algo hacia fuera (como `move || regalo`, que devuelve la `String`) solo es `FnOnce`: tras la primera llamada, el regalo ya no está.
+
+Quien **recibe** un closure elige qué pide. Y la regla de oro es al revés de lo que parece: **pedir menos acepta más**. Una función con `F: FnOnce` acepta cualquier closure; una con `F: Fn` solo los más «tranquilos». Si vas a llamar al closure una sola vez, pide `FnOnce`; si lo llamas en un bucle, `FnMut`; si lo necesitas desde varios sitios a la vez, `Fn`.
+
+## Pruébalo
+
+<Ejecutar ej="m14/tres-traits" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Los tres traits están en la biblioteca estándar y forman una escalera de **supertraits**: `trait FnMut: FnOnce` y `trait Fn: FnMut`. Simplificando (la firma real usa una tupla de argumentos y es inestable implementarlos a mano):
+
+```rust
+trait FnOnce<Args> {
+    type Output;
+    fn call_once(self, args: Args) -> Self::Output;      // se consume
+}
+trait FnMut<Args>: FnOnce<Args> {
+    fn call_mut(&mut self, args: Args) -> Self::Output;  // préstamo exclusivo
+}
+trait Fn<Args>: FnMut<Args> {
+    fn call(&self, args: Args) -> Self::Output;          // préstamo compartido
+}
+```
+
+`f()` es azúcar para una de esas tres llamadas. Por eso un `FnMut` necesita `let mut f`: `call_mut` pide `&mut self`, y no se puede tomar un préstamo exclusivo de una variable que no es `mut` (E0596, como con cualquier método `&mut self`). Y por eso un `FnOnce` no se puede llamar dos veces: `call_once(self)` **mueve** el closure, y usarlo después es un uso tras mover (E0382).
+
+Las funciones `fn` normales y los closures sin capturas implementan los tres traits, y además se convierten en **punteros a función** `fn(i32) -> i32` (8 bytes en un PC de 64 bits: solo la dirección del código).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m14/fn-no-muta"
+  explicacion="`llama` pide `Fn`, que solo da `&self` al closure: con un préstamo compartido no se puede modificar `pasos` (E0594). Fíjate en la sugerencia del compilador: «change this to accept `FnMut` instead of `Fn`». El arreglo hace exactamente eso, y pone `mut f`."
+/>
+
+<Trampa titulo="Un FnOnce no se puede llamar dos veces">
+
+<NoCompila
+  ej="m14/fnonce-dos-veces"
+  explicacion="El closure devuelve `regalo`, es decir, lo mueve hacia fuera. La primera llamada se lleva la `String`; si hubiera una segunda, ¿qué devolvería? Rust lo impide moviendo el propio closure al llamarlo (E0382). Si necesitas llamarlo varias veces, devuelve `regalo.clone()`: entonces solo lo lee y es `Fn`."
+/>
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["fn tres_veces<F: FnMut()>(mut f: F) {", "    f();", "    f();", "    f();", "}"]}
+  distractores={["fn tres_veces<F: FnOnce()>(f: F) {", "fn tres_veces<F: FnMut()>(f: F) {"]}
+  explicacion="Para llamar un closure varias veces hace falta al menos `FnMut` (con `FnOnce`, la primera llamada lo consumiría). Y como `call_mut` pide `&mut self`, el parámetro tiene que ser `mut f`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="El closure `move || regalo` (con `regalo: String`) devuelve la `String`. ¿Qué traits implementa?"
+  opciones={["Solo `FnOnce`", "`Fn`, `FnMut` y `FnOnce`", "Solo `Fn`, porque no modifica nada", "`FnMut` y `FnOnce`"]}
+  correcta={0}
+  explicacion="Devolver `regalo` lo mueve fuera del closure: solo puede pasar una vez."
+  porque={["Correcto.", "No puede ser `Fn`: después de la primera llamada ya no tendría el regalo.", "Mover hacia fuera es más que modificar: es consumir.", "`FnMut` permitiría llamarlo dos veces, y la segunda no tendría qué devolver."]}
+/>
+
+<Pregunta
+  pregunta="Escribes una función que llama a su closure **una sola vez**. ¿Qué bound es el más útil para quien la use?"
+  opciones={["`F: FnOnce()`", "`F: Fn()`", "`F: FnMut()`", "Da igual: los tres aceptan los mismos closures"]}
+  correcta={0}
+  explicacion="`FnOnce` es el requisito más débil, así que acepta el conjunto más grande de closures."
+  porque={["Correcto.", "`Fn` rechazaría closures que modifican o consumen, sin necesidad.", "`FnMut` rechazaría closures que consumen lo capturado.", "No: `Fn` ⊂ `FnMut` ⊂ `FnOnce` en cuanto a closures aceptados."]}
+/>
+
+<Pregunta
+  pregunta="¿Quién decide si un closure es `Fn`, `FnMut` o `FnOnce`?"
+  opciones={["El compilador, según lo que hace el cuerpo con lo capturado", "Tú, escribiendo `Fn` delante del closure", "La palabra `move`: con `move` siempre es `FnOnce`", "Quien lo recibe: el bound lo convierte"]}
+  correcta={0}
+  explicacion="`move` decide **cómo se captura**, no qué trait se implementa. Un `move || x + 1` solo lee su copia de `x`, así que es `Fn`."
+  porque={["Correcto.", "No existe esa sintaxis en Rust estable.", "Confusión muy común: `move` cambia la captura, no el uso.", "El bound solo **comprueba**; si el closure no cumple, es un error."]}
+/>

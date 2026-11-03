@@ -1,0 +1,57 @@
+---
+title: "Deref y DerefMut"
+description: "El operador * y la coerción automática: por qué &String sirve donde se pide &str."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::ops::Deref, std::ops::DerefMut`
+
+## Sinopsis
+
+```rust
+pub trait Deref {
+    type Target: ?Sized;
+
+    // Required method
+    fn deref(&self) -> &Self::Target;
+}
+
+pub trait DerefMut: Deref {
+    // Required method
+    fn deref_mut(&mut self) -> &mut Self::Target;
+}
+```
+
+## Qué hace
+
+`Deref` dice a qué apunta un tipo «puntero»: `*x` llama a `deref`. Además, el compilador aplica la **coerción por `Deref`**: si una función pide `&str` y le pasas `&String`, convierte `&String` → `&str` sola (`String: Deref<Target = str>`). Igual con `Box<T>` → `&T` y `Vec<T>` → `&[T]`. Y al llamar a un método, busca también en el `Target`. Impleméntalo solo en tipos que se comportan como punteros o envoltorios.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/ops-deref" />
+
+**Salida:**
+
+```text
+3 ANA
+hola, Ana
+Ana Gil
+6
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [Box](/ref/std/boxed/box/)
+- [AsRef](/ref/std/convert/asref/)
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

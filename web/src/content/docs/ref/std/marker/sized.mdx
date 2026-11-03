@@ -1,0 +1,47 @@
+---
+title: "Sized"
+description: "Tipos cuyo tamaño se conoce al compilar; ?Sized permite aceptar también str, [T] y dyn Trait."
+sidebar:
+  order: 3
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::marker::Sized` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub trait Sized { }
+```
+
+## Qué hace
+
+Casi todos los tipos son `Sized`. Los que no lo son (**tipos de tamaño dinámico**, DST) son `str`, `[T]` y `dyn Trait`: solo se pueden usar detrás de un puntero (`&str`, `Box<[T]>`, `&dyn Trait`), que entonces guarda también la longitud o el puntero a la vtable. Todo parámetro genérico lleva un `T: Sized` implícito; escribe `T: ?Sized` para aceptar también los DST.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/marker-sized" />
+
+**Salida:**
+
+```text
+[42] ocupa 4 bytes
+[hola] ocupa 4 bytes
+[ñu] ocupa 3 bytes
+3
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [E0746](/errores/e0746/)
+- [mem::size_of](/ref/std/mem/size_of/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

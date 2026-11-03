@@ -1,0 +1,89 @@
+---
+title: "E0373: la closure puede vivir más que lo que toma prestado"
+description: "Una closure que se devuelve (o se manda a otro hilo) toma prestada una variable local que morirá antes."
+sidebar:
+  order: 27
+insignias: ["Tiempos de vida"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` closure may outlive the current function, but it borrows `base`, which is owned by the current function ``
+
+## Qué significa
+
+Por defecto, una closure captura las variables **por préstamo** si le basta. Aquí la closure se devuelve fuera de `contador`, pero `base` es local y muere al terminar la función: la closure llevaría dentro una referencia colgante.
+
+## Qué error evita
+
+Llamar a la closure después leería `base` desde una zona de la pila que ya se ha reutilizado: **uso tras liberar**. Es el mismo error que aparece con `thread::spawn`, porque el hilo puede durar más que la función que lo crea.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0373" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0373]: closure may outlive the current function, but it borrows `base`, which is owned by the current function
+ --> E0373.rs:3:5
+  |
+3 |     || base + 1
+  |     ^^ ---- `base` is borrowed here
+  |     |
+  |     may outlive borrowed value `base`
+  |
+note: closure is returned here
+ --> E0373.rs:3:5
+  |
+3 |     || base + 1
+  |     ^^^^^^^^^^^
+help: to force the closure to take ownership of `base` (and any other referenced variables), use the `move` keyword
+  |
+3 |     move || base + 1
+  |     ++++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Devolver una closure (`impl Fn`, `Box<dyn Fn>`) que usa variables locales.
+- Pasar a `thread::spawn` una closure que usa variables locales sin `move`.
+
+## Cómo arreglarlo
+
+Pon `move` delante de la closure: así **se lleva** las variables (las mueve o las copia dentro de ella) y ya no depende de la función. Si después necesitas la variable fuera, clónala antes del `move`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn contador() -> impl Fn() -> u32 {
+    let base = 10;
+    move || base + 1 // la closure se lleva su propia copia de `base`
+}
+
+fn main() {
+    let f = contador();
+    println!("{}", f());
+}
+```
+
+**Salida:**
+
+```text
+11
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0373` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0597](/errores/e0597/): un valor no vive lo suficiente
+- [E0521](/errores/e0521/): un dato prestado escapa de la función
+
+## Aprende esto en
+
+- [Mundo 14 · Closures e iteradores](/curso/14-closures-e-iteradores/)
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

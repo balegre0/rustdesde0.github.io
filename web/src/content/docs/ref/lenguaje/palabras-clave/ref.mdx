@@ -1,0 +1,63 @@
+---
+title: "ref"
+description: "Palabra clave estricta: en un patrón, enlaza por referencia en lugar de mover o copiar."
+sidebar:
+  order: 26
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`ref` se usa **dentro de un patrón** para que la variable sea una referencia al valor, en lugar de moverlo o copiarlo.
+
+## Sinopsis
+
+```text
+ref nombre          // nombre: &T
+ref mut nombre      // nombre: &mut T
+ref nombre @ subpatrón
+```
+
+## Qué hace
+
+- `let ref x = v;` equivale a `let x = &v;`. La diferencia importa **dentro** de patrones más grandes: `let (ref k, n) = par;` presta el primer campo y copia (o mueve) el segundo, sin mover el par entero.
+- `ref mut` da un préstamo exclusivo para modificar el valor en su sitio.
+- `&` en un patrón hace lo contrario: **quita** una referencia (`let &x = &5;` da `x: i32`).
+
+### `ref` y la ergonomía de `match`
+
+Desde Rust 1.26, si haces `match` sobre una **referencia** con un patrón que no empieza por `&`, el compilador cambia el modo de enlace por defecto a «por referencia»: las variables salen como `&T` solas. Por eso hoy `ref` casi no se escribe: `match &o { Some(s) => … }` ya da `s: &String`.
+
+En la edición 2024, escribir `ref` (o `mut`, o `&`) explícito **cuando el modo por defecto ya no es «mover»** es un error: era redundante o confuso.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-ref" />
+
+Salida:
+
+```text
+clave 7
+clave sigue entero
+Some("hola mundo")
+longitud 10
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-ref-error" />
+
+En la edición 2024: `error: cannot explicitly borrow within an implicitly-borrowing pattern`. La ayuda propone quitar el `ref`.
+
+## Desde
+
+Rust 1.0. Ergonomía de `match` (modos de enlace por defecto): 1.26. Restricción de `ref` explícito: edición 2024.
+
+## Ver también
+
+- [Patrones](/ref/lenguaje/patrones/) · [`match`](/ref/lenguaje/palabras-clave/match/) · [`mut`](/ref/lenguaje/palabras-clave/mut/) · [Ediciones](/ref/ediciones/)
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

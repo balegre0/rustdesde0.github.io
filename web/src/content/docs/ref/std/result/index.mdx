@@ -1,0 +1,37 @@
+---
+title: "std::result"
+description: "Result<T, E>: el resultado de una operación que puede fallar, con Ok(valor) o Err(error)."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+**Ruta:** `std::result`
+
+## Para qué sirve
+
+Las operaciones que pueden fallar de forma **esperable** (leer un archivo, convertir texto en número, conectarse a algo) devuelven `Result<T, E>`: `Ok(valor)` si todo fue bien, o `Err(error)` con la explicación. Igual que con `Option`, el compilador no te deja usar el valor sin mirar antes si hubo error. Los fallos que indican un **error del programa** (un índice imposible) se tratan con pánico, no con `Result`.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Result`](/ref/std/result/result/) | El enum `Ok(T)` / `Err(E)` y sus métodos. | 1.0 |
+| `Iter, IterMut, IntoIter` | Iteradores sobre el valor de `Ok`. | 1.0 |
+
+**Catálogo completo:** [Result: todos los métodos](/ref/std/result/catalogo/)
+
+## Conceptos clave
+
+- **El operador `?`**: dentro de una función que devuelve `Result`, `valor?` saca el `Ok` o **devuelve el `Err` al que llama** (convirtiéndolo con `From` si hace falta). Es la forma normal de propagar errores.
+- **`#[must_use]`**: si ignoras un `Result`, el compilador te avisa con un *warning*.
+- **Recoger**: un iterador de `Result<T, E>` se puede recoger en `Result<Vec<T>, E>`; se detiene en el primer error.
+
+## Ver también
+
+- [std::error](/ref/std/error/)
+- [std::option](/ref/std/option/)
+- [E0277 (el `?` fuera de sitio)](/errores/e0277/)
+
+## Aprende esto en
+
+- [Mundo 10 · Errores](/curso/10-errores/)

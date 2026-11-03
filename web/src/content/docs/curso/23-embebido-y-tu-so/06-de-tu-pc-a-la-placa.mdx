@@ -1,0 +1,69 @@
+---
+title: "De tu PC a la placa"
+description: "Compilar para un microcontrolador, grabarlo y depurarlo desde Windows: targets bare-metal, rust-lld, probe-rs, defmt, y simuladores como Wokwi y QEMU."
+sidebar:
+  order: 6
+duracion: 11
+requiere: ["23-embebido-y-tu-so/05-embassy"]
+tarjetas:
+  - p: "¿Qué target usa la micro:bit v2?"
+    r: "`thumbv7em-none-eabihf` (ARM Cortex-M4 con unidad de coma flotante)."
+  - p: "¿Para qué sirve probe-rs?"
+    r: "Para grabar el programa en la placa y depurarlo a través de una sonda (la micro:bit trae una integrada). `cargo run` puede llamarlo directamente."
+  - p: "¿Qué es defmt?"
+    r: "Un sistema de registro (*logging*) para embebido muy ligero: el texto de los mensajes se queda en tu PC y la placa solo envía índices y valores."
+---
+
+import { Pregunta } from '~/components';
+
+Hasta aquí todo se podía simular. Esta lección es el puente con el hardware real, y funciona perfectamente desde Windows, **incluso sin las Build Tools de Visual Studio**.
+
+## Paso a paso (micro:bit v2)
+
+1. **Instala el target** del procesador de la placa:
+
+   ```powershell
+   rustup target add thumbv7em-none-eabihf
+   ```
+
+2. **Instala probe-rs**, que graba y depura (la página oficial, probe.rs, tiene el instalador para Windows).
+
+3. **Configura el proyecto** en `.cargo/config.toml`:
+
+   ```toml
+   [build]
+   target = "thumbv7em-none-eabihf"
+
+   [target.thumbv7em-none-eabihf]
+   runner = "probe-rs run --chip nRF52833_xxAA"
+   ```
+
+4. Un `memory.x` con el mapa de memoria del chip (flash y RAM) y las dependencias de tu HAL o de Embassy, siguiendo la plantilla del libro *Discovery* o de los ejemplos de Embassy.
+
+5. Conecta la placa por USB y:
+
+   ```powershell
+   cargo run --release
+   ```
+
+   Cargo compila, `rust-lld` enlaza, probe-rs graba el programa y muestra lo que la placa envíe.
+
+## Ver lo que pasa dentro
+
+- **defmt**: `defmt::info!("temperatura: {}", t)`. El texto no viaja a la placa: se queda en el ejecutable de tu PC y la placa envía solo un índice y los valores. Ocupa muy poco y es rapidísimo. probe-rs lo muestra en tu terminal.
+- **Depurador**: probe-rs funciona con el depurador de VS Code (extensión *probe-rs-debugger*): puntos de ruptura, variables y registros en la placa real.
+
+## Sin placa
+
+- **Wokwi** simula placas (Raspberry Pi Pico, ESP32 y otras) en el navegador o en VS Code, con LEDs, botones y pantallas.
+- **QEMU** emula microcontroladores ARM Cortex-M y un PC completo (lo usarás en la parte 2).
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué compilar para la micro:bit funciona en Windows aunque falten las Build Tools de Visual Studio?"
+  opciones={["Porque la micro:bit lleva Windows", "Porque los targets sin sistema operativo se enlazan con rust-lld, incluido en Rust", "Porque no hace falta enlazar", "No funciona"]}
+  correcta={1}
+  explicacion="`link.exe` solo hace falta para generar ejecutables de Windows. Para un microcontrolador, el enlazador es `rust-lld`, que viene con Rust."
+  porque={["No lleva ningún sistema operativo.", "", "Sí hay que enlazar: el resultado es un ejecutable ELF para el chip.", "Funciona sin problema."]}
+/>

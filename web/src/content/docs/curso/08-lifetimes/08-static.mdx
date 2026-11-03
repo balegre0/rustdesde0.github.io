@@ -1,0 +1,99 @@
+---
+title: "'static: qué significa de verdad"
+description: "&'static T es una referencia válida durante todo el programa. T: 'static significa otra cosa: que T no tiene préstamos cortos dentro. Un String es 'static."
+sidebar:
+  order: 8
+duracion: 13
+desde: "1.0"
+requiere: ["08-lifetimes/07-lifetimes-en-impl"]
+tarjetas:
+  - p: "¿Qué lifetime tiene un literal como `\"hola\"`?"
+    r: "`'static`: su texto está grabado en el ejecutable y es válido durante todo el programa. Su tipo es `&'static str`."
+  - p: "¿Qué significa la cota `T: 'static`?"
+    r: "Que `T` no contiene referencias que puedan caducar: o no tiene referencias, o solo tiene `&'static`. No significa que el valor viva para siempre."
+  - p: "¿Cumple un `String` la cota `T: 'static`?"
+    r: "Sí. Es dueño de su texto y no tiene préstamos cortos. Puede liberarse cuando quieras: `'static` habla de lo que el tipo tiene prestado, no de cuánto vive el valor."
+  - p: "¿Qué dice E0310?"
+    r: "Que un tipo genérico podría no vivir lo suficiente (*may not live long enough*): se necesita `T: 'static`, normalmente para guardarlo en un `Box<dyn Trait>`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+`'static` es la lifetime con nombre propio y la que más malentendidos provoca. Tiene **dos usos** que se parecen mucho por escrito y significan cosas distintas. Vas a separarlos.
+
+## Predice
+
+<Predice
+  ej="m08/p-static-string"
+  opciones={["`\"vivo poco\"`, `42` y `\"literal\"`", "No compila: un `String` no es `'static`", "No compila: `42` no es una referencia", "Solo imprime `\"literal\"`"]}
+  correcta={0}
+  explicacion={"`T: 'static` no exige que el valor viva todo el programa: exige que **no tenga préstamos cortos dentro**. Un `String` es dueño de su texto, `42` no tiene referencias y `\"literal\"` es un `&'static str`. Los tres cumplen."}
+  porque={["", "Es el malentendido clásico: un `String` sí es `'static`, porque no presta nada.", "`'static` se aplica a cualquier tipo, no solo a referencias.", "Los tres cumplen la cota."]}
+/>
+
+## La idea
+
+**Uso 1: `&'static T`, una referencia que vale todo el programa.** El caso típico son los literales de texto. Su contenido está grabado dentro del ejecutable, así que existe desde que el programa arranca hasta que termina:
+
+<Ejecutar ej="m08/p-static-literal" />
+
+**Uso 2: `T: 'static`, una cota sobre un tipo.** Se lee «`T` no tiene préstamos que puedan caducar». La cumplen:
+
+- los tipos **sin referencias**: `i32`, `String`, `Vec<u8>`, tus structs con campos propios;
+- los tipos con referencias **`'static`**: `&'static str`.
+
+**No** la cumplen los tipos que llevan un préstamo corto, como `&'a String` hacia una variable local:
+
+<NoCompila ej="m08/p-static-ref-local" explicacion="`guardar` exige `T: 'static`. `&s` es una referencia a una variable local, que muere al final de `main`: no es `'static`. En cambio, `guardar(s)` (moviendo el `String`) sí compilaría." />
+
+La diferencia clave: un `String` **cumple** `'static` y puede liberarse en la línea siguiente. `'static` en una cota no dice nada de **cuánto vive** el valor: dice que **si alguien lo guarda**, nada de dentro va a caducar.
+
+## Pruébalo
+
+¿Dónde aparece `T: 'static` en la práctica? Siempre que algo se guarda **sin saber cuánto tiempo**: un hilo nuevo (mundo 17), una tarea asíncrona (mundo 18) o una caja con un trait dentro:
+
+<NoCompila ej="m08/p-box-dyn" explicacion="`Box<dyn Display>` sin lifetime significa `Box<dyn Display + 'static>`: la caja puede vivir cuanto quiera, así que lo de dentro no puede llevar préstamos cortos. `T` podría ser una referencia a algo local. El arreglo añade la cota `T: Display + 'static`." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Dónde viven los `'static`.** El texto de un literal va a una sección de solo lectura del ejecutable (`.rodata` en Linux, `.rdata` en Windows). Una `static` (una variable global) vive en `.data` o `.bss`. Las dos existen desde que el sistema operativo carga el programa hasta que termina.
+
+**Fabricar un `&'static` en tiempo de ejecución.** `Box::leak(Box::new(valor))` devuelve un `&'static mut T`: reserva el valor en el heap y **renuncia a liberarlo nunca**. Es una fuga de memoria a propósito. Sirve para datos de configuración que se crean una vez al arrancar. No es la solución a un error de lifetimes.
+
+**La lifetime por defecto de `dyn Trait`.** `Box<dyn Trait>` es `Box<dyn Trait + 'static>`; `&'a dyn Trait` es `&'a (dyn Trait + 'a)`. Son las reglas de elisión de los *trait objects* (mundo 13). Si quieres meter algo con préstamos en una caja, escribe la lifetime: `Box<dyn Display + 'a>`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Arreglar errores de lifetime con 'static">
+
+El compilador a veces sugiere `'static`. Casi nunca es lo que quieres:
+
+❌ `fn primera(s: &'static str) -> &'static str`: ahora solo se puede llamar con literales. Nadie podrá pasarle un `String` que haya leído de un archivo.
+
+❌ `Box::leak` para «sacar» una referencia de una función: fuga de memoria.
+
+✅ Si algo tiene que vivir mucho o guardarse en sitios lejanos, haz que sea **dueño** de sus datos (`String`, `Vec`). Si tiene que prestar, usa una lifetime genérica `'a`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estos tipos NO cumple `T: 'static`?"
+  opciones={["`String`", "`Vec<i32>`", "`&'static str`", "`&'a str`, donde `'a` es la vida de una variable local"]}
+  correcta={3}
+  explicacion="Es el único que lleva un préstamo que puede caducar. Los demás o no tienen referencias o solo tienen `&'static`."
+  porque={["Dueño de su texto: cumple.", "Dueño de sus elementos: cumple.", "Válido todo el programa: cumple.", ""]}
+/>
+
+<Pregunta
+  pregunta={"`fn guardar<T: 'static>(t: T)`. Llamas `guardar(String::from(\"x\"))`. ¿Vivirá ese `String` todo el programa?"}
+  opciones={["Sí: `'static` lo obliga", "No: se libera al terminar `guardar` (salvo que lo guarde en algún sitio)", "Sí, si no lo mueves", "No compila"]}
+  correcta={1}
+  explicacion="`T: 'static` dice que el tipo no tiene préstamos que caduquen, no que el valor viva para siempre. El `String` se mueve a `guardar` y se libera en su `}`."
+  porque={["Una cota no cambia cuándo se libera nada.", "", "Ya se movió a `guardar`.", "Compila: `String` cumple `'static`."]}
+/>

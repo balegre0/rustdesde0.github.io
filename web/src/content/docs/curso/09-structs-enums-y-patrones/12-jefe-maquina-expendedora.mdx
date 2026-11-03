@@ -1,0 +1,94 @@
+---
+title: "Jefe: la máquina expendedora"
+description: "Junta structs, enums, métodos, Option, match, guardas y let else en un programa completo."
+sidebar:
+  order: 12
+duracion: 15
+desde: "1.65"
+requiere: ["09-structs-enums-y-patrones/11-disenar-con-tipos"]
+tarjetas:
+  - p: "En un `match` sobre `accion: Accion` por valor, ¿qué pasa con los datos de la variante?"
+    r: "Se mueven (o se copian, si son `Copy`) a las variables del patrón. Aquí `Moneda` es `Copy` y `usize` también, así que no hay problema."
+  - p: "¿Por qué `procesar` devuelve `Option<String>`?"
+    r: "Porque algunas acciones no tienen nada que decir (meter una moneda, devolver con saldo 0). `None` lo expresa sin inventar un texto vacío."
+  - p: "¿Qué hace `self.productos.get(n)` si `n` no existe?"
+    r: "Devuelve `None` en vez de dar un pánico como `self.productos[n]`. Con `let Some(p) = … else { return … }` se trata el caso y se sigue."
+---
+
+import { Pregunta, Reto, BajoElCapo, Ordena } from '~/components';
+
+Último combate del mundo: una máquina expendedora con monedas, productos y cambio. No hay nada nuevo: solo todo lo que ya sabes, junto.
+
+## Predice
+
+<Pregunta
+  pregunta="La máquina tiene agua a 80 céntimos. Metes 50 y 20 y pides agua. ¿Qué debería responder?"
+  opciones={["`faltan 10 céntimos`", "`toma tu agua`", "`faltan 70 céntimos`", "Nada"]}
+  correcta={0}
+  porque={["Correcto: 80 − 70 = 10.", "El saldo (70) no llega al precio (80).", "Tienes 70 de saldo; lo que falta es la diferencia.", "Pedir un producto siempre responde algo."]}
+/>
+
+## La idea
+
+El diseño, pieza a pieza:
+
+- `enum Moneda` con un método `centimos` (lecciones 3 y 5). Es `Copy`: se puede pasar por valor sin moverla.
+- `enum Accion { Meter(Moneda), Pedir(usize), Devolver }`: cada acción lleva justo lo que necesita.
+- `struct Maquina { saldo, productos }` con `new` (lección 4) y `procesar(&mut self, accion) -> Option<String>` (lección 6).
+- Dentro de `procesar`: un `match` exhaustivo (7), patrones con datos (8), `let else` para el producto que no existe (9).
+
+## Pruébalo
+
+El `main` del reto (más abajo) lanza estas acciones: pedir agua sin dinero, meter 50 y 20, pedir, meter 10, pedir, pedir el producto 7, meter 1 € y 20, devolver dos veces. La solución de referencia imprime exactamente esto:
+
+```text
+faltan 80 céntimos
+faltan 10 céntimos
+toma tu agua
+no existe el producto 7
+devuelvo 120 céntimos
+saldo final: 0
+```
+
+Antes de escribir código, recorre las acciones a mano y comprueba que entiendes cada línea (¿por qué el segundo `Devolver` no imprime nada?).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`Accion` ocupa 8 bytes en wasm32: el `usize` de `Pedir` (4) más una etiqueta, redondeado al alineamiento 4. `Moneda` cabe en 1 byte. `Maquina` guarda un `Vec<Producto>`: 12 bytes en la pila (puntero, capacidad, longitud) que apuntan a los productos en el heap (lo verás a fondo en el mundo 11).
+
+`procesar` recibe `&mut self` porque cambia el saldo; mientras se ejecuta, tiene el préstamo exclusivo de la máquina. Dentro, `let Some(p) = self.productos.get(n)` saca un préstamo compartido de un producto; después hacemos `self.saldo -= p.precio`. El borrow checker lo acepta porque `saldo` y `productos` son **campos distintos**: prestar uno no bloquea el otro.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Ordena
+  lineas={["let Some(p) = self.productos.get(n) else {", "    return Some(format!(\"no existe el producto {n}\"));", "};", "if self.saldo < p.precio {", "    return Some(format!(\"faltan {} céntimos\", p.precio - self.saldo));", "}", "self.saldo -= p.precio;", "Some(format!(\"toma tu {}\", p.nombre))"]}
+  distractores={["let p = self.productos[n];", "self.saldo -= p.precio; // antes de comprobar el saldo"]}
+  explicacion="Primero se comprueba que el producto existe (sin pánico: `get` + `let else`), luego que el saldo llega, y solo entonces se cobra. Restar antes de comprobar podría desbordar el `u32` (pánico en debug)."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m09/expendedora"
+  enunciado="Completa `procesar`. `Meter(m)` suma `m.centimos()` y devuelve `None`. `Pedir(n)`: si no existe → `no existe el producto n`; si no llega el saldo → `faltan X céntimos`; si llega, cobra y devuelve `toma tu NOMBRE`. `Devolver`: con saldo 0 → `None`; si no, `devuelvo X céntimos` y deja el saldo a 0."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `Pedir(n)` usa `self.productos.get(n)` y no `self.productos[n]`?"
+  opciones={["Porque `get` devuelve `None` si `n` no existe, mientras que `[n]` daría un pánico", "Porque `[n]` no compila con `Vec`", "Porque `get` es más rápido", "Da igual, los dos devuelven `Option`"]}
+  correcta={0}
+  porque={["Correcto: un número de producto inventado es una entrada normal, no un fallo del programa.", "`[n]` sí compila; el problema llega al ejecutar con un `n` fuera de rango.", "La velocidad no es el motivo.", "`[n]` devuelve el elemento directamente, o un pánico."]}
+/>
+
+<Pregunta
+  pregunta="Si añades `Accion::Cancelar` al enum sin tocar `procesar`, ¿qué ocurre?"
+  opciones={["No compila: el `match` deja de ser exhaustivo (E0004)", "Compila y `Cancelar` no hace nada", "Compila y `Cancelar` se trata como `Devolver`", "Da un pánico al pulsar Cancelar"]}
+  correcta={0}
+  porque={["Correcto: el compilador te lleva al sitio exacto que hay que completar.", "Sin un `_`, ningún brazo cubre la variante nueva.", "Rust nunca adivina qué brazo usar.", "No llega a ejecutarse."]}
+/>

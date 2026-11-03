@@ -1,0 +1,99 @@
+---
+title: "Jefe: una macro que escribe un tipo entero"
+description: "Combina fragmentos, repeticiones, recursión y stringify! en una macro que genera un enum con sus métodos."
+sidebar:
+  order: 11
+duracion: 15
+desde: "1.0"
+requiere: ["19-macros/10-expandir-y-cuando-no"]
+tarjetas:
+  - p: "¿Qué fragmento captura un atributo como derive(Debug) para reenviarlo con #[$m]?"
+    r: "meta, dentro de una repetición: $(#[$m:meta])*."
+  - p: "¿Qué fragmento captura una visibilidad que puede estar vacía?"
+    r: "vis: acepta pub, pub(crate)… o nada."
+  - p: "¿Cómo obtienes el nombre de una variante como &'static str dentro de una macro?"
+    r: "Con stringify!($variante), que se convierte en un literal al compilar."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+El jefe de este mundo es una macro de las que se escriben en proyectos reales: a partir de una lista de nombres genera un `enum`, su número de variantes, un array con todas ellas y un método que devuelve el nombre de cada una. Usa casi todo lo que has aprendido.
+
+## Predice
+
+<Predice
+  ej="m19/jefe-estados"
+  opciones={["hay 3 estados / Verde -> Verde / Ambar -> Ambar / Rojo -> Rojo / true", "hay 0 estados / true", "No compila: una macro no puede generar un enum y su impl a la vez", "hay 3 estados / Verde -> 0 / Ambar -> 1 / Rojo -> 2 / true"]}
+  correcta={0}
+  explicacion="`contar!` da 3 en compilación, `TODOS` contiene las tres variantes en orden, `nombre()` devuelve `stringify!` de cada variante y la comparación usa el `PartialEq` que pedimos con derive."
+  porque={["Correcto.", "contar! recibe las tres variantes.", "Una plantilla puede contener varios items seguidos.", "`nombre()` devuelve el texto de la variante, no su posición."]}
+/>
+
+## La idea
+
+Repasemos qué pieza de la macro usa cada lección:
+
+| Pieza | Para qué | Lección |
+|---|---|---|
+| `$(#[$meta:meta])*` | reenviar atributos como `#[derive(...)]` | 3 y 4 |
+| `$vis:vis` | respetar `pub`, `pub(crate)` o nada | 3 |
+| `$($var:ident),+ $(,)?` | la lista de variantes, con coma final opcional | 4 |
+| `contar!($($var)*)` | el número de variantes, como constante | 6 |
+| `stringify!($var)` | el nombre como texto | 1 y 8 |
+| `$nombre::$var` | rutas construidas con identificadores capturados | 3 |
+
+El `match` de `nombre()` se genera con una repetición: un brazo por variante. Si mañana añades `Intermitente` a la lista, el enum, `N`, `TODOS` y `nombre()` se actualizan solos. Esa es la razón de ser de esta macro: mantener **sincronizadas** varias piezas de código que dependen de la misma lista.
+
+## Pruébalo
+
+<Ejecutar ej="m19/jefe-estados" />
+
+Experimenta (en el editor del reto, más abajo, o en tu máquina): quita `Clone, Copy` del derive y mira qué falla, o añade una cuarta variante.
+
+## Bajo el capó
+
+<BajoElCapo>
+**¿Hace falta `Copy`?** Para este `main`, no: lo hemos comprobado quitando `Clone, Copy` y sigue compilando e imprimiendo lo mismo. Cada vez que escribes `Semaforo::TODOS` se crea un array nuevo (una constante se copia en cada uso), así que el `for` puede moverlo, y `==` compara por referencia. Pero en cuanto guardas el array en una variable y sacas un elemento con `let b = a[0];`, el compilador protesta con `error[E0508]: cannot move out of type [Semaforo; 3], a non-copy array`: sacar un valor de un array lo dejaría con un hueco. Un enum sin datos es tan barato de copiar como un número, así que pedir `Clone, Copy` es lo natural.
+
+**Qué se genera.** Para tres variantes, la macro produce un `enum` de tres variantes sin datos (que ocupa 1 byte), una constante `N = 1 + 1 + 1 + 0`, un array de 3 elementos y un `match` de tres brazos. Ni una línea se ejecuta para «calcular» nada de esto: todo existe antes de que arranque el programa.
+
+**Límite de diseño.** Esta macro no permite variantes con datos (`Rojo(u8)`). Añadirlo complicaría mucho el patrón. Cuando una macro empieza a necesitar muchos casos especiales, es el momento de preguntarse si una derive procedural (lección 9) sería más clara.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Reenviar atributos sin repetición">
+❌ `(#[$meta:meta] enum ...)`: obliga a poner **exactamente un** atributo. Sin atributo, la macro no encaja; con dos, tampoco.
+
+✅ `($(#[$meta:meta])* ...)` en el patrón y `$(#[$meta])*` en la plantilla: cero o más atributos, reenviados tal cual.
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m19/jefe-reto" enunciado="Completa `menu!` para que genere el enum `Plato` con las variantes dadas, un método `precio(&self) -> u32` (un brazo de match por plato) y `carta()`, que devuelva un Vec de (nombre, precio) usando stringify!. La salida debe ser la carta alineada y `total: 24 €`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `contar!` puede usarse como tamaño del array `TODOS`?"
+  opciones={["Porque los tamaños de array pueden calcularse al ejecutar", "Porque se expande a una expresión constante (`1usize + 1usize + ...`) que el compilador evalúa", "Porque contar! devuelve un Vec", "No puede: hay que escribir el número a mano"]}
+  correcta={1}
+  explicacion="Un tamaño de array tiene que ser constante. La expansión de contar! es una suma de literales, que es una expresión constante."
+  porque={["Los tamaños de array se fijan en compilación.", "Correcto.", "Devuelve un número, no un Vec.", "Precisamente por eso lo calculamos con la macro."]}
+/>
+
+<Pregunta
+  pregunta="Si añades `Intermitente` a la lista de `estados!`, ¿qué tienes que cambiar a mano?"
+  opciones={["El valor de N", "El array TODOS", "El match de nombre()", "Nada: todo se genera de la misma lista"]}
+  correcta={3}
+  explicacion="Las cuatro piezas se generan a partir de la misma repetición. Es la ventaja principal frente a escribirlas a mano."
+  porque={["N lo calcula contar!.", "TODOS se genera con una repetición.", "Cada brazo sale de una repetición.", "Correcto."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué fragmento usarías para aceptar `pub`, `pub(crate)` o nada delante de `enum`?"
+  opciones={["`$v:ident`", "`$v:vis`", "`$($v:tt)?`", "`$v:meta`"]}
+  correcta={1}
+  explicacion="`vis` está pensado para eso y acepta la visibilidad vacía."
+  porque={["`pub` es una palabra clave, no un identificador.", "Correcto.", "`pub(crate)` son dos árboles de tokens (`pub` y `(crate)`), así que un único `tt` opcional no lo acepta.", "`meta` es para el interior de atributos."]}
+/>

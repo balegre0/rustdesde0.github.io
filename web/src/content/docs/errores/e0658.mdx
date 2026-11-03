@@ -1,0 +1,75 @@
+---
+title: "E0658: característica inestable"
+description: "Usas una característica del lenguaje o de la biblioteca que todavía no es estable."
+sidebar:
+  order: 67
+insignias: ["Constantes, unsafe, async y otros"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` `try` expression is experimental ``
+
+## Qué significa
+
+Rust tiene funciones experimentales que solo están disponibles en el compilador *nightly* con `#![feature(...)]`. En la versión estable (la que usa este curso, 1.99.1) dan E0658. Aquí, los bloques `try { }` siguen siendo experimentales.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0658" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0658]: `try` expression is experimental
+ --> E0658.rs:2:51
+  |
+2 |       let r: Result<i32, std::num::ParseIntError> = try {
+  |  ___________________________________________________^
+3 | |         "5".parse::<i32>()? + 1
+4 | |     };
+  | |_____^
+  |
+  = note: see issue #154391 <https://github.com/rust-lang/rust/issues/154391> for more information
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Copiar código de un ejemplo pensado para *nightly*.
+- Usar APIs marcadas como inestables en la documentación.
+
+## Cómo arreglarlo
+
+Busca la alternativa estable. Para `try { }`, mueve el código a una función que devuelva `Result` y usa `?` dentro de ella.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn sumar_uno(t: &str) -> Result<i32, std::num::ParseIntError> {
+    Ok(t.parse::<i32>()? + 1)
+}
+
+fn main() {
+    println!("{:?}", sumar_uno("5"));
+}
+```
+
+**Salida:**
+
+```text
+Ok(6)
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0658` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0133](/errores/e0133/): operación insegura fuera de unsafe
+
+## Aprende esto en
+
+- [Mundo 21 · El compilador por dentro](/curso/21-el-compilador-por-dentro/)
+- [Mundo 10 · Errores](/curso/10-errores/)

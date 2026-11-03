@@ -1,0 +1,124 @@
+---
+title: "fn main: donde empieza todo"
+description: "Entiende cada carácter del programa más pequeño de Rust y en qué orden se ejecutan sus líneas."
+sidebar:
+  order: 1
+duracion: 10
+desde: "1.0"
+requiere: ["00-el-taller/06-cargo-new-y-run"]
+tarjetas:
+  - p: "¿Qué función ejecuta primero un programa de Rust?"
+    r: "`main`. Si no existe, el compilador da el error E0601."
+  - p: "¿Qué significan las llaves `{ }` después de `fn main()`?"
+    r: "Delimitan el cuerpo de la función: las instrucciones que se ejecutan cuando se la llama."
+  - p: "¿En qué orden se ejecutan las líneas dentro de `main`?"
+    r: "De arriba abajo, una tras otra, salvo que algo (un bucle, un `if`) cambie ese orden."
+  - p: "¿Le importa al compilador la sangría (los espacios al principio de la línea)?"
+    r: "No. La sangría es para las personas; `cargo fmt` la pone de forma estándar."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Cuando hiciste `cargo new`, Cargo te regaló un programa de tres líneas. Hoy vas a entender cada carácter de esas tres líneas y la regla que decide en qué orden se ejecuta lo que escribas dentro.
+
+## Predice
+
+Este programa tiene cuatro `println!`, y uno de ellos va vacío. ¿Qué imprime?
+
+<Predice
+  ej="m02/orden"
+  opciones={["`Primero` · `Segundo` · `Tercero` (tres líneas seguidas)", "`Primero` · `Segundo` · una línea en blanco · `Tercero`", "`Tercero` · `Segundo` · `Primero`", "No compila: `println!()` necesita un texto"]}
+  correcta={1}
+  explicacion="Las líneas se ejecutan de arriba abajo. `println!()` sin nada dentro imprime solo el salto de línea: una línea vacía."
+  porque={["Te has saltado el `println!()` vacío: también imprime algo, un salto de línea.", "", "El orden de ejecución es el del texto, de arriba abajo.", "`println!()` sin argumentos es válido: escribe una línea vacía."]}
+/>
+
+## La idea
+
+Un programa de Rust está hecho de **funciones** (*functions*): trozos de código con nombre que hacen una tarea. Mira el programa mínimo pieza a pieza:
+
+```rust
+fn main() {
+    println!("¡Hola, mundo!");
+}
+```
+
+- `fn` es una **palabra clave** (*keyword*): le dice al compilador «aquí empieza una función».
+- `main` es el **nombre** de la función. No es un nombre cualquiera: es el **punto de entrada** (*entry point*). Cuando ejecutas el programa, lo primero tuyo que corre es `main`.
+- `()` son los **parámetros**: los datos que recibe la función. `main` no recibe ninguno, así que los paréntesis van vacíos (pero son obligatorios).
+- `{ … }` es el **cuerpo**: las instrucciones que se ejecutan. Cada instrucción de este tipo termina en `;`.
+
+Dentro del cuerpo, las instrucciones se ejecutan **en orden, de arriba abajo**, una sola vez cada una. Más adelante aprenderás a cambiar ese orden (repetir, saltarte trozos), pero la regla por defecto es esa. Los espacios del principio de la línea (la **sangría**, *indentation*) no cambian nada para el compilador: sirven para que tú veas qué está dentro de qué. La forma estándar la pone `cargo fmt` por ti.
+
+## Pruébalo
+
+<Ejecutar ej="m02/hola" />
+
+Salida real:
+
+```text
+¡Hola, mundo!
+```
+
+Fíjate en que la `¡` y la tilde salen bien: el texto de Rust es UTF-8 siempre (lo viste en el mundo de la máquina). Ahora el programa de la predicción, con sus comentarios-subobjetivo:
+
+<Ejecutar ej="m02/orden" />
+
+```text
+Primero
+Segundo
+
+Tercero
+```
+
+## Bajo el capó
+
+<BajoElCapo titulo="¿De verdad main es lo primero que se ejecuta?">
+Lo primero *tuyo*, sí. Pero antes de `main` corre un poco de código de la **biblioteca estándar** (*standard library*, `std`) que prepara el terreno: deja listos los argumentos del programa y la salida de texto, y luego llama a tu `main`. Cuando `main` termina, ese mismo código convierte el final en un **código de salida** para el sistema operativo: `0` significa «todo bien».
+
+Puedes verlo pidiendo al compilador su representación intermedia para LLVM (`rustc --emit=llvm-ir`). En la de este programa aparece una función de `std` llamada `std::rt::lang_start` (*rt* = *runtime*, «entorno de ejecución») que recibe tu `main` como argumento, y otra llamada `Termination::report`, que traduce el final de `main` en ese código de salida. Tu `main` aparece como una función más, `hola::main`.
+
+Por eso, si borras `main`, el compilador no tiene a quién pasarle a `lang_start` y se niega a construir el ejecutable.
+</BajoElCapo>
+
+## Trampa típica
+
+Llamar a la función de otra forma, aunque sea en español, no sirve: el punto de entrada **tiene** que llamarse `main`.
+
+<NoCompila ej="m02/sin-main" explicacion="El error E0601 dice que no hay función `main` en el crate. Rust no adivina cuál de tus funciones es la principal: la busca por su nombre." />
+
+El mensaje real empieza así: «`main` function not found in crate `sin_main`» (no se encontró la función `main` en el crate). Un **crate** es la unidad que compila `rustc` de una vez: aquí, tu archivo. Pulsa «Ver arreglo» para ver la versión que funciona.
+
+## Tu turno
+
+Ordena las líneas para obtener un programa que imprima `Hola` y luego `Adiós`.
+
+<Ordena
+  lineas={["fn main() {", "    println!(\"Hola\");", "    println!(\"Adiós\");", "}"]}
+  distractores={["fn principal() {", "    println!(\"Adiós\")"]}
+  explicacion="La función tiene que llamarse `main`, y cada instrucción `println!` termina en `;`. El orden de los `println!` es el orden de la salida."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tienes un programa con dos funciones, `saludar` y `main`. `saludar` está escrita **arriba** en el archivo. ¿Cuál se ejecuta primero?"
+  opciones={["`saludar`, porque está antes en el archivo", "`main`, porque es el punto de entrada", "Las dos a la vez", "Ninguna: hay que elegir una con una opción de Cargo"]}
+  correcta={1}
+  explicacion="El orden «de arriba abajo» se aplica a las instrucciones **dentro** de una función. Entre funciones manda otra regla: el programa empieza siempre en `main`, y las demás solo se ejecutan si alguien las llama."
+  porque={["La posición de una función en el archivo no decide cuándo se ejecuta; solo importa si alguien la llama.", "", "Un programa normal hace una cosa detrás de otra; la ejecución simultánea llega con los hilos, mucho más adelante.", "No hace falta: el punto de entrada siempre es `main`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué significan los paréntesis vacíos de `fn main()`?"
+  opciones={["Que la función está vacía", "Que la función no recibe parámetros", "Que es una macro", "Nada: son opcionales"]}
+  correcta={1}
+  explicacion="Los paréntesis contienen la lista de parámetros. Vacíos quiere decir «no recibo nada». Son obligatorios incluso vacíos."
+  porque={["El contenido de la función va entre llaves `{}`, no entre paréntesis.", "", "Lo que marca una macro es el `!`, como en `println!`.", "Sin ellos, `fn main {` no compila."]}
+/>
+
+<Respuesta
+  pregunta="¿Qué código de error da `rustc` si tu programa no tiene función `main`?"
+  respuestas={["E0601", "e0601"]}
+  explicacion="E0601: «`main` function not found». Puedes leer su ficha completa con `rustc --explain E0601`."
+/>

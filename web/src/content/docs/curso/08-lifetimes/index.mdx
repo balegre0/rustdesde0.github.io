@@ -1,0 +1,43 @@
+---
+title: "Mundo 08 · Lifetimes"
+description: "Cómo comprueba el compilador que ninguna referencia vive más que su dueña: regiones, anotaciones 'a, elisión, structs con referencias, 'static, varianza y los malentendidos más comunes."
+sidebar:
+  order: 0
+---
+
+En el mundo 07 viste **cómo** se usa un préstamo. Aquí verás **cuánto** puede durar. La regla nueva cabe en una frase:
+
+> **Una referencia nunca puede vivir más que el valor al que apunta.**
+
+Si pudiera, apuntaría a memoria ya liberada: una **referencia colgante** (*dangling reference*), el error de memoria más clásico. Para impedirlo, el compilador le asigna a cada referencia una **lifetime** (literalmente, «tiempo de vida»): el tramo del programa durante el que tiene que ser válida.
+
+Casi siempre el compilador calcula las lifetimes solo. Solo tienes que escribirlas (con la sintaxis `'a`) cuando una función o un struct **relaciona** varias referencias y el compilador no puede adivinar cómo. Este es el tema que más cuesta en Rust: según un estudio con estudiantes, confunde a más del 85 % al principio. Por eso va despacio, con un único concepto por lección.
+
+:::note[Una palabra sobre el vocabulario]
+En español no hay una traducción asentada de *lifetime*, así que el curso usa la palabra inglesa, como la documentación oficial y la comunidad. Cuando ayude a entender, la llamaremos también **región**: un conjunto de puntos del programa.
+:::
+
+## Lecciones
+
+1. [Referencias colgantes](/curso/08-lifetimes/01-referencias-colgantes/): el error que hay que impedir (E0597, E0515).
+2. [Qué es una lifetime](/curso/08-lifetimes/02-que-es-una-lifetime/): una región del programa, calculada al compilar.
+3. [Anotar funciones](/curso/08-lifetimes/03-anotar-funciones/): `'a` y E0106.
+4. [Elisión](/curso/08-lifetimes/04-elision/): las tres reglas que te ahorran escribir `'a`.
+5. [Anotar con precisión](/curso/08-lifetimes/05-anotar-con-precision/): no ates lo que no va junto.
+6. [Structs con referencias](/curso/08-lifetimes/06-structs-con-referencias/): un struct que presta.
+7. [Lifetimes en `impl`](/curso/08-lifetimes/07-lifetimes-en-impl/): devolver lo prestado, no `self`.
+8. [`'static`](/curso/08-lifetimes/08-static/): qué significa de verdad.
+9. [Temporales](/curso/08-lifetimes/09-temporales/): valores sin nombre (E0716).
+10. [Malentendidos](/curso/08-lifetimes/10-malentendidos/): lo que las lifetimes **no** son.
+11. [Varianza](/curso/08-lifetimes/11-varianza/): cuándo una lifetime larga sirve como una corta.
+12. [Jefe: el cortador de palabras](/curso/08-lifetimes/12-jefe/): todo junto.
+
+## Lo que el compilador vigila en este mundo
+
+| Error | Qué te impide hacer | Qué fallo de memoria evita |
+|---|---|---|
+| [E0597](/errores/e0597/) | Que una referencia se use después de que su valor termine | Referencia colgante (uso tras liberar) |
+| [E0515](/errores/e0515/) | Devolver una referencia a una variable local | Apuntar a un marco de pila que ya no existe |
+| [E0106](/errores/e0106/) | Devolver una referencia sin decir de qué entrada sale | Que el que llama no sepa cuánto puede usarla |
+| [E0716](/errores/e0716/) | Usar una referencia a un temporal que ya se destruyó | Referencia colgante a un valor sin nombre |
+| [E0310](/errores/e0310/) | Guardar como `'static` un tipo que podría llevar referencias cortas | Que algo guardado «para siempre» apunte a memoria liberada |

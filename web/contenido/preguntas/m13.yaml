@@ -1,0 +1,495 @@
+# Banco de preguntas del mundo 13 — Traits y genéricos (CONTENIDO.md §7.1).
+# Todo código citado está en ejemplos/m13/*.rs, compilado y ejecutado con rustc 1.99.1, edición 2024.
+
+- id: m13-metodo-por-defecto
+  titulo: "Métodos por defecto"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m13/predice-saludo
+  opciones:
+    - "`Hola, soy R2` y `Miau`"
+    - "`Hola, soy R2` y `Hola, soy Misi`"
+    - "No compila: `Robot` no implementa `saludo`"
+    - "`R2` y `Misi`"
+  correcta: 0
+  solucion: |
+    `saludo` tiene implementación por defecto en el trait, que usa `nombre`. `Robot` la hereda; `Gata` la **sustituye** por la suya.
+  etiquetas: ["traits", "métodos por defecto"]
+
+- id: m13-dyn-por-defecto
+  titulo: "Cajas de traits"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m13/jefe-predice
+  opciones:
+    - "`buenas buenas` y `hola hola`"
+    - "`hola hola` y `buenas buenas`"
+    - "`buenas` y `hola`"
+    - "No compila: `Box<dyn Hablar>` no se puede pasar como `&dyn Hablar`"
+  correcta: 0
+  solucion: |
+    El vector tiene primero `B` (que sustituye `hola`) y luego `A` (que usa el método por defecto). `{0} {0}` repite el primer argumento. `h.as_ref()` convierte `&Box<dyn Hablar>` en `&dyn Hablar`.
+  etiquetas: ["dyn", "Box", "traits"]
+
+- id: m13-tipo-asociado
+  titulo: "Tipos y constantes asociados"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m13/assoc-predice
+  opciones:
+    - "`Some(\"llave\") 3`"
+    - "`\"llave\" 3`"
+    - "`Some(\"llave\") 2`"
+    - "No compila: un trait no puede tener constantes"
+  correcta: 0
+  solucion: |
+    `primero` devuelve `Option<&String>`, que se imprime como `Some("llave")`. `CAPACIDAD` es una constante asociada (3), no el número de elementos.
+  etiquetas: ["tipos asociados", "const"]
+
+- id: m13-derive-orden-variantes
+  titulo: "¿Cómo ordena un derive?"
+  mundo: 13-traits-y-genericos
+  tema: derive
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m13/derive-orden
+  opciones:
+    - "`[Grande, Pequena, Mediana]`"
+    - "`[Pequena, Mediana, Grande]`"
+    - "`[Grande, Mediana, Pequena]`"
+    - "`[Mediana, Grande, Pequena]`"
+  correcta: 0
+  solucion: |
+    `#[derive(PartialOrd, Ord)]` en un enum ordena por el **orden en que están escritas** las variantes, no por su nombre ni por su significado. Si quieres otro orden, reordena las variantes o implementa `Ord` a mano.
+  etiquetas: ["derive", "Ord"]
+
+- id: m13-from-into
+  titulo: "From da Into gratis"
+  mundo: 13-traits-y-genericos
+  tema: conversiones
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m13/from-into
+  opciones:
+    - "`6.5`"
+    - "No compila: falta implementar `Into`"
+    - "`2.54`"
+    - "No compila: `4.0.into()` es ambiguo"
+  correcta: 0
+  solucion: |
+    Implementar `From<f64> for Metros` da automáticamente `Into<Metros> for f64` (hay una implementación general en la biblioteca estándar). La anotación `let b: Metros` le dice a `into` a qué convertir.
+  etiquetas: ["From", "Into"]
+
+- id: m13-impl-trait-arg
+  titulo: "impl Trait en un argumento"
+  mundo: 13-traits-y-genericos
+  tema: genericos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m13/impl-arg
+  opciones:
+    - "`[[5][cinco]]`"
+    - "`[5][cinco]`"
+    - "`[[5]][[cinco]]`"
+    - "No compila: `entre_corchetes` no puede recibir un número y un texto"
+  correcta: 0
+  solucion: |
+    `x: impl Display` es azúcar de un genérico `<T: Display>`: cada llamada usa su propio tipo (`i32`, `&str`, `String`). La tercera llamada recibe `"[5]" + "[cinco]"`.
+  etiquetas: ["impl Trait", "Display"]
+
+- id: m13-mayor-generico
+  titulo: "Una función, tres tipos"
+  mundo: 13-traits-y-genericos
+  tema: genericos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la última línea?"
+  ej: m13/mayor-generico
+  opciones:
+    - "`u`"
+    - "`t`"
+    - "`r`"
+    - "No compila: `char` no se puede comparar"
+  correcta: 0
+  solucion: |
+    `char` implementa `PartialOrd` por su valor de Unicode: «u» (U+0075) es la mayor de «r», «u», «s», «t». La salida completa es `9`, `1.5` y `u`.
+  etiquetas: ["genéricos", "PartialOrd"]
+
+- id: m13-type-name
+  titulo: "¿Qué tipo eligió?"
+  mundo: 13-traits-y-genericos
+  tema: genericos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m13/type-name
+  opciones:
+    - "`i32`, `u8` y `&str`"
+    - "`i64`, `u8` y `String`"
+    - "`T`, `T` y `T`"
+    - "`int`, `u8` y `str`"
+  correcta: 0
+  solucion: |
+    Un literal entero sin sufijo es `i32` por defecto; `7u8` fija `u8`; un literal de texto es `&str` (`&'static str`). `type_name` muestra el tipo concreto con el que se monomorfizó `T`.
+  etiquetas: ["genéricos", "inferencia"]
+
+- id: m13-dyn-o-generico
+  titulo: "Genérico o dyn"
+  mundo: 13-traits-y-genericos
+  tema: dyn
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué `suma_generica(&[Cuadrado(1.0), Circulo(1.0)])` no compilaría, pero `suma_dyn(&[&Cuadrado(1.0), &Circulo(1.0)])` sí?"
+  codigo: |
+    fn suma_generica<T: Forma>(formas: &[T]) -> f64 { … }
+    fn suma_dyn(formas: &[&dyn Forma]) -> f64 { … }
+  opciones:
+    - "Con un genérico, todos los elementos son del mismo tipo `T`; con `&dyn Forma`, cada elemento puede ser de un tipo distinto"
+    - "Porque los genéricos no admiten structs"
+    - "Porque `Circulo` no implementa `Forma`"
+    - "Las dos compilarían"
+  correcta: 0
+  solucion: |
+    Un slice `&[T]` tiene un único `T`. `dyn Forma` borra el tipo concreto y llama a `area` a través de una vtable, así que puede mezclar. El ejemplo `m13/dyn-o-generico` imprime `5` y `4`.
+  etiquetas: ["dyn", "genéricos"]
+
+- id: m13-vec-mezcla
+  titulo: "Un Vec de perros y gatos"
+  mundo: 13-traits-y-genericos
+  tema: dyn
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Cómo se arregla?"
+  ej: m13/vec-mezcla
+  opciones:
+    - "`let animales: Vec<Box<dyn Animal>> = vec![Box::new(Perro), Box::new(Gato)];`"
+    - "Haciendo `Perro` y `Gato` `Copy`"
+    - "Con `vec![Perro, Gato] as Vec<Animal>`"
+    - "No tiene arreglo"
+  correcta: 0
+  solucion: |
+    Un `Vec<T>` guarda elementos del **mismo** tipo y tamaño (E0308: se esperaba `Perro`, se encontró `Gato`). Con `Box<dyn Animal>` todos los elementos son del mismo tipo: un puntero ancho (dirección + vtable).
+  etiquetas: ["E0308", "dyn", "Box"]
+
+- id: m13-falta-metodo
+  titulo: "Implementación incompleta"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da?"
+  ej: m13/falta-metodo
+  opciones:
+    - "E0046: falta implementar `nombre`, que el trait declara sin cuerpo por defecto"
+    - "E0277: `Cuadrado` no implementa `Forma`"
+    - "E0599: `area` no existe"
+    - "Ninguno: los métodos que no se usan no hace falta implementarlos"
+  correcta: 0
+  solucion: |
+    Una implementación tiene que dar **todos** los métodos sin cuerpo por defecto, aunque no se llamen. rustc sugiere el esqueleto del que falta.
+  etiquetas: ["E0046", "traits"]
+
+- id: m13-huerfana
+  titulo: "Display para Vec<u8>"
+  mundo: 13-traits-y-genericos
+  tema: coherencia
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m13/huerfana
+  opciones:
+    - "Por la regla huérfana (E0117): ni `Display` ni `Vec<u8>` son de tu crate. Arreglo: un newtype `struct Bytes(Vec<u8>)` e implementar `Display` para él"
+    - "Porque `Vec<u8>` ya implementa `Display`"
+    - "Porque falta `use std::fmt::Display`"
+    - "Porque `write!` no existe sin `std::io::Write`"
+  correcta: 0
+  solucion: |
+    Si cualquier crate pudiera implementar un trait ajeno para un tipo ajeno, dos crates podrían hacerlo de formas distintas y el programa tendría dos respuestas para la misma pregunta. La coherencia lo impide.
+  etiquetas: ["E0117", "regla huérfana", "newtype"]
+
+- id: m13-solapamiento
+  titulo: "Dos implementaciones para i32"
+  mundo: 13-traits-y-genericos
+  tema: coherencia
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m13/solapamiento
+  opciones:
+    - "La implementación general `impl<T: Debug> Describir for T` ya cubre `i32`; una segunda para `i32` se solapa (E0119)"
+    - "Porque `i32` no implementa `Debug`"
+    - "Porque los traits no pueden tener implementaciones genéricas"
+    - "Porque `5.describir()` es ambiguo entre `i32` e `i64`"
+  correcta: 0
+  solucion: |
+    Rust estable no permite dos implementaciones que se apliquen al mismo tipo. Permitir «la más específica gana» es la **especialización**, que existe solo en nightly por sus problemas de soundness.
+  etiquetas: ["E0119", "coherencia"]
+
+- id: m13-sin-bound
+  titulo: "Comparar sin saber comparar"
+  mundo: 13-traits-y-genericos
+  tema: genericos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué le falta a `fn mayor<T>(a: T, b: T) -> T`?"
+  ej: m13/sin-bound
+  opciones:
+    - "La cota `T: PartialOrd`: sin ella, el compilador no sabe si `T` se puede comparar con `>` (E0369)"
+    - "La cota `T: Copy`"
+    - "Un `return` explícito"
+    - "Nada: compila"
+  correcta: 0
+  solucion: |
+    Un genérico sin cotas no permite hacer nada con sus valores salvo moverlos. Cada operación (`>`, `+`, `{}`) exige su trait. rustc sugiere `fn mayor<T: PartialOrd>`.
+  etiquetas: ["E0369", "cotas"]
+
+- id: m13-sin-add
+  titulo: "Sumar dinero"
+  mundo: 13-traits-y-genericos
+  tema: operadores
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué hay que hacer para que `a + b` funcione con `Dinero`?"
+  ej: m13/sin-add
+  opciones:
+    - "Implementar `std::ops::Add for Dinero` (con `type Output = Dinero`)"
+    - "Derivar `PartialEq`"
+    - "Derivar `Debug`"
+    - "Nada: los structs se suman campo a campo"
+  correcta: 0
+  solucion: |
+    Los operadores son traits: `a + b` es `Add::add(a, b)`. No se pueden derivar con `#[derive]` en la biblioteca estándar; hay que implementarlos (E0369 si faltan).
+  etiquetas: ["E0369", "Add", "operadores"]
+
+- id: m13-copy-string
+  titulo: "Copy con un String dentro"
+  mundo: 13-traits-y-genericos
+  tema: derive
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede derivar `Copy` aquí?"
+  ej: m13/copy-string
+  opciones:
+    - "Porque `String` no es `Copy`: copiar el struct bit a bit crearía dos dueños del mismo texto (E0204)"
+    - "Porque los structs nunca pueden ser `Copy`"
+    - "Porque falta derivar `Debug`"
+    - "Porque `u32` no es `Copy`"
+  correcta: 0
+  solucion: |
+    Un tipo es `Copy` solo si **todos** sus campos lo son. Quita `Copy` y usa `clone()` cuando de verdad quieras una copia.
+  etiquetas: ["E0204", "Copy"]
+
+- id: m13-dyn-clone
+  titulo: "dyn de un trait con Clone"
+  mundo: 13-traits-y-genericos
+  tema: dyn
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede usar `dyn Figura` si `trait Figura: Clone`?"
+  ej: m13/clonar-dyn
+  opciones:
+    - "`Clone` exige `Sized` (su `clone` devuelve `Self` por valor), así que `Figura` deja de ser compatible con `dyn` (E0038)"
+    - "Porque `Triangulo` no implementa `Clone`"
+    - "Porque `Box` no admite traits"
+    - "Porque falta `#[derive(Debug)]`"
+  correcta: 0
+  solucion: |
+    Para llamar a un método a través de `dyn`, el compilador tiene que poder ponerlo en la vtable sin saber el tipo concreto. Un método que devuelve `Self` necesita conocer su tamaño. La solución habitual: un método `fn clonar_caja(&self) -> Box<dyn Figura>`.
+  etiquetas: ["E0038", "dyn", "Clone"]
+
+- id: m13-impl-dos-tipos
+  titulo: "impl Trait devuelve un solo tipo"
+  mundo: 13-traits-y-genericos
+  tema: genericos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `fn etiqueta(numero: bool) -> impl Display` que devuelve `42` o `\"cuarenta y dos\"`?"
+  ej: m13/impl-dos-tipos
+  opciones:
+    - "`impl Display` es **un** tipo concreto oculto: todas las ramas tienen que devolver el mismo (E0308). Para elegir al ejecutar, usa `Box<dyn Display>`"
+    - "Porque `42` no implementa `Display`"
+    - "Porque falta un `else`"
+    - "Porque `impl` no se puede usar en el tipo de retorno"
+  correcta: 0
+  solucion: |
+    El compilador elige un único tipo para `impl Display` en esa función. Con `Box<dyn Display>` cada rama puede devolver un tipo distinto en su caja.
+  etiquetas: ["E0308", "impl Trait"]
+
+- id: m13-ambiguo
+  titulo: "¿A qué conviertes?"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Cómo se arregla `let x = t.convertir();`?"
+  ej: m13/ambiguo
+  opciones:
+    - "Anotando el tipo: `let x: f64 = t.convertir();` (hay dos implementaciones posibles: E0283)"
+    - "Borrando una de las dos implementaciones es la única opción"
+    - "Llamando a `t.convertir::<>()`"
+    - "Haciendo `Celsius` `Copy`"
+  correcta: 0
+  solucion: |
+    `Celsius` implementa `ConvertirA<f64>` y `ConvertirA<String>`. Sin más información, el compilador no sabe cuál elegir. Con la anotación (o con `ConvertirA::<f64>::convertir(&t)`) queda decidido.
+  etiquetas: ["E0283", "inferencia"]
+
+- id: m13-sin-inferir
+  titulo: "Un Vec vacío de qué"
+  mundo: 13-traits-y-genericos
+  tema: genericos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da `let v = vacia();` si `fn vacia<T>() -> Vec<T>` y `v` solo se usa con `len()`?"
+  ej: m13/sin-inferir
+  opciones:
+    - "E0282: hacen falta anotaciones de tipo; nada fija qué es `T`"
+    - "E0308: tipos que no coinciden"
+    - "Ninguno: `T` vale `()` por defecto"
+    - "E0599: `len` no existe"
+  correcta: 0
+  solucion: |
+    Arreglos: `let v: Vec<i32> = vacia();` o `vacia::<i32>()` (el *turbofish*).
+  etiquetas: ["E0282", "turbofish"]
+
+- id: m13-monomorfizacion
+  titulo: "Una copia por tipo"
+  mundo: 13-traits-y-genericos
+  tema: genericos
+  dificultad: media
+  tipo: opcion
+  enunciado: "Llamas a `fn mayor<T: PartialOrd + Copy>(…)` con `i32`, `f64` y `char`. ¿Cuántas versiones de `mayor` hay en el programa compilado?"
+  opciones:
+    - "Tres: una por cada tipo con que se usa (monomorfización)"
+    - "Una sola, que comprueba el tipo al ejecutar"
+    - "Ninguna: se expande en línea siempre"
+    - "Una por cada llamada"
+  correcta: 0
+  solucion: |
+    Los genéricos se compilan generando código especializado para cada tipo. Por eso son tan rápidos como escribir cada versión a mano, a cambio de más tiempo de compilación y binarios algo más grandes. El ejemplo `m13/mono` lo muestra.
+  etiquetas: ["monomorfización"]
+
+- id: m13-vtable
+  titulo: "¿Qué es una vtable?"
+  mundo: 13-traits-y-genericos
+  tema: dyn
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué contiene un `&dyn Forma` en memoria?"
+  opciones:
+    - "Dos punteros: uno a los datos y otro a la vtable (tamaño, alineación, drop y un puntero por cada método del trait)"
+    - "Un puntero a los datos"
+    - "Una copia de los datos y su tipo"
+    - "El nombre del tipo concreto"
+  correcta: 0
+  solucion: |
+    Por eso `&dyn Trait` mide el doble que una referencia normal (el ejemplo `m13/dyn-zoo` muestra 4 frente a 8 bytes en wasm32). Llamar a un método es leer su dirección de la vtable y saltar: una indirección.
+  etiquetas: ["dyn", "vtable"]
+
+- id: m13-turbofish
+  titulo: "El turbofish"
+  mundo: 13-traits-y-genericos
+  tema: genericos
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "Completa para que `n` sea un `u8` sin anotar `n`: `let n = \"42\".parse::<___>().unwrap();` (escribe solo el tipo)."
+  respuestas: ["u8"]
+  solucion: |
+    `::<u8>` es la sintaxis *turbofish*: da los parámetros genéricos de una función en la propia llamada.
+  etiquetas: ["turbofish", "parse"]
+
+- id: m13-where
+  titulo: "Cláusulas where"
+  mundo: 13-traits-y-genericos
+  tema: genericos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿En qué se diferencian `fn f<T: Display + Clone>(x: T)` y `fn f<T>(x: T) where T: Display + Clone`?"
+  opciones:
+    - "En nada: son dos formas de escribir las mismas cotas; `where` se lee mejor cuando hay muchas"
+    - "`where` comprueba al ejecutar"
+    - "`where` solo vale para traits"
+    - "La primera no compila"
+  correcta: 0
+  solucion: |
+    `where` además permite cotas que no son sobre un parámetro directamente, como `where Vec<T>: Debug` o `where for<'a> &'a T: IntoIterator`.
+  etiquetas: ["where", "cotas"]
+
+- id: m13-supertrait
+  titulo: "Supertraits"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué significa `trait Mascota: Animal + Display { … }`?"
+  opciones:
+    - "Que para implementar `Mascota` un tipo tiene que implementar también `Animal` y `Display`, y que dentro de `Mascota` puedes usar sus métodos"
+    - "Que `Mascota` hereda los campos de `Animal`"
+    - "Que todo `Animal` es automáticamente `Mascota`"
+    - "Que `Mascota` sustituye a `Display`"
+  correcta: 0
+  solucion: |
+    Es un requisito, no una herencia de datos: los traits no tienen campos. Un `&dyn Mascota` también puede llamar a los métodos de `Animal`.
+  etiquetas: ["supertraits"]
+
+- id: m13-assoc-vs-generico
+  titulo: "Tipo asociado o parámetro genérico"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Por qué `Iterator` usa un tipo asociado (`type Item;`) y no un parámetro (`trait Iterator<Item>`)?"
+  opciones:
+    - "Porque cada iterador produce **un** tipo de elemento: con un tipo asociado hay una sola implementación por tipo y no hace falta anotar `Item` al usarlo"
+    - "Porque los parámetros genéricos son más lentos"
+    - "Porque los traits no pueden tener parámetros"
+    - "Por compatibilidad con versiones antiguas"
+  correcta: 0
+  solucion: |
+    Un parámetro (`From<T>`) permite **varias** implementaciones para el mismo tipo (como `ConvertirA<f64>` y `ConvertirA<String>`), lo que obliga a desambiguar. Un tipo asociado fija una sola.
+  etiquetas: ["tipos asociados", "Iterator"]
+
+- id: m13-blanket
+  titulo: "Implementaciones generales"
+  mundo: 13-traits-y-genericos
+  tema: traits
+  dificultad: media
+  tipo: opcion
+  enunciado: "La biblioteca estándar tiene `impl<T: Display> ToString for T`. ¿Qué consecuencia tiene?"
+  opciones:
+    - "Cualquier tipo que implemente `Display` tiene `to_string()` automáticamente"
+    - "Hay que implementar `ToString` a mano para cada tipo"
+    - "`to_string()` solo funciona con `String`"
+    - "Que `Display` y `ToString` son el mismo trait"
+  correcta: 0
+  solucion: |
+    Es una implementación general (*blanket impl*). Por eso nunca se implementa `ToString` directamente: se implementa `Display` y `to_string` viene solo.
+  etiquetas: ["blanket impl", "Display"]
+
+- id: m13-orphan-newtype
+  titulo: "Saltar la regla huérfana"
+  mundo: 13-traits-y-genericos
+  tema: coherencia
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Quieres implementar `Display` para `Vec<String>`. ¿Qué haces?"
+  opciones:
+    - "Envolverlo en un tipo propio, `struct Lista(Vec<String>);`, e implementar `Display` para `Lista`"
+    - "Usar `unsafe impl`"
+    - "Implementarlo en `main.rs`"
+    - "No se puede de ninguna forma"
+  correcta: 0
+  solucion: |
+    El newtype es tuyo, así que la regla huérfana lo permite, y no cuesta nada en memoria. El ejemplo `m13/newtype` lo usa.
+  etiquetas: ["newtype", "regla huérfana"]

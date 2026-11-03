@@ -1,0 +1,52 @@
+---
+title: "Jefe: la fila del cine"
+description: "Arregla un programa con tres errores de ownership sin usar clone: recoger lo que devuelve una función, usar antes de entregar y medir antes de consumir."
+sidebar:
+  order: 12
+duracion: 18
+desde: "1.0"
+requiere: ["06-ownership/11-mover-en-bucles-y-ramas"]
+tarjetas:
+  - p: "Tres arreglos de E0382 sin clonar:"
+    r: "Recoger la propiedad que devuelve una función, usar el valor antes de entregarlo, y calcular lo que necesites antes de que algo lo consuma."
+  - p: "Las tres reglas del ownership:"
+    r: "Cada valor tiene un dueño; solo hay un dueño a la vez; cuando el dueño sale de ámbito, el valor se libera."
+---
+
+import { Reto, Pregunta } from '~/components';
+
+Un cine organiza la fila de entrada con un `Vec<String>`. El programa tiene tres errores de ownership. Tu misión: que compile **sin usar `.clone()`** y sin cambiar lo que imprime.
+
+## El reto
+
+<Reto
+  ej="m06/jefe"
+  enunciado="Haz que el programa compile **sin `.clone()`** y que imprima lo mismo que la solución. Pistas: (1) `anunciar` devuelve la propiedad: recógela. (2) Usa `b` **antes** de entregarla al vector. (3) Mide la fila **antes** de que el `for` la consuma."
+/>
+
+## Repaso relámpago
+
+<Pregunta
+  pregunta={"¿Por qué `for persona in fila { … } println!(\"{}\", fila.len());` no compila?"}
+  opciones={["Porque `len` no existe en `Vec`", "Porque el `for` consume `fila`: después ya no existe", "Porque `persona` sigue viva", "Porque `fila` no es `mut`"]}
+  correcta={1}
+  explicacion="`for x in v` mueve el vector al bucle. Por eso la solución mide antes del bucle."
+  porque={["`len` existe.", "", "`persona` muere en cada vuelta.", "Leer la longitud no necesita `mut`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué error de memoria evita que no puedas usar `b` después de `fila.push(b)`?"
+  opciones={["Un desbordamiento", "Que haya dos dueñas del mismo texto: doble liberación al final", "Una fuga de memoria", "Ninguno"]}
+  correcta={1}
+  explicacion="Si `b` siguiera siendo dueña, al final se liberaría el texto dos veces: una por `b` y otra al liberar el vector."
+  porque={["No hay aritmética.", "", "Mover nunca pierde memoria.", "Cada regla del ownership evita un error concreto."]}
+/>
+
+## Lo que te llevas del mundo 06
+
+- Cada valor tiene **un único dueño**, que lo libera al salir de ámbito.
+- Asignar, pasar a una función, devolver, `push` y `for` **mueven** (salvo los tipos `Copy`).
+- `clone()` crea un segundo dueño con su propia copia: explícito y con precio.
+- El compilador sigue **todos los caminos**; cuando no puede decidir al compilar, usa una bandera de drop.
+
+Te habrás dado cuenta de que mover para **solo mirar** es incómodo. En el mundo 07 aprenderás a **prestar**: usar un valor sin quedártelo.

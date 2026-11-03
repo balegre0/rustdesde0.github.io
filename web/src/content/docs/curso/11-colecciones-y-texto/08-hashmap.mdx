@@ -1,0 +1,99 @@
+---
+title: "HashMap y la API entry"
+description: "Guarda datos por clave, cuenta y agrupa con entry, y descubre por qué el orden de un HashMap cambia en cada ejecución."
+sidebar:
+  order: 8
+duracion: 13
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/07-construir-texto"]
+tarjetas:
+  - p: "¿Qué devuelve `mapa.get(&clave)`?"
+    r: "`Option<&V>`: `Some` con una referencia al valor, o `None` si la clave no está."
+  - p: "¿Qué hace `*mapa.entry(k).or_insert(0) += 1;`?"
+    r: "Busca la clave `k`; si no está, la inserta con 0. Devuelve `&mut V` al valor, y le suma 1. Es la forma idiomática de contar."
+  - p: "¿En qué orden recorre las claves un `HashMap`?"
+    r: "En ninguno definido: puede cambiar entre ejecuciones (std usa una semilla aleatoria). Si necesitas orden, ordena las claves o usa `BTreeMap`."
+  - p: "¿Qué devuelve `insert` si la clave ya existía?"
+    r: "`Some(valor_viejo)`: el nuevo valor reemplaza al viejo. Si no existía, `None`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a usar el diccionario de Rust: guardar valores por **clave** y encontrarlos al instante.
+
+## Predice
+
+<Predice
+  ej="m11/hashmap-predice"
+  opciones={["`Some(7) None 2`", "`Some(10) None 2`", "`Some(17) None 2`", "`Some(7) None 3`"]}
+  correcta={0}
+  explicacion={'Cada clave aparece una sola vez: el segundo `insert("manzanas", 7)` reemplaza al 10. No hay kiwis, así que `get` da `None`. Quedan 2 claves.'}
+  porque={["Correcto.", "`insert` sobre una clave existente reemplaza el valor.", "No suma: reemplaza.", "La clave repetida no cuenta dos veces."]}
+/>
+
+## La idea
+
+Un **`HashMap<K, V>`** guarda parejas **clave → valor**. Cada clave aparece una sola vez. Buscar, insertar y quitar por clave es, en promedio, igual de rápido con diez elementos que con diez millones.
+
+- `insert(k, v)` añade o reemplaza (y devuelve el valor viejo, si había).
+- `get(&k)` devuelve `Option<&V>`; `contains_key`, `remove`, `len`…
+- `mapa[&k]` también lee, pero entra en pánico si la clave no está.
+
+La joya es la **API `entry`**, para el caso de «si no está, créalo; en cualquier caso, actualízalo»:
+
+```rust
+*cuenta.entry(palabra).or_insert(0) += 1;          // contar
+grupos.entry(inicial).or_default().push(nombre);   // agrupar
+```
+
+Una sola búsqueda, sin `if contains_key … else …`. Y una advertencia importante: **el orden de recorrido no está definido**. Nunca dependas de él.
+
+## Pruébalo
+
+<Ejecutar ej="m11/hashmap" />
+
+Fíjate en el paso 6: para imprimir el recuento en un orden fijo, pasamos los pares a un `Vec` y lo ordenamos.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un `HashMap` es una tabla con muchas casillas. Para guardar una clave, una **función hash** la convierte en un número grande, y ese número elige la casilla. Buscar es repetir el cálculo e ir directamente a esa casilla (si dos claves caen en la misma, se prueba la siguiente). Por eso la clave debe implementar `Hash` y `Eq` (los tipos básicos, `String` y `&str` lo hacen; los tuyos, con `#[derive(Hash, PartialEq, Eq)]`).
+
+La función hash por defecto de la biblioteca estándar (SipHash 1-3) usa una **semilla aleatoria** distinta en cada ejecución. Así, alguien que te envíe claves a propósito no puede predecir en qué casillas caerán y llenarte una sola para hacerlo lentísimo (un ataque de denegación de servicio). El precio: el orden de recorrido **cambia de una ejecución a otra**. Compruébalo ejecutando esto varias veces:
+
+<Ejecutar ej="m11/hashmap-orden" titulo="El orden cambia en cada ejecución" />
+
+`get` con `&str` sobre un `HashMap<String, V>` funciona porque `String` implementa `Borrow<str>`: puedes buscar por la versión prestada de la clave sin crear un `String`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m11/hashmap-get-mut-prestamo"
+  explicacion="`p` es una referencia al interior del mapa; `insert` puede necesitar redimensionar la tabla y mover todos los valores, con lo que `p` apuntaría a memoria liberada. Es el mismo E0502 que con `Vec::push`. El arreglo copia el número antes de insertar."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m11/letras"
+  enunciado="Cuenta cuántas veces aparece cada letra de `año nuevo` (sin contar los espacios) con un `HashMap<char, usize>` y `entry(c).or_insert(0)`. El código que imprime ya ordena los pares."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Quieres imprimir un `HashMap<String, u32>` siempre en el mismo orden. ¿Qué haces?"
+  opciones={["Pasar los pares a un `Vec`, ordenarlo e imprimirlo (o usar `BTreeMap`)", "Insertar las claves en el orden deseado", "Nada: el orden es el de inserción", "Usar `mapa.sort()`"]}
+  correcta={0}
+  porque={["Correcto.", "El orden de inserción no se conserva.", "El orden no está definido y cambia entre ejecuciones.", "`HashMap` no tiene `sort`."]}
+/>
+
+<Pregunta
+  pregunta={'¿Qué hace `mapa.entry("x").or_insert(5)` si `"x"` ya vale 2?'}
+  opciones={["Nada en el mapa; devuelve `&mut` al 2", "Cambia el valor a 5", "Cambia el valor a 7", "Entra en pánico"]}
+  correcta={0}
+  porque={["Correcto: `or_insert` solo inserta si falta.", "Solo insertaría 5 si la clave no existiera.", "No suma nada.", "La clave existente es el caso normal."]}
+/>

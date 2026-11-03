@@ -1,0 +1,135 @@
+---
+title: "Bits y bytes"
+description: "Aprende qué es un bit, qué es un byte y por qué el mismo byte puede ser un número, una letra u otra cosa según su tipo."
+sidebar:
+  order: 3
+duracion: 10
+desde: "1.0"
+requiere: ["01-la-maquina/02-casillas-con-numero"]
+tarjetas:
+  - p: "¿Qué es un bit?"
+    r: "La unidad más pequeña de información: un 0 o un 1."
+  - p: "¿Cuántos bits tiene un byte? ¿Cuántos valores distintos puede tomar?"
+    r: "8 bits, que dan 2⁸ = 256 combinaciones distintas."
+  - p: "¿Qué dice `std::mem::size_of::<T>()`?"
+    r: "Cuántos bytes ocupa en memoria un valor del tipo `T`."
+  - p: "Si un byte guarda los bits 01000001, ¿qué significa?"
+    r: "Depende del tipo con que se lea: como `u8` es 65 y como carácter es la letra A. El byte no cambia; el tipo le da significado."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa, Bits } from '~/components';
+
+Vas a conocer las piezas más pequeñas de la máquina, los bits, y a descubrir que un byte no significa nada hasta que Rust le pone un tipo.
+
+## Predice
+
+`size_of::<u32>()` pregunta cuántos **bytes** ocupa un `u32`. Pista: el número del nombre del tipo cuenta **bits**.
+
+<Predice
+  ej="m01/tamano-u32"
+  opciones={["`4`", "`32`", "`8`", "`1`"]}
+  correcta={0}
+  explicacion="`u32` significa «32 bits». Un byte son 8 bits, así que 32 ÷ 8 = **4 bytes**."
+  porque={["Correcto.", "32 son los **bits**; `size_of` cuenta bytes.", "8 son los bits de **un** byte, no los bytes de un `u32`.", "1 byte es lo que ocupa un `u8`."]}
+/>
+
+## La idea
+
+Un **bit** (*bit*, de *binary digit*) es la pieza mínima de información: **0 o 1**. Apagado o encendido. En el chip es un voltaje bajo o alto, pero a ti te basta con 0 y 1.
+
+Un bit solo puede decir dos cosas, así que se agrupan. Ocho bits forman un **byte** (*byte*). Con 8 bits hay 2 × 2 × 2 × 2 × 2 × 2 × 2 × 2 = **256** combinaciones distintas: desde `00000000` hasta `11111111`. El byte es la unidad con la que se numera la memoria: cada dirección es un byte.
+
+Y ahora la idea más importante del mundo: **un byte no significa nada por sí solo**. Los bits `01000001` pueden ser el número 65, la letra A o un trozo de un número más grande. Lo que decide qué significan es el **tipo** (*type*) con que el programa los lee. En Rust, cada valor tiene un tipo, y el compilador lo sabe siempre.
+
+<Bits objetivo={65} />
+
+Enciende los interruptores hasta formar el 65. Son exactamente los bits de la letra A.
+
+## Pruébalo
+
+Primero, cuántos bytes ocupa cada tipo:
+
+<Ejecutar ej="m01/tamanos" />
+
+Salida real:
+
+```text
+u8   -> 1 byte
+u16  -> 2 bytes
+u32  -> 4 bytes
+u64  -> 8 bytes
+u128 -> 16 bytes
+bool -> 1 byte
+char -> 4 bytes
+f64  -> 8 bytes
+```
+
+Ahora el mismo byte leído con tipos distintos. `{:08b}` escribe los bits (lo explica la lección 4) y `as` le pide a Rust que lea el valor como otro tipo:
+
+<Ejecutar ej="m01/un-byte-tres-lecturas" />
+
+Salida real:
+
+```text
+bits:         01000001
+como u8:      65
+como letra:   A
+bits:         11111111
+como u8:      255
+como i8:      -1
+```
+
+Los bits `11111111` son 255 como `u8` y −1 como `i8`. No es magia: son dos formas distintas de leer los mismos 8 bits. La lección 7 te explica la segunda.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un `bool` solo necesita un bit (verdadero o falso), pero ocupa **un byte entero**. ¿Por qué? Porque la memoria se numera por bytes: no hay dirección para un bit suelto. Rust guarda `false` como el byte `00000000` y `true` como `00000001`.
+
+Un `char` ocupa 4 bytes porque tiene que poder guardar **cualquier** carácter del mundo, no solo las letras inglesas (lo verás en la lección 10).
+
+Para medir cantidades grandes se usan múltiplos. Con prefijos binarios, 1 **KiB** (*kibibyte*) son 1024 bytes, 1 **MiB** son 1024 KiB y 1 **GiB** son 1024 MiB. Verás también KB, MB y GB, que a veces significan lo mismo y a veces potencias de 1000. Si te importa la diferencia, mira qué prefijo se usa.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Bits frente a bytes">
+
+❌ «Un `u64` ocupa 64 bytes.»
+
+✅ Ocupa **64 bits = 8 bytes**. El número del nombre de un entero cuenta bits; `size_of` cuenta bytes. Para pasar de uno a otro, divide o multiplica por 8.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m01/bytes-reto"
+  enunciado="Cambia SOLO el tipo que va entre `<` y `>` para que el programa imprima exactamente `16 bytes = 128 bits`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántos valores distintos caben en un byte?"
+  opciones={["256", "255", "8", "1024"]}
+  correcta={0}
+  explicacion="8 bits, cada uno con 2 posibilidades: 2⁸ = 256 valores (del 0 al 255 si se leen como número sin signo)."
+  porque={["Correcto.", "255 es el valor **más alto** de un `u8`, pero contando el 0 hay 256 valores.", "8 es el número de bits, no el de combinaciones.", "1024 son los bytes de un KiB."]}
+/>
+
+<Pregunta
+  pregunta="El byte `01000001` está en memoria. ¿Qué es?"
+  opciones={["Depende del tipo con que el programa lo lea", "Siempre el número 65", "Siempre la letra A", "Nada: un byte no puede tener ese valor"]}
+  correcta={0}
+  porque={["Correcto: el tipo da significado a los bits.", "Leído como `u8`, sí. Pero leído como carácter es la A.", "Leído como carácter, sí. Pero leído como `u8` es 65.", "Cualquier combinación de 8 bits es un byte válido."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué un `bool` ocupa un byte entero si solo necesita un bit?"
+  opciones={["Porque la memoria se numera por bytes y no hay dirección para un bit suelto", "Porque Rust guarda `true` como el texto «true»", "Porque los 7 bits sobrantes guardan una copia de seguridad", "No es verdad: un `bool` ocupa un bit"]}
+  correcta={0}
+  porque={["Correcto.", "Rust guarda `true` como el byte `00000001`, no como texto.", "Los 7 bits sobrantes valen siempre 0.", "`size_of::<bool>()` devuelve 1: un byte."]}
+/>

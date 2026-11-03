@@ -1,0 +1,45 @@
+---
+title: "Punteros crudos y NonNull"
+description: "*const T y *mut T: direcciones sin garantías. Crear uno es seguro; leer o escribir a través de él es unsafe. NonNull<T>: un puntero crudo que nunca es nulo."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core", "unsafe"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::ptr`, `std::ptr::NonNull`
+
+## Sinopsis
+
+```rust
+let p: *const T = &x;          // crear: seguro
+let q: *mut T = &mut y;
+unsafe { p.read() }             // leer: unsafe
+unsafe { q.write(valor) }       // escribir: unsafe
+ptr::null::<T>(), p.is_null()
+p.add(n), p.offset(n)           // aritmética (unsafe: tiene que quedar dentro del mismo objeto)
+NonNull::new(q) -> Option<NonNull<T>>
+```
+
+## Qué hace
+
+Un **puntero crudo** es una dirección **sin ninguna de las garantías** de las referencias: puede ser nulo, estar desalineado, apuntar a memoria liberada o tener alias con un `&mut`. Por eso crearlo es seguro, pero **desreferenciarlo** (leer, escribir, crear una referencia a partir de él) es `unsafe`: tú garantizas que es válido.
+
+**`NonNull<T>`** es un `*mut T` que **nunca es nulo**. Gracias a eso, `Option<NonNull<T>>` ocupa lo mismo que un puntero (optimización de nicho), y es lo que usan por dentro `Box`, `Vec` y `Rc`. Además es covariante en `T`, como `*const T`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/ptr-nonnull" />
+
+## Errores típicos
+
+- Desreferenciar un puntero a una variable que ya salió de ámbito: el compilador no lo detecta (los punteros no tienen lifetime). Es comportamiento indefinido.
+- Usar `as` para convertir entre enteros y punteros: pierde la *procedencia* (*provenance*). Usa `ptr::with_exposed_provenance` o, mejor, las APIs de procedencia estricta (`addr`, `with_addr`), estables desde 1.84.
+
+## Desde
+
+Rust 1.0. `NonNull`: 1.25.
+
+## Ver también
+
+[`&raw` y `addr_of!`](/ref/std/macros/addr-of/) · [Mundo 20 · Unsafe](/curso/20-unsafe-y-ub/)

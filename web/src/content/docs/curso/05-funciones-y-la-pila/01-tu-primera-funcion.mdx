@@ -1,0 +1,134 @@
+---
+title: "Tu primera función"
+description: "Define tus propias funciones con fn, llámalas desde main y entiende el viaje de ida y vuelta que hace el programa en cada llamada."
+sidebar:
+  order: 1
+duracion: 8
+desde: "1.0"
+requiere: ["04-expresiones-y-control/10-jefe"]
+tarjetas:
+  - p: "¿Cómo se define una función sin parámetros que no devuelve nada?"
+    r: "`fn nombre() { ... }`."
+  - p: "¿Importa si defines una función antes o después de `main`?"
+    r: "No. Rust conoce todas las funciones del archivo antes de compilar las llamadas."
+  - p: "¿Qué pasa cuando una función termina?"
+    r: "El programa vuelve justo detrás del punto donde se la llamó y sigue desde ahí."
+  - p: "¿Qué convención de nombres usan las funciones en Rust?"
+    r: "*snake_case*: minúsculas con guiones bajos, como `dibujar_linea`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo } from '~/components';
+
+Vas a crear tus propias funciones y a seguir con el dedo el camino que recorre el programa cuando las llama.
+
+## Predice
+
+<Predice
+  ej="m05/primera-funcion"
+  opciones={[
+    "`¡hola desde saludar!` primero, porque la función está definida al final",
+    "`empieza main`, dos veces `¡hola desde saludar!` y `termina main`",
+    "`empieza main` y `termina main`: `saludar` no se ejecuta porque está después de `main`",
+    "No compila: hay que definir `saludar` antes de usarla"
+  ]}
+  correcta={1}
+  explicacion="El programa empieza siempre en `main`. Cada `saludar();` salta a la función, ejecuta su cuerpo y vuelve. El lugar donde esté escrita la función no importa."
+  porque={[
+    "Definir una función no la ejecuta: solo se ejecuta cuando alguien la llama.",
+    "",
+    "Sí se ejecuta: `main` la llama dos veces. La posición en el archivo da igual.",
+    "Rust no exige orden: conoce todas las funciones del archivo antes de comprobar las llamadas."
+  ]}
+/>
+
+## La idea
+
+Desde el mundo 02 llevas escribiendo una función: `main`. Ahora vas a escribir las tuyas. Una **definición** de función tiene la palabra `fn`, un **nombre**, unos paréntesis (de momento vacíos) y un **cuerpo**, que es un bloque `{ }`. Definirla no hace nada visible: solo le pone nombre a ese trozo de código.
+
+Para usarla la **llamas** (*call*): escribes su nombre seguido de paréntesis, `saludar();`. En ese momento el programa deja `main`, salta al cuerpo de `saludar`, lo ejecuta entero y **vuelve** al punto exacto de donde salió, para seguir con la siguiente línea.
+
+¿Para qué sirve? Para **no repetirte** (escribes algo una vez y lo usas muchas) y, sobre todo, para **poner nombre a las ideas**: `dibujar_tablero();` se entiende mucho mejor que veinte líneas de `print!`. Los nombres de funciones en Rust se escriben en minúsculas y con guiones bajos (*snake_case*): `dibujar_tablero`, no `DibujarTablero`.
+
+## Pruébalo
+
+<Ejecutar ej="m05/primera-funcion" />
+
+1. `main` imprime su primera línea.
+2. La primera llamada salta a `saludar`, imprime y vuelve.
+3. La segunda llamada repite el viaje.
+4. `main` termina, y con ella el programa.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Una llamada es un salto con billete de vuelta.** Cuando la CPU ejecuta una llamada, primero apunta **la dirección de la instrucción siguiente** (la «dirección de retorno») y después salta al principio de la función. Al terminar, la función salta a esa dirección apuntada. ¿Dónde se apunta? En la **pila**, la zona de memoria que conociste en el mundo 01. Lo verás con direcciones reales en la lección 6.
+
+**Por qué el orden no importa.** El compilador lee el archivo entero y apunta todos los **ítems** (*items*: funciones, y más adelante tipos y constantes) antes de comprobar ninguna llamada. Por eso `main` puede llamar a una función escrita debajo.
+
+**El compilador puede «pegar» la función.** Si una función es pequeña, el optimizador puede copiar su cuerpo en el lugar de la llamada (*inlining*) y ahorrarse el salto. Tu programa se comporta igual; solo va más rápido. Por eso dividir en funciones pequeñas no cuesta rendimiento.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m05/funcion-no-existe"
+  explicacion="Llamas a `saluda` pero la función se llama `saludar`. «cannot find function `saluda` in this scope» significa «no encuentro ninguna función `saluda` aquí». El compilador incluso te señala la que tiene un nombre parecido."
+/>
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena el programa para que imprima `---`, `menú`, `---` (una línea cada uno), usando la función `separador`."
+  lineas={[
+    "fn separador() {",
+    "    println!(\"---\");",
+    "}",
+    "fn main() {",
+    "    separador();",
+    "    println!(\"menú\");",
+    "    separador();",
+    "}"
+  ]}
+  distractores={["    fn separador();"]}
+  explicacion="La definición `fn separador() { ... }` va fuera de `main`; dentro de `main` solo se llama, con `separador();`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta={"Defines `fn ayuda() { println!(\"ayuda\"); }` pero nunca la llamas. ¿Qué pasa al ejecutar?"}
+  opciones={[
+    "Imprime «ayuda» al empezar",
+    "No imprime nada de `ayuda` (el compilador avisa de que no se usa)",
+    "No compila",
+    "Imprime «ayuda» al terminar"
+  ]}
+  correcta={1}
+  explicacion="Una función solo se ejecuta si alguien la llama. Rust compila igualmente, pero avisa de que hay código muerto (*dead code*)."
+  porque={[
+    "El programa empieza en `main`, no en las demás funciones.",
+    "",
+    "Compila; una función sin usar es solo un aviso, no un error.",
+    "Nada ejecuta `ayuda` automáticamente, ni al principio ni al final."
+  ]}
+/>
+
+<Pregunta
+  pregunta="Cuando una función termina, ¿por dónde sigue el programa?"
+  opciones={[
+    "Por el principio de `main`",
+    "Por la línea siguiente a la llamada",
+    "Por la función que esté escrita debajo",
+    "El programa termina"
+  ]}
+  correcta={1}
+  explicacion="Antes de saltar, se guarda la dirección de retorno. Al acabar la función, el programa vuelve justo ahí."
+  porque={[
+    "`main` no se reinicia: sigue donde se quedó.",
+    "",
+    "El orden en el archivo no influye en la ejecución.",
+    "Solo termina cuando termina `main`."
+  ]}
+/>

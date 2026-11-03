@@ -1,0 +1,106 @@
+---
+title: "Copiar, mover y represtar referencias"
+description: "Las referencias compartidas son Copy; las exclusivas se mueven. Para usar un &mut varias veces, Rust lo represta en cada llamada."
+sidebar:
+  order: 7
+duracion: 12
+desde: "1.0"
+requiere: ["07-prestamos/06-hasta-cuando-dura"]
+tarjetas:
+  - p: "¿Es `&T` un tipo `Copy`? ¿Y `&mut T`?"
+    r: "`&T` sí: copiar un lector no rompe nada. `&mut T` no: si se copiara habría dos escritores, así que se mueve."
+  - p: "¿Qué es un reborrow (represtar)?"
+    r: "Crear un préstamo nuevo y más corto a partir de otro: `&mut *r` (o `&*r`). Mientras el nuevo vive, el original queda en pausa."
+  - p: "¿Por qué puedes llamar dos veces a `f(r)` con `r: &mut T` sin que `r` se mueva?"
+    r: "Porque al pasar una referencia exclusiva a una función que espera `&mut T`, el compilador represta automáticamente: pasa `&mut *r`."
+  - p: "¿Por qué compila `v.push(v.len())`?"
+    r: "Por los préstamos en dos fases (*two-phase borrows*): el `&mut v` del método se reserva primero y solo se activa después de evaluar los argumentos, cuando `v.len()` ya terminó."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Las referencias también son valores: se guardan en variables, se pasan a funciones y se asignan. Vas a ver qué pasa al copiarlas, y por qué los dos tipos de préstamo se comportan **al revés**.
+
+## Predice
+
+<Predice
+  ej="m07/p-ref-copy"
+  opciones={["`hola hola hola`", "No compila: `r1` se movió a `r2`", "No compila: `s` está prestada", "`hola hola` y un error"]}
+  correcta={0}
+  explicacion="`let r2 = r1;` **copia** la referencia (una dirección). Ahora hay dos lectores de `s`, y leer `s` a la vez también es correcto: todos son lectores."
+  porque={["", "Las referencias compartidas son `Copy`: asignarlas no las mueve.", "Leer una variable prestada en compartido está permitido.", "No hay ningún error."]}
+/>
+
+## La idea
+
+**Una referencia compartida (`&T`) es `Copy`.** Copiarla crea otro lector, y la regla permite muchos lectores. No hay peligro en duplicarla.
+
+**Una referencia exclusiva (`&mut T`) no es `Copy`: se mueve.** Si se copiara, habría dos escritores, que es justo lo que prohíbe la regla. Por eso, después de `let r2 = r;`, la vieja `r` ya no sirve:
+
+<NoCompila ej="m07/p-mover-mut-ref" explicacion="`let r2 = r;` **mueve** el préstamo exclusivo a `r2`. `r` queda como cualquier variable movida: sin permisos. Es el mismo E0382 del mundo 06." />
+
+Entonces, ¿cómo puedes pasar un `&mut` a varias funciones seguidas? Con un **reborrow** («represtar»): crear un préstamo **nuevo y más corto** a partir del que ya tienes.
+
+```rust
+sumar_uno(&mut *r);   // un préstamo nuevo de *r, que vive solo durante la llamada
+```
+
+Mientras ese préstamo nuevo vive, `r` queda **en pausa**; cuando termina, `r` vuelve a estar disponible. Y lo mejor: cuando pasas `r` a una función que espera `&mut T`, **el compilador represta solo**. Por eso `sumar_uno(r); sumar_uno(r);` funciona.
+
+## Pruébalo
+
+<Predice
+  ej="m07/represtar-predice"
+  opciones={["`13`", "No compila: `r` se mueve en la primera llamada", "`3`", "`10`"]}
+  correcta={0}
+  explicacion="Tres llamadas que suman 1 (las dos primeras represtan automáticamente; la tercera lo hace a mano con `&mut *r`) y luego `*r += 10`: 0 + 1 + 1 + 1 + 10 = 13."
+  porque={["", "Al pasar `r` a una función que espera `&mut i32`, se represta: `r` no se mueve.", "Te has olvidado del `*r += 10`.", "Las tres llamadas sí suman."]}
+/>
+
+<Ejecutar ej="m07/p-reborrow" />
+
+Y un caso que parece imposible y compila:
+
+<Ejecutar ej="m07/p-two-phase" />
+
+`v.push(v.len())` necesita `&mut v` (para `push`) y `&v` (para `len`) en la misma línea. Compila porque el préstamo exclusivo de `push` se hace **en dos fases**: primero se *reserva*, luego se evalúan los argumentos (`v.len()` termina) y solo entonces se *activa*. Se llama *two-phase borrow* y existe precisamente para este patrón tan común.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El reborrow es una pila.** Imagina los préstamos de `x` apilados: abajo `r`, encima el préstamo nuevo `&mut *r`. Solo puede usarse el de **arriba**. Cuando el de arriba termina, se quita y el de abajo vuelve a poder usarse. Usar el de abajo antes de tiempo invalidaría el de arriba. Este modelo, con algunos matices, es el que usa la herramienta Miri para comprobar código `unsafe`: se llama *Stacked Borrows* (y su sucesor, *Tree Borrows*). Lo verás en el mundo 20.
+
+**Por qué el reborrow es automático solo a veces.** El compilador represta cuando **sabe** que el destino espera una referencia exclusiva (el tipo del parámetro es `&mut T`). En `let r2 = r;` no hay tipo anotado que lo pida, así que mueve. Si escribes `let r2: &mut Vec<i32> = r;`, sí represta. Es una regla de las *coerciones* de Rust, no de los préstamos.
+
+**`&mut` → `&`.** También puedes represtar en compartido: `&*r` da un `&T` a partir de un `&mut T`. Mientras ese lector vive, `r` no puede escribir.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Guardar un &mut «para luego» en otra variable">
+
+❌ `let atajo = r;` para «no escribir tanto»: mueve el préstamo y `r` deja de servir.
+
+✅ Usa `r` directamente. Si de verdad necesitas otro nombre durante un rato, represta: `let atajo = &mut *r;` y deja de usar `atajo` antes de volver a `r`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`let a: &String = &s; let b = a;` ¿Qué pasa con `a`?"
+  opciones={["Se mueve a `b` y ya no puede usarse", "Se copia: `a` y `b` son dos lectores válidos", "No compila", "`b` es un `String` nuevo"]}
+  correcta={1}
+  explicacion="`&T` es `Copy`. Copiar una referencia compartida solo copia la dirección y añade un lector."
+  porque={["Eso pasaría con un `&mut`.", "", "Compila sin problema.", "Se copia la dirección, no el texto."]}
+/>
+
+<Pregunta
+  pregunta="`fn f(v: &mut Vec<i32>)`. Tienes `let r = &mut lista;`. ¿Por qué `f(r); f(r);` compila?"
+  opciones={["Porque `&mut` es `Copy`", "Porque el compilador represta: cada llamada recibe `&mut *r`", "Porque `f` devuelve el préstamo", "No compila: la segunda llamada da E0382"]}
+  correcta={1}
+  explicacion="Al pasar una referencia exclusiva donde se espera `&mut T`, se crea un préstamo nuevo que vive durante la llamada. Al volver, `r` se puede usar otra vez."
+  porque={["No lo es: dos `&mut` copiados serían dos escritores.", "", "`f` no devuelve nada.", "Daría E0382 si `r` se moviera, pero se represta."]}
+/>

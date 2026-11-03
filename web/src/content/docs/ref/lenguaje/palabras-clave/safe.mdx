@@ -1,0 +1,63 @@
+---
+title: "safe"
+description: "Palabra clave débil: dentro de un bloque unsafe extern, marca una función o static como seguro de usar."
+sidebar:
+  order: 73
+desde: "1.82"
+categoria: "debil"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`safe` solo tiene significado **dentro de un bloque `unsafe extern`**: marca una función o un `static` externo que se puede usar **sin** bloque `unsafe`.
+
+## Sinopsis
+
+```text
+unsafe extern "C" {
+    pub safe fn f(x: i32) -> i32;      // se llama sin unsafe
+    pub unsafe fn g(p: *const u8);      // se llama dentro de unsafe
+    fn h();                             // sin marca: igual que unsafe
+    pub safe static N: i32;
+}
+```
+
+## Qué hace
+
+Al escribir `unsafe extern`, prometes que las firmas declaradas son correctas. Con `safe` prometes **además** que llamar a esa función es seguro **con cualquier argumento válido de su tipo**. Por ejemplo, una función que calcula el valor absoluto de un `i32` puede ser `safe`; una que lee de un puntero, no.
+
+Si esa promesa es falsa, el código seguro que la llama podría provocar comportamiento indefinido sin escribir `unsafe`: la culpa es de la declaración.
+
+Fuera de un bloque extern, `safe` es un identificador normal.
+
+## Ejemplo
+
+El ejemplo exporta dos funciones con la ABI `"C"` y las vuelve a importar a través de un bloque `unsafe extern`, una como `safe` y otra como `unsafe`:
+
+<Ejecutar ej="ref-lenguaje/kw-safe" />
+
+Salida:
+
+```text
+42
+7
+true
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-safe-error" />
+
+`error: items outside of unsafe extern { } cannot be declared with safe safety qualifier`.
+
+## Desde
+
+Rust 1.82 (junto con `unsafe extern`).
+
+## Ver también
+
+- [`extern`](/ref/lenguaje/palabras-clave/extern/) · [`unsafe`](/ref/lenguaje/palabras-clave/unsafe/) · [Atributos](/ref/lenguaje/atributos/): `#[unsafe(no_mangle)]`.
+
+## Aprende esto en
+
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)

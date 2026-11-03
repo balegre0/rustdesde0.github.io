@@ -1,0 +1,142 @@
+---
+title: "BTreeMap<K, V>"
+description: "Diccionario ordenado por clave: se recorre en orden y permite consultar rangos."
+sidebar:
+  order: 3
+insignias: ["Desde 1.0", "alloc"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::collections::BTreeMap`
+
+## Sinopsis
+
+```rust
+pub struct BTreeMap<K, V, A = Global>
+where
+    A: Allocator + Clone,
+{ /* private fields */ }
+```
+
+## Qué hace
+
+Un `BTreeMap` guarda los pares en un **árbol B**: nodos con varias claves ordenadas cada uno. Es algo más lento que `HashMap` para buscar, pero se recorre siempre en orden de clave y permite pedir rangos (`range`), el mínimo y el máximo.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`insert`](#insert) | Inserta o reemplaza; devuelve el valor anterior. | 1.0 |
+| [`get`](#get) | Busca una clave. | 1.0 |
+| [`range`](#range) | Iterador de los pares cuyas claves caen en un rango. | 1.17 |
+| [`first_key_value`](#first_key_value) | El par con la clave más pequeña. | 1.66 |
+| [`last_key_value`](#last_key_value) | El par con la clave más grande. | 1.66 |
+| [`entry`](#entry) | Igual que en `HashMap`: insertar o modificar en un paso. | 1.0 |
+| [`remove`](#remove) | Quita una clave. | 1.0 |
+
+### `insert`
+
+```rust
+pub fn insert(&mut self, key: K, value: V) -> Option<V>
+where
+    K: Ord,
+```
+
+Inserta o reemplaza; devuelve el valor anterior.
+
+### `get`
+
+```rust
+pub fn get<Q>(&self, key: &Q) -> Option<&V>
+where
+    K: Borrow<Q> + Ord,
+    Q: Ord + ?Sized,
+```
+
+Busca una clave.
+
+### `range`
+
+```rust
+pub fn range<T, R>(&self, range: R) -> Range<'_, K, V>
+where
+    T: Ord + ?Sized,
+    K: Borrow<T> + Ord,
+    R: RangeBounds<T>,
+```
+
+Iterador de los pares cuyas claves caen en un rango.
+
+### `first_key_value`
+
+```rust
+pub fn first_key_value(&self) -> Option<(&K, &V)>
+where
+    K: Ord,
+```
+
+El par con la clave más pequeña.
+
+### `last_key_value`
+
+```rust
+pub fn last_key_value(&self) -> Option<(&K, &V)>
+where
+    K: Ord,
+```
+
+El par con la clave más grande.
+
+### `entry`
+
+```rust
+pub fn entry(&mut self, key: K) -> Entry<'_, K, V, A>
+where
+    K: Ord,
+```
+
+Igual que en `HashMap`: insertar o modificar en un paso.
+
+### `remove`
+
+```rust
+pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
+where
+    K: Borrow<Q> + Ord,
+    Q: Ord + ?Sized,
+```
+
+Quita una clave.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/collections-btreemap" />
+
+**Salida:**
+
+```text
+Ana: 9
+Eva: 5
+Luis: 7
+Some(("Ana", 9))
+Some(("Luis", 7))
+[("Eva", 5), ("Luis", 7)]
+{"Ana": 9, "Eva": 6, "Luis": 7}
+```
+
+## Rendimiento
+
+`insert`, `get` y `remove`: O(log n). Recorrer en orden: O(n).
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `range` (1.17), `first_key_value` (1.66), `last_key_value` (1.66).
+
+## Ver también
+
+- [HashMap](/ref/std/collections/hashmap/)
+- [std::cmp (Ord)](/ref/std/cmp/ord/)
+
+## Aprende esto en
+
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

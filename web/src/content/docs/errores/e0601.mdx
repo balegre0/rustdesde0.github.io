@@ -1,0 +1,66 @@
+---
+title: "E0601: no hay función main"
+description: "Compilas un programa (binario) que no tiene función main."
+sidebar:
+  order: 56
+insignias: ["Constantes, unsafe, async y otros"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` `main` function not found in crate `ejemplo` ``
+
+## Qué significa
+
+Un programa ejecutable empieza siempre en `fn main()`. Si el archivo no la tiene, el compilador no sabe por dónde empezar. Las bibliotecas (`src/lib.rs`) no la necesitan; los programas (`src/main.rs`) sí.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0601" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0601]: `main` function not found in crate `ejemplo`
+ --> E0601.rs:3:2
+  |
+3 | }
+  |  ^ consider adding a `main` function to `E0601.rs`
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Nombrar la función principal de otra forma.
+- Escribir código de biblioteca en `main.rs`.
+- Una errata: `fn mian()`.
+
+## Cómo arreglarlo
+
+Añade `fn main() { ... }` o renombra tu función a `main`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    println!("hola");
+}
+```
+
+**Salida:**
+
+```text
+hola
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0601` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0425](/errores/e0425/): nombre no encontrado
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)

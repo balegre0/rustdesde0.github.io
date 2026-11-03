@@ -1,0 +1,58 @@
+---
+title: "in"
+description: "Palabra clave estricta: separa patrón e iterador en for, y forma la visibilidad pub(in ruta)."
+sidebar:
+  order: 18
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`in` solo aparece en dos sitios: en el bucle `for` y en la visibilidad `pub(in ruta)`.
+
+## Sinopsis
+
+```text
+for patrón in expresión { … }
+pub(in ruta::de::módulo) elemento
+```
+
+## Qué hace
+
+### Uso 1 · En `for`
+
+Separa el patrón (a la izquierda) de la expresión que se convierte en iterador (a la derecha). Ver [`for`](/ref/lenguaje/palabras-clave/for/).
+
+### Uso 2 · `pub(in ruta)`
+
+Hace visible un elemento **solo dentro** del módulo indicado (y sus descendientes). La ruta debe ser un **antepasado** del módulo actual y empezar por `crate`, `self` o `super`. `pub(crate)`, `pub(super)` y `pub(self)` son casos particulares.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-in" />
+
+Salida:
+
+```text
+rust
+42
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-in-error" />
+
+`error[E0603]: function secreto is private`: desde `main` (fuera de `crate::a`) no se ve.
+
+## Desde
+
+Rust 1.0 (`for`). `pub(in ruta)`: 1.18.
+
+## Ver también
+
+- [`for`](/ref/lenguaje/palabras-clave/for/) · [`pub`](/ref/lenguaje/palabras-clave/pub/) · [Visibilidad y rutas](/ref/lenguaje/visibilidad-y-rutas/)
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/) · [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

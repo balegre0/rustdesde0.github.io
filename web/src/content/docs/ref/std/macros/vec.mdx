@@ -1,0 +1,47 @@
+---
+title: "vec!"
+description: "Crea un Vec: con elementos (vec![1, 2, 3]), con un valor repetido (vec![0; n]) o vacío."
+sidebar:
+  order: 3
+insignias: ["Desde 1.0", "alloc"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::vec`
+
+## Sinopsis
+
+```rust
+macro_rules! vec {
+    () => { ... };
+    ($elem:expr; $n:expr) => { ... };
+    ($($x:expr),+ $(,)?) => { ... };
+}
+```
+
+## Qué hace
+
+Tres formas: `vec![a, b, c]` con elementos; `vec![valor; n]` con `n` copias (el valor debe ser `Clone`); `vec![]` vacío.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-vec" />
+
+**Salida:**
+
+```text
+[1, 2, 3] [0, 0, 0, 0, 0] [] ["x", "x"]
+true 5
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [Vec](/ref/std/vec/vec/)
+
+## Aprende esto en
+
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

@@ -1,0 +1,57 @@
+---
+title: "while"
+description: "Palabra clave estricta: repite un bloque mientras se cumpla una condición o encaje un patrón."
+sidebar:
+  order: 39
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`while` repite su bloque **mientras** una condición sea verdadera (o mientras un patrón encaje, con `while let`).
+
+## Sinopsis
+
+```text
+'etiqueta: while condición { … }
+while let patrón = expresión { … }
+while let P = e && condición { … }      // cadena let (edición 2024)
+```
+
+## Qué hace
+
+- Comprueba la condición **antes** de cada vuelta; si de entrada es falsa, el cuerpo no se ejecuta nunca.
+- `while let` vuelve a evaluar la expresión en cada vuelta y sigue mientras encaje el patrón. Es el modo típico de vaciar una pila: `while let Some(x) = pila.pop()`.
+- Un `while` siempre vale `()`; su `break` no puede llevar valor.
+- Admite `break`, `continue` y etiquetas.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-while" />
+
+Salida:
+
+```text
+10 7 4 1
+c b a
+[1, 2, 30]
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-while-error" />
+
+`error[E0308]: mismatched types` con `expected bool, found integer`.
+
+## Desde
+
+Rust 1.0. Cadenas `let` en `while`: 1.88 (edición 2024).
+
+## Ver también
+
+- [`loop`](/ref/lenguaje/palabras-clave/loop/) · [`for`](/ref/lenguaje/palabras-clave/for/) · [`break`](/ref/lenguaje/palabras-clave/break/) · [`let`](/ref/lenguaje/palabras-clave/let/)
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/)

@@ -1,0 +1,1 @@
+{ "nota": "En el navegador (wasm32) un usize mide 4 bytes y la ficha de un String 12. En un PC de 64 bits: 8 y 24." }

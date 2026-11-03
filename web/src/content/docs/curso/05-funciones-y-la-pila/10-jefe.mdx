@@ -1,0 +1,113 @@
+---
+title: "Jefe: la calculadora de fracciones"
+description: "Combina funciones, parámetros, retornos, tuplas y recursión en una calculadora de fracciones, y repasa qué pasa en la pila en cada llamada."
+sidebar:
+  order: 10
+duracion: 15
+desde: "1.0"
+requiere: ["05-funciones-y-la-pila/09-cuanta-pila-cabe"]
+tarjetas:
+  - p: "¿Cómo devuelve una función dos valores a la vez?"
+    r: "En una tupla: `-> (u64, u64)`, y quien llama la desarma con `let (n, m) = f(...);`."
+  - p: "¿Cuántos marcos hay en la pila mientras se ejecuta `mcd` dentro de `simplificar` dentro de `sumar` dentro de `mostrar` dentro de `main`?"
+    r: "Al menos cinco, uno por cada llamada activa (más los de cada nivel recursivo de `mcd`)."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Último combate del mundo: una calculadora de fracciones hecha de funciones pequeñas que se llaman unas a otras.
+
+## Predice
+
+<Predice
+  ej="m05/fracciones"
+  pregunta="¿Qué imprime la segunda línea, `3/4 + 1/4`?"
+  opciones={["`3/4 + 1/4 = 4/4`", "`3/4 + 1/4 = 16/16`", "`3/4 + 1/4 = 1/1`", "`3/4 + 1/4 = 4/8`"]}
+  correcta={2}
+  explicacion="`sumar` calcula (3·4 + 1·4) / (4·4) = 16/16 y llama a `simplificar`, que divide entre `mcd(16, 16)` = 16: queda 1/1."
+  porque={[
+    "4/4 sería sumar numeradores con el mismo denominador, pero la fórmula multiplica los denominadores y además se simplifica.",
+    "16/16 es el resultado ANTES de simplificar; `sumar` devuelve el resultado de `simplificar`.",
+    "",
+    "Los denominadores se multiplican (4·4 = 16), no se suman."
+  ]}
+/>
+
+## La idea
+
+Repaso en cuatro frases:
+
+- **Una función es un contrato**: `fn nombre(parámetros con tipo) -> tipo`. Cada llamada se comprueba contra la firma.
+- **El resultado es la última expresión** del cuerpo, sin `;`. `return` es para salir antes.
+- **Cada llamada tiene su marco** en la pila, con sus parámetros y variables; se libera al volver. La recursión apila un marco por nivel.
+- **No todo cabe en la pila**: lo de tamaño variable va al heap, y entonces surge la pregunta de quién lo libera (mundo 06).
+
+## Pruébalo
+
+<Ejecutar ej="m05/fracciones" />
+
+1. `simplificar` devuelve una **tupla** `(u64, u64)`: dos valores en uno.
+2. `mostrar` la desarma con `let (n, m) = ...;`, un **patrón** como los del `match`.
+3. Cada función hace **una sola cosa** y tiene un nombre que lo dice. Leer `main` basta para saber qué hace el programa.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La pila en el momento más profundo.** Mientras `mcd` trabaja para `mostrar(1, 2, 1, 3)`, la pila contiene, de arriba abajo: el marco de `main`, el de `mostrar` (con `a, b, c, d`), el de `sumar`, el de `simplificar` (con `num = 5, den = 6`) y los de cada nivel de `mcd`: `mcd(5, 6)` → `mcd(6, 5)` → `mcd(5, 1)` → `mcd(1, 0)`, que es el caso base. Cuatro niveles de `mcd`, cada uno con su marco.
+
+**Las tuplas viajan por valor.** `(u64, u64)` ocupa 16 bytes y se devuelve copiándose al marco de quien llama (o en registros, si el compilador puede). Como los `u64` son números, copiarlos es seguro y barato. En el mundo 06 verás qué cambia cuando lo que se devuelve es un `String`.
+
+**El optimizador puede deshacer tus funciones.** En modo *release*, el compilador probablemente integre `simplificar` y `sumar` dentro de `mostrar` (*inlining*), y convierta la recursión de `mcd` en un bucle, porque la llamada recursiva es lo último que hace la función (**recursión de cola**, *tail call*). Rust no **garantiza** esa conversión: si necesitas recursión muy profunda, escribe un bucle.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Tres errores del mundo. Antes de abrir cada uno, intenta adivinar el código de error.
+
+<NoCompila ej="m05/punto-y-coma-final" explicacion="El `;` final se come el valor de retorno: el cuerpo vale `()`." />
+
+<NoCompila ej="m05/argumentos-de-mas" explicacion="Un argumento por parámetro, siempre." />
+
+<NoCompila ej="m05/rama-sin-valor" explicacion="Un camino (n == 0) termina sin valor." />
+
+## Tu turno
+
+<Reto
+  ej="m05/mcd"
+  enunciado="Escribe `mcd(a: u32, b: u32) -> u32` de forma recursiva (Euclides: `mcd(a, 0) = a`, `mcd(a, b) = mcd(b, a % b)`) y `simplificar(num, den)`, que imprime la fracción simplificada con el formato `12/18 = 2/3`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántas llamadas a `mcd` hace `mcd(48, 36)`?"
+  opciones={["2", "3", "4", "12"]}
+  correcta={1}
+  explicacion="mcd(48, 36) → mcd(36, 12) → mcd(12, 0), que es el caso base. Tres llamadas; el resultado es 12."
+  porque={[
+    "Te dejas la llamada del caso base, mcd(12, 0).",
+    "",
+    "Después de mcd(12, 0) no hay más llamadas: b vale 0.",
+    "12 es el resultado, no el número de llamadas."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Qué firma es correcta para una función que recibe un precio y un porcentaje y devuelve el precio con descuento y lo ahorrado?"
+  opciones={[
+    "`fn descuento(precio: f64, pct: f64) -> f64, f64`",
+    "`fn descuento(precio: f64, pct: f64) -> (f64, f64)`",
+    "`fn descuento(precio, pct) -> (f64, f64)`",
+    "`fn descuento(precio: f64, pct: f64) { (f64, f64) }`"
+  ]}
+  correcta={1}
+  explicacion="Para devolver dos valores se devuelve una tupla, y su tipo va entre paréntesis tras `->`."
+  porque={[
+    "Sin paréntesis, Rust no entiende dos tipos de retorno sueltos.",
+    "",
+    "Faltan los tipos de los parámetros.",
+    "El tipo de retorno va tras `->`, no dentro del cuerpo."
+  ]}
+/>

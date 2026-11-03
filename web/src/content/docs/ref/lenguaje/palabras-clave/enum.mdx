@@ -1,0 +1,64 @@
+---
+title: "enum"
+description: "Palabra clave estricta: define un tipo cuyo valor es exactamente una de varias variantes."
+sidebar:
+  order: 11
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Un `enum` (enumeración) es un tipo que vale **una de varias variantes**, y cada variante puede llevar sus propios datos.
+
+## Sinopsis
+
+```text
+enum Nombre<genéricos> where … {
+    Unidad,                       // sin datos
+    Tupla(T1, T2),                // datos sin nombre
+    Struct { campo: T },          // datos con nombre
+    ConDiscriminante = 3,         // valor numérico explícito
+}
+```
+
+## Qué hace
+
+- Cada valor es **exactamente una** variante. Para saber cuál, se usa `match` o `if let`; el compilador obliga a cubrir todas las variantes.
+- El compilador guarda una **etiqueta** (el *discriminante*) junto a los datos. Muchas veces la esconde en valores imposibles de los propios datos (un *nicho*): por eso `Option<&T>` ocupa lo mismo que `&T`.
+- Las variantes se nombran con la ruta del enum: `Mensaje::Salir`. Las variantes tipo tupla son también funciones constructoras: `Some` funciona como `fn(T) -> Option<T>`.
+- Un enum **sin variantes** (`enum Nunca {}`) no tiene ningún valor posible.
+- Con `#[repr(u8)]`, `#[repr(C)]`, etc., fijas cómo se guarda la etiqueta. Los discriminantes explícitos se pueden usar en variantes con datos si el enum tiene un `repr` primitivo.
+- `as` convierte una variante **sin datos** a su discriminante.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-enum" />
+
+Salida:
+
+```text
+salir
+mover a (1, -2)
+escribir «hola»
+NoEncontrado = 404
+Ok
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-enum-error" />
+
+`error[E0004]: non-exhaustive patterns: Semaforo::Ambar not covered`. El compilador incluso sugiere la rama que falta.
+
+## Desde
+
+Rust 1.0. Discriminantes explícitos en variantes con datos: 1.66.
+
+## Ver también
+
+- [`match`](/ref/lenguaje/palabras-clave/match/) · [`struct`](/ref/lenguaje/palabras-clave/struct/) · [`union`](/ref/lenguaje/palabras-clave/union/) · [Patrones](/ref/lenguaje/patrones/) · [Layout de tipos](/ref/lenguaje/layout-de-tipos/)
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

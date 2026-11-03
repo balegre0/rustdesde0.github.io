@@ -1,0 +1,119 @@
+---
+title: "bool y char"
+description: "Usa valores de verdad (bool) y caracteres Unicode (char), y descubre por qué un char ocupa siempre 4 bytes aunque la ñ en UTF-8 ocupe 2."
+sidebar:
+  order: 9
+duracion: 12
+desde: "1.0"
+requiere: ["03-valores-y-tipos/04-enteros", "01-la-maquina/10-texto-en-bytes-utf8"]
+tarjetas:
+  - p: "¿Cuántos bytes ocupa un `bool`? ¿Y un `char`?"
+    r: "`bool`: 1 byte. `char`: 4 bytes, siempre."
+  - p: "¿Qué es exactamente un `char` en Rust?"
+    r: "Un valor escalar Unicode: un número de 0 a 0x10FFFF, excluyendo los sustitutos 0xD800–0xDFFF."
+  - p: "¿Qué comillas usa un `char`? ¿Y un texto?"
+    r: "`char`: comillas simples, `'ñ'`. Texto (`&str`): comillas dobles, `\"ñ\"`."
+  - p: "¿Qué devuelve `char::from_u32(0xD800)`?"
+    r: "`None`: 0xD800 es un sustituto (surrogate), no un valor escalar Unicode."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Hoy conoces dos tipos pequeños pero fundamentales: el que responde «sí o no» y el que guarda **una letra**. Una letra de cualquier idioma, incluida la ñ, el griego o un cangrejo 🦀.
+
+## Predice
+
+<Predice
+  ej="m03/char"
+  opciones={["`€ -> U+20AC, bytes en UTF-8: 3`", "`€ -> U+20AC, bytes en UTF-8: 1`", "`€ -> U+20AC, bytes en UTF-8: 4`", "`€ -> U+0080, bytes en UTF-8: 1`"]}
+  correcta={0}
+  explicacion="El euro es el carácter Unicode U+20AC. En UTF-8, los números de U+0800 a U+FFFF se codifican con 3 bytes."
+  porque={["", "Solo los caracteres ASCII (hasta U+007F) ocupan 1 byte en UTF-8.", "4 bytes es lo que ocupa un `char` en memoria; en UTF-8 el euro ocupa 3.", "U+0080 no es el euro: el euro es U+20AC."]}
+/>
+
+## La idea
+
+**`bool`** (de George Boole) tiene solo dos valores: `true` (verdadero) y `false` (falso). Es el resultado de toda comparación (`5 > 3` es `true`) y se combina con `&&` («y»), `||` («o») y `!` («no»). Ocupa 1 byte.
+
+**`char`** es **un carácter Unicode**. Se escribe entre comillas **simples**: `'a'`, `'ñ'`, `'€'`, `'🦀'`. Por dentro es un número: el **valor escalar Unicode** (*Unicode scalar value*) de ese carácter, de 0 a 0x10FFFF. Ocupa **siempre 4 bytes**, sea una `a` o un emoji, porque 4 bytes bastan para cualquier número de ese rango.
+
+No confundas un `char` con un texto. `'ñ'` (comillas simples) es un `char` de 4 bytes. `"ñ"` (comillas dobles) es un texto (`&str`) codificado en UTF-8, donde la ñ ocupa 2 bytes. Son tipos distintos.
+
+## Pruébalo
+
+<Ejecutar ej="m03/char" />
+
+Salida real:
+
+```text
+llueve: false, sol: true
+y: false, o: true
+a -> U+0061, bytes en UTF-8: 1
+ñ -> U+00F1, bytes en UTF-8: 2
+Ω -> U+03A9, bytes en UTF-8: 2
+€ -> U+20AC, bytes en UTF-8: 3
+🦀 -> U+1F980, bytes en UTF-8: 4
+bool ocupa 1 byte, char ocupa 4 bytes
+```
+
+`c.len_utf8()` te dice cuántos bytes **ocuparía** ese carácter dentro de un texto UTF-8: de 1 a 4. Pero como `char`, en una variable, todos miden 4.
+
+## Bajo el capó
+
+<BajoElCapo titulo="No todo número es un char válido">
+Un `bool` ocupa un byte entero, pero solo dos patrones son válidos: `00000000` (`false`) y `00000001` (`true`). Un `char` ocupa 4 bytes, pero no todos los números de 32 bits son caracteres: solo los de 0 a 0x10FFFF, **sin** el hueco 0xD800–0xDFFF (los «sustitutos» o *surrogates*, reservados por Unicode para otra codificación). Rust **garantiza** que un `char` siempre contiene un valor válido. Por eso convertir un número en `char` puede fallar:
+
+<Ejecutar ej="m03/char-de-numero" />
+
+Salida real:
+
+```text
+0 1
+Some('A')
+Some('🦀')
+None
+None
+char::MAX = U+10FFFF
+```
+
+`false as u8` es 0 y `true as u8` es 1. `char::from_u32` devuelve `None` para el sustituto 0xD800 y para 0x110000, que se sale del rango.
+
+Estas garantías («un `bool` es 0 o 1», «un `char` es un valor escalar válido») son parte de las reglas de **validez** de Rust. En el código normal no puedes romperlas; en el Mundo 20 verás que, con `unsafe`, fabricar un `bool` que valga 2 es comportamiento indefinido.
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m03/char-comillas" explicacion="E0308: se esperaba un `char` y se encontró un `&str`. Las comillas dobles crean texto; para un carácter, comillas simples. El propio compilador lo sugiere." />
+
+El `help:` del error es muy directo: «si querías escribir un literal `char`, usa comillas simples».
+
+## Tu turno
+
+<Reto
+  ej="m03/mayuscula"
+  enunciado="Para `c = 'ñ'`, imprime el carácter, su número Unicode en hexadecimal con `U+`, si es alfabético (`c.is_alphabetic()`) y su mayúscula (`c.to_uppercase()`). Salida exacta: `ñ U+F1 true Ñ`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántos bytes ocupa en memoria `let c = 'a';`?"
+  opciones={["1", "2", "4", "Depende del carácter"]}
+  correcta={2}
+  explicacion="Un `char` mide siempre 4 bytes. Es en UTF-8, dentro de un texto, donde la `a` ocuparía 1."
+  porque={["1 byte es lo que ocupa la `a` en UTF-8, no como `char`.", "Ningún `char` mide 2.", "", "El tamaño de un tipo es fijo: no depende del valor."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué vale `!(3 > 5) && true`?"
+  opciones={["`true`", "`false`", "No compila", "`1`"]}
+  correcta={0}
+  explicacion="`3 > 5` es `false`; `!false` es `true`; `true && true` es `true`."
+  porque={["", "El `!` invierte el `false` de la comparación.", "Es una expresión booleana válida.", "Un `bool` se imprime como `true`/`false`, no como número."]}
+/>
+
+<Respuesta
+  pregunta="¿Cuántos bytes ocupa la «ñ» codificada en UTF-8?"
+  respuestas={["2", "dos"]}
+  explicacion="U+00F1 está entre U+0080 y U+07FF, que en UTF-8 se codifican con 2 bytes: `c3 b1`."
+/>

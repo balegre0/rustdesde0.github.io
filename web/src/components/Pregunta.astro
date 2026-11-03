@@ -1,0 +1,8 @@
+---
+// <Pregunta pregunta opciones correcta explicacion? porque? /> — CONTENIDO.md §4
+import PreguntaIsla from './islas/Pregunta';
+interface Props { pregunta: string; opciones: string[]; correcta: number; explicacion?: string; porque?: string[]; idPregunta?: string }
+const { pregunta, opciones, correcta, explicacion, porque, idPregunta } = Astro.props;
+if (!Array.isArray(opciones) || correcta < 0 || correcta >= opciones.length) throw new Error(`<Pregunta pregunta="${pregunta}">: "correcta" (${correcta}) debe ser un índice válido de "opciones".`);
+---
+<PreguntaIsla client:visible pregunta={pregunta} opciones={opciones} correcta={correcta} explicacion={explicacion} porque={porque} idPregunta={idPregunta} />

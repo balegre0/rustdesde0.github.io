@@ -1,0 +1,1 @@
+{ "nota": "En el navegador (wasm32) usize mide 4 bytes: &str ocupa 8 y String 12. En tu PC de 64 bits: 16 y 24." }

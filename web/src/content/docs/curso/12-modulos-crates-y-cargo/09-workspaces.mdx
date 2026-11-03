@@ -1,0 +1,91 @@
+---
+title: "Workspaces"
+description: "Un workspace agrupa varios paquetes que comparten Cargo.lock y carpeta target: se compilan juntos y pueden depender unos de otros por ruta."
+sidebar:
+  order: 9
+duracion: 9
+desde: "1.12"
+requiere: ["12-modulos-crates-y-cargo/08-perfiles-y-cfg"]
+tarjetas:
+  - p: "¿Qué es un workspace de Cargo?"
+    r: "Un conjunto de paquetes que comparten un `Cargo.lock` y una carpeta `target`. Se declara con `[workspace]` y `members` en un `Cargo.toml` raíz."
+  - p: "¿Cómo depende un paquete de otro del mismo workspace?"
+    r: "Por ruta: `nucleo = { path = \"../nucleo\" }` (o con `workspace = true` si se declaró en `[workspace.dependencies]`)."
+  - p: "¿Por qué usar un workspace en vez de un único paquete enorme?"
+    r: "Porque cada crate se recompila por separado: cambiar uno no obliga a recompilar los que no dependen de él. Además separa responsabilidades."
+---
+
+import { Pregunta, Trampa } from '~/components';
+
+Cuando un proyecto crece, conviene partirlo en varios crates: una biblioteca con la lógica, un programa de terminal, quizá un servidor. Un **workspace** los mantiene juntos.
+
+## La idea
+
+Un **workspace** es una carpeta con un `Cargo.toml` raíz que lista varios paquetes:
+
+```text
+mi-juego/
+├── Cargo.toml          ← el del workspace
+├── Cargo.lock          ← uno solo para todos
+├── target/             ← uno solo para todos
+├── nucleo/             ← biblioteca: reglas del juego
+│   ├── Cargo.toml
+│   └── src/lib.rs
+└── terminal/           ← binario: juega en la terminal
+    ├── Cargo.toml
+    └── src/main.rs
+```
+
+El `Cargo.toml` raíz:
+
+```toml
+[workspace]
+members = ["nucleo", "terminal"]
+resolver = "3"
+
+[workspace.dependencies]
+rand = "0.9"            # versión compartida por todos los miembros
+```
+
+Y `terminal/Cargo.toml` depende de `nucleo` **por ruta**, y de `rand` con la versión del workspace:
+
+```toml
+[dependencies]
+nucleo = { path = "../nucleo" }
+rand = { workspace = true }
+```
+
+Desde la raíz:
+
+```powershell
+cargo build                 # compila todos los miembros
+cargo run -p terminal       # ejecuta un paquete concreto
+cargo test --workspace      # prueba todos
+```
+
+## Qué ganas
+
+- **Un solo `Cargo.lock`**: todos los miembros usan las mismas versiones de las dependencias.
+- **Un solo `target`**: lo que ya está compilado se reutiliza entre miembros.
+- **Recompilación por partes**: si cambias `terminal`, `nucleo` no se recompila.
+- **Fronteras claras**: `terminal` solo ve lo que `nucleo` exporta como `pub`.
+
+Es la estructura de casi todos los proyectos grandes de Rust, incluido el propio compilador.
+
+<Trampa titulo="Crear un paquete dentro de otro sin workspace">
+
+❌ `cargo new` dentro de la carpeta de otro paquete y esperar que se compilen juntos. Cada uno tendrá su `Cargo.lock` y su `target`, y Cargo avisará de que el paquete interior «parece estar en un workspace» sin serlo.
+
+✅ Crea el `Cargo.toml` raíz con `[workspace]` y añade cada paquete a `members` (`cargo new` dentro de un workspace lo añade solo).
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En un workspace con los miembros `a` y `b`, ¿cuántos `Cargo.lock` hay?"
+  opciones={["Ninguno", "Uno, en la raíz", "Uno por miembro", "Tres"]}
+  correcta={1}
+  explicacion="El workspace comparte un único `Cargo.lock` y una única carpeta `target`."
+  porque={["Siempre hay uno en cuanto compilas.", "", "Esa es justo la diferencia con tener paquetes sueltos.", "Solo hay uno."]}
+/>

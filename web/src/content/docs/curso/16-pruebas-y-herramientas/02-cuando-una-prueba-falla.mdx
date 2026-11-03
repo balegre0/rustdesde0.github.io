@@ -1,0 +1,226 @@
+---
+title: "Cuando una prueba falla"
+description: "Lee un fallo como una pista, escribe mensajes que expliquen qué salió mal y prueba también los pánicos y los errores."
+sidebar:
+  order: 2
+duracion: 13
+desde: "1.0"
+requiere: ["16-pruebas-y-herramientas/01-tu-primer-test"]
+tarjetas:
+  - p: "¿Qué hace `#[should_panic(expected = \"…\")]`?"
+    r: "La prueba pasa solo si entra en pánico **y** el mensaje del pánico contiene ese texto. Sin `expected`, cualquier pánico la daría por buena, incluso uno por otra razón."
+  - p: "¿Cómo escribes una prueba que use `?`"
+    r: "Haz que devuelva `Result<(), E>` (con `E: Debug`). Si devuelve `Err`, la prueba falla; si devuelve `Ok(())`, pasa."
+  - p: "¿Para qué sirve `#[ignore]`?"
+    r: "Para que `cargo test` no ejecute esa prueba por defecto (por ejemplo, porque es lenta). Se ejecuta con `cargo test -- --ignored`. Admite un motivo: `#[ignore = \"lenta\"]`."
+  - p: "¿Qué diferencia hay entre `assert!` y `debug_assert!`?"
+    r: "`debug_assert!` solo se comprueba con las comprobaciones de depuración activas (perfil debug); en release desaparece. `assert!` se comprueba siempre."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Una prueba que falla no es un desastre: es la herramienta haciendo su trabajo. Vas a aprender a sacarle toda la información a un fallo y a probar también lo que *debe* salir mal.
+
+## Predice
+
+El año 1900 **no** fue bisiesto (los siglos solo lo son si se dividen entre 400). Esta función se olvida de esa regla. ¿Qué verás?
+
+<Predice
+  ej="m16/assert-mensaje"
+  opciones={["`todo bien`", "Un pánico con el mensaje `1900 no es bisiesto, pero es_bisiesto dice que sí`", "Un pánico con el mensaje `assertion failed: !es_bisiesto(año)`", "No compila: `assert!` no admite un mensaje"]}
+  correcta={1}
+  explicacion="`es_bisiesto(1900)` devuelve `true` (1900 es múltiplo de 4), así que `!true` es `false` y el `assert!` falla. Como le diste un mensaje propio, el pánico muestra **tu** mensaje, con `{año}` sustituido por `1900`."
+  porque={["La función está incompleta y la comprobación no se cumple.", "Correcto: con mensaje propio, se imprime ese mensaje.", "Ese sería el texto si no hubieras escrito un mensaje. Al escribirlo, sustituye al genérico.", "Todas las macros `assert` aceptan un mensaje con formato después de la condición."]}
+/>
+
+## La idea
+
+Cuando una prueba falla, `cargo test` te da tres pistas: **qué prueba** falló (su nombre completo), **dónde** (archivo, línea y columna del `assert`) y **por qué** (el mensaje y, con `assert_eq!`, los dos valores). Un buen mensaje ahorra minutos: escribe en él lo que *esperabas* y los datos que usaste.
+
+Además de comprobar valores, a menudo quieres comprobar que algo **falla bien**. Rust te da tres herramientas:
+
+- **`#[should_panic]`**: la prueba pasa solo si entra en pánico. Con `expected = "texto"` exiges además que el mensaje contenga ese texto.
+- **Pruebas que devuelven `Result<(), E>`**: así puedes usar `?` dentro. Si sale un `Err`, la prueba falla y se muestra el error.
+- **`#[ignore]`**: aparta una prueba (por ejemplo, una lenta). No se ejecuta salvo que lo pidas con `cargo test -- --ignored`.
+
+## Pruébalo
+
+Estas son pruebas reales de una pequeña biblioteca de notas. Cada una enseña una herramienta:
+
+```rust title="src/lib.rs (fragmento)"
+pub fn parsear(texto: &str) -> Result<f64, String> { /* … */ }
+pub fn nota_en(notas: &[f64], i: usize) -> f64 { notas[i] }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cinco_aprueba() {
+        assert!(aprobado(5.0));
+        assert!(!aprobado(4.9), "4.9 no debería aprobar");
+    }
+
+    // 1. Una prueba que devuelve Result: puede usar `?`.
+    #[test]
+    fn parsear_bien() -> Result<(), String> {
+        let n = parsear(" 7.5 ")?;
+        assert_eq!(n, 7.5);
+        Ok(())
+    }
+
+    // 2. Debe entrar en pánico, y con ese mensaje.
+    #[test]
+    #[should_panic(expected = "index out of bounds")]
+    fn nota_fuera_de_rango() {
+        nota_en(&[1.0], 3);
+    }
+
+    // 3. Lenta: solo con `cargo test -- --ignored`.
+    #[test]
+    #[ignore = "lento: recorre un millón de notas"]
+    fn muchas_notas() {
+        let v = vec![5.0; 1_000_000];
+        assert_eq!(media(&v), Some(5.0));
+    }
+}
+```
+
+Y así se ve `cargo test -- --ignored`, que ejecuta **solo** las ignoradas:
+
+```text title="cargo test -- --ignored (salida real, recortada)"
+running 1 test
+test tests::muchas_notas ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.02s
+```
+
+Fíjate en el `--` del medio: lo que va **antes** es para Cargo; lo que va **después**, para el programa de pruebas.
+
+Ahora, un fallo de verdad. Esta función tiene un error y la prueba lo caza:
+
+```rust
+pub fn doble(x: i32) -> i32 {
+    x * 3 // ¡error! debería ser x * 2
+}
+
+#[test]
+fn doble_de_dos() {
+    assert_eq!(doble(2), 4);
+}
+```
+
+El mensaje que produce el `assert_eq!` (salida real):
+
+```text
+assertion `left == right` failed
+  left: 6
+ right: 4
+```
+
+En tu PC, `cargo test` además lo envuelve en un **informe de fallos**. Para ver su forma exacta, aquí tienes uno real de una prueba que falla devolviendo `Err` (como `parsear_bien`, pero con el texto `"abc"`):
+
+```text title="informe real de una prueba fallida"
+running 1 test
+test leer_numero ... FAILED
+
+failures:
+
+---- leer_numero stdout ----
+Error: ParseIntError { kind: InvalidDigit }
+
+
+failures:
+    leer_numero
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+Tres partes: la línea `FAILED`, una sección por cada prueba fallida con lo que imprimió (aquí, el error con `Debug`; con un `assert_eq!` fallido, el mensaje `left`/`right` de arriba junto con el archivo y la línea) y la lista de los nombres que fallaron. El programa termina con un código de error (101), que es lo que usan los servidores de integración continua para saber que algo se ha roto.
+
+Un primo de `assert!`: **`debug_assert!`**, que solo se comprueba en el perfil debug. Sirve para comprobaciones caras que quieres durante el desarrollo pero no en el programa final. Este ejemplo muestra los dos perfiles:
+
+<Ejecutar ej="m16/debug-assert" />
+
+En debug, el segundo cálculo se detiene con tu mensaje. En release, la comprobación no existe y el programa imprime un porcentaje sin sentido (`125%`). Úsalo para detectar errores tuyos, nunca para validar datos que vienen de fuera.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+¿Cómo puede el arnés **seguir ejecutando pruebas** después de que una entre en pánico? Porque en tu PC, por defecto, un pánico **desenrolla la pila** (*unwinding*): va destruyendo los marcos de pila de las funciones, ejecutando los `Drop` de cada variable, hasta que alguien lo recoge. El arnés ejecuta cada prueba en su propio hilo y recoge el pánico al final de ese hilo. Para él, «pánico recogido» = `FAILED`, y pasa a la siguiente.
+
+Esto tiene una consecuencia que verás en la plataforma de este curso. WebAssembly se compila con `panic = "abort"`: un pánico **detiene el programa entero** en el acto, sin desenrollar. Por eso, en wasm, el arnés marca las pruebas `#[should_panic]` como `ignored` (no tiene forma de recogerlas) y una prueba que falla corta todas las demás. Esta es la línea real de la salida en wasm:
+
+```text
+test tests::nota_fuera_de_rango - should panic ... ignored
+```
+
+En tu PC, con el enlazador instalado, esa misma prueba se ejecuta y aparece como `ok`. Lo mismo pasa si configuras `panic = "abort"` en tu `Cargo.toml`: las pruebas que dependen de recoger pánicos dejan de tener sentido.
+
+`#[should_panic(expected = "…")]` compara con el **mensaje** del pánico como subcadena. El mensaje de un índice fuera de rango empieza por `index out of bounds`, por eso basta con ese trozo.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="should_panic sin expected acepta cualquier pánico">
+
+❌ Esta prueba quiere comprobar que repartir entre cero personas entra en pánico. Pero tiene un despiste que provoca **otro** pánico… y la prueba pasa igual:
+
+```rust
+fn reparto(total: u32, personas: u32) -> u32 {
+    total / personas
+}
+
+#[test]
+#[should_panic]
+fn repartir_entre_nadie() {
+    let grupos: Vec<u32> = vec![];
+    reparto(100, grupos[0]); // grupos está vacío: pánico por el índice, no por el cero
+}
+```
+
+El pánico real aquí es `index out of bounds: the len is 0 but the index is 0`: la división ni se llega a hacer. La prueba «pasa» sin probar nada.
+
+✅ Con `expected`, solo pasa si el pánico es **el que buscabas** (el mensaje real de dividir un entero entre cero es `attempt to divide by zero`):
+
+```rust
+#[test]
+#[should_panic(expected = "attempt to divide by zero")]
+fn repartir_entre_nadie() {
+    reparto(100, 0);
+}
+```
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m16/reto-bisiesto" enunciado="Las pruebas de `main` describen la regla completa: un año es bisiesto si es múltiplo de 4, **salvo** los múltiplos de 100, **que sí lo son** si además son múltiplos de 400. Arregla `es_bisiesto` para que pasen todos los casos." />
+
+## Comprueba
+
+<Pregunta
+  pregunta={'Tienes `#[test] fn prueba() -> Result<(), String>` y dentro `let n: i32 = "abc".parse().map_err(|e| format!("{e}"))?;`. ¿Qué pasa al ejecutarla?'}
+  opciones={["Pasa, porque no hay ningún `assert!`", "Falla, porque el `?` devuelve el `Err` y una prueba que devuelve `Err` cuenta como fallida", "No compila: las pruebas no pueden devolver nada", "Entra en un bucle infinito"]}
+  correcta={1}
+  explicacion={'`"abc".parse::<i32>()` da `Err`. El `?` lo devuelve de la función y el arnés trata ese `Err` como un fallo, mostrando el error con `Debug`.'}
+  porque={["Devolver `Err` también es fallar, aunque no haya `assert!`.", "Correcto.", "Las pruebas pueden devolver `Result<(), E>` siempre que `E` implemente `Debug`.", "No hay ningún bucle."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué ejecuta `cargo test -- --ignored`?"
+  opciones={["Todas las pruebas, incluidas las ignoradas", "Solo las pruebas marcadas con `#[ignore]`", "Ninguna: solo las lista", "Las pruebas que fallaron la última vez"]}
+  correcta={1}
+  explicacion="`--ignored` ejecuta únicamente las ignoradas (en la salida real, las otras 5 aparecen como `filtered out`). Para ejecutar todas a la vez existe `--include-ignored`."
+  porque={["Eso es `--include-ignored`.", "Correcto.", "Para listar está `--list`.", "`cargo test` no recuerda ejecuciones anteriores."]}
+/>
+
+<Pregunta
+  pregunta="¿Para qué es buena idea `debug_assert!`?"
+  opciones={["Para validar lo que escribe el usuario", "Para comprobaciones internas caras que quieres durante el desarrollo y que desaparecen en release", "Para que el programa sea más seguro en release", "Para sustituir a todos los `assert!` de las pruebas"]}
+  correcta={1}
+  explicacion="En release `debug_assert!` no existe. Por eso nunca debe proteger contra datos externos: en el programa final esa protección desaparecería, como viste con el `125%`."
+  porque={["Los datos externos se validan siempre, con `Result` o con `assert!`.", "Correcto.", "En release no hace nada, así que no añade seguridad.", "Las pruebas se compilan normalmente en debug, pero un `assert!` deja claro que la comprobación es obligatoria."]}
+/>

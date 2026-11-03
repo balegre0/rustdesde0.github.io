@@ -1,0 +1,147 @@
+---
+title: "La regla: muchos lectores o un escritor"
+description: "Puedes tener muchos préstamos compartidos o uno exclusivo, nunca ambos. Por qué: un Vec que crece libera su memoria vieja y dejaría colgando a quien la leía."
+sidebar:
+  order: 4
+duracion: 14
+desde: "1.0"
+requiere: ["07-prestamos/03-prestamo-exclusivo"]
+tarjetas:
+  - p: "Enuncia la regla de los préstamos."
+    r: "En cada momento, un valor puede tener o muchos préstamos compartidos (`&`) o un solo préstamo exclusivo (`&mut`), nunca las dos cosas a la vez."
+  - p: "¿Qué dice E0499?"
+    r: "Que intentas tener dos préstamos exclusivos (`&mut`) del mismo valor vivos a la vez."
+  - p: "¿Qué dice E0502?"
+    r: "Que intentas un préstamo exclusivo mientras hay uno compartido vivo, o al revés."
+  - p: "¿Por qué `let p = &v[0]; v.push(4); println!(\"{p}\");` es peligroso?"
+    r: "Porque `push` puede necesitar más capacidad: pide un bloque nuevo, copia los elementos y libera el viejo. `p` apuntaría a memoria liberada (uso tras liberar)."
+  - p: "¿Qué tienen que darse a la vez para que haya una carrera de datos?"
+    r: "Dos accesos al mismo dato, al menos uno de escritura y sin sincronización. La regla de los préstamos impide que se den a la vez."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Pregunta, BajoElCapo, Trampa, Historia } from '~/components';
+
+Esta es la lección más importante del mundo. Vas a ver la regla que hace seguro a Rust y, sobre todo, **el fallo concreto que evita**. Cuando sabes qué evita, sus errores dejan de parecer caprichos.
+
+## Predice
+
+<NoCompila ej="m07/p-push-con-ref" explicacion={"Este programa parece inofensivo: guarda una referencia al primer elemento, añade otro y la imprime. Antes de leer la explicación: ¿qué podría salir mal en `v.push(4)`? Pista: ¿dónde están los elementos de un `Vec` y qué pasa si no caben?"} />
+
+## La idea
+
+> **En cada momento, un valor puede tener muchos préstamos compartidos o un solo préstamo exclusivo. Nunca las dos cosas a la vez.**
+
+En forma de tabla:
+
+| Ya hay vivo… | ¿Puedo crear `&`? | ¿Puedo crear `&mut`? |
+|---|---|---|
+| nada | sí | sí |
+| uno o más `&` | **sí** | **no** (E0502) |
+| un `&mut` | **no** (E0502) | **no** (E0499) |
+
+¿Por qué? Porque **leer mientras otro modifica** es la raíz de muchos fallos de memoria. El ejemplo de arriba es el clásico:
+
+1. `primero` apunta al elemento 0, que vive en el heap.
+2. `v.push(4)` necesita sitio. Si la capacidad no da, el `Vec` pide un bloque **nuevo** y más grande, copia los elementos y **libera el viejo**.
+3. `primero` sigue apuntando al bloque viejo, que ya está liberado. Leerlo sería un **uso tras liberar** (*use after free*): el programa podría imprimir basura, romperse o, peor, seguir funcionando con datos de otro.
+
+`push` necesita `&mut v`. `primero` es un `&` vivo (se usa después). La regla lo prohíbe y el fallo no llega a existir.
+
+## Pruébalo
+
+Esto es lo que hace `push` cuando no cabe. En el navegador:
+
+<Ejecutar ej="m07/realloc" />
+
+La dirección de los datos **cambia**: el `Vec` se ha mudado. (El vecino está ahí para que el asignador no pueda ampliar el bloque en su sitio. Sin él, a veces sí podría, y ese «a veces» es justo lo que hace estos fallos tan difíciles de cazar.)
+
+Ahora, la regla en acción cuando se cumple:
+
+<Ejecutar ej="m07/tabla-regla" />
+
+<Prestamos lineas={[
+  { codigo: "let mut s = String::from(\"hola\");", permisos: { s: "RWO" } },
+  { codigo: "let a = &s;", permisos: { s: "R--", a: "R-O" }, nota: "Un compartido: s solo puede leerse." },
+  { codigo: "let b = &s;", permisos: { s: "R--", a: "R-O", b: "R-O" }, nota: "Dos compartidos: sin problema, todos leen." },
+  { codigo: "println!(\"{a} {b}\");", permisos: { s: "RWO" }, nota: "Último uso de a y b: s lo recupera todo." },
+  { codigo: "let c = &mut s;", permisos: { s: "---", c: "R-O", "*c": "RW-" }, nota: "Un exclusivo: posible porque ya no hay compartidos vivos." },
+  { codigo: "c.push('!');", permisos: { s: "---", c: "R-O", "*c": "RW-" } },
+  { codigo: "println!(\"{c}\");", permisos: { s: "RWO" }, nota: "Último uso de c." },
+  { codigo: "println!(\"{s}\");", permisos: { s: "RWO" } }
+]} />
+
+Y cuando no se cumple. Dos escritores a la vez (E0499):
+
+<NoCompila ej="m07/p-dos-mut" explicacion="`a` y `b` serían dos caminos para modificar el mismo `String`. Con un `&mut` puedes, por ejemplo, sacar una vista de su texto; si el otro `&mut` hiciera crecer el texto y lo mudara, esa vista quedaría colgando. Y si cada uno estuviera en un hilo distinto, sería una carrera de datos. Con un solo `&mut` vivo, nada de eso puede pasar." />
+
+Un lector y un escritor a la vez (E0502):
+
+<NoCompila ej="m07/p-mut-mientras-compartido" explicacion="`vista` lee el texto; `push` lo modifica (y podría mudarlo). La regla obliga a que el lector termine antes de que empiece el escritor: mueve el `println!` antes del `push`." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Lo que evita, en una frase.** La regla impide que exista **a la vez** (1) un camino para leer un dato y (2) otro camino para modificarlo. Así quedan fuera de juego tres familias de fallos:
+
+- **Uso tras liberar** por reubicación: el `push` de arriba, un `clear()` mientras alguien mira un elemento, reasignar un `String` mientras alguien lee su texto.
+- **Invalidación de iteradores**: modificar una colección mientras la recorres (lección 8).
+- **Carreras de datos** (*data races*): dos hilos tocando el mismo dato, al menos uno escribiendo, sin sincronizar. En el mundo 17 verás que la misma regla, aplicada entre hilos, las hace imposibles en Rust seguro.
+
+**Aliasing XOR mutación.** En la jerga se dice que Rust impone *aliasing XOR mutability*: o hay varios nombres (alias) para el dato, o se puede modificar, pero no las dos cosas. XOR es el «o exclusivo» que viste en el mundo 01.
+
+**Comprobarlo cuesta cero al ejecutar.** No hay cerrojos, contadores ni comprobaciones ocultas. El comprobador de préstamos analiza el MIR (una versión simplificada de tu programa) y, si encuentra una línea que necesita un permiso que no hay, se niega a compilar.
+
+</BajoElCapo>
+
+<Historia titulo="Una regla con historia">
+
+La idea de que «el que escribe tiene que estar solo» es muy anterior a Rust: está en los cerrojos de lectores y escritores que usan los sistemas operativos. Lo que Rust hizo fue convertirla en una regla **del sistema de tipos**, comprobada al compilar, inspirada en investigaciones académicas sobre *tipos lineales* y *regiones*. La fórmula exacta de Rust se fue ajustando hasta la versión 1.0 (2015).
+
+</Historia>
+
+## Trampa típica
+
+<Trampa titulo="«Pero mi programa no es peligroso»">
+
+Muchas veces el código que rechaza el compilador **no** fallaría en esa ejecución concreta: quizá el `Vec` tenía capacidad de sobra y no se mudó. Da igual. El compilador no puede saber cuánta capacidad habrá en cada ejecución, y un fallo que aparece «a veces» es el peor tipo de fallo.
+
+❌ Buscar una forma de «engañar» al compilador (o clonarlo todo para que se calle).
+
+✅ Reordenar: termina de leer antes de modificar. O guarda una **copia del valor**, no una referencia, si es barato:
+
+```rust
+let primero = v[0];   // copia el i32 (es Copy), no lo presta
+v.push(4);
+println!("{primero}");
+```
+
+Ese es justo el arreglo del ejemplo de arriba (ábrelo en «Ver arreglo»).
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Hay dos `&v` vivos. ¿Qué puedes hacer ahora con `v`?"
+  opciones={["Crear un tercer `&v`", "Crear un `&mut v`", "Llamar a `v.push(1)`", "Moverlo a otra variable"]}
+  correcta={0}
+  explicacion="Con préstamos compartidos vivos solo se permiten más lectores. Modificar (`&mut`, `push`) o mover dejaría colgando a los lectores."
+  porque={["", "E0502: un escritor mientras hay lectores.", "`push` necesita `&mut v`: el mismo E0502.", "E0505: mover un valor prestado (lección 5)."]}
+/>
+
+<Pregunta
+  pregunta={"¿Qué fallo concreto evita E0502 en `let p = &v[0]; v.push(4); println!(\"{p}\");`?"}
+  opciones={["Un desbordamiento de enteros", "Leer memoria liberada si `push` reubica el vector", "Una fuga de memoria", "Dividir entre cero"]}
+  correcta={1}
+  explicacion="Si `push` necesita más capacidad, mueve los elementos a otro bloque y libera el viejo. `p` apuntaría al bloque liberado: uso tras liberar."
+  porque={["Aquí no hay ninguna operación aritmética que se desborde.", "", "Nada se queda sin liberar: al revés, se liberaría algo que todavía se mira.", "No hay ninguna división."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál es el código de error de tener dos préstamos exclusivos del mismo valor a la vez?"
+  opciones={["E0382", "E0499", "E0502", "E0596"]}
+  correcta={1}
+  explicacion="E0499: *cannot borrow as mutable more than once at a time*. E0502 es la mezcla de compartido y exclusivo."
+  porque={["E0382 es usar un valor que ya se movió.", "", "E0502 es un exclusivo con compartidos vivos (o al revés).", "E0596 es pedir `&mut` de algo que no es `mut`."]}
+/>

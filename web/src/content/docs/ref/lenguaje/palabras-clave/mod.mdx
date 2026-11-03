@@ -1,0 +1,57 @@
+---
+title: "mod"
+description: "Palabra clave estricta: declara un módulo, en línea o en otro archivo."
+sidebar:
+  order: 22
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`mod` crea un **módulo**: una caja con nombre que agrupa funciones, tipos y otros módulos, y que decide qué se ve desde fuera.
+
+## Sinopsis
+
+```text
+mod nombre { elementos }       // módulo en línea
+mod nombre;                    // módulo en otro archivo
+#[path = "otro.rs"] mod nombre;
+```
+
+## Qué hace
+
+- Un módulo es un **espacio de nombres**: `geometria::formas::area` no choca con otra `area` de otro módulo.
+- Todo lo de dentro es **privado** por defecto: solo lo ven el propio módulo y sus descendientes. `pub` lo abre.
+- `mod nombre;` le dice al compilador que cargue el contenido de un archivo. Si lo escribes en `src/main.rs` (o `src/lib.rs`), busca `src/nombre.rs` o `src/nombre/mod.rs`. Si lo escribes en `src/a.rs`, busca `src/a/nombre.rs` (o `src/a/nombre/mod.rs`).
+- Los archivos **no** se convierten en módulos por existir: solo si alguien los declara con `mod`.
+- El conjunto de módulos forma un **árbol** cuya raíz es el crate. Las rutas `crate::`, `self::` y `super::` se mueven por ese árbol.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-mod" />
+
+Salida:
+
+```text
+9
+privada
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-mod-error" />
+
+`error[E0603]: function saldo_secreto is private`.
+
+## Desde
+
+Rust 1.0. La forma `a.rs` + `a/b.rs` (sin necesitar `a/mod.rs`): edición 2018.
+
+## Ver también
+
+- [`pub`](/ref/lenguaje/palabras-clave/pub/) · [`use`](/ref/lenguaje/palabras-clave/use/) · [`crate`](/ref/lenguaje/palabras-clave/crate/) · [`super`](/ref/lenguaje/palabras-clave/super/) · [Visibilidad y rutas](/ref/lenguaje/visibilidad-y-rutas/)
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

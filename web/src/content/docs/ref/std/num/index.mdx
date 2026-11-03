@@ -1,0 +1,58 @@
+---
+title: "std::num (y los métodos de los enteros)"
+description: "Números: aritmética checked, wrapping, saturating y overflowing, NonZero, Wrapping y los errores de parse."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::num y los tipos primitivos i8…u128, f32, f64`
+
+## Para qué sirve
+
+Los enteros (`i8`…`i128`, `u8`…`u128`, `isize`, `usize`) y los flotantes (`f32`, `f64`) son tipos primitivos con muchos métodos propios. El módulo `std::num` añade tipos auxiliares (`NonZero`, `Wrapping`, `Saturating`) y los errores de conversión desde texto.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Aritmética con desbordamiento`](/ref/std/num/aritmetica/) | `checked_*`, `wrapping_*`, `saturating_*`, `overflowing_*`. | 1.0 |
+| `NonZero` | Un entero que nunca es 0. | 1.79 |
+| `Wrapping, Saturating` | Envoltorios cuyos operadores dan la vuelta o se saturan. | 1.0 |
+| `ParseIntError, IntErrorKind` | Por qué falló `"...".parse::<i32>()`. | 1.0 |
+| `ParseFloatError` | Por qué falló `parse::<f64>()`. | 1.0 |
+| `TryFromIntError` | Error de `TryFrom` entre enteros. | 1.0 |
+
+## Conceptos clave
+
+- **Desbordamiento** (*overflow*): sumar 1 a `u8::MAX`. Con el perfil *debug* el programa **entra en pánico**; con *release* el valor **da la vuelta** en silencio (módulo 2ⁿ). No es comportamiento indefinido, pero casi siempre es un error: si puede pasar, usa los métodos explícitos.
+- **Flotantes**: `0.1 + 0.2 != 0.3` porque esos números no tienen representación exacta en binario. Compara con un margen.
+- **`parse`** devuelve `Result`: el texto puede no ser un número o no caber en el tipo.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/num-parse" />
+
+**Salida:**
+
+```text
+Ok(42)
+Err(ParseIntError { kind: InvalidDigit })
+Err(ParseIntError { kind: Empty })
+Ok(3.5)
+demasiado grande: number too large to fit in target type
+Ok(255)
+Some(5) None
+4 8
+false true
+```
+
+## Ver también
+
+- [std::convert (TryFrom)](/ref/std/convert/tryfrom/)
+- [E0080 (desbordamiento en const)](/errores/e0080/)
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)

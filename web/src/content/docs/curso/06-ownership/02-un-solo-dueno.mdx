@@ -1,0 +1,118 @@
+---
+title: "Un solo dueño"
+description: "Aprende a ver quién es el dueño de cada valor, qué permisos le da ser dueño y cómo la propiedad forma un árbol que se libera de una vez."
+sidebar:
+  order: 2
+duracion: 9
+desde: "1.0"
+requiere: ["06-ownership/01-quien-limpia"]
+tarjetas:
+  - p: "¿Qué permisos tiene la dueña de un valor declarada con `let` (sin `mut`)? ¿Y con `let mut`?"
+    r: "Sin mut: R-O (leer y propiedad). Con mut: RWO (leer, escribir y propiedad)."
+  - p: "¿Qué es el árbol de propiedad?"
+    r: "Una variable posee un valor, que puede poseer otros (un Vec posee sus elementos; un String, sus bytes). Al liberar la raíz se libera todo lo que cuelga de ella."
+  - p: "Con E0596 «cannot borrow `x` as mutable», ¿qué permiso falta?"
+    r: "W (escribir): la variable no se declaró con `mut`."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Vas a aprender a mirar un programa y responder siempre a la misma pregunta: **¿de quién es esto?** Y a leer qué permisos da ser dueño.
+
+## Predice
+
+<Predice
+  ej="m06/arbol"
+  pregunta="`caja` es dueña de un `Vec` con tres valores que avisan al liberarse. ¿Qué se imprime después de «fin de main»?"
+  opciones={[
+    "Nada: el Vec se libera, pero sus elementos se quedan en memoria",
+    "drop: uno, drop: dos, drop: tres",
+    "drop: tres, drop: dos, drop: uno",
+    "Solo «drop: uno»"
+  ]}
+  correcta={1}
+  explicacion="Al liberar `caja`, el `Vec` libera a todos sus elementos, **del primero al último**. Un dueño es responsable de todo lo que cuelga de él."
+  porque={[
+    "Eso sería una fuga. El Vec es dueño de sus elementos y los libera.",
+    "",
+    "El orden inverso es el de las **variables** de un bloque. Dentro de un Vec, los elementos se liberan en orden.",
+    "El Vec libera todos sus elementos, no solo el primero."
+  ]}
+/>
+
+## La idea
+
+Un **dueño** es casi siempre una **variable**. Cuando escribes `let nota = String::from("comprar");`, la variable `nota` pasa a ser la dueña de ese `String`. Ser dueña le da permisos:
+
+- **R** (leer): siempre, mientras sea dueña.
+- **W** (escribir): solo si la declaraste con `mut`.
+- **O** (propiedad): la responsabilidad de liberarlo... y el derecho a entregárselo a otro (eso es **mover**, lección 4).
+
+Un valor puede, a su vez, ser dueño de otros. Un `String` es dueño de sus bytes en el heap. Un `Vec` es dueño de sus elementos. Así, la propiedad forma un **árbol**: cada valor cuelga de un único dueño, y al liberar la raíz se libera todo lo que cuelga de ella, sin que tengas que recorrer nada a mano.
+
+## Pruébalo
+
+<Ejecutar ej="m06/dueno-mut" />
+
+<Prestamos lineas={[
+  { codigo: "let fija = String::from(\"hola\");", permisos: { fija: "R-O" }, nota: "Sin mut: no hay W." },
+  { codigo: "println!(\"{fija}\");", permisos: { fija: "R-O" }, nota: "Leer solo necesita R." },
+  { codigo: "let mut nota = String::from(\"comprar\");", permisos: { fija: "R-O", nota: "RWO" }, nota: "Con mut: los tres permisos." },
+  { codigo: "nota.push_str(\" pan\");", permisos: { fija: "R-O", nota: "RWO" }, nota: "Modificar necesita W." },
+  { codigo: "println!(\"{nota}\");", permisos: { fija: "R-O", nota: "RWO" } }
+]} />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El árbol en memoria.** En el ejemplo de «Predice», la raíz `caja` es una ficha de 3 campos en la pila (puntero, capacidad, longitud: 12 bytes en el navegador, 24 en un PC de 64 bits). El puntero señala un bloque del heap con los tres elementos seguidos:
+
+```text
+  PILA                         HEAP
+  caja ┌──────────┐           ┌─────────┬─────────┬─────────┐
+       │ ptr  ────┼──────────►│ "uno"   │ "dos"   │ "tres"  │
+       │ cap  3   │           └─────────┴─────────┴─────────┘
+       │ len  3   │
+       └──────────┘
+```
+
+Liberar `caja` hace dos cosas, en este orden: primero libera cada elemento (de `[0]` a `[2]`) y después devuelve el bloque del heap. Si un elemento fuera un `String`, al liberarlo devolvería también **sus** bytes. Nadie se queda sin dueño y nadie se libera dos veces.
+
+**`mut` no es del valor, es de la variable.** El permiso W lo da la *variable* dueña. El mismo `String` puede empezar en una variable sin `mut` y, al moverlo a otra con `mut`, pasar a poder modificarse. Lo verás en la lección 9.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m06/sin-mut" explicacion="`push_str` necesita modificar el texto, es decir, el permiso **W**. `nota` se declaró sin `mut`, así que solo tiene `R-O`. El compilador lo explica con su propio vocabulario («cannot borrow as mutable»): en el mundo 07 verás que modificar a través de un método significa pedir un *préstamo exclusivo*." />
+
+## Comprueba
+
+<Pregunta
+  pregunta={"`let v = vec![String::from(\"a\"), String::from(\"b\")];` ¿Cuántos trozos del heap se liberan cuando `v` sale de su ámbito?"}
+
+  opciones={["1", "2", "3", "Ninguno"]}
+  correcta={2}
+  explicacion={"Tres: los bytes de \"a\", los bytes de \"b\" y el bloque del Vec que guarda las dos fichas. El árbol se libera entero desde la raíz."}
+
+  porque={[
+    "Eso sería solo el bloque del Vec; los dos String también tienen bytes en el heap.",
+    "Faltaría el propio bloque del Vec, donde están las fichas de los dos String.",
+    "",
+    "`v` es dueña: al terminar su ámbito, todo se libera."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Qué permiso le falta a una variable declarada con `let` (sin `mut`)?"
+  opciones={["R", "W", "O", "Ninguno"]}
+  correcta={1}
+  explicacion="Sin `mut` tiene `R-O`: puede leer y es dueña, pero no puede modificar."
+  porque={[
+    "Leer siempre se puede si eres la dueña.",
+    "",
+    "Sigue siendo la dueña: la O no depende de `mut`.",
+    "Le falta W."
+  ]}
+/>

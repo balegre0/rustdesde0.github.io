@@ -1,0 +1,121 @@
+---
+title: "derive y los traits de comparar"
+description: "Pide al compilador que escriba por ti Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash y Default, y entiende qué hace cada uno."
+sidebar:
+  order: 8
+duracion: 14
+desde: "1.0"
+requiere: ["13-traits-y-genericos/07-coherencia-y-regla-huerfana", "06-ownership"]
+tarjetas:
+  - p: "¿Qué hace `#[derive(PartialOrd, Ord)]` en un enum?"
+    r: "Ordena las variantes por su posición en la declaración: la primera es la menor. No mira el nombre."
+  - p: "¿Y en un struct?"
+    r: "Compara campo a campo en el orden en que están declarados: decide el primero que sea distinto (orden lexicográfico)."
+  - p: "¿Cuándo se puede derivar `Copy`?"
+    r: "Solo si todos los campos son `Copy` (y además se deriva `Clone`). Con un campo `String` da E0204."
+  - p: "¿Por qué `f64` no implementa `Eq` ni `Ord`?"
+    r: "Por `NaN`: `NaN == NaN` es falso, así que la igualdad no es reflexiva, y `NaN` no es mayor ni menor que nada. Por eso solo tiene `PartialEq` y `PartialOrd`."
+  - p: "¿Qué necesitas para meter un tipo en un `HashSet` o como clave de un `HashMap`?"
+    r: "`Hash` y `Eq` (que pide `PartialEq`). Con `derive(PartialEq, Eq, Hash)` basta."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a ahorrarte decenas de líneas con una sola anotación, y a saber exactamente qué código escribe el compilador por ti.
+
+## Predice
+
+<Predice
+  ej="m13/derive-orden"
+  opciones={["`[Grande, Pequena, Mediana]`", "`[Pequena, Mediana, Grande]`", "`[Grande, Mediana, Pequena]`", "`[Mediana, Grande, Pequena]`"]}
+  correcta={0}
+  explicacion="`Ord` derivado en un enum ordena por **posición en la declaración**: `Grande` va primero, luego `Pequena`, luego `Mediana`. No sabe nada del significado de los nombres ni del alfabeto."
+  porque={["Correcto.", "El compilador no entiende de tallas: solo mira el orden en que escribiste las variantes.", "Eso sería orden alfabético, que tampoco se usa.", "`sort` ordena; el vector no se queda como estaba."]}
+/>
+
+## La idea
+
+Muchos traits tienen una implementación «obvia»: comparar dos structs campo a campo, copiarlos campo a campo, mostrarlos con sus nombres. Escribirla a mano es aburrido y propenso a errores, así que Rust te deja pedirla con **`#[derive(…)]`** encima del tipo. Es una macro: el compilador genera el `impl` por ti.
+
+Los que se pueden derivar en la biblioteca estándar, y qué significan:
+
+| Trait | Te da | Lo que genera `derive` |
+|---|---|---|
+| `Debug` | `{:?}` y `{:#?}` | el nombre del tipo y de cada campo |
+| `Clone` | `.clone()` | clona cada campo |
+| `Copy` | copiar al asignar, sin mover | nada nuevo: marca el tipo (necesita `Clone`) |
+| `PartialEq` | `==` y `!=` | iguales si todos los campos son iguales |
+| `Eq` | promesa: la igualdad es total | nada: marca el tipo (necesita `PartialEq`) |
+| `PartialOrd` | `<`, `>`, `<=`, `>=` | campo a campo, en orden de declaración |
+| `Ord` | `.cmp()`, `sort()`, `max()` | igual, pero con orden total (necesita `Eq` y `PartialOrd`) |
+| `Hash` | usar en `HashMap` y `HashSet` | combina el hash de cada campo |
+| `Default` | `Tipo::default()` | cada campo con su valor por defecto |
+
+Una condición para todos: **cada campo** tiene que implementar ese trait. Si un campo no es `Copy`, el struct no puede serlo. Esa regla tiene sentido: el compilador construye la implementación con la de los campos.
+
+## Pruébalo
+
+<Ejecutar ej="m13/derive-todo" />
+
+Fíjate en `a < c: false`: el primer campo es `palo`, y `'♥'` (U+2665) es mayor que `'♠'` (U+2660). El valor (7 frente a 1) ni se mira, porque el primer campo ya decide.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+¿Por qué hay **dos** traits para igualdad (`PartialEq`, `Eq`) y dos para orden (`PartialOrd`, `Ord`)? Por los números decimales. En `f64` existe `NaN` (*not a number*, el resultado de `0.0 / 0.0`), y `NaN == NaN` es **falso**. Una igualdad donde algo no es igual a sí mismo es «parcial». `Eq` añade la promesa de que la igualdad es una equivalencia de verdad (`a == a` siempre). Del mismo modo, `NaN` no es ni mayor ni menor que nada, así que `f64` solo tiene `PartialOrd`: `partial_cmp` devuelve `Option<Ordering>`, y `None` significa «no comparables». Por eso `vec_de_f64.sort()` no compila: `sort` exige `Ord`.
+
+`Copy` y `Eq` son **traits marcador** (*marker traits*): no tienen métodos. Solo informan al compilador de una propiedad. `Copy` cambia la semántica de la asignación: `let q = p;` copia los bytes de `p` en vez de moverlo, y `p` sigue siendo usable. Por eso solo se permite cuando copiar los bytes es correcto: un `String` copiado así daría dos dueños del mismo buffer en el heap, y al destruirse los dos tendrías una **doble liberación**. E0204 te protege exactamente de eso. Por la misma razón, `Copy` y `Drop` no pueden ir juntos (E0184).
+
+`Hash` y `Eq` tienen que ir de acuerdo: si `a == b`, entonces `hash(a) == hash(b)`. Si los derivas los dos, se cumple solo. Si escribes uno a mano, es tu responsabilidad.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m13/copy-string"
+  explicacion="`Usuario` tiene un `String`, que no es `Copy`: copiar sus bytes duplicaría el dueño del texto en el heap (E0204). El arreglo deja solo `Clone` y pide la copia de forma explícita con `.clone()`."
+/>
+
+<Trampa titulo="El orden de los campos importa">
+
+El `Ord` derivado de un struct compara **en el orden en que escribiste los campos**. Si quieres ordenar personas por edad y luego por nombre, `edad` tiene que ir primero en el struct. Si el orden que necesitas no coincide con el de los campos, implementa `Ord` a mano o usa `sort_by_key`.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Quieres usar `struct Coordenada { x: i32, y: i32 }` como clave de un `HashMap`. ¿Qué derive es el mínimo necesario?"
+  opciones={["`#[derive(PartialEq, Eq, Hash)]`", "`#[derive(Hash)]`", "`#[derive(Debug, Hash)]`", "`#[derive(PartialOrd, Ord)]`"]}
+  correcta={0}
+  explicacion="Las claves de `HashMap` necesitan `Hash` (para elegir el cajón) y `Eq` (para comparar dentro), y `Eq` necesita `PartialEq`."
+  porque={["Correcto.", "Falta poder comparar claves: `Eq`.", "`Debug` sirve para imprimir, no para buscar.", "Esos sirven para un `BTreeMap`, no para un `HashMap`."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`#[derive(PartialOrd, PartialEq)] struct P { a: u8, b: u8 }`. ¿Cuánto vale `P { a: 1, b: 9 } < P { a: 2, b: 0 }`?"
+  opciones={["`true`", "`false`", "No compila: hay que derivar también `Ord`", "Depende de la suma de los campos"]}
+  correcta={0}
+  explicacion="Se compara `a` primero: 1 < 2, y ya está decidido. `b` no se mira."
+  porque={["Correcto.", "Solo si el primer campo fuera igual se miraría `b`.", "`<` solo necesita `PartialOrd`.", "No se suma nada: es orden lexicográfico."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `vec![2.5, 1.0].sort()` no compila?"
+  opciones={["Porque `f64` no implementa `Ord`, por culpa de `NaN`", "Porque los decimales no se pueden comparar", "Porque `sort` solo existe para `Vec<i32>`", "Porque falta `mut` y nada más"]}
+  correcta={0}
+  explicacion="`sort` necesita orden total. Con `f64` usa `sort_by(|a, b| a.total_cmp(b))`."
+  porque={["Correcto.", "Sí se pueden con `<` (`PartialOrd`); lo que falta es el orden **total**.", "`sort` sirve para cualquier `T: Ord`.", "Aunque pusieras `mut`, seguiría faltando `Ord`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué evita E0204 al rechazar `#[derive(Copy)]` en un struct con un `String`?"
+  opciones={["Una doble liberación: dos copias serían dueñas del mismo texto del heap", "Un desbordamiento de enteros", "Que el struct sea demasiado grande", "Que el `String` se imprima mal"]}
+  correcta={0}
+  explicacion="`Copy` copia los bytes tal cual. Con un puntero al heap dentro, las dos copias liberarían el mismo bloque."
+  porque={["Correcto.", "No tiene nada que ver con números.", "El tamaño no importa para `Copy`.", "El problema es de propiedad, no de formato."]}
+/>

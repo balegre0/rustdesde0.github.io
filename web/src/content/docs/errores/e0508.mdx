@@ -1,0 +1,85 @@
+---
+title: "E0508: mover fuera de un array"
+description: "Intentas mover un elemento no Copy fuera de un array indexándolo."
+sidebar:
+  order: 45
+insignias: ["Propiedad y movimientos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot move out of type `[String; 2]`, a non-copy array ``
+
+## Qué significa
+
+`nombres[0]` es un lugar dentro del array. Si su tipo no es `Copy`, escribir `let primero = nombres[0];` lo **movería** fuera y dejaría un hueco en el array, cosa que Rust no permite.
+
+## Qué error evita
+
+El array seguiría creyendo que su primer elemento es válido y lo liberaría al final, igual que `primero`: **doble liberación**.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0508" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0508]: cannot move out of type `[String; 2]`, a non-copy array
+ --> E0508.rs:3:19
+  |
+3 |     let primero = nombres[0];
+  |                   ^^^^^^^^^^
+  |                   |
+  |                   cannot move out of here
+  |                   move occurs because `nombres[_]` has type `String`, which does not implement the `Copy` trait
+  |
+help: consider borrowing here
+  |
+3 |     let primero = &nombres[0];
+  |                   +
+help: consider cloning the value if the performance cost is acceptable
+  |
+3 |     let primero = nombres[0].clone();
+  |                             ++++++++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Indexar arrays o slices de `String`, `Vec` u otros tipos no `Copy` y asignarlo a una variable.
+- Pasar `v[i]` a una función que recibe el valor por valor.
+
+## Cómo arreglarlo
+
+Toma prestado el elemento (`&nombres[0]`), clónalo, o si quieres quedarte con los elementos recorre el array por valor (`for n in nombres`). Para un `Vec`, `v.remove(i)` o `v.swap_remove(i)` sacan el elemento de verdad.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let nombres = [String::from("Ana"), String::from("Luis")];
+    let primero = &nombres[0]; // préstamo compartido del elemento
+    println!("{primero}");
+}
+```
+
+**Salida:**
+
+```text
+Ana
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0508` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0507](/errores/e0507/): mover desde detrás de una referencia
+- [E0382](/errores/e0382/): uso de un valor ya movido
+
+## Aprende esto en
+
+- [Mundo 06 · Ownership](/curso/06-ownership/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

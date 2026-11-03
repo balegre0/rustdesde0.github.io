@@ -1,0 +1,74 @@
+---
+title: "Patrones de bucle"
+description: "Cuatro recetas que resuelven la mayoría de problemas con bucles: contar, acumular, quedarse con el mejor y buscar hasta encontrar."
+sidebar:
+  order: 9
+duracion: 12
+desde: "1.0"
+requiere: ["04-expresiones-y-control/08-operadores-y-precedencia"]
+tarjetas:
+  - p: "Patrón «el mejor hasta ahora»: ¿con qué valor empiezas?"
+    r: "Con el primer elemento (no con 0): si todos fueran negativos, empezar en 0 daría un máximo falso."
+  - p: "¿Cómo buscas el primer elemento que cumple algo y paras en cuanto lo encuentras?"
+    r: "Con loop y break valor (o un for con break): `break Some(i)` si lo encuentras y `break None` si llegas al final."
+  - p: "¿Cómo sacas las cifras de un número una a una?"
+    r: "Con un while n > 0: la última cifra es n % 10 y n /= 10 la quita."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Casi todos los problemas con bucles son variaciones de **cuatro recetas**. Si las reconoces, la mitad del trabajo está hecha.
+
+## La idea
+
+| Receta | Variables | Dentro del bucle |
+|---|---|---|
+| **Contar** | `let mut cuenta = 0;` | `if condición { cuenta += 1; }` |
+| **Acumular** | `let mut total = 0;` (o `1` para multiplicar, o `String::new()`) | `total += x;` |
+| **El mejor hasta ahora** | `let mut mejor = primero;` | `if x > mejor { mejor = x; }` |
+| **Buscar y parar** | ninguna | `if encontrado { break …; }` |
+
+## Pruébalo
+
+Las cuatro sobre las mismas notas:
+
+<Ejecutar ej="m04/patrones-bucle" />
+
+Fíjate en el último: `loop` con `break Some(i)` o `break None` devuelve si encontró algo y dónde. Es el `Option` que verás a fondo en el mundo 09.
+
+Y una receta clásica con `while`: recorrer las cifras de un número.
+
+<Reto
+  ej="m04/digitos"
+  enunciado="Cuenta las cifras de `n` y súmalas con un bucle `while n > 0`: la última cifra es `n % 10` y `n /= 10` la quita. Debe imprimir `5 cifras, suman 21`."
+/>
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**En el mundo 14 escribirás esto en una línea.** Los iteradores tienen cada receta ya hecha: `filter(…).count()` cuenta, `sum()` acumula, `max()` y `enumerate().max_by_key(…)` buscan el mejor y `position(…)` busca y para. Y el compilador genera **el mismo código máquina** que con el bucle escrito a mano. Conviene saber hacerlo con bucles primero: así sabes qué hace cada método por dentro.
+
+**`% 10` y `/ 10` en binario.** El procesador no tiene una instrucción para dividir entre 10 rápido, pero el compilador sabe convertir la división entre una constante en una multiplicación y un desplazamiento, mucho más baratos.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Empezar el máximo en 0">
+
+❌ `let mut maxima = 0;` para buscar la temperatura más alta de un invierno con `[-5, -2, -8]`. El resultado sería `0`, una temperatura que no está en la lista.
+
+✅ Empieza con el **primer elemento** (`lista[0]`, comprobando antes que no esté vacía) o usa `i32::MIN`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Quieres saber si alguna nota es un 10 y dejar de mirar en cuanto aparezca. ¿Qué receta usas?"
+  opciones={["Buscar y parar", "Contar", "Acumular", "El mejor hasta ahora"]}
+  correcta={0}
+  explicacion="No necesitas recorrer todo: en cuanto lo encuentras, `break`."
+  porque={["", "Contar recorre todo, aunque el 10 esté al principio.", "No hay nada que sumar.", "No buscas el mayor, sino si existe un valor concreto."]}
+/>

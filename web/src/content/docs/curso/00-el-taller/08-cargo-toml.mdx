@@ -1,0 +1,84 @@
+---
+title: "Cargo.toml"
+description: "El manifiesto de tu proyecto: nombre, versión, edición de Rust y dependencias. Cómo se lee el formato TOML y qué es Cargo.lock."
+sidebar:
+  order: 8
+duracion: 9
+requiere: ["00-el-taller/07-check-build-y-release"]
+tarjetas:
+  - p: "¿Qué es `Cargo.toml`?"
+    r: "El manifiesto del paquete: su nombre, versión, edición de Rust, dependencias y configuración."
+  - p: "¿Qué indica `edition = \"2024\"`?"
+    r: "La edición de Rust del paquete: un conjunto de reglas del lenguaje. La actual es 2024. Paquetes de ediciones distintas pueden usarse entre sí."
+  - p: "¿Qué hace `cargo add rand`?"
+    r: "Añade la biblioteca (crate) `rand` a la sección `[dependencies]` de `Cargo.toml`, con su última versión."
+  - p: "¿Qué es `Cargo.lock`?"
+    r: "Un archivo que Cargo genera con las versiones exactas de todas las dependencias usadas, para que la compilación sea reproducible."
+---
+
+import { Pregunta, Trampa } from '~/components';
+
+Cada proyecto de Cargo tiene un `Cargo.toml`. Es corto, pero lo vas a abrir muchas veces: ahí se decide el nombre del programa, la edición de Rust y qué bibliotecas usa.
+
+## La idea
+
+Este es el `Cargo.toml` que crea `cargo new hola`:
+
+```toml
+[package]
+name = "hola"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+```
+
+El formato se llama **TOML**: secciones entre corchetes (`[package]`) y, dentro, pares `clave = valor`. Los textos van entre comillas.
+
+- **`name`**: el nombre del paquete y del ejecutable (`hola.exe`).
+- **`version`**: la versión de tu programa, con el formato `MAYOR.MENOR.PARCHE` (mundo 12).
+- **`edition`**: la **edición** de Rust. Es un conjunto de reglas del lenguaje que se fija por paquete. La actual es **2024**. Rust garantiza que un paquete de 2015 y otro de 2024 pueden usarse juntos: la edición cambia algunas reglas de escritura, no el lenguaje por dentro (mundo 02).
+- **`[dependencies]`**: las bibliotecas de otros que usa tu paquete.
+
+## Dependencias
+
+Las bibliotecas de Rust se llaman **crates** y se publican en **crates.io**. Para añadir una:
+
+```powershell
+cargo add rand
+```
+
+Cargo escribe en `Cargo.toml` una línea con la última versión publicada, algo como:
+
+```toml
+[dependencies]
+rand = "0.9"
+```
+
+La próxima vez que compiles, Cargo la descargará y la compilará (solo la primera vez). `"0.9"` no significa «exactamente la 0.9», sino «cualquier versión compatible con la 0.9», según las reglas de *semver* que verás en el mundo 12.
+
+## Cargo.lock
+
+Al compilar por primera vez, Cargo crea `Cargo.lock`, con la versión **exacta** de cada dependencia que eligió. Así, si compilas dentro de un año, usará las mismas. **No lo edites a mano**. En un programa (como los tuyos), guárdalo en Git.
+
+<Trampa titulo="Romper el TOML">
+
+TOML es estricto. Errores típicos: olvidar las comillas (`name = hola`), escribir `edition = 2024` sin comillas o poner la dependencia fuera de `[dependencies]`. Cargo te dirá la línea:
+
+```text
+error: failed to parse manifest at `C:\dev\hola\Cargo.toml`
+```
+
+✅ Usa `cargo add` en vez de editar a mano mientras aprendes, y deja que la extensión Even Better TOML te marque los errores.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿En qué sección de `Cargo.toml` van las bibliotecas que usa tu programa?"
+  opciones={["`[package]`", "`[dependencies]`", "`[edition]`", "En `Cargo.lock`"]}
+  correcta={1}
+  explicacion="`[dependencies]` lista las crates que usas. `cargo add` las escribe ahí."
+  porque={["`[package]` describe tu propio paquete.", "", "La edición es una clave dentro de `[package]`.", "`Cargo.lock` lo genera Cargo: no se edita."]}
+/>

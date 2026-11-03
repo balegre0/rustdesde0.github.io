@@ -1,0 +1,74 @@
+---
+title: "Mover a funciones"
+description: "Pasar un argumento es una asignación: un String se mueve dentro de la función y se libera al terminar; un i32 se copia."
+sidebar:
+  order: 8
+duracion: 9
+desde: "1.0"
+requiere: ["06-ownership/07-clone"]
+tarjetas:
+  - p: "¿Qué pasa con `n` al llamar `saludar(n)` si `saludar` recibe un `String`?"
+    r: "Se mueve: es como escribir `let nombre = n;`. El parámetro pasa a ser el dueño y `n` pierde sus permisos."
+  - p: "Si una función recibe un `String` y no lo devuelve, ¿cuándo se libera?"
+    r: "Al terminar la función, cuando su parámetro sale de ámbito."
+  - p: "¿Y si la función recibe un `i32`?"
+    r: "Se copia (`i32` es `Copy`): la variable de quien llama sigue siendo válida y cambiar el parámetro no la afecta."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Las funciones reciben valores. Vas a ver que pasar un argumento **es exactamente** una asignación, y por tanto sigue las mismas reglas que `let b = a;`.
+
+## Predice
+
+<NoCompila ej="m06/usar-tras-pasar" explicacion={"Piensa en `saludar(n)` como si fuera `let nombre = n;`. ¿Quién es la dueña de \"Ana\" después de la llamada? ¿Y cuándo termina su ámbito?"} />
+
+## La idea
+
+Al llamar a `saludar(n)`, el valor de `n` se **asigna** al parámetro `nombre`. Como `String` no es `Copy`, eso es un **movimiento**:
+
+1. `nombre` pasa a ser la dueña del texto.
+2. `n` pierde todos sus permisos.
+3. Al terminar `saludar`, `nombre` sale de ámbito y **el texto se libera**.
+
+Por eso `println!("Adiós, {n}")` no compila: el texto ya ni siquiera existe.
+
+Con un tipo `Copy` todo es distinto: el parámetro recibe una **copia** y la variable original sigue intacta.
+
+## Pruébalo
+
+<Ejecutar ej="m06/pasar-a-funcion" />
+
+<Ejecutar ej="m06/copia-a-funcion" />
+
+`doble` modifica su copia `n`; la `x` de `main` sigue valiendo 21. Fíjate también en `mut n` en el parámetro: los parámetros son variables locales normales, y si quieres modificarlos tienen que ser `mut`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Qué viaja.** Al pasar un `String`, se copia la **ficha** (puntero, capacidad, longitud) al marco de pila de la función, o a registros del procesador. El texto del heap no se mueve. Es la misma operación que `let b = a;`.
+
+**Dónde va el `drop`.** El compilador inserta el `drop` del texto **al final de `saludar`**, no al final de `main`. En `main` no queda ningún `drop` para `n`, porque ya no es dueña de nada.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Recibir String cuando solo vas a leer">
+
+❌ `fn saludar(nombre: String)` para una función que solo imprime. Cada llamada se lleva el texto y obliga al que llama a clonar o a perderlo.
+
+✅ Por ahora, la regla es: si la función tiene que **quedarse** con el valor (guardarlo en una lista, devolverlo cambiado), recibe `String`. Si solo lo **lee**, en el mundo 07 aprenderás a recibir un **préstamo** (`&str`), que no se lleva nada.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`fn medir(s: String) -> usize { s.len() }`. Después de `let n = medir(t);`, ¿qué pasa con `t`?"
+  opciones={["Sigue valiendo lo mismo", "Se movió a `medir` y su texto se liberó al terminar la función", "Se vació, pero se puede usar", "Se clonó automáticamente"]}
+  correcta={1}
+  explicacion="Pasar `t` lo mueve al parámetro `s`. Al terminar `medir`, `s` sale de ámbito y libera el texto."
+  porque={["Ya no es la dueña.", "", "No queda nada que usar: el compilador no deja leer `t`.", "Rust nunca clona sin que lo escribas."]}
+/>

@@ -1,0 +1,155 @@
+---
+title: "Expresiones"
+description: "Todas las clases de expresiones, lugares y valores, temporales, orden de evaluación y la tabla de precedencia de operadores."
+sidebar:
+  order: 110
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Rust es un lenguaje **orientado a expresiones**: casi todo, incluidos los bloques, `if`, `match` y `loop`, produce un valor.
+
+## En una frase
+
+Una **expresión** calcula un valor (y quizá tiene efectos); una **sentencia** solo tiene efectos y termina en `;`. Un bloque `{ … }` vale lo que vale su última expresión **sin** `;`.
+
+## Sentencias
+
+- `let patrón: Tipo = expresión;` (también con `else`).
+- Un **elemento** (*item*): `fn`, `struct`, `use`… dentro de un bloque.
+- Una **expresión seguida de `;`**: su valor se descarta. Las expresiones con bloque (`if`, `match`, `loop`, `{}`) en posición de sentencia no necesitan `;` si valen `()`.
+- Una llamada a macro con `;`.
+
+## Clases de expresiones
+
+| Clase | Ejemplos |
+|---|---|
+| literal | `1`, `2.5`, `'a'`, `"texto"`, `b'x'`, `b"bytes"`, `c"C"`, `r"crudo"`, `true` |
+| ruta | `x`, `std::f64::consts::PI`, `Vec::<u8>::new`, `<T as Trait>::f` |
+| bloque | `{ … }`, `unsafe { … }`, `const { … }`, `async { … }`, `'etiqueta: { … }` |
+| operador | aritméticos, bits, comparación, lógicos, `-x`, `!x`, `*x`, `&x`, `&mut x`, `&raw const x`, `x as T`, `x?`, asignación |
+| agrupación | `(x)` |
+| tupla e índice de tupla | `(a, b)`, `(a,)`, `t.0` |
+| array e índice | `[a, b]`, `[0; 8]`, `v[i]` |
+| struct | `S { a: 1, ..base }`, `S(1, 2)`, `S` |
+| llamada | `f(x)`, `v.len()` (método) |
+| campo | `p.x` |
+| closure | `\|x\| x + 1`, `move \|\| …`, `async \|\| …` |
+| control | `if`, `if let`, `match`, `loop`, `while`, `while let`, `for`, `break`, `continue`, `return` |
+| rango | `a..b`, `a..=b`, `a..`, `..b`, `..=b`, `..` |
+| `.await` | `fut.await` |
+| guion bajo | `_` (solo a la izquierda de una asignación) |
+| macro | `vec![1, 2]`, `println!(…)` |
+
+### Operadores
+
+- **Aritméticos**: `+ - * / %`. División entera trunca hacia cero; `%` tiene el signo del dividendo. Desbordamiento: pánico en debug, vuelta en release. Dividir un entero entre cero: siempre pánico.
+- **Bits**: `& | ^ ! << >>`. `!` en enteros es el complemento bit a bit. Desplazar tantos bits o más como tiene el tipo es un pánico en debug.
+- **Comparación**: `== != < > <= >=`. **No se encadenan**: `a < b < c` es un error.
+- **Lógicos**: `&&` y `||`, con cortocircuito. `&` y `|` sobre `bool` evalúan los dos lados.
+- **Asignación** `=` y compuesta `+=`, `-=`… La asignación vale `()`. A la izquierda puede ir un patrón de tupla, array o struct (**asignación con desestructuración**, 1.59): `(a, b) = (b, a);`.
+- **`?`**: si el valor es `Err(e)` (o `None`), devuelve `Err(From::from(e))` (o `None`) desde la función; si no, desenvuelve el valor.
+- **`as`**: conversiones primitivas. Ver [`as`](/ref/lenguaje/palabras-clave/as/).
+- Los operadores son azúcar de traits (`Add`, `Sub`, `Neg`, `Not`, `Index`, `PartialEq`, `PartialOrd`…), así que tus tipos pueden usarlos.
+
+## Precedencia y asociatividad
+
+De **más fuerte** (se agrupa antes) a **más débil**:
+
+| Operador o expresión | Asociatividad |
+|---|---|
+| rutas | |
+| llamadas a método | |
+| acceso a campo | izquierda a derecha |
+| llamadas a función, indexación | |
+| `?` | |
+| unarios `-` `!` `*` y préstamos `&` `&mut` | |
+| `as` | izquierda a derecha |
+| `*` `/` `%` | izquierda a derecha |
+| `+` `-` | izquierda a derecha |
+| `<<` `>>` | izquierda a derecha |
+| `&` | izquierda a derecha |
+| `^` | izquierda a derecha |
+| `\|` | izquierda a derecha |
+| `==` `!=` `<` `>` `<=` `>=` | exigen paréntesis |
+| `&&` | izquierda a derecha |
+| `\|\|` | izquierda a derecha |
+| `..` `..=` | exigen paréntesis |
+| `=` `+=` `-=` `*=` `/=` `%=` `&=` `\|=` `^=` `<<=` `>>=` | derecha a izquierda |
+| `return`, `break`, closures | |
+
+Consecuencias que sorprenden:
+
+- `-2_i32.pow(2)` vale `-4`: el método se aplica antes que el `-`.
+- `6 & 3 == 2` es `(6 & 3) == 2`.
+- `x as u8 + 1` es `(x as u8) + 1`.
+- `.await` y `?` se encadenan de izquierda a derecha: `f().await?.campo`.
+
+## Lugares y valores
+
+Una expresión es de **lugar** (*place expression*) si nombra una posición de memoria: una variable, `*p`, `x.campo`, `v[i]`, o un paréntesis alrededor de otra de lugar. Todas las demás son de **valor**.
+
+- Se exige un lugar a la izquierda de `=`, como operando de `&`/`&mut`, y como escrutinio de `match` o `if let`.
+- Usar un lugar donde se espera un valor **mueve** (o copia, si el tipo es `Copy`) lo que contiene. Por eso no se puede mover fuera de `*referencia` ni de `v[i]` si el tipo no es `Copy`.
+- Usar un valor donde se espera un lugar crea un **temporal**: `&String::from("x")` toma prestado un temporal que vive hasta el final de la sentencia (o más, si se extiende). Ver [Destructores](/ref/lenguaje/destructores-y-orden-de-drop/).
+- **Promoción constante**: `&5` o `&[1, 2, 3]`, si la expresión se puede evaluar al compilar y no tiene mutabilidad interior ni destructor, se guarda como `static` y el préstamo es `&'static`.
+
+## Orden de evaluación
+
+Los operandos se evalúan **de izquierda a derecha**, tal como se escriben, y después se aplica la operación. En `f(1) + f(2) * f(3)`, las llamadas ocurren en el orden 1, 2, 3, aunque la multiplicación se haga antes que la suma. Excepciones: `&&`, `||`, `if`, `match` y los bucles evalúan partes solo si hace falta. En una asignación `a = b`, primero se evalúa `b`.
+
+## Divergencia
+
+Una expresión de tipo `!` **diverge**: nunca termina de producir un valor (`return`, `break`, `continue`, `panic!`, `loop` sin `break`). Un bloque que contiene una expresión divergente puede tener cualquier tipo, porque su final nunca se alcanza.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/expresiones-precedencia" />
+
+Salida:
+
+```text
+14
+4
+-4
+4
+true
+3
+6 5
+11
+9
+[1, 2, 3]
+```
+
+`?`, rangos y asignación con desestructuración:
+
+<Ejecutar ej="ref-lenguaje/expresiones-interrogacion" />
+
+Salida:
+
+```text
+Ok(42)
+Err(ParseIntError { kind: InvalidDigit })
+Some('R') None
+[1, 2, 3] [1, 2, 3, 4]
+2 1 9
+```
+
+## Errores típicos
+
+<NoCompila ej="ref-lenguaje/expresiones-error" />
+
+`error: comparison operators cannot be chained`, con la ayuda `split the comparison into two`: `a < b && b < c`.
+
+## Desde
+
+Rust 1.0. `?`: 1.13 (con `Option`, 1.22). Asignación con desestructuración: 1.59. Bloques `const`: 1.79. `&raw`: 1.82.
+
+## Ver también
+
+- [Patrones](/ref/lenguaje/patrones/) · [Destructores y orden de drop](/ref/lenguaje/destructores-y-orden-de-drop/) · [Coerciones](/ref/lenguaje/coerciones/) · [`if`](/ref/lenguaje/palabras-clave/if/) · [`match`](/ref/lenguaje/palabras-clave/match/) · [`loop`](/ref/lenguaje/palabras-clave/loop/)
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/)

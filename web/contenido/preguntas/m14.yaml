@@ -1,0 +1,906 @@
+# Banco de preguntas del mundo 14 — Closures e iteradores (CONTENIDO.md §7.1).
+# Todo código citado está en ejemplos/m14/ y se ha compilado/ejecutado con rustc 1.99.1, edición 2024
+# (wasm32-wasip1 para las salidas; --emit=metadata para los errores).
+
+# ───────────────────────── Closures ─────────────────────────
+
+- id: m14-closure-tipo-fijo
+  titulo: "Un closure, dos tipos"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m14/closure-tipo-fijo
+  opciones:
+    - "El primer uso fija el tipo del parámetro (entero) y `2.5` ya no encaja (E0308)"
+    - "Los closures no pueden devolver su propio argumento"
+    - "Falta escribir el tipo de `x`: en un closure es obligatorio"
+    - "No se puede llamar dos veces al mismo closure"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0308]: mismatched types`, con la nota «expected because the closure was earlier called with an argument of type `{integer}`».
+    Un closure **no es genérico**: el tipo de sus parámetros se deduce en el primer uso y queda fijo.
+    - Devolver el argumento está permitido (`|x| x` es válido).
+    - Los tipos se pueden omitir; el problema es que se deducen una sola vez.
+    - Un closure que solo lee se puede llamar tantas veces como quieras.
+    Arreglo: dos closures con tipos distintos, o una función genérica `fn identidad<T>(x: T) -> T`.
+  etiquetas: ["E0308", "inferencia"]
+
+- id: m14-captura-mut-conflicto
+  titulo: "Leer lo que otro modifica"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila? Fíjate en las tres líneas que señala el error."
+  ej: m14/captura-mut-conflicto
+  opciones:
+    - "`sumar` tiene un préstamo exclusivo de `contador` hasta su último uso; leer `contador` en medio choca con él (E0502)"
+    - "`contador` se ha movido dentro del closure"
+    - "Un closure no puede modificar variables de fuera"
+    - "Falta `move` delante del closure"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0502]: cannot borrow contador as immutable because it is also borrowed as mutable`. Marca la creación del closure («mutable borrow occurs here»), el `println!` («immutable borrow occurs here») y la llamada `sumar()` («mutable borrow later used here»).
+    El closure guarda dentro un `&mut contador`. Mientras viva, nadie más puede leer `contador`: sería aliasing con mutación.
+    - Sin `move`, se presta; no se mueve.
+    - Sí puede modificarlas: por eso captura con `&mut`.
+    - Con `move` compilaría (con avisos), pero el closure incrementaría **su propia copia**: comprobado, el `contador` de fuera se queda en 0 para siempre.
+    Arreglo verificado: llamar a `sumar()` antes de imprimir.
+  etiquetas: ["E0502", "captura", "&mut"]
+
+- id: m14-move-string
+  titulo: "move se la lleva"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué falla la última línea?"
+  ej: m14/move-string
+  opciones:
+    - "`move` mueve la `String` `s` dentro del closure: fuera ya no existe (E0382)"
+    - "Un closure `move` solo se puede llamar una vez"
+    - "`println!` no puede usarse dentro de un closure"
+    - "`s` se destruyó al llamar a `f()`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of moved value: s`, «value moved into closure here».
+    Con `move`, cada variable que usa el cuerpo pasa a ser del closure. Una `String` no es `Copy`, así que se **mueve**.
+    - Este closure solo lee su `s`: es `Fn` y se puede llamar muchas veces. `move` decide la captura, no el trait.
+    - `println!` funciona en cualquier sitio.
+    - `s` sigue viva dentro de `f` hasta que `f` se destruye; el problema es que ya no es de `main`.
+    Arreglo (lo sugiere el compilador): clonar antes y mover la copia.
+  etiquetas: ["E0382", "move"]
+
+- id: m14-move-vec
+  titulo: "El vector viajero"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué impide compilar este programa?"
+  ej: m14/q-move-vec
+  opciones:
+    - "El closure `move` se ha quedado con `v`; usar `v.len()` fuera es usar un valor movido (E0382)"
+    - "`v.len()` modifica el vector"
+    - "No se puede llamar a métodos dentro de un closure"
+    - "`f()` destruye el vector al llamarse"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of moved value: v`. `move` mete el `Vec` dentro del closure.
+    - `len()` solo lee.
+    - Los closures pueden llamar a cualquier método.
+    - Llamar a `f()` no destruye nada: el closure solo lee su `v`.
+    Si solo necesitas leer, quita `move`: el closure tomará `&v` y podrás seguir usando `v`.
+  etiquetas: ["E0382", "move", "Vec"]
+
+- id: m14-move-copia
+  titulo: "La foto de x"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m14/q-move-copia
+  opciones: ["`1 5`", "`5 5`", "`1 1`", "No compila: `x` se movió al closure"]
+  correcta: 0
+  solucion: |
+    Imprime `1 5`. `move` captura por valor; como `i32` es `Copy`, el closure se guarda **una copia** de `x` (1) al crearse. Después `x = 5` cambia solo la variable de fuera.
+    - `5 5` sería así si el closure tomara `&x`, pero entonces `x = 5` no compilaría (E0506).
+    - La de fuera sí cambió.
+    - Copiar no invalida el original.
+  etiquetas: ["move", "Copy"]
+
+- id: m14-fnmut-sin-mut
+  titulo: "El closure que no era mut"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: media
+  tipo: no-compila
+  enunciado: "El closure modifica `c`. ¿Por qué falla la llamada `inc()`?"
+  ej: m14/q-fnmut-sin-mut
+  opciones:
+    - "Llamar a un `FnMut` pide `&mut inc`, y `inc` no se declaró `mut` (E0596)"
+    - "`c` no es `mut`"
+    - "Los closures que modifican solo se pueden pasar a funciones, no llamar directamente"
+    - "`inc` es `FnOnce` y ya se ha llamado"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0596]: cannot borrow inc as mutable, as it is not declared as mutable`, con la nota «calling `inc` requires mutable binding due to mutable borrow of `c`».
+    `inc()` es azúcar de `FnMut::call_mut(&mut inc)`: hace falta un préstamo exclusivo **del closure**, que guarda dentro un `&mut c` y cambia al llamarlo.
+    - `c` sí es `mut`.
+    - Se pueden llamar directamente: basta `let mut inc`.
+    - Es la primera llamada; y este closure es `FnMut`, no solo `FnOnce`.
+  etiquetas: ["E0596", "FnMut"]
+
+- id: m14-fnonce-dos-veces
+  titulo: "El regalo se entrega una vez"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede llamar dos veces a `entregar`?"
+  ej: m14/fnonce-dos-veces
+  opciones:
+    - "El closure devuelve (mueve hacia fuera) `regalo`: solo es `FnOnce` y llamarlo lo consume (E0382)"
+    - "Los closures `move` solo se pueden llamar una vez"
+    - "Falta `mut` en `entregar`"
+    - "`regalo` se destruye al crear el closure"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: use of moved value: entregar`, con dos notas: «closure cannot be invoked more than once because it moves the variable `regalo` out of its environment» y «this value implements `FnOnce`, which causes it to be moved when called».
+    `FnOnce::call_once(self)` recibe el closure por valor: tras la primera llamada ya no existe.
+    - `move` no es la causa: `move || regalo.len()` se podría llamar muchas veces. La causa es **devolver** `regalo`.
+    - `mut` no sirve: no se trata de modificar, sino de consumir.
+    - `regalo` vive dentro del closure hasta la primera llamada.
+    Arreglo: devolver `regalo.clone()` (el closure pasa a ser `Fn`).
+  etiquetas: ["E0382", "FnOnce"]
+
+- id: m14-fn-no-muta
+  titulo: "Pide Fn, recibe FnMut"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila la llamada a `llama`?"
+  ej: m14/fn-no-muta
+  opciones:
+    - "`llama` pide `Fn`, que solo da `&self`; el closure necesita modificar `pasos` (E0594)"
+    - "`pasos` no es `mut`"
+    - "Las funciones genéricas no aceptan closures, solo funciones con nombre"
+    - "Falta `move`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0594]: cannot assign to pasos, as it is a captured variable in a Fn closure`, y sugiere «change this to accept `FnMut` instead of `Fn`».
+    El bound decide qué closures se aceptan. `Fn` solo llama con un préstamo compartido del closure, así que no deja modificar lo capturado.
+    - `pasos` sí es `mut`.
+    - Aceptan cualquier cosa que cumpla el bound: closures incluidos.
+    - Con `move` el closure modificaría su copia, pero seguiría necesitando `FnMut`: el error no cambia.
+    Arreglo verificado: `fn llama<F: FnMut()>(mut f: F)`.
+  etiquetas: ["E0594", "Fn", "FnMut"]
+
+- id: m14-bound-mas-generoso
+  titulo: "Pedir menos acepta más"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: media
+  tipo: opcion
+  enunciado: "Tu función llama a su closure **exactamente una vez**. ¿Qué bound acepta más closures?"
+  opciones: ["`F: FnOnce()`", "`F: Fn()`", "`F: FnMut()`", "Los tres aceptan los mismos"]
+  correcta: 0
+  solucion: |
+    `FnOnce` solo exige «se puede llamar una vez», y eso lo cumple **cualquier** closure. Como `trait FnMut: FnOnce` y `trait Fn: FnMut`, todo `Fn` es `FnMut` y todo `FnMut` es `FnOnce`.
+    - `Fn` rechazaría los que modifican o consumen lo capturado.
+    - `FnMut` rechazaría los que consumen (los que mueven algo hacia fuera).
+    - No: son conjuntos encajados, cada vez más grandes.
+    El ejemplo `m14/jerarquia` pasa un `Fn`, un `FnMut` y un `FnOnce` a la misma función con `F: FnOnce() -> i32`.
+  etiquetas: ["FnOnce", "bounds"]
+
+- id: m14-move-no-decide-trait
+  titulo: "¿move = FnOnce?"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "`let n = 5; let f = move || n + 1;` — ¿qué traits de llamada implementa `f`?"
+  opciones: ["`Fn`, `FnMut` y `FnOnce`", "Solo `FnOnce`, por el `move`", "Solo `FnMut`", "Ninguno hasta que se llame"]
+  correcta: 0
+  solucion: |
+    `move` decide **cómo se captura** (por valor), no qué hace el cuerpo. El cuerpo solo **lee** su copia de `n`, así que el closure es `Fn` (y por tanto también `FnMut` y `FnOnce`).
+    - Confusión muy común: un closure es solo `FnOnce` cuando el cuerpo **consume** algo capturado (por ejemplo, lo devuelve).
+    - Sería `FnMut` si modificara su `n`.
+    - Los traits se deciden al compilar, mirando el cuerpo.
+  etiquetas: ["move", "Fn"]
+
+- id: m14-devolver-sin-move
+  titulo: "Un closure que sobrevive a su función"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `sumador`?"
+  ej: m14/devolver-sin-move
+  opciones:
+    - "El closure toma prestado `n`, que muere al acabar `sumador`, pero el closure sigue vivo fuera (E0373)"
+    - "`impl Fn` no se puede usar como tipo de retorno"
+    - "Un closure no puede sumar un parámetro de otra función"
+    - "Falta poner el tipo de `x`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0373]: closure may outlive the current function, but it borrows n, which is owned by the current function`, y propone `move |x| x + n`.
+    Si compilara, el closure devuelto guardaría un puntero a `n`, un parámetro cuyo espacio en la pila desaparece al volver: un uso tras liberar.
+    - `-> impl Fn(i32) -> i32` es la forma habitual de devolver un closure.
+    - Puede usarlo si se lleva su propia copia (`move`).
+    - El tipo de `x` se deduce del `impl Fn(i32) -> i32`.
+  etiquetas: ["E0373", "move", "impl Trait"]
+
+- id: m14-dos-closures-un-tipo
+  titulo: "Gemelos que no son iguales"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "Los dos closures tienen la misma firma. ¿Por qué no caben en el mismo `Vec`?"
+  ej: m14/dos-closures-un-tipo
+  opciones:
+    - "Cada closure tiene su propio tipo anónimo; el `Vec` ya es del tipo del primero (E0308)"
+    - "Un `Vec` no puede guardar funciones"
+    - "Falta `mut` en `lista`"
+    - "Los closures deben tener el mismo cuerpo para ser del mismo tipo"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0308]: mismatched types`, «expected closure, found a different closure», con la nota «no two closures, even if identical, have the same type» y la ayuda «consider boxing your closure and/or using it as a trait object».
+    - Sí puede: con `Vec<Box<dyn Fn(i32) -> i32>>` (ejemplo `m14/devolver-closure`).
+    - `lista` sí es `mut`.
+    - Ni con el mismo cuerpo: el tipo depende del sitio donde se escribe el closure.
+  etiquetas: ["E0308", "dyn Fn", "tipos de closure"]
+
+- id: m14-contador-fnmut
+  titulo: "Dos contadores"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m14/contador-fnmut
+  opciones: ["`a: 1 2 3` y `b: 1`", "`a: 1 2 3` y `b: 4`", "`a: 1 1 1` y `b: 1`", "No compila: `cuenta` es local"]
+  correcta: 0
+  solucion: |
+    Cada llamada a `nuevo_contador` crea un closure distinto con **su propia** `cuenta`, movida dentro con `move`. El estado persiste entre llamadas del mismo closure, pero no se comparte entre closures.
+    - `b` empieza su propia cuenta en 0.
+    - `cuenta += 1` modifica la copia que vive dentro del closure, que no se reinicia.
+    - Con `move`, `cuenta` deja de ser local: viaja dentro del closure.
+  etiquetas: ["FnMut", "impl Fn", "estado"]
+
+- id: m14-closure-copy
+  titulo: "Copiar un closure"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: dificil
+  tipo: predice
+  enunciado: "`let g = f;` ¿mueve el closure o lo copia? ¿Qué pasa?"
+  ej: m14/q-closure-copy
+  opciones: ["Imprime `11 11`", "No compila: `f` se movió a `g` (E0382)", "Imprime `11 12`", "No compila: los closures no se pueden asignar"]
+  correcta: 0
+  solucion: |
+    Imprime `11 11`. Un closure es `Copy` si todas sus capturas lo son. Este captura `&x`, y una referencia compartida es `Copy`, así que `let g = f;` **copia** el closure y los dos siguen usables.
+    - Con una captura no `Copy` (por ejemplo, una `String` movida con `move`) sí habría E0382.
+    - Los dos leen el mismo `x` (10) y suman 1.
+    - Un closure es un valor normal: se asigna, se pasa y se devuelve.
+  etiquetas: ["Copy", "captura"]
+
+- id: m14-fn-puntero-captura
+  titulo: "Puntero a función con equipaje"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "`|x| x + 1` sí se puede guardar en un `fn(i32) -> i32`. ¿Por qué este no?"
+  ej: m14/q-fn-puntero-captura
+  opciones:
+    - "Captura `n`, y un puntero a función solo guarda la dirección del código: no hay sitio para `n` (E0308)"
+    - "`fn(i32) -> i32` solo admite funciones declaradas con `fn`"
+    - "`n` tendría que ser `mut`"
+    - "Habría que escribir `move`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0308]: mismatched types`, «expected fn pointer, found closure», con la nota «closures can only be coerced to `fn` types if they do not capture any variables» señalando `n`.
+    Un `fn(i32) -> i32` es solo una dirección de código (8 bytes en x86-64). Un closure que captura es un struct con datos: no cabe.
+    - Los closures **sin capturas** también se convierten (ejemplo `m14/q-fn-puntero`).
+    - La mutabilidad no influye.
+    - Con `move` seguiría capturando `n`, así que seguiría sin caber.
+    Para guardar closures con capturas: genéricos (`impl Fn`) o `Box<dyn Fn(i32) -> i32>`.
+  etiquetas: ["E0308", "fn", "punteros a función"]
+
+- id: m14-impl-vs-dyn
+  titulo: "impl Fn o Box<dyn Fn>"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué describe mejor la diferencia entre recibir `impl Fn(i32) -> i32` y `Box<dyn Fn(i32) -> i32>`?"
+  opciones:
+    - "`impl Fn`: una copia de la función por closure, llamada directa e inlineable. `dyn Fn`: una sola copia, llamada indirecta por vtable y el closure en el montón"
+    - "Son lo mismo; `dyn` es la sintaxis antigua"
+    - "`impl Fn` no admite closures con capturas"
+    - "`dyn Fn` es más rápido porque no genera copias"
+  correcta: 0
+  solucion: |
+    `impl Fn` en un argumento es un genérico anónimo: monomorfización, el compilador sabe qué closure es y puede meter su código dentro. `Box<dyn Fn>` borra el tipo: el `Box` es un puntero gordo (datos + vtable; 16 bytes en x86-64, comprobado con `size_of::<Box<dyn Fn()>>() == 16`) y cada llamada salta a la dirección guardada en la vtable.
+    - Son mecanismos distintos (estático frente a dinámico), los dos vigentes.
+    - Ambos admiten capturas.
+    - Generar menos código no hace más rápida la llamada: la indirección impide el inlining.
+    Usa `dyn` cuando necesites mezclar closures distintos (por ejemplo, en un `Vec`).
+  etiquetas: ["dyn Fn", "impl Trait", "vtable", "monomorfización"]
+
+- id: m14-tamano-closures
+  titulo: "¿Cuánto pesa un closure?"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: dificil
+  tipo: predice
+  enunciado: "En el navegador (wasm32, donde un puntero mide 4 bytes), ¿qué tamaños imprime para los cuatro closures, en orden?"
+  ej: m14/tamano-closures
+  opciones: ["0, 4, 8 y 12 bytes", "8, 8, 8 y 8 bytes", "0, 8, 8 y 24 bytes", "4, 4, 8 y 4 bytes"]
+  correcta: 0
+  solucion: |
+    Un closure es un struct con sus capturas: sin capturas, 0 bytes; con `&u64`, un puntero (4 en wasm32); con el `u64` movido, 8; con la `String` movida, sus tres campos de 4 bytes (puntero, capacidad, longitud) = 12.
+    - No son punteros a función de tamaño fijo.
+    - 0, 8, 8 y 24 es lo que da en un PC de 64 bits (comprobado con aserciones en tiempo de compilación), no en wasm32.
+    - Un closure que mueve una `String` se la lleva entera, no un puntero a ella.
+  etiquetas: ["tamaño", "layout", "move"]
+
+- id: m14-respuesta-zst
+  titulo: "Cero"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuántos bytes ocupa en memoria un closure que no captura nada? (Escribe solo el número.)"
+  respuestas: ["0", "cero"]
+  solucion: |
+    **0**. Un closure sin capturas es un struct sin campos: un tipo de tamaño cero. Lo comprobamos ejecutando `size_of_val(&sin_nada)` en el ejemplo `m14/tamano-closures`, y con una aserción al compilar para x86-64. Llamarlo no lee memoria: el compilador sabe a qué código saltar solo por el tipo.
+  etiquetas: ["tamaño", "ZST"]
+
+- id: m14-respuesta-e0373
+  titulo: "El código del closure fugitivo"
+  mundo: 14-closures-e-iteradores
+  tema: closures
+  dificultad: media
+  tipo: respuesta
+  enunciado: "¿Qué código de error da rustc cuando un closure que devuelves toma prestada una variable local («closure may outlive the current function»)? Formato: `E0000`."
+  respuestas: ["E0373"]
+  solucion: |
+    **E0373**. Lo viste en `m14/devolver-sin-move` y en `m14/devolver-iter-sin-move`. La solución que propone el compilador es `move`, para que el closure se lleve sus capturas en vez de tomarlas prestadas.
+  etiquetas: ["E0373"]
+
+# ───────────────────────── Iteradores ─────────────────────────
+
+- id: m14-perezoso
+  titulo: "¿Cuándo se calcula?"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿En qué orden aparecen los mensajes?"
+  ej: m14/perezoso
+  opciones:
+    - "`receta preparada` y después `calculando` y `recibo` alternados"
+    - "Los tres `calculando`, luego `receta preparada` y luego los tres `recibo`"
+    - "`receta preparada`, los tres `calculando` seguidos y los tres `recibo`"
+    - "Ningún `calculando`: `map` no ejecuta el closure"
+  correcta: 0
+  solucion: |
+    Los iteradores son **perezosos**: `map` solo prepara la receta. Cada vuelta del `for` pide un elemento con `next()`, y en ese momento se calcula uno y se entrega.
+    - Crear el `Map` no ejecuta nada.
+    - No se calcula todo de golpe: no hay lista intermedia.
+    - Sí se ejecuta, cuando el `for` lo pide.
+  etiquetas: ["pereza", "map"]
+
+- id: m14-orden-perezoso
+  titulo: "Filter y map, codo con codo"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime la primera línea?"
+  ej: m14/q-orden-perezoso
+  opciones: ["`f1 m1 f2 f3 m3`", "`f1 f2 f3 m1 m3`", "`f1 m1 f2 m2 f3 m3`", "`m1 m3 f1 f2 f3`"]
+  correcta: 0
+  solucion: |
+    Cada elemento recorre la tubería **entero** antes de pasar al siguiente: el 1 pasa el filtro y se mapea; el 2 no pasa el filtro (no hay `m2`); el 3 pasa y se mapea.
+    - Eso sería si `filter` procesara toda la lista antes que `map`.
+    - El 2 se queda en el filtro.
+    - `map` está después de `filter`: no puede ver elementos que aún no han pasado.
+  etiquetas: ["pereza", "filter", "map"]
+
+- id: m14-infinito
+  titulo: "Un rango sin final"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: facil
+  tipo: predice
+  enunciado: "`1..` no tiene fin. ¿Qué pasa?"
+  ej: m14/q-infinito
+  opciones: ["Imprime `14`", "Se queda colgado para siempre", "Pánico por desbordamiento", "No compila"]
+  correcta: 0
+  solucion: |
+    Imprime `14` (1 + 4 + 9). Gracias a la pereza, `take(3)` solo pide tres elementos; nadie calcula el cuarto.
+    - Se colgaría si un consumidor intentara recorrer el rango entero (por ejemplo, `(1..).count()`).
+    - Solo se calculan tres cuadrados pequeños.
+    - `1..` es un `RangeFrom`, un iterador válido.
+  etiquetas: ["pereza", "take", "rangos"]
+
+- id: m14-map-sin-consumir
+  titulo: "El map que no hacía nada"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Con `#![deny(unused_must_use)]`, este programa no compila. ¿Qué intenta decirte el compilador?"
+  ej: m14/map-sin-consumir
+  opciones:
+    - "Que el `Map` creado no se usa y los iteradores no hacen nada si no se consumen: no se imprime nada"
+    - "Que `println!` no se puede usar dentro de `map`"
+    - "Que `v` debería ser `mut`"
+    - "Que `map` necesita un `collect` obligatorio"
+  correcta: 0
+  solucion: |
+    rustc: `error: unused Map that must be used`, con la nota «iterators are lazy and do nothing unless consumed». Antes avisa (lint `map_unit_fn`) de que la llamada a `map` descarta los valores y sugiere `for_each`.
+    Sin el `deny` sería solo un aviso, pero el programa no imprimiría nada.
+    - `println!` es válido dentro de cualquier closure.
+    - `v` solo se lee.
+    - Cualquier consumidor serviría; para efectos (imprimir), lo natural es un `for` o `for_each`.
+  etiquetas: ["must_use", "pereza", "map"]
+
+- id: m14-next-mut
+  titulo: "¿Por qué &mut self?"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: facil
+  tipo: opcion
+  enunciado: "La firma es `fn next(&mut self) -> Option<Self::Item>`. ¿Por qué `&mut self`?"
+  opciones: ["Porque avanzar cambia el estado interno del iterador", "Porque modifica la colección que recorre", "Porque el `Option` lo exige", "No hay razón: podría ser `&self`"]
+  correcta: 0
+  solucion: |
+    El iterador recuerda por dónde va (por ejemplo, `slice::Iter` guarda un puntero al elemento actual); entregar un elemento es avanzar esa posición.
+    - `v.iter()` no modifica `v`: solo su propia posición.
+    - El tipo de retorno no tiene nada que ver.
+    - Con `&self` no podría avanzar sin mutabilidad interior.
+  etiquetas: ["Iterator", "next"]
+
+- id: m14-respuesta-next
+  titulo: "El único método obligatorio"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "Para implementar `Iterator` escribes `type Item` y **un** método. ¿Cómo se llama? (Solo el nombre.)"
+  respuestas: ["next", "next()"]
+  solucion: |
+    **`next`**. Todos los demás métodos de `Iterator` (`map`, `filter`, `sum`, `collect`…) tienen implementación por defecto escrita en función de `next`. Ejemplo: `m14/contador`.
+  etiquetas: ["Iterator", "next"]
+
+- id: m14-iterator-sin-item
+  titulo: "¿Qué entregas?"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué le falta a esta implementación?"
+  ej: m14/iterator-sin-item
+  opciones:
+    - "El tipo asociado `type Item = u8;` (E0046)"
+    - "El método `iter()`"
+    - "`#[derive(Iterator)]` en el struct"
+    - "Que `next` reciba `self` por valor"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0046]: not all trait items implemented, missing: Item`, con la ayuda `type Item = /* Type */;`.
+    - `iter()` es un método de las colecciones, no del trait `Iterator`.
+    - `Iterator` no se puede derivar.
+    - `next` recibe `&mut self`.
+  etiquetas: ["E0046", "Iterator", "tipos asociados"]
+
+- id: m14-into-iter-mueve
+  titulo: "El for que se comió el vector"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede usar `nombres.len()` después del `for`?"
+  ej: m14/into-iter-mueve
+  opciones:
+    - "`for n in nombres` llama a `into_iter()`, que mueve el vector (E0382)"
+    - "El `for` vacía el vector al recorrerlo"
+    - "`len()` no existe para `Vec<String>`"
+    - "Hay que cerrar el iterador antes de usar el vector"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of moved value: nombres`, con la nota de que el `for` «is desugared into a call to `IntoIterator::into_iter`, which takes ownership of the receiver `self`», y sugiere `for n in &nombres`.
+    - No se «vacía»: el vector entero se mueve al iterador, y se libera al terminar el bucle.
+    - `len()` existe.
+    - No hay que cerrar nada: el problema es la propiedad.
+  etiquetas: ["E0382", "into_iter", "for"]
+
+- id: m14-iter-mut
+  titulo: "Cambiar en el sitio"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m14/q-iter-mut
+  opciones: ["`[10, 20, 30]`", "`[1, 2, 3]`", "No compila: `x` es inmutable", "No compila: no se puede multiplicar una referencia"]
+  correcta: 0
+  solucion: |
+    `for x in &mut v` entrega `&mut i32` (equivale a `v.iter_mut()`). Con `*x *= 10` se modifica cada elemento dentro del vector.
+    - Los cambios se hacen sobre los elementos reales, no sobre copias.
+    - `x` es un préstamo exclusivo: permite escribir a través de él.
+    - Por eso se escribe `*x`: primero se desreferencia.
+  etiquetas: ["iter_mut", "&mut"]
+
+- id: m14-iter-tipos
+  titulo: "Tres formas de recorrer"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: opcion
+  enunciado: "Para `v: Vec<String>`, ¿qué entregan `v.iter()`, `v.iter_mut()` y `v.into_iter()`, en ese orden?"
+  opciones: ["`&String`, `&mut String`, `String`", "`String`, `&mut String`, `&String`", "`&String` los tres", "`String` los tres, clonados"]
+  correcta: 0
+  solucion: |
+    Préstamo compartido, préstamo exclusivo y el valor (moviéndolo fuera del vector). Las tres corresponden a `for x in &v`, `for x in &mut v` y `for x in v` (ejemplo `m14/iter-vs-into`).
+    - El orden está cambiado.
+    - `iter_mut` permite modificar e `into_iter` entrega los valores.
+    - Ningún iterador clona por su cuenta.
+  etiquetas: ["iter", "iter_mut", "into_iter"]
+
+- id: m14-predice-cadena
+  titulo: "Filtra, eleva, corta"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m14/predice-cadena
+  opciones: ["`[9, 36]`", "`[3, 6]`", "`[9, 36, 81]`", "`[1, 4]`"]
+  correcta: 0
+  solucion: |
+    Múltiplos de 3 entre 1 y 10: 3, 6, 9. Al cuadrado: 9, 36, 81. `take(2)`: los dos primeros.
+    - Falta aplicar el `map`.
+    - `take(2)` corta en dos.
+    - El `filter` va primero: filtra 1..=10, no sus cuadrados.
+  etiquetas: ["filter", "map", "take"]
+
+- id: m14-filter-doble-ref
+  titulo: "Una referencia de más"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede comparar `x > 3`?"
+  ej: m14/filter-doble-ref
+  opciones:
+    - "`x` es `&&i32` (referencia a cada `&i32` de `iter()`) y no se compara con un entero (E0308)"
+    - "`filter` solo acepta funciones con nombre"
+    - "`3` debería ser `3i32`"
+    - "`filter` necesita `iter_mut()`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0308]: mismatched types`, «expected `&&_`, found integer». `iter()` entrega `&i32` y `filter` presta cada elemento a su closure: `&&i32`.
+    Arreglos: `|&&x| x > 3` (patrón que quita las dos capas) o `|x| **x > 3`.
+    - `filter` acepta closures.
+    - El literal no es el problema: es el número de `&`.
+    - `filter` solo mira, no modifica.
+  etiquetas: ["E0308", "filter", "referencias"]
+
+- id: m14-zip-corto
+  titulo: "Parejas desparejadas"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m14/q-zip-corto
+  opciones: ["`2`", "`3`", "`5`", "No compila: tienen distinta longitud"]
+  correcta: 0
+  solucion: |
+    `zip` se para en cuanto uno de los dos iteradores devuelve `None`. Solo hay dos parejas.
+    - No hay pareja para el 3.
+    - `zip` empareja; concatenar es `chain`.
+    - La longitud distinta está permitida.
+  etiquetas: ["zip"]
+
+- id: m14-enumerate-rev
+  titulo: "Contar hacia atrás"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime? Ojo al orden de `enumerate` y `rev`."
+  ej: m14/q-enumerate-rev
+  opciones: ["`2c 1b 0a`", "`0c 1b 2a`", "`0a 1b 2c`", "No compila: `enumerate` no se puede invertir"]
+  correcta: 0
+  solucion: |
+    `enumerate` numera **primero** (0a, 1b, 2c) y `rev` recorre ese resultado al revés. Cada letra conserva su posición original.
+    - Eso saldría con `.rev().enumerate()`: invertir y luego numerar.
+    - Falta el `rev`.
+    - Se puede: el iterador de un slice sabe ir hacia atrás y conoce su longitud, así que `Enumerate` también.
+  etiquetas: ["enumerate", "rev"]
+
+- id: m14-take-while
+  titulo: "take_while frente a filter"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m14/q-take-while
+  opciones: ["`[2, 4] [2, 4, 6, 8]`", "`[2, 4, 6, 8] [2, 4, 6, 8]`", "`[2, 4] [2, 4]`", "`[5] [2, 4, 6, 8]`"]
+  correcta: 0
+  solucion: |
+    `take_while` se detiene **para siempre** en el primer elemento que no cumple (el 5). `filter` sigue hasta el final.
+    - `take_while` no se salta el 5.
+    - `filter` no se detiene.
+    - `take_while` entrega los que cumplen antes del primer fallo.
+  etiquetas: ["take_while", "filter"]
+
+- id: m14-chars-rev
+  titulo: "Al revés con ñ"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m14/q-chars-rev
+  opciones: ["`oña`", "`oñ a`", "Texto roto: se invierten los bytes de la ñ", "No compila: un `String` no se puede invertir"]
+  correcta: 0
+  solucion: |
+    `chars()` recorre **caracteres** (Unicode), no bytes, así que la «ñ» (2 bytes en UTF-8) se mueve entera. `rev()` funciona porque el iterador de caracteres sabe ir hacia atrás, y `collect` a `String` los vuelve a unir.
+    - No aparece ningún espacio.
+    - Eso pasaría si invirtieras los **bytes** (`bytes()`), y además el resultado no sería UTF-8 válido.
+    - No se invierte el `String`: se invierte el iterador de sus caracteres.
+  etiquetas: ["chars", "rev", "UTF-8"]
+
+- id: m14-nth
+  titulo: "nth consume"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m14/q-nth
+  opciones: ["`Some(20) Some(30)`", "`Some(20) Some(10)`", "`Some(10) Some(20)`", "`Some(20) Some(20)`"]
+  correcta: 0
+  solucion: |
+    `nth(1)` devuelve el elemento de posición 1 (empezando en 0), es decir 20, y **consume** los anteriores y ese mismo. El siguiente `next()` sigue desde ahí: 30.
+    - El iterador no vuelve atrás.
+    - `nth` empieza a contar en 0.
+    - `nth` saca el elemento; no lo deja para el siguiente `next`.
+  etiquetas: ["nth", "next"]
+
+- id: m14-collect-sin-tipo
+  titulo: "collect sin destino"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué falta?"
+  ej: m14/collect-sin-tipo
+  opciones:
+    - "Decir qué colección construir: `let v: Vec<_>` o `collect::<Vec<_>>()` (E0283)"
+    - "Un `mut` en `v`"
+    - "Un `.iter()` antes del `map`"
+    - "`collect` solo funciona con `Vec<String>`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0283]: type annotations needed`, «the type must implement `FromIterator<i32>`», y propone `let v: Vec<_> = …`.
+    `collect` es genérico en lo que devuelve: podría ser un `Vec`, un `HashSet`, un `VecDeque`…
+    - No se modifica `v`.
+    - Un rango ya es un iterador.
+    - Construye cualquier tipo que implemente `FromIterator`.
+  etiquetas: ["E0283", "collect", "turbofish"]
+
+- id: m14-sum-sin-tipo
+  titulo: "Sumar ¿en qué?"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: no-compila
+  enunciado: "`v` es un `Vec<i32>`. ¿Por qué no sabe el compilador de qué tipo es `s`?"
+  ej: m14/q-sum-sin-tipo
+  opciones:
+    - "`sum` es genérico en su resultado (cualquier `S: Sum<&i32>`); hay que decirlo: `let s: i32` (E0283)"
+    - "No se pueden sumar referencias"
+    - "`sum` solo existe para `Vec<f64>`"
+    - "Falta `.copied()`: sin él nunca compila"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0283]: type annotations needed`, «the type must implement `Sum<&i32>`». Como `collect`, `sum` puede producir varios tipos y no elige por ti.
+    - Sí se pueden: `i32` implementa `Sum<&i32>`.
+    - Existe para todos los numéricos.
+    - `.copied()` no resuelve la ambigüedad; con `let s: i32 = v.iter().sum();` compila sin él.
+  etiquetas: ["E0283", "sum"]
+
+- id: m14-count-dos-veces
+  titulo: "Contar dos veces"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede llamar dos veces a `it.count()`?"
+  ej: m14/q-count-dos-veces
+  opciones:
+    - "`count` recibe `self`: consume (mueve) el iterador (E0382)"
+    - "`it` debería ser `mut`"
+    - "Un iterador vacío no se puede contar"
+    - "`count` solo funciona una vez por programa"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: use of moved value: it`, con la nota «`Iterator::count` takes ownership of the receiver `self`». Contar es recorrer hasta el final: el iterador se gasta.
+    Si quieres contar otra vez, crea otro iterador (`v.iter().count()`) o usa `v.len()`.
+    - `mut` no ayuda: `count` se lo lleva por valor.
+    - No está vacío; además contar uno vacío da 0.
+    - No hay límite por programa: el límite es el iterador.
+  etiquetas: ["E0382", "count", "consumidores"]
+
+- id: m14-any-corto
+  titulo: "any se para pronto"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m14/q-any-corto
+  opciones: ["`true 2`", "`true 4`", "`true 1`", "No compila: el closure modifica `miradas`"]
+  correcta: 0
+  solucion: |
+    `any` se detiene en el primer elemento que cumple (el 9, en la segunda posición): el closure se llama 2 veces. `any` acepta un `FnMut`, así que puede modificar `miradas`.
+    - No sigue tras encontrar la respuesta.
+    - Primero mira el 1.
+    - `any` pide `FnMut`, no `Fn`.
+  etiquetas: ["any", "cortocircuito", "FnMut"]
+
+- id: m14-fold-texto
+  titulo: "Doblar texto"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m14/q-fold-texto
+  opciones: ["`>abc`", "`abc>`", "`abc`", "`>a>b>c`"]
+  correcta: 0
+  solucion: |
+    `fold` empieza con el valor inicial (la `String` `>`) y le aplica el closure con cada elemento, por orden: `>a`, `>ab`, `>abc`.
+    - El valor inicial va al principio.
+    - Falta el valor inicial.
+    - El valor inicial se usa una vez.
+  etiquetas: ["fold"]
+
+- id: m14-filter-map
+  titulo: "Quedarse con los que se pueden leer"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m14/q-filter-map
+  opciones: ["`[4, 15]`", "`[4, 0, 15]`", "Pánico al leer `x`", "No compila: `parse` necesita turbofish"]
+  correcta: 0
+  solucion: |
+    `filter_map` aplica el closure y se queda solo con los `Some`. `s.parse().ok()` convierte el `Result` en `Option`: `"x"` da `None` y se descarta.
+    - No se inventa ningún 0.
+    - `parse` no entra en pánico: devuelve `Err`.
+    - El tipo de destino (`i32`) se deduce de `Vec<i32>`.
+  etiquetas: ["filter_map", "parse", "Option"]
+
+- id: m14-max-f64
+  titulo: "El máximo de unos decimales"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué `max()` no funciona con `f64`?"
+  ej: m14/q-max-f64
+  opciones:
+    - "`max` necesita `Ord` (orden total) y `f64` no lo tiene por culpa de `NaN` (E0277)"
+    - "`max` solo funciona con `Vec<i32>`"
+    - "Hay que escribir `max::<f64>()`"
+    - "Los `f64` no se pueden comparar en Rust"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0277]: the trait bound {float}: Ord is not satisfied`. `NaN` no es mayor, menor ni igual a nada (ni a sí mismo), así que `f64` solo implementa `PartialOrd`.
+    Arreglo verificado: `v.iter().copied().fold(f64::NEG_INFINITY, f64::max)` (imprime `9.1`). También existe `max_by` con `f64::total_cmp`.
+    - Funciona con cualquier tipo `Ord`.
+    - El turbofish no añade `Ord`.
+    - Sí se comparan con `<` (`PartialOrd`), pero el resultado puede ser «no comparables».
+  etiquetas: ["E0277", "Ord", "f64", "max"]
+
+- id: m14-coste-cero-asm
+  titulo: "Lo que dijo el diff"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: media
+  tipo: opcion
+  enunciado: "Compilamos con `-O` un `while` con `v[i]` y `v.iter().fold(…)`, y comparamos su ensamblador con `diff`. ¿Qué salió?"
+  opciones:
+    - "Idénticos, salvo un `xor eax, eax` movido una línea; los dos vectorizados con SSE2 y sin comprobación de límites"
+    - "El iterador llama al closure en cada vuelta"
+    - "El bucle tiene una comprobación de límites por elemento que el iterador evita"
+    - "El iterador es el doble de largo pero más rápido"
+  correcta: 0
+  solucion: |
+    Es el experimento de la lección 9 (x86-64 Windows, rustc 1.99.1): el `diff` de los cuerpos solo muestra el nombre y una línea `xor eax, eax` cambiada de sitio. Los dos procesan 8 `u32` por vuelta con `movdqu`/`paddd`.
+    - El closure se inlinea y desaparece.
+    - El optimizador demostró `i < v.len()` y quitó la comprobación también del bucle.
+    - Son el mismo código.
+  etiquetas: ["coste cero", "asm", "monomorfización"]
+
+- id: m14-rev-propio
+  titulo: "rev en mi iterador"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Implementas `Iterator` (solo `type Item` y `next`) para tu struct y llamas a `.rev()`. ¿Qué pasa?"
+  opciones:
+    - "No compila: `rev` exige que el tipo implemente también `DoubleEndedIterator` (E0277)"
+    - "Funciona: `rev` guarda todo en un `Vec` y lo recorre al revés"
+    - "Funciona como cualquier adaptador"
+    - "Compila pero entra en pánico al ejecutarse"
+  correcta: 0
+  solucion: |
+    `rev` tiene el requisito `Self: DoubleEndedIterator`, que pide un método `next_back`. Comprobado: rustc da `error[E0277]: the trait bound C: DoubleEndedIterator is not satisfied`.
+    - `rev` nunca guarda nada: llama a `next_back`.
+    - La mayoría de adaptadores no piden nada extra, pero `rev` sí.
+    - El problema se detecta al compilar.
+  etiquetas: ["E0277", "rev", "DoubleEndedIterator"]
+
+- id: m14-captura-2024
+  titulo: "El préstamo que se lleva el impl"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "`fn dobles(v: &[i32]) -> impl Iterator<Item = i32> { v.iter().map(|x| x * 2) }` — ¿qué pasa en edición 2024?"
+  codigo: |
+    fn dobles(v: &[i32]) -> impl Iterator<Item = i32> {
+        v.iter().map(|x| x * 2)
+    }
+  opciones:
+    - "Compila: el `impl Trait` de retorno captura todos los parámetros genéricos en ámbito, también el tiempo de vida de `v`"
+    - "E0700: hay que añadir `+ '_` al tipo de retorno"
+    - "E0373: falta `move` en el closure"
+    - "No compila: no se puede devolver un iterador que toma prestado un parámetro"
+  correcta: 0
+  solucion: |
+    En edición 2024 compila tal cual (verificado). Con `--edition 2021`, el mismo código da `error[E0700]: hidden type for impl Iterator<Item = i32> captures lifetime that does not appear in bounds`: en las ediciones anteriores había que escribir `+ '_`.
+    - E0700 es el error de las ediciones antiguas.
+    - El closure no captura nada (`x` es su parámetro), así que `move` no hace falta.
+    - Se puede: el iterador devuelto queda ligado al préstamo de `v`.
+    Para limitar lo que se captura existe `use<…>` (por ejemplo `+ use<'_>`).
+  etiquetas: ["edición 2024", "impl Trait", "E0700", "lifetimes"]
+
+- id: m14-devolver-iter-sin-move
+  titulo: "Iterador con un préstamo caducado"
+  mundo: 14-closures-e-iteradores
+  tema: iteradores
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `multiplos`?"
+  ej: m14/devolver-iter-sin-move
+  opciones:
+    - "El closure de `filter` toma prestado `n`, que muere al salir de la función, pero el iterador devuelto sigue vivo (E0373)"
+    - "No se puede devolver un `filter`"
+    - "`1..=hasta` no es un iterador"
+    - "Falta `collect()` al final"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0373]: closure may outlive the current function, but it borrows n`, con la nota «function requires argument type to outlive `'static`» y la sugerencia `filter(move |x| x % n == 0)`.
+    - Se puede devolver cualquier iterador con `impl Iterator`.
+    - Un rango inclusivo es un iterador.
+    - Justamente no queremos `collect`: devolvemos el iterador perezoso.
+  etiquetas: ["E0373", "impl Iterator", "move"]

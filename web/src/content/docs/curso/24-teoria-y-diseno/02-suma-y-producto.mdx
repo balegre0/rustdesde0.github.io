@@ -1,0 +1,78 @@
+---
+title: "Suma y producto: el álgebra de los tipos"
+description: "Los structs y tuplas son productos (|A × B| = |A| · |B|); los enums son sumas (|A + B| = |A| + |B|). Por eso se llaman tipos algebraicos."
+sidebar:
+  order: 2
+duracion: 11
+requiere: ["24-teoria-y-diseno/01-tipos-como-conjuntos"]
+tarjetas:
+  - p: "¿Por qué se dice que un struct es un tipo producto?"
+    r: "Porque contiene un valor de CADA campo a la vez: su cardinalidad es el producto de las de sus campos."
+  - p: "¿Por qué se dice que un enum es un tipo suma?"
+    r: "Porque contiene un valor de UNA de sus variantes: su cardinalidad es la suma de las de sus variantes."
+  - p: "¿Qué cardinalidad tiene `Option<T>`?"
+    r: "|T| + 1: todos los valores de T (dentro de `Some`) más `None`."
+  - p: "¿Qué significa que dos tipos sean isomorfos?"
+    r: "Que hay conversiones de uno a otro y de vuelta que no pierden información. Tienen la misma cardinalidad y «la misma forma»."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+Rust tiene dos formas de construir tipos nuevos a partir de otros: juntar (**y**) y elegir (**o**). Contando valores, la primera multiplica y la segunda suma. Por eso se llaman **tipos algebraicos de datos** (*algebraic data types*, ADT).
+
+## La idea
+
+**Producto: «un A y un B».** Una tupla `(A, B)` o un struct con campos `A` y `B` contiene un valor de **cada uno**. Hay |A| formas de elegir el primero y, para cada una, |B| de elegir el segundo:
+
+> |(A, B)| = |A| · |B|
+
+**Suma: «un A o un B».** Un enum con variantes `X(A)` e `Y(B)` contiene un valor de **una** de ellas:
+
+> |X(A) | Y(B)| = |A| + |B|
+
+Algunas consecuencias que ya conoces:
+
+| Tipo | Álgebra | Cardinalidad |
+|---|---|---|
+| `()` | 1 | 1 |
+| `bool` | 1 + 1 | 2 |
+| `Option<T>` | T + 1 | \|T\| + 1 |
+| `Result<T, E>` | T + E | \|T\| + \|E\| |
+| `[T; 3]` | T · T · T | \|T\|³ |
+| `enum` sin variantes | 0 | 0 |
+
+Dos tipos con la misma «fórmula» son **isomorfos**: puedes convertir uno en el otro y volver sin perder nada. `Option<T>` y `Result<T, ()>` son los dos T + 1.
+
+## Pruébalo
+
+<Ejecutar ej="m24/algebra" />
+
+El `assert_eq!` comprueba la ida y vuelta para **todos** los valores de `Option<Semaforo>`: las dos funciones son inversas.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El álgebra sigue funcionando.** Las leyes de los números valen para los tipos (salvo isomorfismo): `(A, B)` ≅ `(B, A)` (conmutativa), `(A, ())` ≅ `A` (el 1 es neutro del producto), `Result<A, !>` ≅ `A` (el 0 es neutro de la suma) y `(A, Result<B, C>)` ≅ `Result<(A, B), (A, C)>` (distributiva). Incluso las funciones encajan: `fn(A) -> B` tiene |B|^|A| valores posibles, y por eso a veces se escribe `B^A`.
+
+**Por qué importa al diseñar.** Si una estructura tiene un campo `es_error: bool` y otro `mensaje: String` que solo tiene sentido cuando hay error, su tipo es un **producto** (2 × |String|) cuando lo que quieres es una **suma** (1 + |String|). Los estados sobrantes (sin error pero con mensaje) son errores que esperan a ocurrir. Un `enum` (o un `Option<String>`) los elimina. Lo verás en la lección 12.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántos valores tiene `Result<bool, Option<bool>>`?"
+  opciones={["5", "6", "4", "3"]}
+  correcta={0}
+  explicacion="Es una suma: |bool| + |Option<bool>| = 2 + 3 = 5."
+  porque={["", "Eso sería un producto, 2 × 3.", "Te falta un valor de `Option<bool>` (que tiene 3).", "Te falta sumar las dos variantes."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué tipo es isomorfo a `Option<()>`?"
+  opciones={["`()`", "`bool`", "`u8`", "`Option<bool>`"]}
+  correcta={1}
+  explicacion="|Option<()>| = 1 + 1 = 2 = |bool|. `None` ↔ `false`, `Some(())` ↔ `true`."
+  porque={["Tiene 1 valor y `Option<()>` tiene 2.", "", "Tiene 256.", "Tiene 3."]}
+/>

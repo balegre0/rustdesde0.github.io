@@ -1,0 +1,52 @@
+---
+title: "format!"
+description: "Crea un String con texto formateado, igual que println! pero sin imprimir."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::format`
+
+## Sinopsis
+
+```rust
+macro_rules! format {
+    ($($arg:tt)*) => { ... };
+}
+```
+
+## Qué hace
+
+`format!` construye un `String` nuevo con la [sintaxis de formato](/ref/std/fmt/sintaxis/). Si solo vas a pasarlo a otra macro, `format_args!` hace lo mismo sin reservar memoria.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-format" />
+
+**Salida:**
+
+```text
+3 al cuadrado es 9
+ 1 |  10
+ 2 |  20
+ 3 |  30
+a-b
+0xff 0b11111111
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [println!](/ref/std/macros/println/)
+- [write!](/ref/std/macros/write/)
+- [String](/ref/std/string/string/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

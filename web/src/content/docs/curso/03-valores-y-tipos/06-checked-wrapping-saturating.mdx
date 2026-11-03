@@ -1,0 +1,127 @@
+---
+title: "checked, wrapping, saturating y overflowing"
+description: "Decide tú qué pasa al desbordar: obtener «nada», dar la vuelta, quedarse en el límite o recibir un aviso junto al resultado."
+sidebar:
+  order: 6
+duracion: 12
+desde: "1.0"
+requiere: ["03-valores-y-tipos/05-overflow"]
+tarjetas:
+  - p: "¿Qué devuelve `250u8.checked_add(10)`?"
+    r: "`None`, porque 260 no cabe en un `u8`. Si cupiera, devolvería `Some(resultado)`."
+  - p: "¿Qué devuelve `250u8.wrapping_add(10)`?"
+    r: "4: da la vuelta (260 − 256), en debug y en release."
+  - p: "¿Qué devuelve `3u8.saturating_sub(10)`?"
+    r: "0: se queda en el límite del tipo."
+  - p: "¿Qué devuelve `250u8.overflowing_add(10)`?"
+    r: "La tupla `(4, true)`: el resultado con vuelta y si hubo desbordamiento."
+  - p: "¿Por qué `i8::MIN.checked_neg()` es `None`?"
+    r: "Porque +128 no cabe en un `i8` (su máximo es 127): el rango con signo es asimétrico."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+En la lección anterior viste que el perfil decide qué pasa al desbordar. Hoy vas a decidirlo **tú**, en el código, con cuatro familias de métodos que se comportan igual en debug y en release.
+
+## Predice
+
+<Predice
+  ej="m03/familias"
+  opciones={["`saturating 250 + 10 = 255`", "`saturating 250 + 10 = 4`", "`saturating 250 + 10 = 260`", "`saturating 250 + 10 = None`"]}
+  correcta={0}
+  explicacion="«Saturar» es quedarse pegado al límite: si 250 + 10 no cabe en un `u8`, el resultado es el máximo, 255."
+  porque={["", "4 es lo que da `wrapping_add` (dar la vuelta).", "260 no cabe en un `u8`.", "`None` es lo que da `checked_add`."]}
+/>
+
+## La idea
+
+Cada operación aritmética de los enteros (`add`, `sub`, `mul`, `div`, `neg`, `abs`, `pow`…) existe en cuatro versiones. Las cuatro familias responden de forma distinta a la misma pregunta: «¿y si no cabe?».
+
+| Familia | Si no cabe… | Devuelve | Úsala cuando… |
+|---|---|---|---|
+| `checked_` | te da «nada» | `Option`: `Some(valor)` o `None` | el desbordamiento es un error que quieres tratar |
+| `wrapping_` | da la vuelta | el valor con vuelta | la vuelta es lo que quieres (relojes, *hashes*) |
+| `saturating_` | se queda en el límite | `MIN` o `MAX` | tiene sentido «topar» (volumen, salud de un personaje) |
+| `overflowing_` | da la vuelta y avisa | tupla `(valor, bool)` | necesitas el resultado **y** saber si desbordó |
+
+`Option` es un tipo que verás a fondo en el Mundo 9. Por ahora basta con saber que vale `Some(algo)` o `None` (nada), y que se imprime con `{:?}`.
+
+## Pruébalo
+
+<Ejecutar ej="m03/familias" />
+
+Salida real:
+
+```text
+checked    250 + 3  = Some(253)
+checked    250 + 10 = None
+wrapping   250 + 10 = 4
+saturating 250 + 10 = 255
+saturating 3 - 10   = 0
+overflowing 250 + 10 = (4, true)
+overflowing 250 + 3  = (253, false)
+```
+
+Cuando el resultado cabe, `checked_add` da `Some(253)` y `overflowing_add` da `(253, false)`: no hay nada que avisar.
+
+## Bajo el capó
+
+<BajoElCapo titulo="El caso raro de i8::MIN">
+El rango de los enteros con signo es asimétrico: un `i8` va de −128 a 127. Así que hay operaciones que desbordan aunque parezcan inofensivas. Cambiar el signo de −128 debería dar +128, que no cabe:
+
+<Ejecutar ej="m03/familias-mas" />
+
+Salida real:
+
+```text
+None
+None
+-128
+None
+-128
+None
+```
+
+Línea a línea: `100i8.checked_mul(2)` es `None` (200 no cabe); `10u32.checked_div(0)` es `None` (dividir entre cero no da pánico con `checked_`); `i8::MIN.wrapping_neg()` da **−128** (en complemento a dos, invertir los bits de `10000000` y sumar 1 vuelve a dar `10000000`); `checked_neg` y `checked_abs` de `i8::MIN` son `None`; y `(-100i8).saturating_sub(100)` se queda en −128.
+
+Por dentro, todas estas funciones hacen lo mismo que la CPU: una suma normal y mirar el indicador de desbordamiento. `wrapping_add` compila a la misma instrucción que un `+` en release; `checked_add` añade la comprobación, pero en vez de un pánico construye un `None`. Por eso son la forma de «decir en el código» lo que quieres, sin depender del perfil.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Usar wrapping_ para «quitarse el pánico de encima»">
+❌ Cambiar `a - b` por `a.wrapping_sub(b)` porque en debug daba pánico. El pánico desaparece, pero el resultado sigue siendo absurdo: 2 − 3 = 4294967295 en un `u32`.
+
+✅ Pregúntate qué **significa** el desbordamiento en tu programa. ¿Es un error? `checked_`. ¿Hay un tope natural? `saturating_`. Solo si la vuelta es lo correcto (un contador circular, una suma de control), `wrapping_`.
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m03/cuenta"
+  enunciado="Un saldo de 50 y un gasto de 80, ambos `u32`. Imprime `resta segura: None` usando `checked_sub` y después `saldo final: 0` usando `saturating_sub`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta={'¿Qué imprime `println!("{:?}", 200u8.checked_add(55));`?'}
+  opciones={["`None`", "`Some(255)`", "`255`", "`Some(0)`"]}
+  correcta={1}
+  explicacion="200 + 55 = 255, que cabe justo en un `u8`. `checked_add` devuelve el resultado envuelto en `Some`."
+  porque={["Solo es `None` si no cabe; 255 es el máximo y sí cabe.", "", "`checked_` siempre envuelve el resultado en `Some(...)`.", "No ha habido vuelta: 255 cabe."]}
+/>
+
+<Pregunta
+  pregunta="Un personaje tiene 30 puntos de vida (`u32`) y recibe 50 de daño. ¿Qué método da el resultado más razonable?"
+  opciones={["`wrapping_sub`: 4294967276", "`saturating_sub`: 0", "`-` sin más", "`overflowing_sub`"]}
+  correcta={1}
+  explicacion="La vida no puede bajar de 0: saturar en el límite es lo natural."
+  porque={["Dar la vuelta convierte al personaje en casi inmortal.", "", "En debug sería un pánico y en release daría la vuelta.", "Te diría que hubo desbordamiento, pero el valor sería el de vuelta."]}
+/>
+
+<Respuesta
+  pregunta="¿Qué valor booleano acompaña al resultado en `5u8.overflowing_add(1)`?"
+  respuestas={["false"]}
+  explicacion="5 + 1 = 6 cabe en un `u8`: el resultado es `(6, false)`."
+/>

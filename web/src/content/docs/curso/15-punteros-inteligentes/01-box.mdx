@@ -1,0 +1,130 @@
+---
+title: "Box: un valor en el heap"
+description: "Guardas un valor en el heap con Box y entiendes qué queda en la pila y quién lo libera."
+sidebar:
+  order: 1
+duracion: 10
+desde: "1.0"
+tarjetas:
+  - p: "¿Qué guarda `Box<T>` en la pila?"
+    r: "Solo un puntero (8 bytes en x86-64, 4 en el navegador) a la dirección del heap donde vive el `T`."
+  - p: "¿Quién libera la memoria de una `Box`?"
+    r: "La propia Box, al salir de ámbito: es la única dueña y su `Drop` libera el heap. No hay que hacer nada a mano."
+  - p: "Si mueves una `Box<[u8; 100000]>` a una función, ¿cuántos bytes se copian?"
+    r: "Solo el puntero. Los 100 000 bytes se quedan donde estaban, en el heap; cambia el dueño, no los datos."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a guardar un valor en el **heap** (*montón*) con `Box` y a ver con números qué queda en la pila y quién se encarga de liberarlo.
+
+## Predice
+
+<Predice
+  ej="m15/box-basico"
+  pregunta="En el navegador un puntero mide 4 bytes. ¿Cuánto crees que ocupa en la pila una Box que guarda un array de 1000 bytes?"
+  opciones={["1000 bytes", "1004 bytes", "4 bytes", "No compila: un array tan grande no cabe en una Box"]}
+  correcta={2}
+  explicacion="Una `Box<T>` es solo un puntero: los 1000 bytes viven en el heap. Por eso `Box<i32>` y `Box<[u8; 1000]>` miden lo mismo."
+  porque={["Ese es el tamaño del array, que está en el heap, no en la pila.", "La Box no lleva el array dentro: lleva su dirección.", "Correcto: en la pila solo hay la dirección.", "Al contrario: Box sirve justo para poner datos grandes en el heap."]}
+/>
+
+## La idea
+
+`Box::new(valor)` hace tres cosas: pide al sistema un hueco en el heap del tamaño de `valor`, copia ahí el valor y te devuelve una `Box<T>`, que en la pila no es más que **la dirección** de ese hueco.
+
+La `Box` es la **única dueña** de lo que apunta, igual que una `String` es dueña de sus letras. Todo lo que sabes de propiedad se aplica tal cual: si la asignas a otra variable o la pasas a una función, **se mueve**; y cuando su dueño sale de ámbito, la Box libera el heap automáticamente. Así Rust evita dos errores clásicos: la **doble liberación** (solo hay una dueña, así que solo se libera una vez) y el **uso tras liberar** (tras moverla, el compilador no te deja usar el nombre viejo).
+
+Para leer el valor de dentro usas `*` (**desreferenciar**, *dereference*): `*caja` es «lo que hay en la dirección que guarda `caja`». Muchas veces ni siquiera hace falta, porque Rust lo hace solo al llamar a métodos (lo verás en la lección 3).
+
+¿Para qué sirve, si un `i32` cabe de sobra en la pila? Para tres casos: datos **muy grandes** que no quieres copiar al moverlos, **tipos recursivos** (lección siguiente) y valores cuyo tipo concreto no se conoce al compilar, como `Box<dyn Trait>` (lo viste en el mundo 13).
+
+## Pruébalo
+
+<Ejecutar ej="m15/box-basico" />
+
+Y ahora mueve una Box de 100 000 bytes a una función. Solo viaja el puntero:
+
+<Ejecutar ej="m15/box-mueve" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Así queda la memoria tras `let en_heap = Box::new(5);` (direcciones de ejemplo, en x86-64):
+
+```text
+PILA                                   HEAP
+┌──────────────────────────────┐       ┌──────────────┐
+│ en_pila: i32 = 5     (4 B)   │       │ 0x5a10: 5    │  (4 B, i32)
+│ en_heap: Box<i32>    (8 B) ──┼──────►│              │
+│          = 0x5a10            │       └──────────────┘
+└──────────────────────────────┘
+```
+
+Tamaños comprobados en Windows x86-64 con `const _: () = assert!(size_of::<T>() == N);` (rustc 1.99.1):
+
+| Tipo | x86-64 | navegador (wasm32) |
+|---|---|---|
+| `Box<i32>` | 8 | 4 |
+| `Box<[u8; 1000]>` | 8 | 4 |
+| `Option<Box<i32>>` | 8 | — |
+| `Box<[u8]>` (slice de tamaño variable) | 16 | 8 |
+
+Dos detalles de diseñador:
+
+- `Option<Box<i32>>` mide **lo mismo** que `Box<i32>`: una Box nunca es nula, así que Rust usa la dirección 0 para representar `None`. Es la optimización de **nicho** (*niche*) que viste en el mundo 9.
+- `Box<[u8]>` mide el doble porque es un **puntero gordo** (*fat pointer*): dirección + longitud, igual que `&[u8]`.
+
+Al salir de ámbito, el compilador inserta una llamada a `drop_in_place` sobre la Box, que destruye el `T` y devuelve el hueco al **asignador** (*allocator*). Nadie más guarda esa dirección, así que no puede haber un segundo `free`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Usar la Box después de moverla">
+
+❌ Pasar la Box a una función y luego seguir usándola:
+
+```rust
+let grande = Box::new([7u8; 100_000]);
+let n = medir(grande);
+println!("{}", grande[0]); // error[E0382]: borrow of moved value: `*grande`
+```
+
+✅ Si la función solo necesita mirar, préstale la Box: `fn medir(datos: &[u8; 100_000])` y llama con `medir(&grande)`. Así `grande` sigue siendo la dueña.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m15/r-box"
+  enunciado="Guarda `2.5` en el heap con `Box::new` y calcula su doble usando `*`. Debe imprimir `doble = 5`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué pasa con el heap cuando una `Box` sale de ámbito?"
+  opciones={["Nada: hay que llamar a `free` a mano", "La Box libera su hueco del heap automáticamente", "Se libera cuando acaba el programa", "Depende de si llamaste a `drop`"]}
+  correcta={1}
+  explicacion="La Box es la dueña: al salir de ámbito ejecuta su destructor y libera el heap."
+  porque={["En Rust seguro no existe un `free` que llamar a mano.", "Correcto.", "Se libera mucho antes: en cuanto el dueño sale de ámbito.", "`drop(b)` solo adelanta lo que pasaría igualmente."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `Option<Box<i32>>` ocupa lo mismo que `Box<i32>`?"
+  opciones={["Porque `Option` no ocupa nada nunca", "Porque una Box nunca es nula y la dirección 0 se usa para `None`", "Porque el compilador guarda la etiqueta en el heap", "No es verdad: ocupa el doble"]}
+  correcta={1}
+  explicacion="Es la optimización de nicho: un valor imposible (dirección 0) representa la variante `None`."
+  porque={["`Option<u32>` sí ocupa más que `u32`: depende de si hay nicho.", "Correcto.", "La etiqueta no se guarda en ningún sitio: se deduce del puntero.", "Está comprobado con `size_of`: 8 y 8 en x86-64."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál de estos NO es un buen motivo para usar `Box`?"
+  opciones={["Un tipo recursivo como una lista", "Un `i32` que quieres que vaya más rápido", "Un array enorme que se va a mover muchas veces", "Guardar distintos tipos que implementan un trait en un `Vec<Box<dyn Trait>>`"]}
+  correcta={1}
+  explicacion="Meter un `i32` en el heap lo hace más lento: una reserva de memoria y un salto más para leerlo."
+  porque={["Es el caso de la lección siguiente.", "Correcto: no gana nada y añade coste.", "Mover la Box copia solo el puntero.", "Es el uso típico de `Box<dyn Trait>`."]}
+/>

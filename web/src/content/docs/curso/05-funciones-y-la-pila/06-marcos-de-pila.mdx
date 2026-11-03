@@ -1,0 +1,142 @@
+---
+title: "Marcos de pila"
+description: "Mira con direcciones reales cómo cada llamada reserva su marco en la pila, cuánto ocupa cada dato y por qué todo se libera solo al volver."
+sidebar:
+  order: 6
+duracion: 12
+desde: "1.0"
+requiere: ["05-funciones-y-la-pila/05-recursion"]
+tarjetas:
+  - p: "¿Qué es un marco de pila?"
+    r: "El trozo de pila que reserva una llamada para sus parámetros y variables locales (y, en un PC, la dirección de retorno). Se libera al volver."
+  - p: "¿Hacia dónde crece la pila?"
+    r: "Hacia direcciones más bajas: cada llamada nueva pone su marco por debajo del anterior."
+  - p: "¿Por qué liberar memoria de la pila no cuesta casi nada?"
+    r: "Porque basta con mover el puntero de pila hacia arriba: no hay que buscar ni ordenar nada."
+  - p: "¿Cuánto ocupan `u8`, `i32`, `f64`, `bool`, `char` y `(u8, u32)`?"
+    r: "1, 4, 8, 1, 4 y 8 bytes (la tupla lleva 3 bytes de relleno para alinear el `u32`)."
+---
+
+import { Ejecutar, Predice, Pregunta, Respuesta, BajoElCapo, Trampa } from '~/components';
+
+Vas a **ver** la pila: direcciones de memoria reales de tus variables, cómo cada llamada apila su espacio y cómo desaparece al volver.
+
+## Predice
+
+<Predice
+  ej="m05/marcos-de-pila"
+  pregunta="`nivel` se llama a sí misma tres veces y cada llamada imprime la dirección de su variable `local`. ¿Qué crees que harán las direcciones?"
+  opciones={[
+    "Las tres iguales: es la misma variable",
+    "Cada vez más bajas",
+    "Cada vez más altas",
+    "Al azar"
+  ]}
+  correcta={1}
+  explicacion="Cada llamada tiene SU propia `local`, en su propio marco. La pila crece hacia abajo: cada marco nuevo se coloca debajo del anterior, así que las direcciones bajan (en este caso, de 48 en 48 bytes)."
+  porque={[
+    "Se llaman igual, pero cada llamada tiene una `local` distinta: tres llamadas vivas a la vez, tres variables.",
+    "",
+    "La pila crece hacia direcciones más bajas.",
+    "La pila es completamente ordenada: un marco justo debajo del otro."
+  ]}
+/>
+
+## La idea
+
+Cuando llamas a una función, el programa necesita sitio para sus parámetros y sus variables locales. Ese sitio se reserva en la **pila** (*stack*) y se llama **marco de pila** (*stack frame*). Cada llamada tiene el suyo, aunque sea la misma función llamándose a sí misma: por eso en la recursión cada nivel tiene su propio `n`.
+
+La pila funciona como una pila de platos: el marco nuevo se pone **encima** (que, en memoria, significa en direcciones **más bajas**: la pila crece hacia abajo) y, al volver de la función, se quita. Un **puntero de pila** (*stack pointer*), un registro de la CPU, marca dónde está la cima. Reservar un marco es restarle unos bytes; liberarlo, sumárselos. Por eso la pila es rapidísima: no hay que buscar huecos ni llevar cuentas.
+
+La consecuencia más importante: **lo que vive en el marco de una función desaparece cuando la función vuelve**. Para la pila esto es perfecto y automático. Pero plantea una pregunta: ¿qué pasa con un dato que tiene que sobrevivir a la función que lo creó, o cuyo tamaño no se sabe hasta ejecutar? Esa es la pregunta de la siguiente lección.
+
+## Pruébalo
+
+<Ejecutar ej="m05/marcos-de-pila" />
+
+Estas son direcciones reales de la memoria del navegador. Dibujadas, quedan así:
+
+```text
+dirección     contenido                     marco
+0x100000      ─── techo de la pila ───
+0xfffc0       en_main = 7                   main
+0xfff98       local = 100                   nivel(1)   (40 bytes más abajo)
+0xfff68       local = 200                   nivel(2)   (48 bytes más abajo)
+0xfff38       local = 300                   nivel(3)   (48 bytes más abajo)
+              ↓ la pila crece hacia abajo
+```
+
+1. Cada llamada a `nivel` ocupa **48 bytes** (0xfff98 − 0xfff68 = 0x30 = 48): la `local` de 8 bytes más lo que el compilador necesita para el `println!` y la llamada siguiente.
+2. Las tres `local` existen **a la vez**, cada una en su marco, mientras las llamadas esperan.
+3. Al volver («salgo del nivel 3», luego 2, luego 1), cada marco se libera en orden inverso.
+
+¿Y cuánto ocupa cada tipo de dato? Mídelo:
+
+<Ejecutar ej="m05/tamanos" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El relleno de la tupla.** `(u8, u32)` ocupa 8 bytes, no 5. Un `u32` debe empezar en una dirección múltiplo de 4 (**alineamiento**, *alignment*), así que el compilador mete 3 bytes de **relleno** (*padding*). Rust incluso puede reordenar los campos para desperdiciar menos (mundo 21).
+
+**`usize` mide lo que mide una dirección.** En el navegador (WebAssembly de 32 bits) las direcciones son de 4 bytes, así que `usize` mide 4. En un PC de 64 bits mide 8. Por eso el ejemplo de tamaños da `usize 4 bytes` aquí y daría 8 en tu ordenador.
+
+**¿Dónde está la dirección de retorno?** En un PC x86-64, la instrucción `call` guarda la dirección de retorno **en la misma pila**, dentro del marco. En WebAssembly no: la máquina virtual guarda las direcciones de retorno en una pila aparte, invisible para tu programa, y en la memoria solo quedan los datos. Es una de las razones por las que un programa no puede «secuestrar» la vuelta de una función en WebAssembly.
+
+**El techo en 0x100000.** En el navegador, tus programas reservan el primer MiB de memoria para la pila (0x100000 = 1 048 576 = 1 MiB), y empiezan por arriba. Si una recursión agota ese espacio (o el límite de llamadas de la máquina virtual, como viste en la lección anterior), el programa se detiene.
+
+**El tamaño de un marco se decide al compilar.** El compilador suma lo que necesitan todas las variables de la función y reserva ese tamaño de una vez al entrar. Eso exige que **el tamaño de cada variable se conozca al compilar**. Un `[u8; 100]` cabe (100 bytes, siempre). Pero ¿un texto que escribe el usuario, de longitud desconocida? No puede ir entero en la pila. Lección siguiente.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Pensar que la variable sigue ahí después de volver">
+
+❌ «La función guardó el resultado en su variable `local`; luego lo leo desde fuera.» No: cuando la función vuelve, su marco se libera y ese hueco lo reutilizará la siguiente llamada. Lo que vivía allí ya no existe.
+
+✅ Lo que quieras conservar, **devuélvelo** (`-> tipo`): el valor de retorno se copia al marco de quien llama antes de que el marco de la función desaparezca. En el mundo 08 verás cómo Rust impide, al compilar, que guardes una referencia a algo de un marco que ya no existe.
+
+</Trampa>
+
+## Tu turno
+
+<Respuesta
+  pregunta="Si `nivel` se llamara una vez más (nivel 4) y su marco ocupara también 48 bytes, ¿en qué dirección estaría su `local`? (El nivel 3 está en 0xfff38.) Escríbela en hexadecimal, como `0x...`."
+  respuestas={["0xfff08", "0xFFF08"]}
+  explicacion="48 en hexadecimal es 0x30. 0xfff38 − 0x30 = 0xfff08: un marco más abajo."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una función recursiva tiene 5 llamadas activas a la vez. ¿Cuántas copias de su variable local existen en ese momento?"
+  opciones={["1", "5", "0", "Depende del tipo"]}
+  correcta={1}
+  explicacion="Cada llamada activa tiene su propio marco con su propia variable."
+  porque={[
+    "Sería así si todas compartieran sitio, pero cada llamada tiene su marco.",
+    "",
+    "Las 5 llamadas están activas, esperando: sus marcos existen.",
+    "El tipo cambia el tamaño, no el número de copias."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué liberar la memoria de la pila es casi gratis?"
+  opciones={[
+    "Porque nunca se libera",
+    "Porque basta con mover el puntero de pila: los marcos se liberan siempre en orden inverso, el último primero",
+    "Porque la pila está en la CPU",
+    "Porque Rust tiene un recolector que la limpia"
+  ]}
+  correcta={1}
+  explicacion="La pila solo se usa por la cima: lo último en entrar es lo primero en salir. Liberar es sumar un número a un registro."
+  porque={[
+    "Se libera al volver de cada función; si no, se acabaría enseguida.",
+    "",
+    "La pila está en la memoria principal; lo que está en la CPU es el puntero que marca su cima.",
+    "Rust no tiene recolector de basura: la pila se libera sola por cómo funciona."
+  ]}
+/>

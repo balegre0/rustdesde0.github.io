@@ -1,0 +1,102 @@
+---
+title: "Result: errores que son valores"
+description: "Trata los fallos esperables con Ok y Err, y deja que el compilador te recuerde que existen."
+sidebar:
+  order: 2
+duracion: 12
+desde: "1.0"
+requiere: ["10-errores/01-panic", "09-structs-enums-y-patrones/07-match-exhaustivo"]
+tarjetas:
+  - p: "¿Qué es `Result<T, E>`?"
+    r: "Un enum con dos variantes: `Ok(T)` (todo fue bien y aquí está el valor) y `Err(E)` (falló, y aquí está el error)."
+  - p: "¿En qué se diferencia `Result` de `Option`?"
+    r: "`Option` solo dice si hay valor o no. `Result` dice además POR QUÉ falló: `Err` lleva un valor de error."
+  - p: "¿Qué pasa si llamas a una función que devuelve `Result` y no haces nada con él?"
+    r: "Compila, pero con el aviso «unused Result that must be used»: `Result` está marcado `#[must_use]`."
+  - p: "¿Qué devuelve `\"300\".parse::<u8>()`?"
+    r: "`Err(ParseIntError { kind: PosOverflow })`, que se muestra como «number too large to fit in target type»."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a usar `Result`, la herramienta principal de Rust para los errores que **sí** son normales.
+
+## Predice
+
+<Predice
+  ej="m10/result-predice"
+  opciones={["`42` y `-7` son números; `3.5`, `hola` y la cadena vacía dan error", "Solo `42` es número; `-7` da error", "`3.5` se redondea a 3", "El programa da un pánico con `hola`"]}
+  correcta={0}
+  explicacion="`parse::<i32>()` devuelve `Result<i32, ParseIntError>`. `3.5` no es un entero; `hola` tampoco; la cadena vacía tiene su propio mensaje. Nada de esto es un pánico: son valores `Err` que tratamos en el `match`."
+  porque={["Correcto.", "`i32` admite negativos.", "Un entero no tiene decimales: el punto es un «dígito inválido».", "`parse` no entra en pánico: devuelve `Err`."]}
+/>
+
+## La idea
+
+`Result` es un enum de la biblioteca estándar, igual que `Option`:
+
+```rust
+enum Result<T, E> {
+    Ok(T),    // salió bien: aquí está el valor
+    Err(E),   // salió mal: aquí está el error
+}
+```
+
+Una función que puede fallar **lo dice en su firma**: `fn dividir(a: i32, b: i32) -> Result<i32, String>`. Quien la llama recibe un `Result`, no un número, y no puede usarlo como número hasta tratar el caso `Err`. El error es un valor más: tiene tipo, se puede imprimir, guardar, pasar a otra función o convertir.
+
+La diferencia con `Option` es la información. `None` solo dice «no hay»; `Err(e)` dice «no hay, **y este es el motivo**». Usa `Option` cuando la ausencia es normal y no necesita explicación (buscar algo que puede no estar) y `Result` cuando algo **falló** y quien llama querrá saber por qué.
+
+## Pruébalo
+
+<Ejecutar ej="m10/result" />
+
+El paso 4 muestra que un error tiene dos formas de imprimirse: `{:?}` (Debug, para programadores: `ParseIntError { kind: PosOverflow }`) y `{}` (Display, para personas: `number too large to fit in target type`). Las verás a fondo en la lección 6.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`Result` está marcado con el atributo **`#[must_use]`**: si llamas a una función que lo devuelve y tiras el valor, el compilador avisa. Es la diferencia entre «comprobé el error y decidí ignorarlo» (`let _ = guardar(…)`) y «se me olvidó».
+
+En memoria, `Result<T, E>` es un enum normal: etiqueta + espacio para la variante más grande, con las mismas optimizaciones de nicho del mundo 9. Por ejemplo, `Result<u32, String>` ocupa 12 bytes en wasm32 (igual que un `String`): el puntero de `String` nunca es nulo y su capacidad no puede pasar de `isize::MAX`, así que sobran valores para codificar `Ok`. Devolver un `Result` **no cuesta más** que devolver un valor de ese tamaño: no hay ningún mecanismo oculto ni salto especial.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m10/result-como-valor"
+  explicacion="`parse` devuelve `Result<u32, ParseIntError>`, no un `u32`, y un `Result` no se puede multiplicar (E0369). Rust te obliga a decidir qué hacer si el precio no es un número."
+/>
+
+<Trampa titulo="Ignorar un Result compila… con aviso">
+
+<Ejecutar ej="m10/result-ignorado" titulo="Aviso: unused Result that must be used" />
+
+El programa dice «guardado» aunque `guardar("")` falló. El aviso de rustc te lo estaba diciendo. Nunca silencies este aviso sin pensar: si de verdad quieres ignorar el error, escribe `let _ = guardar("");` para que quede claro que fue a propósito.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m10/raiz"
+  enunciado="Escribe `raiz(x: f64) -> Result<f64, String>`: si `x` es negativo, devuelve `Err` con el texto `no hay raíz real de X` (con el número); si no, `Ok(x.sqrt())`. Debe imprimir `Ok(4.0)` y, en la segunda línea, el `Err` con el texto `no hay raíz real de -4`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una función busca un usuario por nombre en una lista que tienes en memoria. ¿Qué devuelve?"
+  opciones={["`Option<Usuario>`: no estar es normal y no necesita explicación", "`Result<Usuario, String>` con el error «no está»", "`Usuario`, y un pánico si no está", "`bool`"]}
+  correcta={0}
+  porque={["Correcto.", "Funciona, pero el error no aporta nada que `None` no diga.", "Que un nombre no esté no es un fallo del programa.", "Así no obtienes el usuario."]}
+/>
+
+<Pregunta
+  pregunta={'¿Qué imprime `println!("{}", "".parse::<i32>().unwrap_err());`?'}
+  opciones={["`cannot parse integer from empty string`", "`0`", "`ParseIntError { kind: Empty }`", "Un pánico"]}
+  correcta={0}
+  explicacion="`unwrap_err` saca el error (aquí existe). Con `{}` se usa Display, el mensaje para personas."
+  porque={["Correcto.", "Una cadena vacía no es el número 0.", "Eso es lo que mostraría `{:?}` (Debug).", "`unwrap_err` solo entra en pánico si el resultado es `Ok`."]}
+/>

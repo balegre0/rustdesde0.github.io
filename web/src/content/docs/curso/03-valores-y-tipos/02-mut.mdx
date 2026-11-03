@@ -1,0 +1,117 @@
+---
+title: "mut: variables que pueden cambiar"
+description: "Descubre por qué las variables de Rust no cambian salvo que lo pidas con mut, y lee tu primer error E0384."
+sidebar:
+  order: 2
+duracion: 10
+desde: "1.0"
+requiere: ["03-valores-y-tipos/01-let-y-variables"]
+tarjetas:
+  - p: "Por defecto, ¿se puede cambiar el valor de una variable en Rust?"
+    r: "No. Las variables son inmutables salvo que se declaren con `let mut`."
+  - p: "¿Qué código de error da asignar dos veces a una variable sin `mut`?"
+    r: "E0384: «cannot assign twice to immutable variable»."
+  - p: "¿Qué significa `x += 5`?"
+    r: "Lo mismo que `x = x + 5`; necesita que `x` sea `mut`."
+  - p: "¿Qué hace el compilador si pones `mut` y nunca cambias la variable?"
+    r: "Compila, pero da un aviso (`unused_mut`): «variable does not need to be mutable»."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Hoy vas a aprender que en Rust una variable, por defecto, **no cambia**. Y vas a leer tu primer error del compilador de verdad, que te dice exactamente cómo arreglarlo.
+
+## Predice
+
+<NoCompila ej="m03/inmutable" explicacion="E0384: `puntos` se declaró sin `mut`, así que no se le puede asignar un segundo valor. El compilador propone la solución: `let mut puntos`." />
+
+¿Por qué no compila? Mira la línea `puntos = 20;`. A primera vista parece razonable: tenías 10 puntos y ahora tienes 20. Pero el compilador dice «no se puede asignar dos veces a la variable inmutable `puntos`». Pulsa «Ver arreglo» para ver la versión que sí funciona.
+
+## La idea
+
+En Rust, las variables son **inmutables** (*immutable*) por defecto: una vez que tienen valor, se quedan con él. Si quieres poder cambiarlo, lo dices al crearla con `mut` (de *mutable*, «que puede cambiar»):
+
+```rust
+let mut puntos = 10;
+puntos = 20; // ahora sí
+```
+
+¿Por qué este diseño? Porque la mayoría de los valores de un programa **no** necesitan cambiar. Si todo pudiera cambiar, para entender una línea tendrías que revisar todo el código anterior por si alguien la tocó. Con `mut` a la vista, sabes de un vistazo qué variables pueden moverse y cuáles no. Y el compilador lo garantiza.
+
+Para cambiar una variable a partir de su propio valor hay atajos: `x += 1` es `x = x + 1`, y existen también `-=`, `*=`, `/=` y `%=`.
+
+## Pruébalo
+
+<Ejecutar ej="m03/contador" />
+
+Salida real:
+
+```text
+empiezas con 3 vidas
+ahora tienes 2
+¡bonus! 7
+final: 6
+```
+
+Cada asignación **sustituye** el valor anterior en el mismo hueco de memoria: 3 → 2 → 7 → 6. La variable es siempre la misma; lo que cambia es su contenido.
+
+## Bajo el capó
+
+<BajoElCapo titulo="mut es una promesa que comprueba el compilador">
+`mut` no cambia cómo se guarda la variable: un `i32` con `mut` sigue ocupando 4 bytes en la pila, en el mismo sitio. La diferencia está solo en lo que el compilador te **permite** escribir. Es una comprobación de compilación sin ningún coste al ejecutar.
+
+Esta idea, «por defecto no, y si quieres, dilo», es la semilla de lo más importante de Rust. En el Mundo 7 verás que también hay dos tipos de préstamo: el **préstamo compartido** (`&T`), que solo deja leer, y el **préstamo exclusivo** (`&mut T`), que deja cambiar pero a un solo dueño a la vez. El `mut` de hoy es el primer paso de ese sistema.
+
+El compilador también vigila el exceso contrario. Si pones `mut` y nunca cambias la variable, compila, pero te avisa (salida real):
+
+```text
+warning: variable does not need to be mutable
+ --> ejemplos/m03/mut-sin-uso.rs:2:9
+  |
+2 |     let mut nombre = "Ana";
+  |         ----^^^^^^
+  |         |
+  |         help: remove this `mut`
+```
+
+Un aviso (*warning*) no impide compilar, pero merece atención: aquí te sugiere quitar un `mut` que sobra.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Pongo mut a todo por si acaso»">
+❌ Declarar todas las variables con `let mut` «para que no dé errores». Pierdes la información más útil de tu código (qué cambia y qué no), y el compilador te llenará la pantalla de avisos `unused_mut`.
+
+✅ Empieza siempre sin `mut`. Si el compilador te da el error E0384, piensa: «¿de verdad esto tiene que cambiar?». Si la respuesta es sí, añade `mut` donde te indica el `help:`.
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m03/marcador"
+  enunciado="Haz que el programa compile e imprima `marcador: 0` y después `marcador: 3`. Tendrás que descomentar la suma y cambiar una cosa en la declaración."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué pasa con `let x = 1; x = 2;`?"
+  opciones={["`x` vale 2", "`x` vale 1 y se ignora la segunda línea", "No compila (E0384)", "Compila con un aviso"]}
+  correcta={2}
+  explicacion="Sin `mut`, asignar un segundo valor es un error de compilación, no un aviso."
+  porque={["Solo valdría 2 si `x` fuera `let mut x`.", "Rust no ignora nada en silencio: te lo dice.", "", "Es un error, no un aviso: el programa no llega a existir."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué es `vidas -= 1`?"
+  opciones={["Una comparación", "Lo mismo que `vidas = vidas - 1`", "Un número negativo", "Lo mismo que `vidas = -1`"]}
+  correcta={1}
+  explicacion="Es un operador de asignación compuesta: resta 1 al valor actual y guarda el resultado en la misma variable (que debe ser `mut`)."
+  porque={["Comparar es `==`, `<`, `>`…", "", "El `-` aquí forma parte del operador `-=`.", "No pone −1: resta 1 a lo que hubiera."]}
+/>
+
+<Respuesta
+  pregunta="¿Qué palabra hay que añadir entre `let` y el nombre para que una variable pueda cambiar?"
+  respuestas={["mut"]}
+  explicacion="`let mut nombre = ...;`"
+/>

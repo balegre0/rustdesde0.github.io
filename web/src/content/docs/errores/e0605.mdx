@@ -1,0 +1,68 @@
+---
+title: "E0605: conversión con as no primitiva"
+description: "Usas as para convertir entre tipos que no son primitivos (structs, Vec, String…)."
+sidebar:
+  order: 58
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` non-primitive cast: `Vec<u8>` as `u32` ``
+
+## Qué significa
+
+`as` solo convierte entre tipos **primitivos** (números, `bool`, `char`, punteros…). Un `Vec<u8>` no es un número y no hay ninguna regla para convertirlo con `as`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0605" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0605]: non-primitive cast: `Vec<u8>` as `u32`
+ --> E0605.rs:3:13
+  |
+3 |     let n = lista as u32;
+  |             ^^^^^^^^^^^^ an `as` expression can only be used to convert between primitive types or to coerce to a specific trait object
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Intentar `vec as u32`, `string as i32` o `struct as ...`.
+
+## Cómo arreglarlo
+
+Usa el método que hace la conversión que quieres: `.len()`, `.parse()`, `From`/`Into` (`u32::from(x)`), `TryFrom`… `as` es solo para primitivos.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let lista = vec![1u8, 2, 3];
+    let n = lista.len() as u32; // `as` solo entre tipos primitivos
+    println!("{n}");
+}
+```
+
+**Salida:**
+
+```text
+3
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0605` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0606](/errores/e0606/): conversión con as inválida
+- [E0308](/errores/e0308/): tipos que no coinciden
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

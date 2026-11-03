@@ -1,0 +1,154 @@
+---
+title: "dyn Trait y vtables"
+description: "Guarda tipos distintos en una misma lista y mira, en el ensamblador real, cómo se elige el método correcto al ejecutar."
+sidebar:
+  order: 5
+duracion: 15
+desde: "1.0"
+requiere: ["13-traits-y-genericos/04-impl-trait"]
+tarjetas:
+  - p: "¿Qué es un `dyn Trait`?"
+    r: "Un valor de algún tipo que implementa `Trait`, sin saber cuál al compilar. Siempre se usa detrás de un puntero: `&dyn Trait`, `Box<dyn Trait>`."
+  - p: "¿Qué contiene un puntero `&dyn Trait`?"
+    r: "Dos direcciones: una a los datos y otra a la vtable del tipo real. Ocupa 16 bytes en un PC de 64 bits (8 en el navegador, wasm32)."
+  - p: "¿Qué hay en una vtable?"
+    r: "Tres datos del tipo (función de drop, tamaño, alineación) y luego un puntero a cada método del trait, en orden de declaración."
+  - p: "¿Cuándo usar genéricos y cuándo `dyn`?"
+    r: "Genéricos: un tipo por uso, máxima velocidad, más copias. `dyn`: tipos mezclados o elegidos al ejecutar, una sola copia, llamada indirecta."
+  - p: "¿Cuántas instrucciones cuesta llamar a un método por `&dyn` en x86-64?"
+    r: "En el caso más simple, una: `jmp qword ptr [rdx + 24]`, un salto a la dirección guardada en la vtable."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a meter un perro y un gato en la misma lista, y a ver exactamente cómo sabe el programa a qué método llamar en cada uno.
+
+## Predice
+
+<Predice
+  ej="m13/jefe-predice"
+  opciones={["`buenas buenas` y `hola hola`", "`hola hola` y `hola hola`", "`buenas buenas` y `buenas buenas`", "No compila: `A` no implementa ningún método"]}
+  correcta={0}
+  explicacion="`dos_veces` recibe un `&dyn Hablar` y llama a `hola`. Al ejecutar, cada valor lleva consigo la tabla de **sus** métodos: para `B`, su versión propia; para `A`, la de por defecto."
+  porque={["Correcto.", "`B` reescribe `hola`, y su vtable apunta a su versión.", "`A` no reescribe nada: usa el método por defecto.", "`impl Hablar for A {}` es válido: todos los métodos tienen cuerpo por defecto."]}
+/>
+
+## La idea
+
+Con genéricos, cada copia de la función trabaja con **un** tipo. Pero a veces necesitas una lista de figuras donde hay cuadrados **y** círculos, o un programa que elige qué tipo usar según lo que escriba el usuario. Ahí el tipo no se conoce al compilar, y entra **`dyn Trait`** (*trait object*): «un valor de algún tipo que implementa `Trait`; ya veremos cuál».
+
+Un `dyn Animal` no tiene tamaño conocido (un `Perro` y un `Gato` pueden medir distinto), así que **siempre** va detrás de un puntero: `&dyn Animal` si lo prestas, `Box<dyn Animal>` si lo posees en el heap. Así `Vec<Box<dyn Animal>>` es una lista de cajas, todas del mismo tamaño, cada una con un animal distinto dentro.
+
+¿Y cómo sabe `a.sonido()` a qué función saltar? Ese puntero es **gordo** (*fat pointer*): lleva dos direcciones. Una a los datos y otra a la **vtable** (*virtual method table*) del tipo real: una tabla, generada al compilar, con la dirección de cada método. Llamar a un método es leer su dirección en la tabla y saltar. Eso se llama **despacho dinámico** (*dynamic dispatch*), frente al **despacho estático** de los genéricos.
+
+## Pruébalo
+
+<Ejecutar ej="m13/dyn-zoo" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Una vtable real, sacada del ensamblador (x86-64, Windows, `rustc 1.99.1 -O`). El fuente: un trait `Forma` con `area` y `nombre`, implementado por `struct C(f64)`, y dos funciones:
+
+```rust
+#[unsafe(no_mangle)] pub fn llama_dyn(f: &dyn Forma) -> f64 { f.area() }
+#[unsafe(no_mangle)] pub fn crea_dyn() -> &'static dyn Forma { &C(1.0) }
+```
+
+La vtable de `C` como `Forma`:
+
+```text
+anon.29297ea976b047a8456ed3182112749f.2:
+	.asciz	"\000\000\000\000\000\000\000\000\b\000\000\000\000\000\000\000\b\000\000\000\000\000\000"
+	.quad	_RNvXCsksMpE8sARSQ_3vt2NtB2_1CNtB2_5Forma4area
+	.quad	_RNvXCsksMpE8sARSQ_3vt2NtB2_1CNtB2_5Forma6nombre
+```
+
+Se lee en trozos de 8 bytes (la última cadena acaba en un `\000` implícito: son 24 bytes):
+
+| Posición | Contenido | Significado |
+|---|---|---|
+| +0 | `0` | función para destruir el valor (*drop*): `C` no necesita, así que es nula |
+| +8 | `\b` = 8 | tamaño de `C`: 8 bytes (un `f64`) |
+| +16 | `\b` = 8 | alineación de `C`: 8 |
+| +24 | `…Forma4area` | dirección de `C::area` |
+| +32 | `…Forma6nombre` | dirección de `C::nombre` |
+
+Ahora la llamada dinámica, entera:
+
+```text
+llama_dyn:
+	rex64 jmp	qword ptr [rdx + 24]
+```
+
+**Una instrucción.** En Windows x64 el puntero gordo llega en dos registros: `rcx` (datos) y `rdx` (vtable). `[rdx + 24]` lee la casilla +24 de la vtable, el método `area`, y salta allí; `rcx` sigue apuntando a los datos, que es justo el `&self` que `area` espera.
+
+Y crear el puntero gordo es poner las dos direcciones en dos registros:
+
+```text
+crea_dyn:
+	lea	rax, [rip + anon.29297ea976b047a8456ed3182112749f.1]   ; datos: el C(1.0)
+	lea	rdx, [rip + anon.29297ea976b047a8456ed3182112749f.2]   ; la vtable
+	ret
+```
+
+El precio del despacho dinámico no es el salto (es baratísimo), sino que **el compilador no ve a través de él**: no sabe qué función se ejecutará, así que no puede insertarla ni optimizar alrededor. Con genéricos sí puede. Los tamaños del ejemplo, en un PC de 64 bits, comprobados al compilar: `&Perro` = 8, `&dyn Animal` = 16, `Box<dyn Animal>` = 16. En el navegador (wasm32, direcciones de 4 bytes) salen 4 y 8. El orden y la forma de la vtable **no son estables**: pueden cambiar entre versiones del compilador.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m13/vec-mezcla"
+  explicacion="Un `Vec` guarda elementos de **un solo tipo**: el primero es `Perro`, así que el compilador espera más `Perro` (E0308). Para mezclar tipos hace falta un tipo común del mismo tamaño: `Box<dyn Animal>`, con la anotación `Vec<Box<dyn Animal>>`."
+/>
+
+<Trampa titulo="¿Genérico o dyn?">
+
+Elige **genérico** cuando cada uso trabaja con un tipo concreto y quieres la máxima velocidad. Elige **`dyn`** cuando necesitas mezclar tipos en una colección, elegir el tipo al ejecutar, o reducir el tamaño del ejecutable (una sola copia del código). Las dos son buenas herramientas; ejecuta este ejemplo para ver las dos firmas lado a lado:
+
+<Ejecutar ej="m13/dyn-o-generico" />
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m13/reto-formas"
+  enunciado="Implementa `Forma` para `Rect` (área = ancho × alto), escribe `area_total(formas: &[Box<dyn Forma>]) -> f64` y, en `main`, imprime el área total de `Cuadrado(2.0)`, `Rect(1.0, 3.0)` y `Cuadrado(0.5)`. Debe salir `7.25`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué no existe una variable de tipo `dyn Animal` a secas, sin `&` ni `Box`?"
+  opciones={["Porque su tamaño no se conoce al compilar: depende del tipo real", "Porque `dyn` solo funciona con structs vacíos", "Porque `dyn` es más lento sin puntero", "Sí existe; es lo normal"]}
+  correcta={0}
+  explicacion="Un `Perro` y un `Gato { vidas }` miden distinto. Para reservar sitio en la pila, el compilador necesita un tamaño fijo; el puntero sí lo tiene."
+  porque={["Correcto.", "Funciona con cualquier tipo que implemente el trait.", "No es cuestión de velocidad sino de tamaño.", "`dyn Trait` es un tipo sin tamaño (*unsized*): no puede ir solo en una variable."]}
+/>
+
+<Pregunta
+  pregunta="En el asm, `llama_dyn` es `jmp qword ptr [rdx + 24]`. ¿Por qué `+ 24`?"
+  opciones={["Porque las tres primeras casillas de 8 bytes son drop, tamaño y alineación; `area` es la cuarta", "Porque `area` mide 24 bytes", "Porque `C` ocupa 24 bytes", "Es un número aleatorio del compilador"]}
+  correcta={0}
+  explicacion="3 × 8 = 24: el primer método va justo después de los tres datos del tipo."
+  porque={["Correcto.", "Los métodos no «miden»: la vtable guarda su dirección (8 bytes).", "`C` ocupa 8 bytes, y está en la casilla +8 de la vtable.", "Es la posición fija del primer método."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué pierdes al usar `&dyn Forma` en vez de un genérico `T: Forma`?"
+  opciones={["Que el compilador pueda insertar y optimizar el método, porque no sabe cuál se ejecutará", "Las comprobaciones de tipos", "La posibilidad de llamar a métodos del trait", "La seguridad de memoria"]}
+  correcta={0}
+  explicacion="La llamada indirecta es una «pared» para el optimizador. El programa sigue siendo igual de seguro."
+  porque={["Correcto.", "Se comprueba todo igual al compilar.", "Se pueden llamar todos los métodos que caben en la vtable.", "`dyn` es Rust seguro: no hay ningún riesgo de memoria."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuántos bytes ocupa `Box<dyn Animal>` en un PC de 64 bits?"
+  opciones={["16", "8", "Lo que mida el animal", "24"]}
+  correcta={0}
+  explicacion="Dos direcciones de 8 bytes: datos y vtable. El animal vive en el heap."
+  porque={["Correcto.", "Eso mide un `Box<Perro>`: sin vtable, una sola dirección.", "El animal está en el heap; en la variable solo está el puntero gordo.", "No hay longitud ni capacidad: solo dos direcciones."]}
+/>

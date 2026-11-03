@@ -1,0 +1,73 @@
+---
+title: "use"
+description: "Palabra clave estricta: trae nombres a tu ámbito, los renombra y los reexporta; también use<..> en impl Trait."
+sidebar:
+  order: 37
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`use` crea un **atajo**: después de `use std::collections::HashMap;` puedes escribir `HashMap` en vez de la ruta completa.
+
+## Sinopsis
+
+```text
+use ruta::Nombre;
+use ruta::{A, B, sub::C};        // varios, anidados
+use ruta::{self, A};             // el módulo y A
+use ruta::*;                     // glob: todo lo público
+use ruta::Nombre as Otro;        // renombrar
+use ruta::Trait as _;            // importar un trait sin ocupar su nombre
+pub use ruta::Nombre;            // reexportar
+fn f() -> impl Trait + use<'a, T>   // captura precisa (otro significado)
+```
+
+## Qué hace
+
+### Uso 1 · Importar
+
+`use` solo crea un nombre local; no copia código ni cambia la visibilidad del original. Puede ir en cualquier módulo o bloque, y afecta solo a ese ámbito. Los nombres importados con `*` tienen **menos prioridad** que los declarados o importados explícitamente.
+
+Las rutas de `use` empiezan por el nombre de un crate (`std`, una dependencia), por `crate`, `self` o `super`, o por un nombre que ya esté en ámbito.
+
+### Uso 2 · Reexportar
+
+`pub use` hace que el elemento se vea **también** desde aquí. Las bibliotecas lo usan para ofrecer una API plana sin enseñar su estructura interna.
+
+### Uso 3 · `use<…>` en `impl Trait`
+
+En un tipo de retorno `impl Trait + use<'a, T>`, `use<…>` dice **qué** parámetros genéricos y tiempos de vida captura el tipo opaco. Ver [`impl`](/ref/lenguaje/palabras-clave/impl/).
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-use" />
+
+Salida:
+
+```text
+Some("uno")
+4 6
+20
+nota 9
+Ok(())
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-use-error" />
+
+`error[E0425]: cannot find type HashMap in this scope` (y E0433 para `HashMap::new`), con la ayuda `consider importing this struct`.
+
+## Desde
+
+Rust 1.0. Rutas de la edición 2018 (`use` relativo al módulo o a un crate). `use<…>`: 1.82.
+
+## Ver también
+
+- [Visibilidad y rutas](/ref/lenguaje/visibilidad-y-rutas/) · [`as`](/ref/lenguaje/palabras-clave/as/) · [`pub`](/ref/lenguaje/palabras-clave/pub/) · [`mod`](/ref/lenguaje/palabras-clave/mod/)
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

@@ -1,0 +1,140 @@
+---
+title: "Carreras de datos: imposibles en Rust seguro"
+description: "Ver con un simulador cómo dos hilos pierden sumas, por qué eso es comportamiento indefinido y qué tres reglas de Rust lo impiden."
+sidebar:
+  order: 5
+duracion: 13
+desde: "1.0"
+requiere: ["17-concurrencia/04-send-y-sync"]
+tarjetas:
+  - p: "¿Qué es una carrera de datos?"
+    r: "Dos o más hilos acceden a la misma memoria a la vez, al menos uno escribe, y no hay sincronización entre ellos."
+  - p: "¿Es una carrera de datos un simple resultado incorrecto?"
+    r: "No: es comportamiento indefinido. El compilador asume que no ocurren y el programa entero pierde su significado."
+  - p: "¿Qué diferencia hay entre carrera de datos y condición de carrera?"
+    r: "La carrera de datos es acceso a memoria sin sincronizar (UB, imposible en Rust seguro). La condición de carrera es un fallo lógico por el orden de los sucesos; Rust seguro sí la permite."
+  - p: "¿Qué tres piezas de Rust impiden las carreras de datos?"
+    r: "La exclusividad de &mut (un único préstamo exclusivo), Send/Sync (qué cruza entre hilos) y la mutabilidad interior sincronizada (Mutex, atómicos)."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a **ver** una carrera de datos paso a paso (en un simulador que corre en tu navegador) y a entender por qué Rust no la deja compilar.
+
+## Predice
+
+Dos hilos ejecutan `x += 1` sobre la misma `x`, que empieza en 0. Para el procesador, `x += 1` son **tres pasos**: leer `x` a un registro, sumar 1 al registro, escribir el registro en `x`. El simulador prueba **todas** las formas posibles de intercalar esos 3 + 3 pasos.
+
+<Predice
+  ej="m17/simulador-carrera"
+  opciones={[
+    "Las 20 intercalaciones dan x = 2",
+    "La mitad da 2 y la otra mitad 1",
+    "Solo 2 de las 20 dan x = 2; las otras 18 pierden una suma",
+    "Algunas dan x = 0"
+  ]}
+  correcta={2}
+  explicacion="Solo sale bien si un hilo hace sus tres pasos completos antes de que el otro lea: H1 H1 H1 H2 H2 H2 o H2 H2 H2 H1 H1 H1. En cualquier otro orden, los dos leen el mismo 0 y los dos escriben 1. Nunca sale 0, porque alguien siempre escribe al final."
+  porque={[
+    "Eso solo pasaría si `x += 1` fuera un paso indivisible.",
+    "Cuéntalas: casi todas las mezclas pierden.",
+    "Correcto.",
+    "Cada hilo escribe al menos un 1, así que el mínimo es 1."
+  ]}
+/>
+
+## La idea
+
+Lo que acabas de ver se llama **carrera de datos** (*data race*): dos o más hilos acceden **a la misma memoria a la vez**, **al menos uno escribe**, y **no hay sincronización** entre ellos. El simulador es optimista: supone que cada paso ocurre entero y de uno en uno. En un procesador real es peor: cada núcleo tiene sus cachés y su búfer de escrituras, el compilador puede reordenar instrucciones, y una escritura de 8 bytes podría verse a medias. Por eso las carreras de datos son **comportamiento indefinido**: el compilador optimiza suponiendo que **nunca** ocurren, y si ocurren, el programa no tiene ningún significado garantizado.
+
+Rust seguro las **prohíbe al compilar**. No con una regla nueva, sino combinando tres que ya conoces: (1) **exclusividad**: para escribir necesitas `&mut`, y solo puede haber uno vivo; (2) **`Send`/`Sync`**: solo cruza a otro hilo lo que es seguro que cruce; (3) **mutabilidad interior sincronizada**: si varios hilos deben escribir lo mismo, el tipo tiene que traer su propia sincronización (`Mutex`, atómicos). Los tipos con mutabilidad interior **sin** sincronizar (`Cell`, `RefCell`) no son `Sync`.
+
+Pon las tres juntas y una carrera de datos necesita romper al menos una, lo que solo se puede hacer con `unsafe`.
+
+## Pruébalo
+
+Así se ve la carrera del simulador escrita en Rust de verdad:
+
+<NoCompila ej="m17/contador-mut-dos-hilos" explicacion="Cada closure hace `contador += 1`, así que cada uno necesita un préstamo exclusivo de `contador`. Dos préstamos exclusivos vivos a la vez: E0499, el mismo error del mundo 7. Entre hilos, esa regla es exactamente la que impide la carrera. El arreglo usa un Mutex y siempre da 2." />
+
+La carrera del simulador **no se puede escribir** en Rust seguro: el borrow checker la ve como dos `&mut` simultáneos.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Tabla de intercalación.** Este es el orden que el simulador encontró primero entre los que pierden una suma (`H1 H1 H2 H1 H2 H2`):
+
+| Paso | Hilo 1 | Hilo 2 | `x` en memoria | registro H1 | registro H2 |
+|---|---|---|---|---|---|
+| 1 | lee `x` | | 0 | 0 | – |
+| 2 | suma 1 | | 0 | 1 | – |
+| 3 | | lee `x` | 0 | 1 | 0 |
+| 4 | escribe | | **1** | 1 | 0 |
+| 5 | | suma 1 | 1 | 1 | 1 |
+| 6 | | escribe | **1** | 1 | 1 |
+
+El hilo 2 leyó **antes** de que el hilo 1 escribiera. Su escritura pisa la del hilo 1: una suma se pierde.
+
+**Por qué es indefinido y no solo «incorrecto».** El compilador, al ver `x += 1` en un bucle sin sincronización, puede legalmente guardar `x` en un registro durante todo el bucle y escribirla una sola vez al final, porque **nadie más puede estar mirándola**. Con una carrera de datos esa suposición es falsa, y el resultado puede ser cualquier cosa: no solo perder sumas.
+
+**La lista oficial.** La Referencia de Rust abre su lista de comportamiento indefinido con las carreras de datos. Lo verás completo en el mundo 20.
+
+**Lo que Rust sí permite.** Una **condición de carrera** (*race condition*) es un fallo de lógica que depende del orden de los sucesos: dos hilos comprueban «¿queda una entrada?» con un candado, sueltan el candado y luego compran con otro. Cada acceso está sincronizado (no hay carrera de datos), pero la lógica falla. Eso no es UB y Rust no lo impide: lo verás en la lección 10.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Es solo un contador, si pierdo alguna suma no pasa nada»">
+
+❌ Pensar que una carrera de datos «solo» da un número un poco menor. Es comportamiento indefinido: el optimizador puede transformar el programa de formas que no tienen nada que ver con el número esperado.
+
+✅ Si el valor exacto no importa pero el contador se comparte, usa igualmente un atómico (`AtomicU64::fetch_add` con `Ordering::Relaxed`, lección 9): cuesta muy poco y es correcto. En Rust seguro no tienes opción de equivocarte aquí: el compilador ya te lo ha impedido.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m17/reto-carrera" enunciado="Completa `ejecutar` para la versión del simulador en la que `x += 1` es UN solo paso indivisible (como hace un atómico): cada elemento de `orden` es un hilo que suma 1 de una vez. Debe imprimir `[0, 1] -> x = 2` y `[1, 0] -> x = 2`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estas situaciones es una carrera de datos?"
+  opciones={[
+    "Dos hilos leen la misma variable a la vez sin candado",
+    "Dos hilos escriben la misma variable, cada uno con el Mutex tomado",
+    "Un hilo escribe una variable mientras otro la lee, sin sincronización",
+    "Dos hilos escriben variables distintas a la vez"
+  ]}
+  correcta={2}
+  explicacion="Hacen falta las tres condiciones: misma memoria, a la vez, al menos una escritura, sin sincronizar."
+  porque={["Solo lecturas: no hay carrera.", "El Mutex sincroniza los accesos.", "Correcto.", "Memoria distinta: no hay carrera."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué la carrera del simulador no se puede escribir en Rust seguro?"
+  opciones={[
+    "Porque Rust ejecuta los hilos de uno en uno",
+    "Porque cada hilo necesita un `&mut` de la misma variable, y no pueden coexistir dos préstamos exclusivos",
+    "Porque el compilador detecta los números que se pierden",
+    "Sí se puede, solo que da 2 siempre"
+  ]}
+  correcta={1}
+  explicacion="La regla de exclusividad del mundo 7 es, entre hilos, la regla anti-carreras."
+  porque={["Los hilos de Rust son hilos reales y corren en paralelo.", "Correcto.", "El compilador no ejecuta tu programa: razona sobre los préstamos.", "No compila: E0499."]}
+/>
+
+<Pregunta
+  pregunta="Dos hilos sacan dinero: cada uno bloquea el Mutex, lee el saldo, lo suelta, decide, vuelve a bloquearlo y resta. El saldo acaba negativo. ¿Qué es?"
+  opciones={[
+    "Una carrera de datos: comportamiento indefinido",
+    "Una condición de carrera: un fallo de lógica, no UB",
+    "Imposible en Rust",
+    "Un interbloqueo"
+  ]}
+  correcta={1}
+  explicacion="Todos los accesos están sincronizados por el Mutex, pero el «leer y decidir» y el «restar» no están en la misma sección crítica. Rust no puede adivinar qué operaciones deben ser una sola."
+  porque={["Cada acceso está protegido: no hay carrera de datos.", "Correcto.", "Es Rust seguro y compila.", "Nadie se queda esperando para siempre."]}
+/>

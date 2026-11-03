@@ -1,0 +1,90 @@
+---
+title: "Canales"
+description: "En vez de compartir memoria, envía mensajes: mpsc::channel, varios productores, cerrar el canal, canales acotados y por qué el Receiver no se clona."
+sidebar:
+  order: 8
+duracion: 13
+desde: "1.0"
+requiere: ["17-concurrencia/07-rwlock-y-condvar"]
+tarjetas:
+  - p: "¿Qué significa mpsc?"
+    r: "Multiple producer, single consumer: varios emisores (Sender, que se clona) y un único receptor (Receiver)."
+  - p: "¿Cuándo termina `for msg in rx`?"
+    r: "Cuando se han destruido todos los Sender del canal y no quedan mensajes."
+  - p: "¿Qué pasa con el valor que envías por un canal?"
+    r: "Se mueve: pasa a ser del receptor. El emisor ya no puede usarlo."
+  - p: "¿Qué diferencia hay entre channel() y sync_channel(n)?"
+    r: "channel no tiene límite; sync_channel(n) admite como mucho n mensajes pendientes y bloquea al emisor (o falla con try_send) si está lleno."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Hay un lema famoso en programación concurrente: «no te comuniques compartiendo memoria; comparte memoria comunicándote». Los **canales** son la herramienta para hacerlo: un hilo envía mensajes y otro los recibe.
+
+## Predice
+
+<Ejecutar ej="m17/canal-un-hilo" />
+
+Antes de mirar la salida: ¿qué pasaría si quitaras `drop(tx)`? (Respuesta en «La idea».)
+
+## La idea
+
+`std::sync::mpsc::channel()` devuelve una pareja:
+
+- **`Sender<T>`** (`tx`): envía con `tx.send(valor)`. Se puede **clonar**: varios productores.
+- **`Receiver<T>`** (`rx`): recibe con `rx.recv()` (espera hasta que llegue algo) o `rx.iter()` / `for msg in rx`. Es **único**: un solo consumidor.
+
+Tres reglas:
+
+1. **Enviar mueve el valor.** El mensaje pasa a ser del receptor: nada se comparte, así que no hace falta ningún candado.
+2. **El canal se cierra cuando se destruyen todos los `Sender`.** Entonces `recv` devuelve `Err` y el `for` termina. Por eso, sin `drop(tx)`, el bucle de arriba esperaría para siempre un cuarto mensaje.
+3. **Si el receptor desaparece**, `send` devuelve `Err` con el valor dentro: nadie va a recibirlo.
+
+## Pruébalo
+
+Tres productores, un consumidor (con hilos: en el Playground):
+
+<Ejecutar ej="m17/canal-productores" />
+
+Un canal **acotado** (`sync_channel(n)`) limita cuántos mensajes pueden esperar. Así un productor rápido no llena la memoria si el consumidor es lento:
+
+<Ejecutar ej="m17/canal-acotado" />
+
+Y la regla del consumidor único, comprobada por el compilador:
+
+<NoCompila ej="m17/rx-clone" explicacion="`Receiver` no implementa `Clone`. Si varios hilos tienen que repartirse los mensajes, se comparte un único receptor con `Arc<Mutex<Receiver<T>>>`: lo harás en el jefe de este mundo." />
+
+<Reto
+  ej="m17/reto-canal"
+  enunciado="El hilo productor tiene que enviar los cuadrados de 1 a 5 por el canal, y `main` tiene que sumar todo lo que llegue. Debe imprimir `suma de cuadrados = 55`."
+/>
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué no hace falta `Mutex`.** El mensaje se **mueve** del emisor al receptor: en cada momento tiene un solo dueño. El ownership hace que compartir sea imposible, y donde no se comparte no hay carreras.
+
+**La implementación.** Desde Rust 1.67, los canales de la biblioteca estándar usan por dentro el diseño del crate `crossbeam-channel`, sin cerrojos en el caso habitual. `crossbeam` ofrece además canales con **varios consumidores** (*mpmc*) y `select!` para esperar en varios canales a la vez. En código async (mundo 18) se usan los canales de Tokio.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Quedarse con un Sender sin querer">
+
+❌ Clonar `tx` para cada productor y olvidar soltar el original. El `for msg in rx` nunca termina: queda un emisor vivo, el de `main`.
+
+✅ Después de repartir los clones, `drop(tx)`. O mueve el original al último productor en vez de clonarlo.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Envías un `String` por un canal con `tx.send(s)`. ¿Puedes usar `s` después?"
+  opciones={["No: se movió al canal (E0382 si lo usas)", "Sí: se envía una copia", "Sí, pero solo para leer", "Depende de si alguien lo recibió"]}
+  correcta={0}
+  explicacion="`send` recibe el valor por valor. Si necesitas quedarte con él, envía un clon."
+  porque={["", "Rust nunca copia un `String` sin `clone`.", "Ya no es tuyo: ni para leer.", "El movimiento ocurre al llamar a `send`."]}
+/>

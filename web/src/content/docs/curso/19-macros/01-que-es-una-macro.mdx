@@ -1,0 +1,114 @@
+---
+title: "¿Qué es una macro?"
+description: "Entiende qué es una macro, qué recibe (tokens) y por qué println! comprueba el formato antes de ejecutar nada."
+sidebar:
+  order: 1
+duracion: 10
+desde: "1.0"
+requiere: []
+tarjetas:
+  - p: "¿Qué recibe una macro como entrada?"
+    r: "Una secuencia de tokens (trozos de código), no valores ya calculados."
+  - p: "¿Cuándo se ejecuta una macro?"
+    r: "Durante la compilación, en la fase de expansión, antes de comprobar tipos y préstamos."
+  - p: "¿Por qué println!(\"{} {}\", x) no compila?"
+    r: "La macro cuenta los huecos {} del texto en compilación y ve 2 huecos con 1 argumento."
+  - p: "¿Qué indica el signo ! en println!?"
+    r: "Que es una invocación de macro, no una llamada a función."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa, Historia } from '~/components';
+
+Vas a descubrir qué hay detrás del `!` que llevas escribiendo desde el primer día, y por qué ese signo cambia tanto las reglas del juego.
+
+## Predice
+
+<NoCompila ej="m19/formato-mal" explicacion="El texto tiene dos huecos `{}` pero solo pasas un argumento. Lo detecta el compilador, sin ejecutar el programa: `println!` revisa el texto de formato mientras compila." />
+
+¿Cómo puede el compilador saber que faltan argumentos si `println!` todavía no se ha ejecutado? Una función normal no podría: recibe valores cuando el programa ya está en marcha. Una **macro** (*macro*) trabaja antes.
+
+## La idea
+
+Una macro es un trozo de programa que el compilador ejecuta **mientras compila**. Recibe código (en forma de *tokens*) y devuelve más código, que ocupa el lugar de la llamada. A ese proceso se le llama **expansión** (*macro expansion*).
+
+Un **token** (*token*) es la pieza mínima del código: un nombre (`x`), un número (`5`), un símbolo (`+`, `=`), un texto (`"hola"`)… Los espacios y los saltos de línea no son tokens; solo separan.
+
+Esto da a las macros dos poderes que una función no tiene:
+
+1. **Número de argumentos variable**: `println!("a")`, `println!("{}", 1)`, `println!("{} {}", 1, 2)`. Las funciones de Rust tienen siempre un número fijo.
+2. **Mirar el código antes de que exista el programa**: `println!` lee el texto de formato y comprueba que cada `{}` tiene su argumento.
+
+## Pruébalo
+
+<Ejecutar ej="m19/primera-mirada" />
+
+`stringify!` es la macro más sencilla para ver que trabajas con tokens: te devuelve el código que le diste, como texto, **sin calcularlo**.
+
+<Ejecutar ej="m19/tokens" titulo="Tokens, no valores" />
+
+Fíjate en la última línea: `hola mundo ñandú 42` no es Rust válido, pero sí son cuatro tokens correctos, y eso basta para una macro.
+
+## Bajo el capó
+
+<BajoElCapo>
+El compilador procesa tu programa por fases. Las macros se expanden muy pronto:
+
+1. **Análisis léxico**: el texto se parte en tokens.
+2. **Análisis sintáctico**: los tokens forman un árbol (el AST, *abstract syntax tree*). Cuando aparece `nombre!(...)`, lo que hay dentro de los paréntesis se guarda **sin interpretar**, como un árbol de tokens (*token tree*).
+3. **Expansión de macros**: cada invocación se sustituye por el código que produce. Si ese código contiene más macros, se expanden también.
+4. Solo **después** vienen la resolución de nombres, la comprobación de tipos, el borrow checker y la generación de código.
+
+Por eso una macro no sabe de tipos: cuando se ejecuta, los tipos todavía no se han calculado. Lo que sí sabe es la *forma* del código.
+
+Así queda `println!("v = {:?}", v)` después de expandirse (salida real de `rustc -Zunpretty=expanded` con Rust 1.99.1, que verás en la lección 10):
+
+```rust
+{ ::std::io::_print(format_args!("v = {0:?}\n", v)); };
+```
+
+`println!` se convierte en una llamada a una función interna (`_print`) con otra macro, `format_args!`, que es la que analiza el texto de formato. Como esa última está implementada dentro del propio compilador, puede dar el error de la sección *Predice*.
+
+Un detalle: dentro de una invocación los paréntesis, corchetes y llaves deben ir **equilibrados**. `stringify!(a ( b)` no puede ni empezar a expandirse: el analizador léxico necesita saber dónde termina el árbol de tokens.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«println! es una función»">
+❌ Pensar que `println!` recibe valores como una función y que «imprimir mal» es un fallo que verás al ejecutar.
+
+✅ `println!` es una macro: el formato se comprueba **al compilar**. Si el número de `{}` no cuadra con los argumentos, ni siquiera obtienes un programa. Es una ventaja: el error aparece antes de que nadie use tu programa.
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m19/reto-presenta" enunciado="Imprime exactamente las tres líneas del comentario. La última debe mostrar el código `edicion + 1` como texto, sin calcularlo." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿En qué momento se ejecuta `stringify!(1 + 2)`?"
+  opciones={["Al ejecutar el programa, cuando se llega a esa línea", "Al compilar, durante la expansión de macros", "Al enlazar el ejecutable", "Nunca: es solo un comentario"]}
+  correcta={1}
+  explicacion={"Las macros se expanden en compilación. `stringify!(1 + 2)` se sustituye por el literal `\"1 + 2\"` antes de que exista el programa."}
+  porque={["El programa ya recibe el texto hecho; no queda ninguna macro en tiempo de ejecución.", "Correcto.", "El enlazado es muy posterior; para entonces no quedan macros.", "Produce un `&str` de verdad que puedes imprimir."]}
+/>
+
+<Pregunta
+  pregunta={"¿Qué imprime `println!(\"{}\", stringify!(2 * 3));`?"}
+  opciones={["6", "2 * 3", "\"2 * 3\"", "No compila"]}
+  correcta={1}
+  explicacion="`stringify!` devuelve los tokens como texto, sin calcularlos. `println!` lo imprime sin comillas."
+  porque={["Eso sería el resultado de calcular la expresión; stringify! no calcula nada.", "Correcto.", "Las comillas no forman parte del contenido del texto.", "Es perfectamente válido."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué una macro puede aceptar un número variable de argumentos y una función no?"
+  opciones={["Porque las macros son más lentas", "Porque la macro recibe tokens y genera el código adecuado para cada llamada", "Porque las macros no tienen tipos y aceptan cualquier cosa al ejecutar", "No es verdad: las funciones también pueden"]}
+  correcta={1}
+  explicacion="Cada invocación se expande a su propio código. Con tres argumentos se genera código para tres; con uno, para uno. Las funciones de Rust tienen una firma fija."
+  porque={["La expansión ocurre al compilar; no cuesta nada al ejecutar.", "Correcto.", "Sí hay tipos: el código expandido se comprueba con todo el rigor normal.", "Las funciones de Rust tienen un número fijo de parámetros."]}
+/>
+
+<Historia titulo="Por qué el `!`">
+Desde antes de la versión 1.0 (2015), Rust marca las macros con `!` para que, al leer, sepas que esa línea puede hacer cosas que una función no puede: aceptar sintaxis propia o un número variable de argumentos.
+</Historia>

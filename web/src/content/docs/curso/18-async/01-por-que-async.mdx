@@ -1,0 +1,96 @@
+---
+title: "Por qué async"
+description: "Entender qué problema resuelve async: muchas tareas que casi siempre están esperando."
+sidebar:
+  order: 1
+duracion: 10
+desde: "1.39"
+requiere: ["15-punteros-inteligentes/10-arc"]
+tarjetas:
+  - p: "¿Qué tipo de trabajo hace que async merezca la pena?"
+    r: "El que pasa casi todo su tiempo esperando (red, disco, temporizadores), no el que gasta CPU."
+  - p: "Si tienes 10 000 conexiones que esperan, ¿por qué no un hilo por conexión?"
+    r: "Cada hilo reserva su propia pila y cuesta cambiar entre hilos; con async, unas pocas tareas ligeras comparten pocos hilos."
+  - p: "¿Async hace que un cálculo de CPU vaya más rápido?"
+    r: "No. Async solo aprovecha los tiempos de espera; para repartir cálculo entre núcleos se usan hilos (o Rayon)."
+  - p: "¿Desde qué versión de Rust existen async/.await en estable?"
+    r: "Desde Rust 1.39 (noviembre de 2019)."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa, Historia } from '~/components';
+
+Vas a descubrir por qué un programa que espera mucho no necesita muchos hilos, sino una forma de **aprovechar las esperas**.
+
+## Predice
+
+<Pregunta
+  pregunta="Un servidor atiende 3 pedidos. Cada uno necesita 1 tic de trabajo de CPU y después **espera** 4 tics una respuesta de la red. Si los atiende uno detrás de otro, ¿cuántos tics tarda en total?"
+  opciones={["5", "7", "15", "12"]}
+  correcta={2}
+  explicacion="Uno detrás de otro: (1 + 4) × 3 = 15. Durante 12 de esos tics la CPU no hace nada: solo espera."
+  porque={["5 es lo que tarda **un** pedido.", "7 es lo que tardaría si intercalara los pedidos aprovechando las esperas.", "Correcto: 5 + 5 + 5.", "12 son solo las esperas; falta el trabajo."]}
+/>
+
+## La idea
+
+Hay dos clases de trabajo. El trabajo **de CPU** (calcular, ordenar, comprimir) mantiene ocupado al procesador. El trabajo **de espera** (*I/O-bound*: leer de la red, del disco, esperar a un temporizador) consiste casi entero en no hacer nada hasta que llega una respuesta.
+
+Con hilos (mundo 17) puedes atender muchas esperas a la vez: un hilo por pedido. Funciona, pero cada hilo tiene su propia pila reservada y el sistema operativo gasta tiempo cambiando de uno a otro. Con diez pedidos da igual; con diez mil conexiones abiertas, empieza a doler.
+
+**Async** (*asíncrono*) propone otra cosa: cada pedido es una **tarea** pequeñita que sabe decir «ahora mismo no puedo seguir, estoy esperando». Mientras una tarea espera, el mismo hilo avanza con otra. Así, un solo hilo puede intercalar miles de tareas. Es lo que hace un buen camarero: no se queda mirando la cocina mientras se hace tu plato; toma nota en otra mesa.
+
+## Pruébalo
+
+Esta simulación no usa async todavía: solo cuenta tics para ver la diferencia.
+
+<Ejecutar ej="m18/esperas" />
+
+Fíjate: intercalando, B termina **antes** que A (su espera es más corta) y el total baja de 15 a 7 tics. El trabajo de CPU es el mismo; lo que cambia es que las esperas se **solapan**.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Qué cuesta un hilo.** Cada hilo que crea `std::thread::spawn` recibe su propia pila (en las plataformas de escritorio, la biblioteca estándar reserva 2 MiB por defecto para los hilos que crea; se puede cambiar con `thread::Builder::stack_size`). Además, cambiar de un hilo a otro lo hace el sistema operativo, que tiene que guardar y restaurar registros.
+
+**Qué cuesta una tarea async.** Una tarea es un valor normal de Rust (un `struct` o un `enum`) que guarda **solo las variables que necesita para continuar**. En la lección 5 medirás una: 24 bytes. Cambiar de tarea es llamar a una función: no interviene el sistema operativo.
+
+**Concurrencia frente a paralelismo.** *Concurrencia* es tener varias tareas en marcha y avanzar un poco en cada una (puede ser en un solo núcleo). *Paralelismo* es ejecutar, de verdad, dos cosas en el mismo instante (necesita varios núcleos). Async da concurrencia; los ejecutores multihilo, como Tokio, añaden paralelismo encima repartiendo tareas entre unos pocos hilos.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Async no acelera el cálculo">
+
+❌ «Si hago async mi función que calcula primos, irá más rápida.»
+
+✅ Una función que nunca espera no tiene esperas que aprovechar. Async solo ayuda cuando hay **tiempo muerto**. Para repartir cálculo entre núcleos usa hilos o Rayon (mundo 17). Y peor: un cálculo largo dentro de una tarea async **bloquea** el hilo, y las demás tareas de ese hilo se quedan sin turno.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m18/reto-tiempos" enunciado="Completa `secuencial` (suma de 1 + espera de cada pedido) e `intercalado` (el pedido número i empieza en el tic i y termina en i + 1 + espera; el total es el mayor de esos finales)." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿En cuál de estos programas async aporta más?"
+  opciones={["Un programa que calcula los primeros mil millones de decimales de π", "Un servidor de chat con 20 000 usuarios conectados que escriben de vez en cuando", "Un programa que ordena un vector de 10 elementos", "Un programa que suma dos números"]}
+  correcta={1}
+  explicacion="El chat pasa casi todo el tiempo esperando mensajes de 20 000 conexiones: es el caso ideal para tareas ligeras que comparten pocos hilos."
+  porque={["Es trabajo de CPU puro: no hay esperas que solapar.", "Correcto: muchísimas esperas simultáneas.", "Es tan corto que cualquier cosa extra solo añade coste.", "No hay nada que esperar."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué diferencia hay entre concurrencia y paralelismo?"
+  opciones={["Son sinónimos", "Concurrencia = varias tareas en marcha intercalándose; paralelismo = ejecutarse en el mismo instante en varios núcleos", "Paralelismo = async; concurrencia = hilos", "Concurrencia solo existe en Rust"]}
+  correcta={1}
+  explicacion="Un solo núcleo puede ser concurrente (intercalando) pero no paralelo. Async da concurrencia; varios hilos pueden dar además paralelismo."
+  porque={["Se confunden a menudo, pero no son lo mismo.", "Correcto.", "Al revés no, y tampoco así: async puede combinarse con varios hilos.", "Son ideas generales de la computación."]}
+/>
+
+<Historia titulo="Cuatro años hasta `.await`">
+Rust tuvo durante sus primeros años una biblioteca de «hilos verdes» integrada en el lenguaje, y la quitó antes de la versión 1.0 (2015) porque obligaba a todo programa a cargar con un runtime. Después, la comunidad construyó futures como biblioteca y, tras mucho debate sobre la sintaxis (¿`await x` o `x.await`?), `async`/`.await` llegaron a Rust estable en la versión **1.39**, en noviembre de 2019, sin runtime incluido: lo eliges tú.
+</Historia>

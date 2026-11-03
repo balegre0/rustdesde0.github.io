@@ -1,0 +1,136 @@
+---
+title: "Las macros de la biblioteca estándar"
+description: "Qué hacen por dentro println!, format_args!, write!, dbg!, assert!, matches!, todo!, concat!, cfg!, compile_error! y thread_local!."
+sidebar:
+  order: 8
+duracion: 14
+desde: "1.0"
+requiere: ["19-macros/07-ambito-y-exportar"]
+tarjetas:
+  - p: "¿Qué macro es la base de println!, format!, write! y panic!?"
+    r: "format_args!: analiza el texto de formato en compilación y produce un fmt::Arguments sin reservar memoria."
+  - p: "¿Dónde imprime dbg! y qué devuelve?"
+    r: "Imprime en stderr archivo, línea, expresión y valor, y devuelve el valor (lo mueve)."
+  - p: "¿En qué se diferencian todo!() y unreachable!()?"
+    r: "Las dos provocan un pánico; todo! dice «falta por hacer» y unreachable! dice «esto no debería pasar nunca». Comunican intenciones distintas."
+  - p: "¿Qué hace compile_error!(\"…\")?"
+    r: "Detiene la compilación con ese mensaje si llega a expandirse; útil en ramas de macros que detectan un uso incorrecto."
+  - p: "¿Qué diferencia hay entre cfg!(…) y #[cfg(…)]?"
+    r: "cfg! es una expresión booleana (el código de las dos ramas se compila); #[cfg] elimina el código que no cumple la condición."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer por dentro las macros que más usarás, para que dejen de ser cajas negras y sepas elegir la adecuada.
+
+## Predice
+
+<Predice
+  ej="m19/assert-falla"
+  opciones={["Imprime las dos líneas", "Imprime «primer assert superado» y entra en pánico mostrando left: 4 y right: 5", "No compila porque 2 + 2 no es 5", "Entra en pánico en el primer assert"]}
+  correcta={1}
+  explicacion="`assert!(precio > 0)` se cumple. `assert_eq!(precio, 5)` compara en ejecución, falla y entra en pánico mostrando los dos valores y tu mensaje."
+  porque={["El segundo assert falla, así que la última línea nunca se ejecuta.", "Correcto.", "assert_eq! se comprueba al ejecutar, no al compilar.", "4 > 0 es verdadero."]}
+/>
+
+## La idea
+
+Las macros de `std` se dividen en tres familias:
+
+**1. Formato.** `format_args!` es la pieza central: analiza el texto de formato **en compilación** y produce un valor `fmt::Arguments` que describe qué imprimir, sin reservar memoria. Encima de ella están `print!`/`println!` (salida estándar), `eprint!`/`eprintln!` (salida de error), `format!` (crea un `String`), `write!`/`writeln!` (escriben en lo que tú digas) y `panic!`.
+
+**2. Comprobaciones y avisos.** `assert!`, `assert_eq!`, `assert_ne!` (siempre activos) y sus versiones `debug_assert*` (solo con `debug_assertions`, es decir, en modo debug). `dbg!` para inspeccionar. `todo!`, `unimplemented!` y `unreachable!` para marcar código que entra en pánico a propósito. `matches!` para preguntar «¿encaja con este patrón?».
+
+**3. Compilación.** `concat!`, `stringify!`, `line!`, `column!`, `file!`, `module_path!`, `env!` (variable de entorno **al compilar**), `include_str!`/`include_bytes!` (meten un archivo en el binario), `cfg!` y `compile_error!`. Y `thread_local!`, `vec!`.
+
+## Pruébalo
+
+<Ejecutar ej="m19/std-macros" titulo="Macros que miran el código" />
+
+1. `file!` y `line!` dicen dónde está la invocación.
+2. `concat!` pega literales **al compilar**: el resultado es un `&'static str` constante. Acepta números y caracteres.
+3. `matches!(valor, patrón)` admite todo lo que admite un `match`: rangos, `|`, guardas con `if`.
+4. `cfg!` responde `true` o `false` según la configuración (aquí, que el ejemplo se compiló para wasm con aserciones de depuración).
+
+<Ejecutar ej="m19/write-macro" titulo="write!, writeln! y format!" />
+
+`write!` funciona sobre cualquier cosa que implemente `fmt::Write` (como `String`) o `io::Write` (como un archivo). Devuelve un `Result`, porque escribir puede fallar.
+
+<Ejecutar ej="m19/dbg-macro" titulo="dbg! devuelve su valor" />
+
+`dbg!` escribe en **stderr** una línea con el formato `[ruta/del/archivo.rs:5:13] a * 2 = 6` (la ruta depende de dónde se compile) y devuelve el valor, así que puedes envolver cualquier subexpresión sin cambiar el programa. Ojo: **mueve** su argumento; para no perder la propiedad, usa `dbg!(&x)`.
+
+<Ejecutar ej="m19/todo-macro" titulo="todo! compila con cualquier tipo" />
+
+`todo!()` tiene el tipo `!` (*never*), que encaja donde se espere cualquier tipo. Por eso puedes dejar una rama a medias y el programa compila; si se ejecuta, entra en pánico con `not yet implemented: …`.
+
+<Ejecutar ej="m19/thread-local" titulo="thread_local!" />
+
+`thread_local!` declara una variable estática con una copia **por hilo**. Se accede con `.with(|v| …)`, que te presta el valor solo durante la closure.
+
+## Bajo el capó
+
+<BajoElCapo>
+**Macros integradas.** `format_args!`, `concat!`, `stringify!`, `line!`, `file!`, `cfg!`, `include_str!`, `env!` y `compile_error!` no están escritas con `macro_rules!`: las implementa el propio compilador (*built-in macros*), porque necesitan cosas que una macro normal no puede hacer, como leer el contenido de un archivo o analizar el texto de formato.
+
+**`println!` por dentro.** Lo viste en la lección 1: se expande a `::std::io::_print(format_args!("…\n", …))`. El `\n` lo añade la macro al texto, y los huecos `{}` se numeran (`{0}`, `{1}`…).
+
+**`vec!`.** La expansión real de `vec![1, 2]` en Rust 1.99.1 es
+
+```rust
+::alloc::boxed::box_assume_init_into_vec_unsafe(::alloc::intrinsics::write_box_via_move(::alloc::boxed::Box::new_uninit(),
+        [1, 2]))
+```
+
+Es decir: reserva una caja sin inicializar, escribe el array dentro y la convierte en `Vec` sin copiar. Son funciones internas de `alloc` que no puedes llamar tú; la macro tiene permiso porque vive en la biblioteca estándar. Por eso `vec!` es más eficiente que hacer `push` uno a uno.
+
+**`assert!` en release.** `assert!` sigue activo en release; `debug_assert!` desaparece. Usa `assert!` para lo que protege la corrección (por ejemplo, una condición de la que depende código `unsafe`) y `debug_assert!` para comprobaciones caras que solo quieres durante el desarrollo.
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m19/compile-error" explicacion="Aquí el error es intencionado: la regla comodín de `unidad!` usa `compile_error!` para rechazar unidades desconocidas con un mensaje claro, montado con `concat!` y `stringify!`. Es la manera de dar errores amables desde una macro." />
+
+<Trampa titulo="cfg! no elimina código">
+❌ `if cfg!(windows) { funcion_que_solo_existe_en_windows() }`: las dos ramas se compilan siempre, así que en otros sistemas no compila.
+
+✅ `#[cfg(windows)]` sobre la sentencia o la función: el código se elimina antes de comprobar nombres y tipos. `cfg!` sirve cuando las dos ramas son válidas en todas partes y solo cambia el comportamiento.
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m19/reto-vocales" enunciado="Implementa `es_vocal` con `matches!` para contar las vocales, con y sin tilde (y la ü), de la frase. Debe imprimir `10 vocales`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué devuelve `let y = dbg!(x + 1);`?"
+  opciones={["`()`", "El valor de `x + 1`", "Un `String` con el mensaje", "Nada: dbg! no se puede usar como expresión"]}
+  correcta={1}
+  explicacion="dbg! imprime en stderr y devuelve el valor, así que `y` vale `x + 1`."
+  porque={["Eso devolvería println!.", "Correcto.", "El mensaje va a stderr, no se devuelve.", "Está pensada para usarse dentro de expresiones."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál de estas comprobaciones **desaparece** al compilar en release (sin debug_assertions)?"
+  opciones={["`assert!`", "`assert_eq!`", "`debug_assert!`", "`unreachable!`"]}
+  correcta={2}
+  explicacion="Solo las versiones `debug_*` dependen de `debug_assertions`."
+  porque={["assert! está siempre activo.", "assert_eq! está siempre activo.", "Correcto.", "unreachable! siempre entra en pánico si se ejecuta."]}
+/>
+
+<Pregunta
+  pregunta={"¿Por qué `match x { 1 => \"uno\", _ => todo!() }` compila aunque `todo!()` no devuelva un `&str`?"}
+  opciones={["Porque todo! devuelve un String vacío", "Porque todo! tiene el tipo `!`, que encaja con cualquier tipo", "Porque el compilador ignora las ramas con macros", "No compila"]}
+  correcta={1}
+  explicacion="Una expresión de tipo `!` nunca produce un valor (entra en pánico), así que puede ocupar el lugar de cualquier tipo."
+  porque={["No devuelve nada: entra en pánico.", "Correcto.", "Las ramas se comprueban todas.", "Compila sin problemas."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué macro usarías para meter el contenido de `datos.txt` en el binario al compilar?"
+  opciones={["`include_str!(\"datos.txt\")`", "`std::fs::read_to_string(\"datos.txt\")`", "`env!(\"datos.txt\")`", "`concat!(\"datos.txt\")`"]}
+  correcta={0}
+  explicacion="include_str! lee el archivo en compilación (ruta relativa al archivo fuente) y produce un `&'static str`. `fs::read_to_string` lo lee al ejecutar."
+  porque={["Correcto.", "Eso es una función que lee el archivo al ejecutar el programa.", "env! lee variables de entorno, no archivos.", "concat! pegaría el texto «datos.txt» tal cual."]}
+/>

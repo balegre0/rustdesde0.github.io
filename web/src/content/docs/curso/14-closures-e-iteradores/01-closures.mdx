@@ -1,0 +1,103 @@
+---
+title: "Closures: funciones con memoria"
+description: "Escribe funciones pequeñas sin nombre que usan las variables de su alrededor."
+sidebar:
+  order: 1
+duracion: 10
+desde: "1.0"
+requiere: ["05-funciones-y-la-pila", "13-traits-y-genericos"]
+tarjetas:
+  - p: "¿Cómo se escribe un closure que suma 1 a su argumento?"
+    r: "`|x| x + 1`. Los parámetros van entre barras y después el cuerpo (una expresión o un bloque `{ … }`)."
+  - p: "¿Qué diferencia a un closure de una función `fn`?"
+    r: "Que puede capturar variables del lugar donde se crea. Una `fn` solo ve sus parámetros y lo global."
+  - p: "¿Por qué no puedes llamar al mismo closure `|x| x` con un entero y luego con un `f64`?"
+    r: "Porque el tipo de sus parámetros se infiere en el primer uso y queda fijo. Un closure no es genérico (E0308)."
+  - p: "¿Cuánto ocupa en memoria un closure que no captura nada?"
+    r: "0 bytes: es un tipo de tamaño cero. Un closure es un struct con sus capturas como campos."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir tus primeros **closures** (*closures*): funciones pequeñas, sin nombre, que puedes guardar en una variable y que **recuerdan** las variables del lugar donde nacieron.
+
+## Predice
+
+<Predice
+  ej="m14/primer-closure"
+  opciones={["`doble(21) = 42` / `¡Hola, Begoña!` / `100 con IVA = 121`", "No compila: `iva` no es un parámetro de `con_iva`", "`doble(21) = 42` / `¡Hola, Begoña!` / `100 con IVA = 100`", "No compila: a `doble` le falta el tipo de `x`"]}
+  correcta={0}
+  explicacion="`con_iva` usa `iva` sin recibirlo como parámetro: lo **captura** del entorno. Y el tipo de `x` en `doble` se deduce del uso (`doble(21)`)."
+  porque={["Correcto.", "Esa es justo la gracia de un closure: puede usar variables de alrededor.", "`iva` vale 21, y 100 + 100 · 21 / 100 = 121.", "En un closure los tipos se pueden omitir: el compilador los deduce."]}
+/>
+
+## La idea
+
+Una función normal se declara con `fn`, tiene nombre y solo ve sus parámetros. Un closure se escribe **donde lo necesitas**, con los parámetros entre barras verticales:
+
+```rust
+let doble = |x| x * 2;          // parámetro x, cuerpo x * 2
+let suma = |a: i32, b: i32| a + b;   // con tipos
+let largo = |s: &str| -> usize { s.len() };   // con bloque y tipo de retorno
+```
+
+Se llama igual que una función: `doble(21)`. Los tipos son opcionales porque el compilador los **infiere** (deduce) del uso. Pero solo una vez: el primer uso fija el tipo para siempre.
+
+Lo que lo hace especial es la **captura** (*capture*): dentro del cuerpo puedes nombrar variables que existían antes, como `iva` en el ejemplo. El closure se las lleva consigo. Una `fn` no puede hacerlo. Esa es la «memoria» del título, y en la lección siguiente verás exactamente cómo la guarda.
+
+## Pruébalo
+
+<Ejecutar ej="m14/primer-closure" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un closure **no es** un puntero a código. Es un **struct anónimo** que el compilador inventa para ti: sus campos son las variables capturadas, y además el compilador le implementa un trait de llamada (`Fn`, `FnMut` o `FnOnce`, lección 3). Cada closure que escribes tiene **su propio tipo**, distinto de todos los demás, aunque el código sea idéntico.
+
+Por eso su tamaño depende de lo que capture. Lo medimos de verdad:
+
+<Ejecutar ej="m14/tamano-closures" />
+
+En el navegador (wasm32) un puntero mide 4 bytes. En un PC de 64 bits lo comprobamos con aserciones que el compilador evalúa al compilar: sin capturas, 0 bytes; capturando un `u64` por referencia, 8 (un puntero); moviendo el `u64`, 8; moviendo una `String`, 24 (puntero, capacidad y longitud).
+
+Un closure sin capturas ocupa **cero bytes**: llamar a `doble(21)` no lee nada de memoria, el compilador sabe a qué código saltar solo por el tipo.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m14/closure-tipo-fijo"
+  explicacion="El primer uso, `identidad(5)`, fija el parámetro como entero. Después, `identidad(2.5)` no encaja (E0308). Un closure no es genérico: si necesitas dos tipos, escribe dos closures o una función genérica `fn identidad<T>(x: T) -> T`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m14/saludo-closure"
+  enunciado="Completa el closure `grita`: debe devolver el texto en mayúsculas seguido de tantos `!` como diga la variable `exclamaciones`, que el closure **captura**. Salida esperada: `HOLA!!!` y `ÑANDÚ!!!`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué es, para el compilador, el closure `|x| x + n` (que captura `n`)?"
+  opciones={["Un struct anónimo con un campo para `n` y una implementación de un trait de llamada", "Un puntero a una función normal", "Una macro que se copia donde se llama", "Una función `fn` con un parámetro oculto global"]}
+  correcta={0}
+  explicacion="Cada closure es un tipo único: un struct con sus capturas, más una implementación de `Fn`, `FnMut` o `FnOnce`."
+  porque={["Correcto.", "Un puntero a función no puede llevar datos capturados; por eso un closure que captura no cabe en un `fn(i32) -> i32`.", "No: es un valor normal que puedes guardar y pasar.", "No hay nada global: `n` viaja dentro del closure."]}
+/>
+
+<Pregunta
+  pregunta="`let a = || 1; let b = || 1;` — ¿tienen `a` y `b` el mismo tipo?"
+  opciones={["No: cada closure tiene su propio tipo, aunque el código sea idéntico", "Sí, porque el cuerpo es igual", "Sí, los dos son `fn() -> i32`", "Depende de la edición"]}
+  correcta={0}
+  explicacion="El compilador lo dice literalmente en sus errores: dos closures nunca tienen el mismo tipo, ni siquiera si son idénticos."
+  porque={["Correcto.", "El tipo no depende del cuerpo, sino del lugar donde se escribe.", "Pueden *convertirse* a `fn() -> i32` porque no capturan, pero su tipo propio es otro.", "Es así en todas las ediciones."]}
+/>
+
+## Para saber más
+
+- Lección siguiente: cómo captura exactamente.
+- The Rust Reference, «Closure expressions» y «Closure types».

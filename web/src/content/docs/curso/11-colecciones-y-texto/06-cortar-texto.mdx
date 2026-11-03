@@ -1,0 +1,99 @@
+---
+title: "Cortar y buscar en texto"
+description: "Trocea texto con split, trim y lines, busca con find y contains, y corta por bytes sin pánicos."
+sidebar:
+  order: 6
+duracion: 12
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/05-utf8-len-y-chars"]
+tarjetas:
+  - p: "¿Qué pasa con `&\"España\"[0..5]`?"
+    r: "Pánico: el byte 5 cae en mitad de la ñ (bytes 4..6). Los rangos de texto deben caer en fronteras de carácter."
+  - p: "¿Qué devuelve `s.find(\"x\")`?"
+    r: "`Option<usize>` con la posición en BYTES donde empieza la primera aparición. Esa posición siempre es una frontera válida para cortar."
+  - p: "¿En qué se diferencia `split(' ')` de `split_whitespace()`?"
+    r: "`split(' ')` corta en cada espacio y deja trozos vacíos si hay varios seguidos; `split_whitespace()` trata cualquier racha de espacios, tabuladores y saltos de línea como un solo separador."
+  - p: "¿Los trozos que devuelve `split` copian el texto?"
+    r: "No: son `&str` que apuntan dentro del texto original. Por eso no pueden vivir más que él."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a trocear, limpiar y buscar dentro de textos, sin copiar nada y sin pánicos por culpa de las tildes.
+
+## Predice
+
+<Predice
+  ej="m11/cortar-predice"
+  opciones={["`\"Hola, mundo\" [\"Hola\", \"mundo\"]`", "`\"  Hola, mundo  \" [\"Hola\", \"mundo\"]`", "`\"Hola, mundo\" [\"Hola,\", \"mundo\"]`", "`\"Hola, mundo\" [\"Hola, mundo\"]`"]}
+  correcta={0}
+  explicacion={'`trim()` quita los espacios de los dos bordes. `split(", ")` corta por la coma **y** el espacio, así que ninguna parte los conserva.'}
+  porque={["Correcto.", "`trim` sí quitó los espacios de los bordes.", "El separador incluye la coma, así que la coma desaparece.", "El separador `\", \"` aparece una vez: salen dos trozos."]}
+/>
+
+## La idea
+
+Casi todo el trabajo con texto es **trocear, limpiar y buscar**. Los métodos de `str` más usados:
+
+| Método | Da | Ejemplo |
+|---|---|---|
+| `trim()` | `&str` sin espacios en los bordes | `"  hola \n"` → `"hola"` |
+| `split(sep)` | trozos entre separadores | `"a,b,c"` → `a`, `b`, `c` |
+| `split_whitespace()` | palabras | `" uno   dos "` → `uno`, `dos` |
+| `lines()` | líneas | |
+| `split_once(sep)` | `Option<(&str, &str)>` | `"k=v"` → `("k", "v")` |
+| `contains`, `starts_with`, `ends_with` | `bool` | |
+| `find(patrón)` | `Option<usize>`: byte donde empieza | |
+| `to_uppercase`, `to_lowercase` | `String` nuevo (con Unicode) | `"ñandú"` → `"ÑANDÚ"` |
+
+Lo mejor: los trozos son **préstamos** (`&str`) del texto original. No se copia nada.
+
+Para cortar «a mano» con `&s[a..b]`, recuerda que **los números son bytes**, y que deben caer en **fronteras de carácter**. Si no, pánico. Hay dos formas seguras: usar posiciones que te da el propio texto (`find`, `char_indices`), o usar `s.get(a..b)`, que devuelve `None` en vez de entrar en pánico.
+
+## Pruébalo
+
+<Ejecutar ej="m11/cortar" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`split` no crea una lista: devuelve un **iterador** que, cada vez que le pides el siguiente trozo, busca el próximo separador y te da un `&str` (puntero + longitud) que señala dentro del texto original. Por eso es barato y por eso lleva el mismo tiempo de vida que el texto: si el `String` original se destruye, los trozos no pueden seguir existiendo (el borrow checker lo comprueba con lo que aprendiste en el mundo 8). Los iteradores, a fondo, en el mundo 14.
+
+Un rango de texto `&s[a..b]` comprueba dos cosas al ejecutar: que `b <= len` y que `a` y `b` son fronteras de carácter (un byte que no es de continuación `10xxxxxx`). Si alguna falla, el pánico explica exactamente dónde y en qué carácter.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Cortar por un número de bytes «a ojo»">
+
+<Ejecutar ej="m11/cortar-por-bytes" titulo="Pánico: no es frontera de carácter" />
+
+El mensaje real lo dice todo: el byte 5 está **dentro de la ñ** (que ocupa los bytes 4..6). Con texto en español, cortar por un número fijo de bytes es una bomba de relojería. Usa `find`, `char_indices`, `get(a..b)` o, si quieres los `n` primeros caracteres, `s.chars().take(n).collect::<String>()`.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m11/primera-palabra"
+  enunciado={'Escribe `primera_palabra(s: &str) -> &str` que devuelva la primera palabra (separada por espacios) o `""` si no hay ninguna. Pista: `split_whitespace().next()` y `unwrap_or`. Debe imprimir `[árbol]`, `[ñu]` y `[]`.'}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta={'¿Qué devuelve `"España".get(0..5)`?'}
+  opciones={["`None`", "`Some(\"Españ\")`", "Un pánico", "`Some(\"Espa\")`"]}
+  correcta={0}
+  porque={["Correcto: 5 no es frontera de carácter y `get` lo dice sin pánico.", "Los rangos son de bytes, y el byte 5 está dentro de la ñ.", "`get` nunca entra en pánico: devuelve `None`.", "Eso sería `get(0..4)`."]}
+/>
+
+<Pregunta
+  pregunta={"`\"a  b\".split(' ').count()` (con dos espacios entre a y b). ¿Cuánto vale?"}
+  opciones={["3", "2", "1", "4"]}
+  correcta={0}
+  explicacion="Entre los dos espacios hay un trozo vacío: `a`, `` (vacío) y `b`. Con `split_whitespace()` serían 2."
+  porque={["Correcto.", "Eso daría `split_whitespace`.", "Hay al menos un separador, así que hay más de un trozo.", "Dos separadores producen tres trozos."]}
+/>

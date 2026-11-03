@@ -1,0 +1,88 @@
+---
+title: "as"
+description: "Palabra clave estricta: convierte un valor primitivo en otro tipo (cast) o renombra lo que importas."
+sidebar:
+  order: 2
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`as` tiene dos trabajos: **convertir** un valor de un tipo primitivo a otro (un *cast*) y **dar otro nombre** a algo cuando lo importas.
+
+## Sinopsis
+
+```text
+expresión as Tipo                 // conversión (cast)
+use ruta::Nombre as OtroNombre;   // renombrar al importar
+extern crate nombre as alias;     // renombrar un crate
+<Tipo as Trait>::elemento         // ruta calificada: «Tipo visto como Trait»
+```
+
+## Qué hace
+
+### Uso 1 · Conversión entre tipos primitivos
+
+`valor as Tipo` produce un valor nuevo del tipo indicado. Solo funciona entre tipos que el compilador sabe convertir sin ayuda: números entre sí, `bool` y `char` a entero, `u8` a `char`, enums sin datos a entero, y punteros (referencias a punteros crudos, punteros entre sí, punteros a enteros).
+
+Las reglas que más importan:
+
+| Conversión | Qué pasa |
+|---|---|
+| entero → entero más pequeño | se **truncan** los bits altos: `300_i32 as u8` vale `44` |
+| entero → entero más grande | se rellena con ceros (sin signo) o se copia el bit de signo (con signo) |
+| flotante → entero | se **quitan los decimales** y el resultado **satura**: lo que no cabe se queda en el mínimo o el máximo; `NaN` da `0` |
+| entero → flotante | el valor más cercano que se pueda representar |
+| `u8` → `char` | el carácter con ese código (solo `u8`: un `u32` cualquiera podría no ser un carácter válido) |
+| `bool` → entero | `false` → `0`, `true` → `1` |
+| enum sin datos → entero | su discriminante |
+
+`as` **nunca falla ni entra en pánico**: si el valor no cabe, se trunca o satura en silencio. Por eso, cuando perder información sería un error, se prefieren `From`/`TryFrom` (`u8::try_from(300)` devuelve `Err`).
+
+### Uso 2 · Renombrar al importar
+
+En `use` y `extern crate`, `as` da un nombre local distinto. Sirve para evitar choques de nombres o para acortar: `use std::io::Result as IoResult;`. Con `as _` importas un trait solo para poder llamar a sus métodos, sin ocupar su nombre.
+
+### Uso 3 · Rutas calificadas
+
+`<Tipo as Trait>::f` elige sin ambigüedad la `f` del `Trait` implementada por `Tipo`, cuando varios traits tienen un elemento con el mismo nombre.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-as" />
+
+Salida:
+
+```text
+44
+3
+0
+2147483647
+A
+Some(1)
+```
+
+`300` no cabe en un `u8` (máximo 255), así que se queda con los 8 bits bajos: 300 − 256 = 44. `-1.0 as u8` satura a `0` y `1e10 as i32` satura a `i32::MAX`.
+
+## Errores
+
+`as` no convierte entre tipos que no son primitivos compatibles. Por ejemplo, no lee números dentro de un texto:
+
+<NoCompila ej="ref-lenguaje/kw-as-error" />
+
+El compilador responde con `error[E0606]: casting &str as i32 is invalid`. Para eso existe `str::parse`, que devuelve un `Result` porque el texto podría no ser un número.
+
+## Desde
+
+Rust 1.0. La conversión de flotante a entero satura desde Rust 1.45; antes, un valor que no cabía era comportamiento indefinido.
+
+## Ver también
+
+- [Coerciones](/ref/lenguaje/coerciones/): las conversiones que el compilador hace solo, sin `as`.
+- [Tipos](/ref/lenguaje/tipos/) · [`use`](/ref/lenguaje/palabras-clave/use/) · [`extern`](/ref/lenguaje/palabras-clave/extern/)
+- [Expresiones](/ref/lenguaje/expresiones/): precedencia de `as` (más fuerte que `*` y `+`).
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)

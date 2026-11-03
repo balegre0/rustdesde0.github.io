@@ -1,0 +1,110 @@
+---
+title: "Clone: la copia profunda"
+description: "clone() pide memoria nueva y copia los bytes del heap: dos dueñas independientes. Es explícito porque tiene un precio, y a veces cambia lo que hace tu programa."
+sidebar:
+  order: 7
+duracion: 10
+desde: "1.0"
+requiere: ["06-ownership/06-copy"]
+tarjetas:
+  - p: "¿Qué hace `s.clone()` con un `String`?"
+    r: "Reserva un bloque nuevo en el heap, copia en él los bytes del texto y devuelve un `String` nuevo, dueño de ese bloque. El original no cambia."
+  - p: "¿En qué se diferencia `Clone` de `Copy`?"
+    r: "`Copy` es implícito y copia solo los bytes del valor (siempre barato). `Clone` es explícito (`.clone()`) y puede hacer trabajo arbitrario, como copiar el heap."
+  - p: "¿Por qué Rust no clona solo cuando hace falta?"
+    r: "Porque clonar cuesta (memoria y tiempo) y crea dos valores independientes. Rust quiere que ese coste y ese cambio de significado se vean en el código."
+  - p: "¿Todo tipo `Copy` es también `Clone`?"
+    r: "Sí: `Copy` exige `Clone`. Para un tipo `Copy`, `.clone()` hace lo mismo que la copia implícita."
+---
+
+import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa, Prestamos } from '~/components';
+
+A veces de verdad quieres **dos** textos: el original y una versión modificada. Para eso existe `clone()`, la copia **profunda**. Es fácil de usar y fácil de abusar, así que vas a ver qué cuesta y cuándo **cambia el significado** de tu programa.
+
+## Predice
+
+<Predice
+  ej="m06/clonar"
+  pregunta="¿Qué imprime la última línea?"
+  opciones={["`¿mismos bytes? false`", "`¿mismos bytes? true`", "No compila: `original` se movió", "No compila: `copia` no es `mut`"]}
+  correcta={0}
+  explicacion="`clone()` reserva un bloque **nuevo** en el heap y copia allí los bytes. Cada `String` apunta a su propio bloque, así que las direcciones son distintas."
+  porque={["", "Eso sería un movimiento o una copia de la ficha; `clone` copia también el heap.", "`clone()` toma prestado el original: no lo mueve.", "`copia` está declarada con `let mut`."]}
+/>
+
+## La idea
+
+`let copia = original.clone();` hace tres cosas:
+
+1. Pide al asignador un bloque nuevo, del tamaño del texto.
+2. Copia en él los bytes del texto de `original`.
+3. Devuelve un `String` nuevo, **dueño** de ese bloque.
+
+Ahora hay **dos dueñas**, cada una con **su** texto. No hay riesgo de doble liberación: cada una liberará su propio bloque.
+
+La diferencia con `Copy` (lección anterior):
+
+| | `Copy` | `Clone` |
+|---|---|---|
+| Se escribe | nada: `let b = a;` | `let b = a.clone();` |
+| Copia | los bytes del valor (pila) | lo que el tipo decida (por ejemplo, el heap) |
+| Coste | siempre pequeño y fijo | puede ser grande |
+| Ejemplos | `i32`, `bool`, `char`, `&T` | `String`, `Vec<T>`, casi todos los tipos |
+
+`clone()` es **explícito** a propósito: cuando ves `.clone()` en un programa, sabes que ahí se gasta memoria y tiempo.
+
+## Pruébalo
+
+<Ejecutar ej="m06/clonar" />
+
+<Prestamos lineas={[
+  { codigo: "let original = String::from(\"hola\");", permisos: { original: "R-O" } },
+  { codigo: "let mut copia = original.clone();", permisos: { original: "R-O", copia: "RWO" }, nota: "clone solo necesita leer original (R). Las dos son dueñas." },
+  { codigo: "copia.push_str(\", mundo\");", permisos: { original: "R-O", copia: "RWO" }, nota: "Modificar la copia no toca el original." }
+]} />
+
+Ahora, el peligro de clonar «para que compile». Clonar crea un valor **independiente**, y eso cambia lo que hace el programa:
+
+<Ejecutar ej="m06/clonar-cambia-significado" />
+
+`lista` recibió los huevos, pero `compra` no. Si querías modificar la lista de la compra, el `clone()` silenció el error del compilador **y** introdujo un fallo lógico.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El coste.** Clonar un `String` de `n` bytes cuesta una llamada al asignador más copiar `n` bytes. Clonar un `Vec<String>` de 1000 elementos son 1001 reservas y todas sus copias. En un bucle caliente, eso se nota.
+
+**`Clone` es un trait.** Cada tipo decide qué significa clonarse implementando `fn clone(&self) -> Self`. Con `#[derive(Clone)]` (mundo 09), el compilador escribe una implementación que clona campo a campo. En el mundo 15 verás `Rc::clone`, que **no** copia los datos: solo aumenta un contador. Por eso conviene leer `.clone()` como «dame otro dueño», no siempre como «copia todo».
+
+**Copy implica Clone.** Para ser `Copy`, un tipo tiene que ser también `Clone` (y su `clone` debe hacer exactamente la copia de bytes).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Clonar para callar al compilador">
+
+❌ Ver E0382 y añadir `.clone()` sin pensar. Compila, pero quizá ahora modificas una copia en vez del original, o duplicas megabytes en un bucle.
+
+✅ Antes de clonar, pregúntate: **¿necesito dos valores independientes?** Si solo quieres **usar** el valor en otro sitio sin perderlo, lo que necesitas es **prestarlo**, y eso es el mundo 07. Si de verdad quieres dos, clona sin remordimientos.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Después de `let b = a.clone();` (con `a: String`), ¿cuántos bloques de texto hay en el heap?"
+  opciones={["Uno, compartido", "Dos, uno por dueña", "Ninguno", "Depende del optimizador"]}
+  correcta={1}
+  explicacion="`clone` reserva un bloque nuevo. Cada `String` es dueña de su bloque y lo liberará al terminar."
+  porque={["Compartir un bloque entre dos dueñas sería la doble liberación de la lección 5.", "", "Los dos `String` tienen texto.", "`clone` siempre reserva memoria nueva para un `String` no vacío."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué Rust no clona automáticamente un `String` cuando lo usas después de moverlo?"
+  opciones={["Porque no sabe clonar", "Porque clonar tiene un coste y crea un valor independiente: tiene que verse en el código", "Porque los `String` no se pueden clonar", "Porque solo los tipos `Copy` se clonan"]}
+  correcta={1}
+  explicacion="Una copia profunda oculta haría los programas más lentos sin avisar y, como has visto, puede cambiar su significado."
+  porque={["Sí sabe: `String` implementa `Clone`.", "", "Sí se pueden.", "Casi todos los tipos son `Clone`; muy pocos son `Copy`."]}
+/>

@@ -1,0 +1,124 @@
+---
+title: ".await, bloques y closures async"
+description: "Componer futures con .await, bloques async y closures async, y entender en qué orden se ejecuta cada cosa."
+sidebar:
+  order: 6
+duracion: 11
+desde: "1.85"
+requiere: ["18-async/05-maquina-de-estados", "14-closures-e-iteradores/01-closures"]
+tarjetas:
+  - p: "¿Dónde se puede escribir .await?"
+    r: "Solo dentro de una async fn, un bloque async o una closure async."
+  - p: "¿Dos futures creados uno tras otro se ejecutan a la vez?"
+    r: "No. Crearlos no ejecuta nada; .await los ejecuta de uno en uno, en el orden en que los esperas."
+  - p: "¿Qué es un bloque async?"
+    r: "Una expresión async { … } que produce un future anónimo, como una async fn sin nombre."
+  - p: "¿Desde qué versión son estables las closures async y los traits AsyncFn?"
+    r: "Desde Rust 1.85 (febrero de 2025)."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a aprender a **encadenar** futures y a predecir exactamente en qué orden pasan las cosas.
+
+## Predice
+
+<Predice
+  ej="m18/await-orden"
+  opciones={[
+    "empieza uno, empieza tres, futures creados",
+    "futures creados, empieza uno, empieza tres",
+    "futures creados, empieza tres, empieza uno",
+    "empieza tres, empieza uno, futures creados"
+  ]}
+  correcta={2}
+  explicacion="Crear `a` y `b` no ejecuta nada. Después se espera primero `b` y luego `a`: el orden lo marcan los `.await`, no el orden de creación."
+  porque={[
+    "Eso supondría que llamar a la `async fn` ejecuta el cuerpo.",
+    "El orden de los `.await` es b y después a.",
+    "Correcto.",
+    "Nada se ejecuta antes del primer `.await`."
+  ]}
+/>
+
+## La idea
+
+`.await` es un operador **sufijo**: va detrás de la expresión (`descarga().await`). Significa: «sondea este future; si no está listo, suspende **esta** función (devuelve `Pending` a quien nos sondea) y, cuando nos vuelvan a sondear, sigue sondeándolo; cuando esté listo, dame su valor».
+
+Solo existe dentro de contextos async, que son tres:
+
+- `async fn nombre(…) -> T` — una función cuyo resultado es un `impl Future<Output = T>`.
+- `async { … }` — un **bloque async**: un future anónimo hecho en el sitio. Puede capturar variables, como una closure. Con `async move { … }`, las toma en propiedad.
+- `async |args| …` — una **closure async** (Rust 1.85). Se pasa a funciones que piden `impl AsyncFn(A) -> B` (o `AsyncFnMut`, `AsyncFnOnce`, igual que con closures normales).
+
+Detalle clave: `.await` de un future tras otro es **secuencial**. Para que dos futures avancen **a la vez** hace falta algo que los sondee intercalados (`join`, lección 9) o lanzarlos como tareas separadas (lección 8).
+
+## Pruébalo
+
+<Ejecutar ej="m18/async-closure" />
+
+`aplicar_dos_veces` recibe la closure async y la llama dos veces, esperando cada resultado: `(1 + 10) + 10 = 21`. El bloque `async { 6 * 7 }` es un future como cualquier otro.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`.await` por dentro.** La Reference describe `fut.await` como, más o menos, este bucle dentro de la corrutina:
+
+```rust
+match IntoFuture::into_future(fut) {
+    mut pinned => loop {
+        match Pin::new_unchecked(&mut pinned).poll(cx) {
+            Poll::Ready(r) => break r,
+            Poll::Pending => yield, // aquí la función devuelve Pending y se suspende
+        }
+    }
+}
+```
+
+Dos detalles: primero se llama a `IntoFuture::into_future`, así que puedes hacer `.await` sobre cualquier tipo que implemente `IntoFuture` (no solo sobre futures; útil para *builders*). Y el `Pin::new_unchecked` es seguro **aquí** porque la variable `pinned` vive dentro de la propia corrutina, que ya está fijada (lección 7). `Future` e `IntoFuture` están en el preludio desde la edición 2024 (en 2021 había que importarlos con `use std::future::Future;`).
+
+**Por qué hacían falta las closures async.** Antes de 1.85 se escribía `|x| async move { … }`: una closure normal que devuelve un future. Eso tiene un límite: el future devuelto no puede tomar prestado nada **de la propia closure**, porque la closure y el future son dos valores separados. `AsyncFn` resuelve el préstamo: el future que produce `f(x)` puede usar lo que la closure capturó (en el ejemplo, `suma`), y la closure se puede llamar varias veces.
+
+**Orden de evaluación.** En `a().await + b().await`, primero se crea y espera `a()`, después `b()`. Rust evalúa de izquierda a derecha, también con `.await`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Creer que crear futures los lanza">
+
+❌ Esto **no** descarga en paralelo:
+
+```rust
+let f1 = descargar(url1);
+let f2 = descargar(url2);
+let r1 = f1.await; // descarga 1 entera...
+let r2 = f2.await; // ...y luego la 2
+```
+
+✅ Para que avancen a la vez, júntalos con un `join` (`let (r1, r2) = join(f1, f2).await;`, lección 9) o lánzalos como tareas en tu ejecutor (`tokio::spawn`, lección 8).
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m18/reto-componer" enunciado="Completa `componer`: aplica la closure async `f` a `x`, espera el resultado, aplícale `g` y devuelve lo que salga. Con `doble` y `mas_uno` sobre 20 debe imprimir 41." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Compila `fn main() { let x = tarea().await; }` (donde `tarea` es una `async fn`)?"
+  opciones={["Sí", "No: `.await` solo se permite dentro de async fn, bloques async o closures async", "Sí, pero bloquea el hilo", "Solo con Tokio"]}
+  correcta={1}
+  explicacion="`main` es una función normal. Necesitas un ejecutor (`block_on`) que haga de frontera, o la macro de un runtime que convierta `main` (como `#[tokio::main]`)."
+  porque={["rustc da el error E0728: `await` is only allowed inside `async` functions and blocks.", "Correcto.", "No llega a compilar.", "La macro `#[tokio::main]` reescribe `main`, pero el `main` original sigue sin ser async."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué diferencia hay entre `async { … }` y `async move { … }`?"
+  opciones={["Ninguna", "`async move` toma en propiedad las variables que usa; `async` las toma prestadas cuando puede", "`async move` se ejecuta en otro hilo", "`async move` es más rápido"]}
+  correcta={1}
+  explicacion="Es la misma regla que con las closures (mundo 14). `move` es necesario cuando el future tiene que vivir más que las variables locales, por ejemplo al lanzarlo como tarea `'static`."
+  porque={["Cambia cómo se capturan las variables.", "Correcto.", "`move` no tiene nada que ver con hilos.", "No es una cuestión de velocidad."]}
+/>

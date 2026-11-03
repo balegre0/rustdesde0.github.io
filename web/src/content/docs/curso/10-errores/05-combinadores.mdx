@@ -1,0 +1,109 @@
+---
+title: "Combinadores: map, map_err, and_then, ok_or"
+description: "Transforma y encadena resultados sin escribir un match en cada paso, y corta una lista al primer error con collect."
+sidebar:
+  order: 5
+duracion: 12
+desde: "1.0"
+requiere: ["10-errores/04-el-operador-interrogacion"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre `map` y `and_then` sobre un `Result`?"
+    r: "`map(f)` usa una `f` que devuelve un valor normal. `and_then(f)` usa una `f` que devuelve otro `Result`, y no anida: evita el `Result<Result<…>>`."
+  - p: "¿Para qué sirve `map_err`?"
+    r: "Para transformar solo el error (por ejemplo, convertirlo en tu tipo de error o en un texto). El `Ok` pasa intacto."
+  - p: "¿Cómo conviertes un `Option` en un `Result`?"
+    r: "Con `ok_or(error)` (o `ok_or_else(|| error)`): `Some(v)` → `Ok(v)`, `None` → `Err(error)`."
+  - p: "¿Qué hace `iter.collect::<Result<Vec<T>, E>>()` sobre resultados?"
+    r: "Si todos son `Ok`, da `Ok(vec)`. En cuanto encuentra un `Err`, se para y devuelve ese primer error."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a manejar `Result` y `Option` como piezas de un mecano: transformarlos, encadenarlos y convertir uno en otro.
+
+## Predice
+
+<Predice
+  ej="m10/combinadores-predice"
+  opciones={["`Err(ParseIntError { kind: InvalidDigit })` y `[4, 6]`", "`Ok([4, 6])` y `[4, 6]`", "`[Ok(4), Err(…), Ok(6)]` y `[4, 6]`", "Un pánico con `x`"]}
+  correcta={0}
+  explicacion="`collect` sobre un iterador de `Result` hacia `Result<Vec<_>, _>` se detiene en el primer `Err` y lo devuelve. `filter_map(… .ok())` se queda con los que salieron bien y descarta el resto."
+  porque={["Correcto.", "Con un solo `Err`, el resultado entero es `Err`: «todo o nada».", "El tipo pedido es `Result<Vec<i32>, _>`, no `Vec<Result<…>>`.", "Nada aquí llama a `unwrap`."]}
+/>
+
+## La idea
+
+Un **combinador** es un método que transforma un `Result` (u `Option`) en otro sin que tengas que escribir el `match`. Los esenciales:
+
+| Método | Sobre | Hace |
+|---|---|---|
+| `map(f)` | `Ok(v)` | `Ok(f(v))`; un `Err` pasa intacto |
+| `map_err(f)` | `Err(e)` | `Err(f(e))`; un `Ok` pasa intacto |
+| `and_then(f)` | `Ok(v)` | `f(v)`, donde `f` **devuelve otro `Result`** |
+| `ok_or(e)` | `Option` | `Some(v)` → `Ok(v)`; `None` → `Err(e)` |
+| `ok()` | `Result` | `Ok(v)` → `Some(v)`; `Err` → `None` |
+| `unwrap_or_else(f)` | `Err(e)` | calcula un valor de reserva a partir del error |
+
+Las `|n| n * 2` que ves son **closures** (funciones anónimas): `|parámetros| cuerpo`. Las estudiarás en el mundo 14; por ahora léelas como «dado `n`, devuelve `n * 2`».
+
+Y una joya para listas: si tienes un iterador de `Result`, `collect::<Result<Vec<_>, _>>()` te da **o todos los valores, o el primer error**. Es la respuesta a una pregunta muy común: «¿cómo paro un `map` en cuanto algo falla?».
+
+## Pruébalo
+
+<Ejecutar ej="m10/combinadores" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Cada combinador es un `match` corto dentro de la biblioteca estándar. `map`, por ejemplo, es exactamente:
+
+```rust
+match self {
+    Ok(t) => Ok(op(t)),
+    Err(e) => Err(e),
+}
+```
+
+Como el compilador sustituye la llamada por su cuerpo (*inlining*) y la closure también, una cadena `parse().map(…).map_err(…)` produce el mismo código máquina que los `match` escritos a mano. Elige entre `?`, `match` y combinadores por **claridad**, no por velocidad.
+
+`collect` hacia `Result<Vec<T>, E>` funciona porque `Result` implementa el trait `FromIterator`: va pidiendo elementos y, al primer `Err`, deja de consumir el iterador. Los elementos que quedaban detrás ni se calculan.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m10/map-devuelve-result"
+  explicacion="La closure devuelve un `Result`, así que `map` produce `Result<Result<i32, String>, String>`: un resultado dentro de otro (E0308). Cuando el paso siguiente también puede fallar, se usa `and_then`, que «aplana» los dos niveles. Es justo lo que hace el arreglo."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m10/sumar-lista"
+  enunciado="Completa `sumar(textos)` en una sola expresión: `map` para convertir cada texto a `i64`, `collect::<Result<Vec<i64>, _>>()` y `.map(|v| v.iter().sum())`. Debe imprimir `Ok(42)` y `Err(ParseIntError { kind: InvalidDigit })`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tienes `r: Result<u32, ParseIntError>` y tu función devuelve `Result<u32, String>`. ¿Qué escribes para usar `?`?"
+  opciones={["`r.map_err(|e| e.to_string())?`", "`r.map(|e| e.to_string())?`", "`r.ok()?`", "`r.and_then(String::from)?`"]}
+  correcta={0}
+  porque={["Correcto: `map_err` convierte el error.", "`map` transforma el valor `Ok`, no el error.", "`ok()` da un `Option`, que no encaja en una función que devuelve `Result`.", "`and_then` trabaja con el valor `Ok`, no con el error."]}
+/>
+
+<Pregunta
+  pregunta={'¿Qué devuelve `["1", "x", "y"].iter().map(|t| t.parse::<i32>()).collect::<Result<Vec<_>, _>>()`?'}
+  opciones={["El `Err` producido por `\"x\"`", "`Ok(vec![1])`", "Dos errores, uno por `\"x\"` y otro por `\"y\"`", "`Ok(vec![1, 0, 0])`"]}
+  correcta={0}
+  porque={["Correcto: el primero que falla.", "«Todo o nada»: un fallo hace que el resultado sea `Err`.", "Solo se guarda un error, y `\"y\"` ni se llega a convertir.", "Nunca se inventan ceros."]}
+/>
+
+<Pregunta
+  pregunta={'`vec.get(3).ok_or("no hay cuarto")` sobre un `Vec<i32>` de 2 elementos. ¿Qué es?'}
+  opciones={["`Err(\"no hay cuarto\")`", "`None`", "Un pánico", "`Ok(0)`"]}
+  correcta={0}
+  porque={["Correcto: `None` se convierte en `Err` con el error dado.", "`ok_or` convierte el `Option` en `Result`.", "`get` nunca entra en pánico.", "No hay ningún valor por defecto."]}
+/>

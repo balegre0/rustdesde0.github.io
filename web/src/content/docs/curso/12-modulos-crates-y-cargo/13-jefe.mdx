@@ -1,0 +1,51 @@
+---
+title: "Jefe: la biblioteca"
+description: "Organiza un programa en módulos con la visibilidad justa: un campo privado protegido por métodos, un pub(crate) y una re-exportación con pub use."
+sidebar:
+  order: 13
+duracion: 18
+desde: "1.0"
+requiere: ["12-modulos-crates-y-cargo/12-publicar"]
+tarjetas:
+  - p: "Orden para decidir la visibilidad de algo:"
+    r: "Privado por defecto; `pub(crate)` si lo necesita otro módulo del crate; `pub` solo si lo necesitan otros crates (o `main`, desde fuera del módulo)."
+---
+
+import { Reto, Pregunta } from '~/components';
+
+Una biblioteca municipal quiere un programa para prestar libros. La lógica ya está escrita, pero **toda la visibilidad está mal**: nada es público y el programa no compila. Tu trabajo es abrir **solo lo necesario**.
+
+## El reto
+
+<Reto
+  ej="m12/jefe"
+  enunciado="Haz que compile cambiando solo visibilidad y `use`: (1) `Libro`, su campo `titulo`, `nuevo` y `esta_prestado` tienen que ser públicos, pero el campo `prestado` debe seguir **privado**; (2) `marcar` solo la usa otro módulo del crate: `pub(crate)`; (3) `prestamos` necesita `use super::libros::Libro;`; (4) `biblioteca` re-exporta con `pub use libros::Libro;` y `pub use prestamos::prestar;` (y los módulos `libros` y `prestamos` necesitan ser al menos visibles para su padre)."
+/>
+
+## Repaso relámpago
+
+<Pregunta
+  pregunta="¿Por qué conviene que `prestado` siga siendo privado?"
+  opciones={["Por rendimiento", "Para que solo los métodos del módulo puedan cambiarlo y nadie preste dos veces el mismo libro saltándose la comprobación", "Porque los `bool` no pueden ser públicos", "No importa"]}
+  correcta={1}
+  explicacion="Si fuera público, `main` podría escribir `l.prestado = false` y volver a prestarlo sin pasar por `prestar`. El campo privado protege el invariante."
+  porque={["La visibilidad no cuesta nada al ejecutar.", "", "Cualquier campo puede ser público.", "Es justo la razón de ser de la visibilidad."]}
+/>
+
+<Pregunta
+  pregunta="Con `pub use libros::Libro;` en `biblioteca`, ¿qué rutas llevan al struct desde `main`?"
+  opciones={["Solo `biblioteca::libros::Libro`", "Solo `biblioteca::Libro`", "Las dos, si `libros` es `pub`; solo la corta si `libros` es privado", "Ninguna"]}
+  correcta={2}
+  explicacion="La re-exportación crea la ruta corta `biblioteca::Libro`. La larga solo funciona desde fuera si todo el camino (`libros`) es público."
+  porque={["La re-exportación añade la ruta corta.", "La larga también vale si `libros` es `pub`.", "", "La re-exportación hace visible al menos la corta."]}
+/>
+
+## Lo que te llevas del mundo 12
+
+- Los **módulos** organizan nombres en un árbol; las rutas llevan a cada elemento.
+- **Todo es privado** salvo que pongas `pub`; los campos, uno a uno.
+- `use` crea atajos; `pub use` diseña la interfaz pública.
+- Un paquete tiene una biblioteca y varios binarios; los workspaces juntan paquetes.
+- Semver, `Cargo.lock`, features aditivas, perfiles, `cfg`, `build.rs`, rustdoc y doctests.
+
+En el mundo 13 aprenderás la herramienta más potente para escribir código reutilizable: los **traits** y los **genéricos**.

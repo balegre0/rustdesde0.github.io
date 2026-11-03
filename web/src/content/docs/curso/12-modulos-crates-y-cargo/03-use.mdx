@@ -1,0 +1,86 @@
+---
+title: "use: importar, renombrar y re-exportar"
+description: "use trae un nombre a tu ámbito para no escribir la ruta entera; as lo renombra; pub use lo re-exporta para que otros lo vean donde tú quieras."
+sidebar:
+  order: 3
+duracion: 11
+desde: "1.0"
+requiere: ["12-modulos-crates-y-cargo/02-visibilidad"]
+tarjetas:
+  - p: "¿Qué hace `use std::collections::HashMap;`?"
+    r: "Trae el nombre `HashMap` al ámbito actual: a partir de ahí puedes escribir `HashMap` en vez de la ruta completa."
+  - p: "¿Para qué sirve `use x::y as z;`?"
+    r: "Para importar `y` con otro nombre, `z`. Útil cuando dos nombres chocan."
+  - p: "¿Qué hace `pub use`?"
+    r: "Re-exporta: el nombre importado pasa a ser visible desde fuera del módulo, como si estuviera definido ahí."
+  - p: "¿Qué dice E0432?"
+    r: "Que un `use` apunta a algo que no existe en esa ruta (*unresolved import*)."
+  - p: "¿Por qué a veces hay que importar un trait para llamar a un método?"
+    r: "Porque los métodos de un trait solo se pueden llamar si el trait está en el ámbito. `use std::io::Write;` es necesario para usar `writeln!` sobre `stdout()`."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Escribir `std::collections::HashMap` cada vez que quieres un mapa es agotador. `use` es el atajo, y `pub use` es la forma de diseñar qué ve quien usa tu código.
+
+## Predice
+
+<NoCompila ej="m12/use-mal" explicacion={"El `use` apunta a `geometria::superficie`. Mira qué funciones tiene de verdad `geometria`."} />
+
+## La idea
+
+`use ruta::nombre;` trae `nombre` al ámbito actual. Algunas formas:
+
+```rust
+use std::collections::HashMap;          // un nombre
+use std::io::{self, Write};             // varios a la vez; `self` es `std::io`
+use geometria::formas::area_circulo as area;   // con otro nombre
+use std::fmt::Write as _;               // un trait, solo para usar sus métodos
+use std::collections::*;                // todo (glob): úsalo poco
+```
+
+Tres detalles importantes:
+
+1. **`use` no copia ni ejecuta nada.** Solo crea un **atajo** de nombre en ese módulo.
+2. **Los traits se importan para usar sus métodos.** `writeln!(salida, …)` llama al método `write_fmt` del trait `Write`. Si `Write` no está en el ámbito, no compila.
+3. **El atajo es local al módulo.** Un `use` en `main.rs` no vale dentro de `mod cocina { … }`. Cada módulo pone sus propios `use`.
+
+**`pub use`** re-exporta: el nombre se puede usar desde fuera como si estuviera definido ahí. Las bibliotecas lo usan para ofrecer una ruta corta y cómoda aunque el código esté organizado en muchos módulos internos.
+
+## Pruébalo
+
+<Ejecutar ej="m12/usar-use" />
+
+<Ejecutar ej="m12/reexportar" />
+
+Quien usa `motor` escribe `motor::Bujia`, sin saber que por dentro está en `motor::piezas`. Si mañana reorganizas `piezas`, nadie se entera.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El preludio.** Hay nombres que usas sin `use`: `Vec`, `String`, `Option`, `Some`, `Ok`, `Box`, `println!`… Están en el **preludio** (`std::prelude::rust_2024`), una lista de `use` que el compilador pone automáticamente al principio de cada módulo. Cada edición tiene el suyo: el de 2021 añadió `TryFrom`, `TryInto` y `FromIterator`, y el de 2024 añadió `Future` e `IntoFuture`.
+
+**`use` en funciones.** Se puede escribir `use` dentro de una función o de un bloque: el atajo vale solo ahí. Es útil para un `use Enum::*;` antes de un `match` largo.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Importar con * todo lo que hay">
+
+❌ `use std::collections::*;` o `use mi_crate::*;` en todas partes. Al leer el código no sabes de dónde viene cada nombre, y una versión nueva del crate puede añadir nombres que choquen con los tuyos.
+
+✅ Importa nombres concretos. El glob está bien en casos acotados: en los tests (`use super::*;`, mundo 16) y en preludios pensados para ello.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Llamas a `stdout().flush()` y el compilador dice que el método `flush` no existe. ¿Qué falta?"
+  opciones={["`use std::io::stdout;`", "`use std::io::Write;`", "`pub use`", "Nada: `flush` no existe"]}
+  correcta={1}
+  explicacion="`flush` es un método del trait `Write`. Los métodos de un trait solo están disponibles si el trait está en el ámbito."
+  porque={["Eso solo te ahorra escribir `std::io::`.", "", "Re-exportar no tiene que ver.", "Existe: está en el trait `Write`."]}
+/>

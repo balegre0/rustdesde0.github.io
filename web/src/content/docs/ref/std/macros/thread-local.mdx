@@ -1,0 +1,41 @@
+---
+title: "thread_local!"
+description: "Declara variables globales con una copia distinta para cada hilo. Se usan a través de with, get, set y with_borrow."
+sidebar:
+  order: 19
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::thread_local`
+
+## Sinopsis
+
+```rust
+thread_local! {
+    static NOMBRE: Tipo = valor_inicial;
+    static OTRO: Cell<u32> = const { Cell::new(0) }; // inicialización const: más rápida
+}
+```
+
+## Qué hace
+
+Cada hilo tiene **su propia copia** de la variable, que se crea la primera vez que ese hilo la usa y se destruye cuando el hilo termina. Como ningún otro hilo la ve, no hace falta `Mutex`: basta con `Cell` o `RefCell` para modificarla.
+
+Se accede con `CLAVE.with(|v| …)` o, para `Cell` y `RefCell`, con atajos: `get`, `set`, `take`, `replace`, `with_borrow` y `with_borrow_mut`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-thread-local" />
+
+## Bajo el capó
+
+Se implementa con el almacenamiento local de hilo del sistema operativo (TLS). La forma `const { … }` evita comprobar en cada acceso si ya se inicializó.
+
+## Desde
+
+Rust 1.0. Inicialización `const`: 1.59. `with_borrow`/`set`/`get`: 1.73.
+
+## Ver también
+
+[`Cell` y `RefCell`](/ref/std/cell/) · [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

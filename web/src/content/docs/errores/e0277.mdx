@@ -1,0 +1,129 @@
+---
+title: "E0277: un tipo no implementa el trait que se necesita"
+description: "Usas un valor en un sitio que exige un trait (Display, Debug, Copy, Add, Iterator…) que su tipo no implementa."
+sidebar:
+  order: 22
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` `Punto` doesn't implement `std::fmt::Display` ``
+
+## Qué significa
+
+Muchas operaciones piden que el tipo cumpla un **trait**: imprimir con `{}` pide `Display`, con `{:?}` pide `Debug`, `?` pide que la función devuelva `Result` u `Option`, recorrer con `for` pide `IntoIterator`, ordenar pide `Ord`… Si el tipo no lo implementa, rustc dice `the trait X is not implemented for Y`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0277" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0277]: `Punto` doesn't implement `std::fmt::Display`
+ --> E0277.rs:8:20
+  |
+8 |     println!("{}", p);
+  |               --   ^ `Punto` cannot be formatted with the default formatter
+  |               |
+  |               required by this formatting parameter
+  |
+help: the trait `std::fmt::Display` is not implemented for `Punto`
+ --> E0277.rs:1:1
+  |
+1 | struct Punto {
+  | ^^^^^^^^^^^^
+  = note: in format strings you may be able to use `{:?}` (or `{:#?}` for pretty-print) instead
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Imprimir con `{}` un struct propio (no implementa `Display`).
+- Usar `?` dentro de `main` o de una función que no devuelve `Result`/`Option` (segundo ejemplo).
+- Indexar un `Vec` con un `i32` en lugar de `usize`.
+- Pasar un tipo a una función genérica cuyo límite (*bound*) no cumple.
+- Enviar entre hilos algo que no es `Send` (por ejemplo, `Rc`).
+
+## Cómo arreglarlo
+
+Implementa el trait (`impl fmt::Display for Punto`), derívalo si se puede (`#[derive(Debug, Clone, PartialEq)]`), o usa otra cosa que sí lo cumpla (`{:?}` en lugar de `{}`, `usize` como índice, `Arc` en vez de `Rc`). Para `?`, haz que la función devuelva `Result<T, E>`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+use std::fmt;
+
+struct Punto {
+    x: i32,
+    y: i32,
+}
+
+impl fmt::Display for Punto {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
+fn main() {
+    let p = Punto { x: 1, y: 2 };
+    println!("{}", p);
+}
+```
+
+**Salida:**
+
+```text
+(1, 2)
+```
+
+## Otro caso frecuente
+
+<NoCompila ej="errores/E0277-interrogacion" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0277]: the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)
+ --> E0277-interrogacion.rs:2:29
+  |
+1 | fn leer() -> i32 {
+  | ---------------- this function should return `Result` or `Option` to accept `?`
+2 |     let n: i32 = "7".parse()?;
+  |                             ^ cannot use the `?` operator in a function that returns `i32`
+```
+
+Arreglado:
+
+```rust
+fn leer() -> Result<i32, std::num::ParseIntError> {
+    let n: i32 = "7".parse()?;
+    Ok(n)
+}
+
+fn main() {
+    println!("{:?}", leer());
+}
+```
+
+**Salida:**
+
+```text
+Ok(7)
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0277` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0599](/errores/e0599/): no existe ese método para el tipo
+- [E0308](/errores/e0308/): tipos que no coinciden
+- [E0369](/errores/e0369/): operador binario no aplicable
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)
+- [Mundo 10 · Errores](/curso/10-errores/)

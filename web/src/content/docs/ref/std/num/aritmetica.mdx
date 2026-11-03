@@ -1,0 +1,152 @@
+---
+title: "Aritmética checked, wrapping, saturating y overflowing"
+description: "Cuatro formas explícitas de sumar, restar o multiplicar sin sorpresas al desbordar."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `métodos de los enteros (aquí, u8; todos los enteros los tienen)`
+
+## Qué hace
+
+Cada operación aritmética de los enteros existe en cuatro versiones, para que elijas qué pasa si el resultado no cabe:
+
+| Familia | Si se desborda… | Devuelve |
+|---|---|---|
+| `checked_add` | avisa | `Option<T>`: `None` si no cabe |
+| `wrapping_add` | da la vuelta (módulo 2ⁿ) | `T` |
+| `saturating_add` | se queda en el máximo o el mínimo | `T` |
+| `overflowing_add` | da la vuelta y avisa | `(T, bool)` |
+
+Lo mismo con `_sub`, `_mul`, `_div`, `_rem`, `_neg`, `_pow`, `_shl`… Los operadores normales (`+`, `-`, `*`) entran en pánico en *debug* y dan la vuelta en *release*.
+
+## Métodos (firmas de u8)
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`checked_add`](#checked_add) | `Some(a + b)` si cabe; `None` si se desborda. | 1.0 |
+| [`wrapping_add`](#wrapping_add) | Suma dando la vuelta. | 1.0 |
+| [`saturating_add`](#saturating_add) | Suma quedándose en `MAX` si se pasa. | 1.0 |
+| [`saturating_sub`](#saturating_sub) | Resta quedándose en `MIN` (0 en sin signo). | 1.0 |
+| [`overflowing_add`](#overflowing_add) | El resultado con vuelta y un `bool` que dice si hubo desbordamiento. | 1.7 |
+| [`checked_div`](#checked_div) | `None` si el divisor es 0 (o en `MIN / -1` con signo). | 1.0 |
+| [`pow`](#pow) | Potencia (con las mismas reglas de desbordamiento que `*`). | 1.0 |
+| [`rem_euclid`](#rem_euclid) | Resto siempre no negativo: `(-7).rem_euclid(3)` es `2`, mientras que `-7 % 3` es `-1`. | 1.38 |
+
+### `checked_add`
+
+```rust
+pub const fn checked_add(self, rhs: u8) -> Option<u8>
+```
+
+`Some(a + b)` si cabe; `None` si se desborda.
+
+### `wrapping_add`
+
+```rust
+pub const fn wrapping_add(self, rhs: u8) -> u8
+```
+
+Suma dando la vuelta.
+
+### `saturating_add`
+
+```rust
+pub const fn saturating_add(self, rhs: u8) -> u8
+```
+
+Suma quedándose en `MAX` si se pasa.
+
+### `saturating_sub`
+
+```rust
+pub const fn saturating_sub(self, rhs: u8) -> u8
+```
+
+Resta quedándose en `MIN` (0 en sin signo).
+
+### `overflowing_add`
+
+```rust
+pub const fn overflowing_add(self, rhs: u8) -> (u8, bool)
+```
+
+El resultado con vuelta y un `bool` que dice si hubo desbordamiento.
+
+### `checked_div`
+
+```rust
+pub const fn checked_div(self, rhs: u8) -> Option<u8>
+```
+
+`None` si el divisor es 0 (o en `MIN / -1` con signo).
+
+### `pow`
+
+```rust
+pub const fn pow(self, exp: u32) -> u8
+```
+
+Potencia (con las mismas reglas de desbordamiento que `*`).
+
+### `rem_euclid`
+
+```rust
+pub const fn rem_euclid(self, rhs: i32) -> i32
+```
+
+Resto siempre no negativo: `(-7).rem_euclid(3)` es `2`, mientras que `-7 % 3` es `-1`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/num-aritmetica" />
+
+**Salida** (perfil *debug*, con comprobación de desbordamiento):
+
+```text
+Some(255) None
+4
+255 0
+(4, true)
+255 -128 2147483647
+None None
+2 1024
+```
+
+**Salida de error** (debug):
+
+```text
+thread 'main' (1) panicked at num-aritmetica.rs:17:20:
+attempt to add with overflow
+```
+
+**Salida** (perfil *release*, sin comprobación):
+
+```text
+Some(255) None
+4
+255 0
+(4, true)
+255 -128 2147483647
+None None
+2 1024
+4
+```
+
+## Pánicos
+
+El operador `+` normal entra en pánico en *debug* si se desborda (lo muestra el ejemplo). Dividir entre 0 con `/` entra en pánico **siempre**, también en *release*.
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `overflowing_add` (1.7), `rem_euclid` (1.38).
+
+## Ver también
+
+- [std::num](/ref/std/num/)
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)

@@ -1,0 +1,63 @@
+# Preguntas de demostración de la plataforma (bórralas cuando haya contenido real).
+- id: demo-dos-mut
+  titulo: "Dos préstamos exclusivos a la vez"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: demo/dos-mut
+  opciones:
+    - "Porque `lista` no está declarada con `mut`."
+    - "Porque hay dos préstamos exclusivos (`&mut`) de `lista` vivos a la vez."
+    - "Porque `push` no existe para `Vec`."
+    - "Porque `println!` no puede imprimir un `Vec`."
+  correcta: 1
+  solucion: |
+    `a` y `b` son **préstamos exclusivos** de la misma `lista`, y `a` se usa *después* de crear `b`: los dos están vivos a la vez. Rust lo prohíbe (error **E0499**) porque dos caminos para modificar el mismo valor permitirían, por ejemplo, que uno haga crecer el vector (y lo mueva de sitio en el heap) mientras el otro aún apunta a la memoria vieja.
+
+    - La A es falsa: `lista` sí es `mut`.
+    - La C y la D son falsas: `push` existe y `{:?}` imprime un `Vec`.
+  etiquetas: ["E0499", "&mut"]
+- id: demo-division
+  titulo: "División entre enteros"
+  mundo: 03-valores-y-tipos
+  tema: tipos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: demo/division
+  opciones: ["`3.5`", "`3`", "`4`", "No compila"]
+  correcta: 1
+  solucion: |
+    `a` y `b` son enteros (`i32` por defecto), así que `/` es **división entera**: descarta la parte decimal. `7 / 2` vale `3`.
+- id: demo-u8-max
+  titulo: "El mayor u8"
+  mundo: 03-valores-y-tipos
+  tema: tipos
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuál es el valor más grande que cabe en un `u8`?"
+  respuestas: ["255"]
+  solucion: |
+    Un `u8` tiene 8 bits sin signo: de `0` a `2⁸ − 1 = 255`.
+- id: demo-mover-string
+  titulo: "Después de mover"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: opcion
+  enunciado: "Tras `let b = a;` con `a: String`, ¿qué pasa si usas `a`?"
+  codigo: |
+    let a = String::from("hola");
+    let b = a;
+    println!("{a}");
+  opciones:
+    - "Imprime `hola`."
+    - "Imprime una cadena vacía."
+    - "No compila: `a` se ha movido a `b` (E0382)."
+    - "Compila, pero entra en pánico al ejecutarse."
+  correcta: 2
+  solucion: |
+    `String` no es `Copy`: `let b = a;` **mueve** la propiedad a `b` y `a` deja de ser válida. Usarla después es el error **E0382** (*borrow of moved value*). Así Rust evita la **doble liberación**: solo `b` liberará la memoria.
+  etiquetas: ["E0382"]

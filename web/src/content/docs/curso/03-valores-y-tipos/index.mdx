@@ -1,0 +1,39 @@
+---
+title: "Mundo 3 · Valores y tipos"
+description: "Guarda datos en variables y conoce cada tipo básico de Rust: enteros, decimales, bool, char, tuplas, arrays y una primera mirada al texto."
+sidebar:
+  order: 0
+---
+
+Ya sabes que en la memoria solo hay bytes y que es el **tipo** el que les da significado. Aquí eso se vuelve práctica: cada valor que escribas tendrá un tipo, y el compilador lo comprobará antes de que el programa exista.
+
+Tres ideas recorren todo el mundo:
+
+- **Por defecto, nada cambia.** Una variable es inmutable salvo que escribas `mut`, y el compilador te dice cuándo sobra o falta.
+- **Cada tipo tiene un tamaño y un rango exactos.** Un `u8` va de 0 a 255 y ocupa 1 byte. Si un número no cabe, Rust no se inventa un resultado: en debug hay pánico, en release da la vuelta, y con `checked_`/`saturating_` lo decides tú.
+- **Nada se convierte a escondidas.** Ni un entero en decimal, ni un número grande en uno pequeño. Para eso está `as` (que puede truncar, y tienes que saber cuándo) y `try_from` (que te avisa).
+
+## Lo que vas a conseguir
+
+| # | Lección | Al terminar sabrás… |
+|---|---|---|
+| 1 | `let`: dar nombre a un valor | crear variables con o sin anotación de tipo; por qué no se puede leer una variable sin valor (E0381) |
+| 2 | `mut`: variables que pueden cambiar | leer el error E0384 y poner `mut` solo donde hace falta |
+| 3 | Sombreado | reutilizar un nombre con otro `let`, incluso con otro tipo |
+| 4 | Enteros | elegir entre `u8`…`u128`, `i8`…`i128` y `usize`; dividir y calcular restos con negativos |
+| 5 | Desbordamiento | qué pasa cuando un entero no cabe: pánico en debug, vuelta en release, error si se ve al compilar |
+| 6 | `checked`, `wrapping`, `saturating`, `overflowing` | decidir en el código qué significa «no cabe» |
+| 7 | Conversiones: `as`, `From` y `try_from` | predecir `300 as u8` y elegir la conversión que avisa |
+| 8 | Decimales: `f64` y `f32` | por qué `0.1 + 0.2 != 0.3`, qué son `inf` y `NaN`, y cómo comparar decimales |
+| 9 | `bool` y `char` | por qué un `char` ocupa 4 bytes aunque la ñ en UTF-8 ocupe 2 |
+| 10 | Tuplas | agrupar valores de tipos distintos y desestructurarlos; qué es `()` |
+| 11 | Arrays | usar `[T; N]` y entender la comprobación de límites |
+| 12 | Texto: `String` y `&str` | por qué `"año".len()` vale 4 y `texto[0]` no compila |
+| 13 | Constantes y `static` | la diferencia entre un valor fijo y un sitio fijo; por qué `static mut` exige `unsafe` |
+| 14 | Jefe: el conversor | juntar todo en un programa de temperaturas con texto, arrays, conversiones y aritmética comprobada |
+
+Requisitos: el Mundo 1 (bits, complemento a dos, coma flotante, UTF-8, pila y montón) y el Mundo 2 (`fn main`, `println!` y las cadenas de formato).
+
+:::note[Tamaños en el navegador y en tu PC]
+Los ejemplos con ▶ se ejecutan en tu navegador como WebAssembly de 32 bits (`wasm32-wasip1`). Ahí `usize` mide **4 bytes**; en tu PC de 64 bits, **8**. Por eso `usize`, `&str` y `String` salen más pequeños en el navegador. Las lecciones te dan las dos cifras.
+:::

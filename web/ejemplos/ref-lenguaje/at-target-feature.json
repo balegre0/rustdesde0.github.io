@@ -1,0 +1,1 @@
+{ "plataforma": "local", "nota": "Solo x86_64: usa instrucciones AVX2 si la CPU las tiene." }

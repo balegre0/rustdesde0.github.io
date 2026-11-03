@@ -1,0 +1,132 @@
+---
+title: "Destructores y orden de drop"
+description: "Cuándo y en qué orden Rust destruye cada valor: variables, campos, temporales y los cambios de la edición 2024."
+sidebar:
+  order: 104
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Cuando un valor deja de tener dueño, Rust lo **destruye** (*drop*): ejecuta su destructor y libera lo que posee. Esto pasa en momentos **deterministas** que puedes predecir leyendo el código.
+
+## En una frase
+
+Las variables se destruyen al final de su ámbito en **orden inverso** a como se declararon; los campos de un valor, en **orden de declaración**; los temporales, al final de la **sentencia** (salvo que se extienda su vida).
+
+## La regla, paso a paso
+
+### El destructor
+
+Destruir un valor significa:
+
+1. si su tipo implementa `Drop`, llamar a `Drop::drop(&mut self)`;
+2. después, destruir recursivamente sus campos.
+
+`Drop::drop` **no** se puede llamar a mano (error E0040), porque luego se ejecutaría otra vez. Para destruir algo antes de tiempo se usa `drop(valor)` (`std::mem::drop`), que simplemente se queda con el valor.
+
+Un tipo no puede implementar a la vez `Copy` y `Drop` (error E0184).
+
+### Orden
+
+- **Variables locales**: al salir del ámbito, en orden **inverso** de declaración. Así, lo que se creó después (y quizá toma prestado de lo anterior) desaparece primero.
+- **Campos** de un struct, tupla o variante: en orden de **declaración**.
+- **Elementos** de un array, slice o `Vec`: del primero al último.
+- **Capturas** de una closure: sin orden garantizado.
+- **Parámetros** de una función: después de las variables del cuerpo, en orden inverso.
+
+### Ámbitos de destrucción
+
+Cada función, bloque, sentencia, rama de `match`, expresión de `if`/`while` y cuerpo de bucle es un ámbito. Al salir de él (normalmente, con `return`/`break`/`?`, o por un pánico que se desenrolla) se destruye lo que le pertenece.
+
+### Movimientos
+
+Un valor **movido** no se destruye en su sitio original: ahora es responsabilidad del nuevo dueño. Si el movimiento depende de una condición, el compilador lleva un indicador oculto (*drop flag*) para saberlo al final. Esto es lo que evita la **doble liberación**.
+
+### Temporales
+
+Un **temporal** es un valor sin nombre creado en medio de una expresión (`T("x").valor()`). Se destruye al final de la **sentencia** que lo contiene.
+
+Excepciones (**extensión de vida**): en `let r = &temporal;`, en `let r = Struct { campo: &temporal };` y casos parecidos, el temporal vive hasta el final del bloque, como si fuera una variable.
+
+**Edición 2024**:
+
+- el temporal del escrutinio de un `if let` se destruye **antes** de entrar en el `else` (antes, vivía hasta el final de todo el `if let`);
+- los temporales de la **expresión final** de un bloque se destruyen **antes** que las variables locales del bloque (antes, después). Esto arregla errores de préstamo como `c.borrow().len()` como última expresión.
+
+### `let _ =` frente a `let _x =`
+
+`let _ = valor_temporal;` no enlaza nada, así que el temporal se destruye **en el acto**. `let _x = valor;` sí crea una variable y el valor vive hasta el final del ámbito. Importa con candados: `let _ = m.lock();` suelta el candado inmediatamente.
+
+### Lo que no destruye
+
+- `std::mem::forget(v)` y `ManuallyDrop<T>`: el destructor nunca se ejecuta. Es **seguro** (una fuga no es comportamiento indefinido), pero rara vez lo que quieres.
+- Los `static` no se destruyen al acabar el programa.
+- `std::process::exit` termina sin destruir nada.
+- Un pánico **durante** un destructor que se ejecuta porque ya había otro pánico aborta el proceso.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/drop-orden" />
+
+Salida:
+
+```text
+1. variables: en orden inverso de declaración
+  destruyo b
+  destruyo a
+2. campos: en orden de declaración
+  destruyo primero
+  destruyo segundo
+3. `let _ =` no enlaza: el temporal se destruye en el acto
+  destruyo temporal
+  (fin del bloque)
+4. un valor movido no se destruye dos veces
+  movido a y
+  destruyo x
+  después de drop(y)
+5. elementos de un array: en orden
+  destruyo v0
+  destruyo v1
+6. mem::forget: nunca se destruye (fuga segura)
+fin
+```
+
+Temporales y la edición 2024:
+
+<Ejecutar ej="ref-lenguaje/drop-temporales" />
+
+Salida:
+
+```text
+1. un temporal vive hasta el final de su sentencia
+  destruyo temporal
+  n = 1
+2. extensión: `let r = &temporal;` alarga su vida hasta el final del bloque
+  (todavía vivo)
+  destruyo extendido
+3. edición 2024: el temporal del escrutinio de `if let` muere antes del `else`
+  destruyo escrutinio
+  rama else
+fin
+```
+
+Compilado con la edición 2021, el final cambia a `rama else` y **después** `destruyo escrutinio`.
+
+## Errores típicos
+
+<NoCompila ej="ref-lenguaje/drop-error" />
+
+`error[E0040]: explicit use of destructor method`, con la ayuda `consider using drop function`.
+
+## Desde
+
+Rust 1.0. Cambios de ámbito de temporales en `if let` y en expresiones finales: edición 2024.
+
+## Ver también
+
+- [`let`](/ref/lenguaje/palabras-clave/let/) · [`_`](/ref/lenguaje/palabras-clave/guion-bajo/) · [Ediciones](/ref/ediciones/) · [Expresiones](/ref/lenguaje/expresiones/) (lugares y temporales)
+
+## Aprende esto en
+
+- [Mundo 06 · Ownership](/curso/06-ownership/) · [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

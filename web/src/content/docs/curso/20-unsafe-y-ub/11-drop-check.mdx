@@ -1,0 +1,127 @@
+---
+title: "Drop check: cuando destruir también cuenta"
+description: "Entiendes por qué implementar Drop cambia lo que acepta el borrow checker y en qué orden se destruyen las cosas."
+sidebar:
+  order: 11
+duracion: 12
+desde: "1.0"
+requiere: ["20-unsafe-y-ub/10-varianza-y-phantomdata"]
+tarjetas:
+  - p: "¿En qué orden se destruyen las variables locales? ¿Y los campos de un struct?"
+    r: "Las locales, en orden inverso a su declaración. Los campos, en el orden en que están declarados."
+  - p: "¿Qué exige el drop check a un tipo genérico que implementa Drop?"
+    r: "Que todo lo que tome prestado viva estrictamente más que él, porque su drop podría usarlo."
+  - p: "¿Qué es `#[may_dangle]`?"
+    r: "Un atributo inestable que usa la biblioteca estándar (por ejemplo en Vec) para prometer que su Drop no usará los T prestados, solo los destruirá; necesita unsafe impl y PhantomData<T>."
+  - p: "¿`let _ = valor;` mantiene vivo el valor?"
+    r: "No: `_` no enlaza, así que un temporal se destruye en ese mismo momento. `let _x = valor;` sí lo mantiene hasta el final del bloque."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Vas a ver un error que sorprende a casi todo el mundo: el mismo código compila o no **según si un tipo implementa `Drop`**. Detrás está el *drop check*, que protege contra usar memoria ya liberada durante la destrucción.
+
+## Predice
+
+<Predice
+  ej="m20/orden-drop"
+  pregunta="¿Qué se imprime primero?"
+  opciones={["`drop a (local 1)`", "`fin de main`", "`drop temporal con _`", "`drop campo 1`"]}
+  correcta={2}
+  explicacion="`let _ = Ruido(..)` no enlaza el valor a ningún nombre, así que el temporal se destruye en esa misma sentencia, antes incluso de `fin de main`. Después, al salir de main, las locales caen en orden inverso: `_p` (con sus campos en orden), `_b`, `_a`."
+  porque={["`_a` es la primera declarada, así que es la última en destruirse.", "Antes del println ya se ha destruido el temporal.", "Correcto.", "Los campos se destruyen cuando lo hace `_p`, al final."]}
+/>
+
+## La idea
+
+Al terminar un ámbito, Rust ejecuta el `drop` de cada valor, en un orden fijo: **locales en orden inverso** a su declaración; **campos de un struct en el orden declarado**. Normalmente no tienes que pensar en ello.
+
+El problema aparece con tipos que **toman prestado** algo y además **implementan `Drop`**. Su `drop` es código tuyo y podría leer la referencia. Si lo prestado se destruye antes (o a la vez), ese `drop` leería memoria liberada. Por eso el compilador aplica la regla del **drop check**: si un tipo genérico implementa `Drop`, todo lo que toma prestado debe vivir **estrictamente más** que él.
+
+Sin `Drop`, el compilador sabe que destruir el tipo no ejecuta código que mire la referencia, y es más permisivo.
+
+## Pruébalo
+
+`Inspector` toma prestado `mundo.dias` y está guardado en el propio `mundo`. Los dos mueren a la vez. Con `Drop`:
+
+<NoCompila ej="m20/dropck" explicacion="El compilador lo explica en la última nota: el préstamo «podría usarse aquí», cuando se destruya `mundo` y se ejecute el destructor de `Mundo` (que incluye el de `Inspector`). Como `dias` muere en el mismo momento, ese destructor podría leer memoria liberada." />
+
+Quita el `impl Drop` (botón «Ver arreglo») y compila: imprime `días = 1`. El código de los campos no ha cambiado; solo ha desaparecido la posibilidad de que un destructor use la referencia.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La regla precisa.** Para un `impl<T> Drop for MiTipo<T>`, el compilador asume lo peor: que `drop` puede **usar** cualquier `T` (y cualquier referencia dentro). Por eso exige que todo lo que `MiTipo` toma prestado esté vivo cuando se ejecute su `drop`.
+
+**¿Y `Vec`?** `Vec<&str>` implementa `Drop`, pero puedes tener un `Vec` de referencias a cosas que mueren a la vez que el vector. ¿Cómo? La biblioteca estándar usa un atributo **inestable**:
+
+```rust
+// Así está escrito en la biblioteca estándar (no se puede usar en Rust estable):
+unsafe impl<#[may_dangle] T, A: Allocator> Drop for Vec<T, A> { /* ... */ }
+```
+
+`#[may_dangle]` es una promesa (`unsafe impl`): «mi `drop` **no mira** los `T`, solo los destruye». Para que esa promesa sea segura, `Vec` debe declarar que *posee* `T`s (con un `PhantomData<T>` dentro de su puntero), de modo que el compilador siga comprobando el `drop` de cada `T`. Es el tipo de detalle que separa un contenedor sound de uno que no lo es.
+
+**Orden de destrucción, resumido:**
+
+| Qué | Orden |
+|---|---|
+| Variables locales | inverso a la declaración |
+| Campos de un struct / elementos de una tupla | orden de declaración |
+| Elementos de un `Vec` o array | del primero al último |
+| Temporales de una sentencia | al final de la sentencia |
+| `let _ = expr;` | inmediatamente (no hay enlace) |
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="`let _ = cerrojo.lock();`">
+
+❌ Escribir `let _ = m.lock().unwrap();` pensando que el cerrojo queda tomado hasta el final del bloque. Como `_` no enlaza, el guard se destruye **en esa misma línea**, y el `Mutex` vuelve a estar libre. Lo has visto en *Predice* con el temporal.
+
+✅ `let _guard = m.lock().unwrap();`: el nombre que empieza por `_` evita el aviso de variable sin usar **y** mantiene vivo el valor hasta el final del ámbito.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="En el programa del drop check, ¿cuál de estos cambios **también** hace que compile, manteniendo el `impl Drop for Inspector`?"
+  opciones={["Declarar `dias` en una variable propia **antes** de crear `mundo`, y prestar esa variable", "Cambiar `Box<u8>` por `u8`", "Poner `inspector` después de `dias` en el struct", "Añadir `#[derive(Clone)]`"]}
+  correcta={0}
+  explicacion="Si `dias` es una local declarada antes que `mundo`, se destruye **después** (orden inverso), así que vive estrictamente más que el inspector: el drop check queda satisfecho."
+  porque={["Correcto.", "El problema no es el Box: sigue siendo un préstamo de algo que muere con `mundo`.", "El orden de los campos cambia cuándo se destruyen, pero ambos mueren con `mundo`: el drop check no razona sobre el orden de los campos.", "Clone no cambia nada sobre los tiempos de vida."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué el mismo struct compila sin `impl Drop` y no compila con él?"
+  opciones={["Porque Drop hace el tipo más grande", "Porque con Drop se ejecuta código propio al destruir, que podría usar la referencia prestada", "Porque Drop no se puede implementar en tipos con tiempos de vida", "Es un bug del compilador"]}
+  correcta={1}
+  explicacion="El drop check existe para impedir usos tras liberar durante la destrucción. Sin código de destrucción propio, no hay riesgo."
+  porque={["Drop no cambia el tamaño.", "Correcto.", "Sí se puede (el ejemplo lo hace); solo exige que lo prestado viva más.", "Es una regla deliberada."]}
+/>
+
+<Pregunta
+  pregunta="Declaras `let a = …; let b = …; let c = …;`. ¿En qué orden se destruyen?"
+  opciones={["a, b, c", "c, b, a", "En cualquier orden", "Todas a la vez"]}
+  correcta={1}
+  explicacion="Las locales se destruyen en orden inverso, para que lo declarado después (que puede tomar prestado lo anterior) desaparezca antes."
+  porque={["Así se destruyen los campos de un struct, no las locales.", "Correcto.", "El orden está definido por el lenguaje.", "Cada drop es un paso separado y ordenado."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué promete `#[may_dangle]` en el `Drop` de `Vec`?"
+  opciones={["Que el vector nunca se destruye", "Que su drop no usará los `T` prestados, solo los destruirá", "Que los `T` pueden ser nulos", "Que es seguro en varios hilos"]}
+  correcta={1}
+  explicacion="Con esa promesa (unsafe e inestable), los `T` pueden morir a la vez que el vector. `PhantomData<T>` mantiene la comprobación del drop de cada `T`."
+  porque={["Vec sí se destruye.", "Correcto.", "No tiene que ver con nulos.", "No tiene relación con los hilos."]}
+/>
+
+## Para saber más
+
+- *The Rustonomicon*, «Drop Check» (en inglés).
+- *The Rust Reference*, «Destructors».

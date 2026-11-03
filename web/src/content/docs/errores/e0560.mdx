@@ -1,0 +1,74 @@
+---
+title: "E0560: el struct no tiene ese campo"
+description: "Al crear un struct das valor a un campo que no existe en su definición."
+sidebar:
+  order: 50
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` struct `Jugador` has no field named `edad` ``
+
+## Qué significa
+
+Solo puedes dar valor a los campos que declara el struct. `edad` no está en `Jugador`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0560" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0560]: struct `Jugador` has no field named `edad`
+ --> E0560.rs:6:52
+  |
+6 |     let j = Jugador { nombre: String::from("Ana"), edad: 30 };
+  |                                                    ^^^^ `Jugador` does not have this field
+  |
+  = note: all struct fields are already assigned
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Errata en el nombre del campo.
+- Usar un campo que existía en otra versión del struct o en otro tipo.
+
+## Cómo arreglarlo
+
+Corrige el nombre o añade el campo a la definición.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+struct Jugador {
+    nombre: String,
+    edad: u32,
+}
+
+fn main() {
+    let j = Jugador { nombre: String::from("Ana"), edad: 30 };
+    println!("{} {}", j.nombre, j.edad);
+}
+```
+
+**Salida:**
+
+```text
+Ana 30
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0560` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0609](/errores/e0609/): el tipo no tiene ese campo
+- [E0063](/errores/e0063/): falta un campo al crear un struct
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

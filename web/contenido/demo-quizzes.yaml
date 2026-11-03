@@ -1,0 +1,5 @@
+- id: demo-relampago
+  titulo: "Demo: quiz relámpago"
+  descripcion: "Cuatro preguntas en dos minutos."
+  tiempo: 120
+  preguntas: [demo-division, demo-u8-max, demo-mover-string, demo-dos-mut]

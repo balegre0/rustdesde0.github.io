@@ -1,0 +1,108 @@
+---
+title: "Arc: Rc para varios hilos"
+description: "Entiendes por qué Rc no puede cruzar entre hilos, qué cambia en Arc y qué combinación usarás en el mundo de la concurrencia."
+sidebar:
+  order: 10
+duracion: 10
+desde: "1.0"
+requiere: ["15-punteros-inteligentes/05-rc", "15-punteros-inteligentes/08-cell-y-refcell"]
+tarjetas:
+  - p: "¿Qué significa la «A» de `Arc`?"
+    r: "Atómico (*atomically reference counted*): su contador se actualiza con operaciones atómicas, seguras aunque varios hilos lo toquen a la vez."
+  - p: "¿Por qué `Rc` no es `Send`?"
+    r: "Su contador no es atómico: dos hilos clonando o soltando a la vez podrían perder una actualización (carrera de datos) y liberar el valor antes de tiempo."
+  - p: "¿Con qué se combina `Arc` para que varios hilos puedan modificar un dato?"
+    r: "Con `Mutex` o `RwLock`: `Arc<Mutex<T>>`. Es el equivalente para hilos de `Rc<RefCell<T>>`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a ver por qué `Rc` no puede viajar a otro hilo, qué hace `Arc` distinto y cómo encaja en lo que aprenderás en el mundo 17.
+
+## Predice
+
+¿Por qué no compila? Solo queremos imprimir un número desde otro hilo.
+
+<NoCompila
+  ej="m15/rc-hilos"
+  explicacion="`thread::spawn` exige que la closure sea `Send` (que se pueda enviar a otro hilo). La closure contiene un `Rc<i32>`, y `Rc` no es `Send`: su contador no está preparado para que dos hilos lo cambien a la vez. El compilador lo detecta antes de que exista el problema."
+/>
+
+## La idea
+
+Un **hilo** (*thread*) es otra línea de ejecución que corre a la vez que la tuya (lo verás a fondo en el mundo 17). Si dos hilos tienen un `Rc` del mismo valor y los dos hacen `clone` o `drop` **en el mismo instante**, cada uno lee el contador, le suma o resta 1 y lo escribe. Si las dos lecturas ocurren antes de las dos escrituras, una operación se pierde: el contador queda mal y el valor podría liberarse mientras otro hilo lo usa. Eso es una **carrera de datos** (*data race*), y es comportamiento indefinido.
+
+Rust lo impide con dos traits automáticos. `Send` significa «se puede **mover** a otro hilo»; `Sync`, «se puede **compartir** por referencia entre hilos». El compilador los deduce para cada tipo, y `Rc` no tiene ninguno de los dos. Por eso el error E0277 dice `Rc<i32>` *cannot be sent between threads safely*.
+
+`Arc<T>` (*atomically reference counted*) es igual que `Rc` (mismas funciones: `Arc::new`, `Arc::clone`, `Arc::strong_count`, `Arc::downgrade`…) pero su contador usa **operaciones atómicas**: instrucciones del procesador que leen, suman y escriben de una vez, sin que otro hilo pueda colarse en medio. Cuestan algo más que una suma normal, por eso Rust no las usa en `Rc`: solo pagas la atomicidad cuando la necesitas.
+
+## Pruébalo
+
+En el navegador no se pueden crear hilos, pero `Arc` funciona igual en un solo hilo y puedes ver su contador:
+
+<Ejecutar ej="m15/arc" />
+
+`Arc::try_unwrap` devuelve el valor de dentro solo si queda **un único** dueño: es la forma de recuperar la propiedad completa.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+El bloque de `Arc` tiene la misma forma que el de `Rc` (contador fuerte, contador débil, valor), pero los contadores son `AtomicUsize` en lugar de `Cell<usize>`. Este es el ensamblador real de clonar cada uno (rustc 1.99.1, `-O`, x86-64 en Windows, sintaxis Intel):
+
+```text
+clona_arc:                          clona_rc:
+    mov  rax, qword ptr [rcx]           mov  rax, qword ptr [rcx]
+    lock inc qword ptr [rax]            inc  qword ptr [rax]
+    jle  .LBB0_2                        je   .LBB1_1
+    ret                                 ret
+```
+
+`rcx` trae la dirección del `Arc` (o `Rc`); `rax` pasa a ser la del bloque, cuyo primer campo es el contador fuerte. La única diferencia es el prefijo `lock`, que hace la suma indivisible aunque otro núcleo intente lo mismo. El salto siguiente es la comprobación de desbordamiento del contador (si salta, el programa aborta). `Arc<i32>` mide 8 bytes en la pila, igual que `Rc<i32>` (comprobado con `size_of`).
+
+`Arc` solo hace atómico el **contador**. El valor de dentro sigue siendo de solo lectura (`Arc` implementa `Deref`, no `DerefMut`). Para modificarlo desde varios hilos necesitas mutabilidad interior **segura entre hilos**:
+
+| Un hilo | Varios hilos |
+|---|---|
+| `Rc<T>` | `Arc<T>` |
+| `Rc<RefCell<T>>` | `Arc<Mutex<T>>` o `Arc<RwLock<T>>` |
+| `Cell<u32>` | `AtomicU32` |
+
+`Arc<T>` solo es `Send` y `Sync` si `T` es `Send + Sync`. Así, `Arc<RefCell<T>>` tampoco puede cruzar entre hilos: el compilador sigue la pista hasta el final.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Usar Arc en todas partes «por si acaso»">
+
+❌ Usar `Arc` en un programa que nunca crea hilos. Funciona, pero cada `clone` y cada `drop` paga una operación atómica sin motivo.
+
+✅ Usa `Rc` mientras todo ocurra en un hilo. Si algún día necesitas hilos, el compilador te avisará con E0277 exactamente donde haya que cambiar `Rc` por `Arc`.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m15/r-arc"
+  enunciado="Crea un `Vec` con dos clones de `mapa` usando `Arc::clone`, imprime el contador (debe ser 3) y luego suelta el `Vec` con `drop` para que el contador vuelva a 1."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace atómico `Arc<T>`?"
+  opciones={["El valor `T` de dentro", "Solo los contadores de referencias", "Todas las lecturas del valor", "Nada: es igual que `Rc`"]}
+  correcta={1}
+  explicacion="La atomicidad está en el contador. El valor sigue siendo de solo lectura; para mutarlo entre hilos hace falta un `Mutex` o similar."
+  porque={["El valor no se toca: solo se puede leer.", "Correcto.", "Las lecturas son normales; leer a la vez no es un problema.", "La diferencia es justo el contador atómico."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué traits automáticos le faltan a `Rc<T>` para poder usarse entre hilos?"
+  opciones={["`Clone` y `Copy`", "`Send` y `Sync`", "`Deref` y `DerefMut`", "`Debug` y `Display`"]}
+  correcta={1}
+  explicacion="`Rc` no es `Send` (no se puede mover a otro hilo) ni `Sync` (no se puede compartir por referencia)."
+  porque={["`Rc` sí es `Clone` (no `Copy`); no tiene que ver con hilos.", "Correcto.", "Le falta `DerefMut`, pero eso es por la mutación, no por los hilos.", "No tienen relación con los hilos."]}
+/>

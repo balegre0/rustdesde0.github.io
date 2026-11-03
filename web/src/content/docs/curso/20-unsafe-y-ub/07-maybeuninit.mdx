@@ -1,0 +1,138 @@
+---
+title: "MaybeUninit: memoria sin inicializar"
+description: "Reservas memoria sin inicializarla, la rellenas paso a paso y solo entonces afirmas que está lista."
+sidebar:
+  order: 7
+duracion: 12
+desde: "1.36"
+requiere: ["20-unsafe-y-ub/03-la-lista-de-ub"]
+tarjetas:
+  - p: "¿Qué es la memoria sin inicializar para Rust?"
+    r: "No es «basura»: es un estado especial sin valor. Leerla como entero, bool, referencia… es UB."
+  - p: "¿Qué parte de MaybeUninit es segura y cuál es unsafe?"
+    r: "Crear (`uninit`) y escribir (`write`) son seguros; afirmar que ya está inicializada (`assume_init`, `assume_init_read`…) es unsafe."
+  - p: "¿Para qué tipos es UB `mem::zeroed()`?"
+    r: "Para los que no admiten el patrón «todo ceros»: referencias, Box, NonZero*, punteros a función, enums sin variante 0… rustc avisa con el lint invalid_value."
+  - p: "¿Cuánto ocupa `MaybeUninit<T>`?"
+    r: "Lo mismo que T: no añade ningún indicador; quien sabe si está inicializada eres tú."
+---
+
+import { Ejecutar, Ordena, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Vas a trabajar con memoria que todavía no tiene valor, sin cometer el UB más fácil del mundo: leerla antes de tiempo.
+
+## Predice
+
+<Pregunta
+  pregunta="Declaras un `u32` y no le asignas nada. Luego, con unsafe, lo lees. ¿Qué valor tiene?"
+  opciones={["0", "Lo que hubiera antes en esa memoria", "Ninguno: leerlo es comportamiento indefinido", "u32::MAX"]}
+  correcta={2}
+  explicacion="Para Rust, la memoria sin inicializar no contiene «un número cualquiera»: no contiene ningún valor. El optimizador puede tratar cada lectura como un valor distinto, o eliminar el código que depende de ella."
+  porque={["Rust no pone a cero la memoria por ti.", "Esa es la intuición del hardware, pero la máquina abstracta de Rust no funciona así.", "Correcto.", "No hay ningún valor por defecto."]}
+/>
+
+## La idea
+
+En Rust seguro nunca puedes leer una variable sin inicializar: `let x: u32; println!("{x}");` es un error de compilación. Pero a veces necesitas **reservar** memoria y rellenarla poco a poco: un array grande que se calcula casilla a casilla, un búfer que llenará el sistema operativo, una estructura de datos con capacidad de sobra.
+
+Para eso existe `MaybeUninit<T>`: un envoltorio que dice «aquí *quizá* hay un `T`». Crearlo sin inicializar (`MaybeUninit::uninit()`) es seguro, y escribir en él (`write`) también. Lo único `unsafe` es la afirmación final: `assume_init()`, «te garantizo que ya está inicializado». Si mientes, es UB.
+
+`MaybeUninit` sustituye a la antigua `mem::uninitialized`, obsoleta desde 1.39 porque era UB para casi cualquier tipo.
+
+## Pruébalo
+
+<Ejecutar ej="m20/maybeuninit-array" />
+
+(1) `[const { MaybeUninit::uninit() }; N]` crea N casillas sin inicializar (el bloque `const` permite repetir un valor que no es `Copy`); (2) `write` las rellena; (3) solo al final, con todas escritas, `assume_init` convierte cada casilla en `u64`. Y `MaybeUninit<u64>` mide 8 bytes: **no guarda** si está inicializado. Eso lo sabes tú.
+
+El error opuesto, afirmar sin haber escrito (ábrelo en el Playground y pasa *Tools → Miri*):
+
+<Ejecutar ej="m20/assume-init-ub" />
+
+Miri lo detiene e informa de que se está usando memoria sin inicializar como si fuera un entero: el UB ya está en producir ese `u32`, antes incluso de compararlo.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué no es «basura».** En la máquina abstracta, cada byte es o bien un valor `0..=255`, o bien *sin inicializar*. El compilador (y LLVM, donde se llama `undef`/`poison`) puede suponer cualquier valor distinto en cada lectura: `n == 0` y `n != 0` podrían ser **ambos** ciertos. Por eso la Reference lista «enteros, floats y punteros crudos deben estar inicializados» entre las condiciones de validez.
+
+**`MaybeUninit<T>` es una `union`** con dos «caras»: nada o un `T`. Por eso tiene el mismo tamaño y alineación que `T`, y por eso leer el `T` requiere `unsafe` (como cualquier campo de union).
+
+**Las APIs que conviene conocer:**
+
+| Método | Seguro | Qué hace |
+|---|---|---|
+| `MaybeUninit::uninit()` | sí | casilla sin inicializar |
+| `MaybeUninit::new(v)` | sí | casilla ya inicializada |
+| `.write(v)` | sí | inicializa (no destruye lo que hubiera: no había nada) |
+| `.as_ptr()` / `.as_mut_ptr()` | sí | puntero para que otro código escriba |
+| `.assume_init()` | **no** | consume y devuelve el `T` |
+| `.assume_init_read()` | **no** | copia los bits del `T` (cuidado con duplicar dueños) |
+| `.assume_init_drop()` | **no** | destruye el `T` en el sitio |
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="mem::zeroed() «para inicializar a cero»">
+
+❌ `std::mem::zeroed()` rellena con ceros. Para un `u32` es correcto (0 es válido), pero para una referencia produce un valor inválido: un `&i32` nulo. `rustc` 1.99.1 lo detecta en este caso y avisa:
+
+```text
+warning: the type `&i32` does not permit zero-initialization
+ --> zeroed-referencia.rs:5:28
+  |
+5 |     let r: &i32 = unsafe { std::mem::zeroed() }; // ¡MAL! referencia nula
+  |                            ^^^^^^^^^^^^^^^^^^
+  |                            |
+  |                            this code causes undefined behavior when executed
+  |                            help: use `MaybeUninit<T>` instead, and only call `assume_init` after initialization is done
+  |
+  = note: references must be non-null
+```
+
+✅ Usa `MaybeUninit` y afirma la inicialización solo cuando de verdad hayas escrito un valor válido. El aviso no aparece en todos los casos (por ejemplo, dentro de genéricos), así que no confíes en él como red.
+
+</Trampa>
+
+## Tu turno
+
+Ordena las líneas para crear un `[String; 2]` casilla a casilla:
+
+<Ordena
+  lineas={["let mut a: [MaybeUninit<String>; 2] = [const { MaybeUninit::uninit() }; 2];", "a[0].write(String::from(\"uno\"));", "a[1].write(String::from(\"dos\"));", "// SAFETY: las dos casillas están escritas.", "let listo: [String; 2] = a.map(|c| unsafe { c.assume_init() });"]}
+  distractores={["let listo = unsafe { a[0].assume_init_read() }; // antes de escribir a[1]", "let a: [String; 2] = unsafe { std::mem::zeroed() };"]}
+  explicacion="Primero se reserva, después se escribe cada casilla y solo al final se afirma la inicialización. `zeroed` crearía dos String con puntero nulo: valores inválidos."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué operación de `MaybeUninit` necesita `unsafe`?"
+  opciones={["`MaybeUninit::uninit()`", "`.write(v)`", "`.assume_init()`", "`.as_mut_ptr()`"]}
+  correcta={2}
+  explicacion="Crear, escribir y obtener un puntero no pueden causar UB. Afirmar que hay un valor válido sí, si es falso."
+  porque={["Crear una casilla vacía es inofensivo.", "Escribir inicializa: siempre es correcto.", "Correcto.", "Obtener la dirección es seguro; desreferenciarla, no."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuánto mide `MaybeUninit<u64>`?"
+  opciones={["8 bytes", "9 bytes: 8 + un indicador", "16 bytes", "0 bytes"]}
+  correcta={0}
+  explicacion="La salida real lo muestra: 8. No hay indicador; la responsabilidad de saber si está inicializada es tuya."
+  porque={["Correcto.", "No guarda ningún indicador de inicialización.", "Tiene el tamaño de `T`.", "Necesita sitio para el `T`."]}
+/>
+
+<Pregunta
+  pregunta="¿Es UB `let n: u8 = unsafe { std::mem::zeroed() };`?"
+  opciones={["Sí, `zeroed` siempre es UB", "No: 0 es un `u8` válido", "Solo en release", "Solo si luego se lee `n`"]}
+  correcta={1}
+  explicacion="`zeroed` es correcto para tipos en los que «todo ceros» es válido (enteros, floats, punteros crudos). Es UB para los que no lo admiten."
+  porque={["Depende del tipo.", "Correcto.", "El UB no depende del perfil.", "Si fuera inválido, ya sería UB al producirlo."]}
+/>
+
+## Para saber más
+
+- Documentación de `std::mem::MaybeUninit` (sección «Initializing an array element-by-element»).
+- Ralf Jung, «What The Hardware Does is not What Your Program Does: Uninitialized Memory» (blog, en inglés).

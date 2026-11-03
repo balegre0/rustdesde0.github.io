@@ -1,0 +1,92 @@
+---
+title: "Módulos"
+description: "mod crea un espacio de nombres con su propio árbol. Se llega a cada elemento por una ruta absoluta (crate::…) o relativa (self::, super::)."
+sidebar:
+  order: 1
+duracion: 11
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/08-hashmap"]
+tarjetas:
+  - p: "¿Qué crea `mod cocina { … }`?"
+    r: "Un módulo: un espacio de nombres con sus propias funciones, tipos y submódulos. Desde fuera se nombran como `cocina::algo`."
+  - p: "¿Qué es `crate::` al principio de una ruta?"
+    r: "La raíz del crate: una ruta absoluta que empieza en `main.rs` (o `lib.rs`)."
+  - p: "¿Qué significan `self::` y `super::`?"
+    r: "`self::` es el módulo actual; `super::` es el módulo padre (un nivel arriba)."
+  - p: "¿Qué separa las piezas de una ruta en Rust?"
+    r: "`::`, como en `std::collections::HashMap`."
+---
+
+import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Un módulo es una caja con nombre para agrupar código relacionado. Ya has usado muchos sin saberlo: `std::collections` es un módulo de la biblioteca estándar, y `HashMap` vive dentro.
+
+## Predice
+
+<Predice
+  ej="m12/super-y-self"
+  opciones={["`12.10 €`", "No compila: `IVA` es privado y `caja` no puede verlo", "`10.00 €`", "No compila: `super` no existe"]}
+  correcta={0}
+  explicacion="`super::IVA` sube de `caja` a su padre, `tienda`, donde está `IVA`. Y un módulo hijo **puede** ver lo privado de sus antepasados. 10 × 1,21 = 12,10."
+  porque={["", "Lo privado es visible para el propio módulo y todos sus descendientes: `caja` está dentro de `tienda`.", "Sí se aplica el IVA.", "`super` es una palabra clave de las rutas."]}
+/>
+
+## La idea
+
+`mod nombre { … }` crea un **módulo**. Dentro puedes poner funciones, structs, enums, constantes y otros módulos. Todos los módulos de un crate forman un **árbol**, cuya raíz es el propio crate (el archivo `main.rs`):
+
+```text
+crate                  ← main.rs
+└── cocina
+    ├── preparar()
+    ├── horno
+    │   └── hornear()
+    └── salsas
+        └── la_de_la_casa()
+```
+
+Para nombrar algo del árbol se escribe su **ruta**, con `::` entre piezas:
+
+- **Absoluta**: desde la raíz, empezando por `crate::`. Ejemplo: `crate::cocina::salsas::la_de_la_casa()`.
+- **Relativa**: desde donde estás. Ejemplo: `cocina::salsas::la_de_la_casa()` desde `main`, u `horno::hornear()` desde dentro de `cocina`.
+- `self::` es el módulo actual y `super::` es el padre.
+
+Para usar algo de **otro** módulo, tiene que ser **público** (`pub`). Por ahora, pon `pub` delante de lo que quieras usar desde fuera; la próxima lección lo explica a fondo.
+
+## Pruébalo
+
+<Ejecutar ej="m12/modulos" />
+
+`preparar` llama a `horno::hornear` con una ruta relativa (los dos están dentro de `cocina`). Desde `main`, `crate::cocina::preparar()` y `cocina::preparar()` llevan al mismo sitio.
+
+<Ejecutar ej="m12/super-y-self" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Los módulos no existen al ejecutar.** Son solo una forma de organizar los **nombres**. Al compilar, cada función recibe un nombre único que incluye su ruta (y un código de comprobación): por ejemplo, `hornear` acaba llamándose algo como `_ZN4main6cocina5horno7hornear17h…E`. Esto se llama *mangling*. Por eso dos funciones `hornear` en módulos distintos no chocan.
+
+**Resolución de nombres.** Antes de comprobar tipos, el compilador recorre el árbol de módulos y decide a qué elemento se refiere cada ruta. Si una ruta no lleva a nada, verás E0433 o E0425. Lo verás en el mundo 21, en la fase *name resolution*.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Confundir la ruta relativa desde dentro de un módulo">
+
+Dentro de `cocina`, escribir `cocina::horno::hornear()` **no** funciona: buscaría un módulo `cocina` dentro de `cocina`. Las rutas relativas empiezan en el módulo donde estás.
+
+✅ Desde dentro de `cocina`: `horno::hornear()` o `self::horno::hornear()`. Desde cualquier sitio: `crate::cocina::horno::hornear()`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Estás dentro de `mod a { mod b { … } }`, en `b`. ¿Cómo llamas a una función `f` definida en `a`?"
+  opciones={["`a::f()`", "`super::f()`", "`self::f()`", "`b::f()`"]}
+  correcta={1}
+  explicacion="`super` es el padre de `b`, que es `a`. También valdría la ruta absoluta `crate::a::f()`."
+  porque={["Buscaría un módulo `a` dentro de `b`.", "", "`self` es `b`, y `f` no está en `b`.", "`b` es el módulo actual; `b::f` buscaría un `b` dentro de `b`."]}
+/>

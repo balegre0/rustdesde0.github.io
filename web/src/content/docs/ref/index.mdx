@@ -1,0 +1,22 @@
+---
+title: Referencia
+description: El lenguaje Rust y su biblioteca estándar, ficha por ficha, al estilo de rustdoc. Con ejemplos ejecutables.
+sidebar:
+  order: 0
+---
+
+Esta es la parte de **consulta**: no hace falta leerla en orden. Cada ficha sigue la misma estructura (sinopsis con la firma exacta, qué hace, ejemplo ejecutable, pánicos y errores, seguridad, desde qué versión, ver también), para que sepas dónde mirar.
+
+Para encontrar algo rápido, pulsa <kbd>S</kbd>, <kbd>/</kbd> o <kbd>Ctrl</kbd>+<kbd>K</kbd> y escribe su nombre (por ejemplo, `Vec::push`, `Option` o `E0382`).
+
+## Qué hay aquí
+
+- **Lenguaje**: todas las palabras clave (estrictas, reservadas y débiles), tipos, patrones, expresiones, layout de memoria, varianza…
+- **Biblioteca estándar**: módulos de `std` con fichas de sus tipos, traits, funciones y macros más importantes.
+- **Comportamiento indefinido**: la lista de la Reference, explicada.
+- **Ediciones y versiones**: qué cambió en 2015, 2018, 2021 y 2024, y en cada versión estable.
+- **[Errores del compilador](/errores/)**: cada código `E0xxx` explicado, con su ejemplo real.
+
+## Cómo leer las insignias
+
+<span class="rdc-insignia">Desde 1.0</span> indica la versión estable de Rust en la que apareció. <span class="rdc-insignia" data-tipo="inseguro">unsafe</span> marca lo que exige cumplir requisitos que el compilador no comprueba, <span class="rdc-insignia" data-tipo="obsolescente">Desaconsejado</span> lo que tiene una alternativa mejor y <span class="rdc-insignia" data-tipo="borrador">Nightly · inestable</span> lo que aún no está en Rust estable.

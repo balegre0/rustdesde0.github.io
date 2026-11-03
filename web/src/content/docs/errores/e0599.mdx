@@ -1,0 +1,86 @@
+---
+title: "E0599: no existe ese método para el tipo"
+description: "Llamas a un método que el tipo no tiene (o que existe pero en un trait que no está importado o no se cumple)."
+sidebar:
+  order: 54
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` no method named `incrementar` found for struct `Contador` in the current scope ``
+
+## Qué significa
+
+El compilador busca el método en el tipo (sus bloques `impl`) y en los traits **importados** que el tipo implementa. Si no lo encuentra en ninguno, da E0599. A menudo el mensaje incluye una pista: un nombre parecido, un `use` que falta o un límite de trait no cumplido.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0599" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0599]: no method named `incrementar` found for struct `Contador` in the current scope
+ --> E0599.rs:7:7
+  |
+1 | struct Contador {
+  | --------------- method `incrementar` not found for this struct
+...
+7 |     c.incrementar();
+  |       ^^^^^^^^^^^ method not found in `Contador`
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Errata en el nombre del método.
+- El método está en un trait que no has importado con `use` (por ejemplo, `use std::io::Write;` para `write_all`).
+- Llamar a un método de `Option`/`Result` sobre el valor de dentro, o al revés (`.len()` sobre un `Option<String>`).
+- Llamar a `.clone()` o `.iter()` sobre algo que no lo implementa.
+- Olvidar escribir el bloque `impl` del método.
+
+## Cómo arreglarlo
+
+Comprueba el nombre y el tipo real del valor (el mensaje lo dice). Si el método es de un trait, impórtalo. Si es tu tipo, añade el método en un `impl`. Si es un `Option`/`Result`, primero sácalo (`if let`, `match`, `?`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+struct Contador {
+    n: u32,
+}
+
+impl Contador {
+    fn incrementar(&mut self) {
+        self.n += 1;
+    }
+}
+
+fn main() {
+    let mut c = Contador { n: 0 };
+    c.incrementar();
+    println!("{}", c.n);
+}
+```
+
+**Salida:**
+
+```text
+1
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0599` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0277](/errores/e0277/): un tipo no implementa el trait que se necesita
+- [E0609](/errores/e0609/): el tipo no tiene ese campo
+- [E0624](/errores/e0624/): método privado
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

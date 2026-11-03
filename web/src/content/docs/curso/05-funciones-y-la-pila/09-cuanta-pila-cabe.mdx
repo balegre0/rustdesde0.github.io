@@ -1,0 +1,86 @@
+---
+title: "¿Cuánta pila cabe?"
+description: "Cada llamada anidada ocupa un marco en la pila, y la pila tiene un tamaño fijo. Qué pasa al desbordarla, cuánto mide en cada sistema y cómo convertir una recursión en un bucle."
+sidebar:
+  order: 9
+duracion: 12
+desde: "1.0"
+requiere: ["05-funciones-y-la-pila/08-funciones-como-valores"]
+tarjetas:
+  - p: "¿Qué pasa si una recursión es demasiado profunda?"
+    r: "La pila se desborda (stack overflow): Rust lo detecta y aborta el programa con «thread 'main' has overflowed its stack». No es un pánico: no se puede capturar."
+  - p: "¿Cuánto mide la pila del hilo principal?"
+    r: "Depende del sistema: unos 8 MB en Linux y 1 MB en Windows. Los hilos que crea Rust tienen 2 MB por defecto."
+  - p: "¿Cómo se evita desbordar la pila con una recursión?"
+    r: "Convirtiéndola en un bucle (guardando el estado en variables), o en una pila propia en el heap (un Vec) si la recursión es en árbol."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+En la lección 6 viste que cada llamada crea un **marco** en la pila y que se libera al volver. Con una recursión, los marcos se acumulan: una llamada dentro de otra, dentro de otra… La pila es grande, pero **no infinita**.
+
+## La idea
+
+La pila de cada hilo tiene un **tamaño fijo** que se decide al crear el hilo:
+
+| Pila | Tamaño habitual |
+|---|---|
+| hilo principal en Linux | 8 MB |
+| hilo principal en Windows | 1 MB |
+| hilos creados con `thread::spawn` | 2 MB (configurable con `thread::Builder::stack_size`) |
+
+Si una recursión necesita más marcos de los que caben, la pila se **desborda** (*stack overflow*). Rust coloca al final de la pila una **página de guarda** que no se puede tocar: al llegar a ella, el sistema avisa y Rust aborta el programa con:
+
+```text
+thread 'main' has overflowed its stack
+fatal runtime error: stack overflow
+```
+
+No es un pánico: es un **aborto**. No se ejecutan los `drop` ni se puede capturar. Pero tampoco es comportamiento indefinido: Rust garantiza que nunca se escribe fuera de la pila.
+
+## Pruébalo
+
+Diez mil llamadas anidadas caben de sobra. Un bucle no acumula nada, haga las vueltas que haga:
+
+<Ejecutar ej="m05/profundidad" />
+
+Y esta, con mil millones de llamadas anidadas, no cabe en ninguna pila (se ejecuta en el Playground; termina con el error de arriba):
+
+<Ejecutar ej="m05/desbordar-pila" />
+
+La solución habitual es convertir la recursión en un **bucle** que guarde en variables lo que antes guardaba cada marco:
+
+<Reto
+  ej="m05/fib-iterativo"
+  enunciado="Calcula Fibonacci **sin recursión**: guarda los dos últimos valores en dos variables (`a` y `b`) y avanza `n` veces. `fib(90)` debe dar `2880067194370816120`. (La versión recursiva ingenua tardaría años en calcular `fib(90)`: repite los mismos cálculos una y otra vez.)"
+/>
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Cuánto ocupa un marco.** Lo que necesiten las variables locales de la función, más la dirección de vuelta y los registros que haya que guardar. Una función pequeña puede ocupar 16 o 32 bytes; una con un array local de 10 000 elementos, 40 KB por llamada. Por eso, **los arrays grandes van en el heap** (`vec![0; 10_000]`), no en la pila.
+
+**Optimización de llamada final.** Si lo último que hace una función es llamarse a sí misma, el compilador **a veces** reutiliza el marco (en release, LLVM puede convertirlo en un bucle). Rust **no lo garantiza**, así que no puedes contar con ello: si la profundidad depende de los datos, escribe el bucle tú.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Probar solo con datos pequeños">
+
+❌ Una función recursiva que recorre una lista enlazada o un árbol funciona perfectamente en tus pruebas con 100 elementos… y se cae en producción con un millón.
+
+✅ Si la profundidad de la recursión depende del **tamaño de los datos**, usa un bucle o una pila propia en el heap (`let mut pendientes = vec![raiz]; while let Some(nodo) = pendientes.pop() { … }`).
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué pasa cuando un programa en Rust desborda la pila?"
+  opciones={["Aborta con «has overflowed its stack», sin ejecutar los drop", "Entra en pánico y se puede capturar con catch_unwind", "Escribe fuera de la pila y corrompe memoria", "La pila crece sola"]}
+  correcta={0}
+  explicacion="La página de guarda detecta el desbordamiento y Rust aborta de forma segura."
+  porque={["", "No es un pánico: no se desenrolla ni se puede capturar.", "Rust lo impide con la página de guarda.", "La pila de un hilo tiene tamaño fijo."]}
+/>

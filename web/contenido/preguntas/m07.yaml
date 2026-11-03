@@ -1,0 +1,849 @@
+# Banco de preguntas del mundo 07 — Préstamos (CONTENIDO.md §7.1).
+# Todo código citado está en ejemplos/m07/p-*.rs y se ha compilado/ejecutado con rustc 1.99.1, edición 2024
+# (la afirmación sobre Polonius, con rustc 1.101.0-nightly del 2026-11-01).
+
+- id: m07-dos-prestamos-mut
+  titulo: "Dos préstamos exclusivos"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m07/p-dos-mut
+  opciones:
+    - "Un préstamo exclusivo (`&mut`) no admite otro préstamo del mismo valor mientras siga vivo, y `a` se usa después de crear `b` (E0499)"
+    - "`s` no es `mut`"
+    - "No se puede llamar a `push` a través de una referencia"
+    - "Solo se puede tener un `&mut` por función"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0499]: cannot borrow s as mutable more than once at a time`. `a` sigue viva (se usa en `a.push('!')`) cuando nace `b`: habría **dos caminos** para modificar el mismo `String`. Si uno hiciera crecer el texto y el `String` se mudara a otro bloque del heap, el otro camino apuntaría a memoria liberada.
+    - `s` sí es `mut`.
+    - `push` a través de `&mut` es lo normal.
+    - Puedes tener muchos `&mut` en una función… pero **no a la vez** sobre el mismo valor. Si `a` dejara de usarse antes de crear `b`, compilaría.
+  etiquetas: ["E0499", "&mut"]
+
+- id: m07-push-con-referencia
+  titulo: "La referencia que se queda colgando"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Qué fallo de memoria evita este error?"
+  ej: m07/p-push-con-ref
+  opciones:
+    - "`push` puede tener que mudar los elementos a un bloque más grande y liberar el viejo; `primero` apuntaría a memoria liberada (uso tras liberar). E0502"
+    - "Una carrera de datos entre dos hilos"
+    - "Ninguno: Rust es demasiado estricto y el código sería correcto"
+    - "Un desbordamiento: el vector se queda sin sitio"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0502]: cannot borrow v as mutable because it is also borrowed as immutable`. Es el caso clásico de **invalidación**: un `Vec` guarda sus elementos en un bloque del heap con cierta capacidad; si se llena, `push` reserva otro bloque, copia y libera el antiguo. `primero` seguiría apuntando al bloque antiguo.
+    - No hay hilos: el fallo existe con un solo hilo.
+    - Aquí el borrow checker tiene razón: el código sería realmente peligroso.
+    - El vector crece solo; no hay desbordamiento.
+    Arreglo verificado: `let primero = v[0];` copia el `i32` (es `Copy`) y ya no hay préstamo vivo; imprime `1`.
+  etiquetas: ["E0502", "invalidación", "Vec"]
+
+- id: m07-mutar-mientras-recorre
+  titulo: "Cambiar la lista mientras la lees"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede hacer `push` dentro del bucle?"
+  ej: m07/p-mutar-mientras-recorre
+  opciones:
+    - "`for x in &v` mantiene un préstamo compartido de `v` durante **todo** el bucle; `push` necesita uno exclusivo (E0502)"
+    - "Dentro de un `for` nunca se puede llamar a métodos"
+    - "`*x == 2` mueve el elemento"
+    - "Porque el bucle sería infinito"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0502]`, con la nota «this for loop borrows `v` immutably, preventing mutation within its body» y la ayuda «consider using an index-based loop instead, or collecting modifications into a separate collection».
+    El recorrido guarda dentro un puntero al bloque del vector; si `push` lo mudara, el recorrido seguiría leyendo memoria liberada (iterador invalidado).
+    - Métodos que solo leen sí se pueden llamar.
+    - `*x == 2` lee un `i32` (Copy); no mueve.
+    - El bucle podría ser infinito, pero esa no es la razón del error.
+    Solución típica: recoger lo que quieres añadir en otro vector y hacer `v.extend(...)` después.
+  etiquetas: ["E0502", "for", "invalidación"]
+
+- id: m07-asignar-prestado
+  titulo: "No toques lo que estoy mirando"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da?"
+  ej: m07/p-asignar-prestado
+  opciones:
+    - "E0506: «cannot assign to `n` because it is borrowed»"
+    - "E0384: `n` no es `mut`"
+    - "E0502: `n` ya está prestado en exclusiva"
+    - "Ninguno: imprime `20 20`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0506]: cannot assign to n because it is borrowed`. Mientras `r` (préstamo compartido) siga viva, `n` pierde el permiso W. Un préstamo compartido promete: «lo que miro no va a cambiar». Si se permitiera, `r` vería cambiar el valor bajo sus pies (aliasing con mutación).
+    - `n` sí es `mut`.
+    - No hay ningún `&mut`.
+  etiquetas: ["E0506", "&T"]
+
+- id: m07-mover-prestado
+  titulo: "Mudarse con invitados"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `let t = s;`?"
+  ej: m07/p-mover-prestado
+  opciones:
+    - "No se puede mover un valor mientras hay un préstamo vivo: `r` apunta a `s`, y tras mover, `s` ya no sería un sitio válido (E0505)"
+    - "Los `String` no se pueden mover"
+    - "`r` es una copia de `s` y ya hay dos dueños"
+    - "Falta `mut` en `t`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0505]: cannot move out of s because it is borrowed`. Un préstamo quita a `s` el permiso O (propiedad) mientras viva. Mover a `t` podría acabar liberando el texto mientras `r` lo mira.
+    - Los `String` se mueven constantemente; solo que no con préstamos vivos.
+    - `r` no es dueña de nada: es una referencia.
+  etiquetas: ["E0505", "mover", "&T"]
+
+- id: m07-mut-sin-mut
+  titulo: "Prestar lo que no se puede escribir"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m07/p-mut-sin-mut
+  opciones:
+    - "Para prestar en exclusiva (`&mut v`) el dueño debe tener permiso W, es decir, `let mut v` (E0596)"
+    - "`&mut` solo funciona con números"
+    - "Un `Vec` creado con `vec!` es inmutable para siempre"
+    - "Hay que escribir `&mut` también en `r.push`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0596]: cannot borrow v as mutable, as it is not declared as mutable`. No puedes prestar un permiso que no tienes. Arreglo: `let mut v = vec![1, 2];`.
+  etiquetas: ["E0596", "mut", "&mut"]
+
+- id: m07-escribir-por-compartida
+  titulo: "Mirar no es tocar"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "`s` es `mut` en `main`. ¿Por qué no compila `agregar`?"
+  ej: m07/p-escribir-por-compartida
+  opciones:
+    - "`agregar` recibe `&String`, un préstamo compartido: solo permite leer, aunque el dueño sea `mut` (E0596)"
+    - "Las funciones no pueden modificar sus parámetros"
+    - "`push` solo admite `&str`, no `char`"
+    - "Hay que devolver `s`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0596]: cannot borrow *s as mutable, as it is behind a & reference`. Lo que se puede hacer a través de una referencia lo decide **su tipo**, no el dueño. Arreglo: `fn agregar(s: &mut String)` y llamar con `agregar(&mut s)`.
+    - Con `&mut` las funciones sí pueden modificar.
+    - `String::push` recibe un `char`; está bien.
+  etiquetas: ["E0596", "&T", "&mut"]
+
+- id: m07-nll-ultimo-uso
+  titulo: "El préstamo termina antes"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Compila? Si compila, ¿qué imprime?"
+  ej: m07/p-nll-ok
+  opciones:
+    - "Compila: `primero = 1` y luego `[1, 2, 3, 4]`"
+    - "No compila: `primero` está prestado hasta el final de `main`"
+    - "Compila: `primero = 1` y luego `[1, 2, 3]`"
+    - "Compila, pero el segundo `println!` hace pánico"
+  correcta: 0
+  solucion: |
+    Un préstamo dura hasta su **último uso**, no hasta la llave de cierre (*non-lexical lifetimes*, NLL). `primero` se usa por última vez en el primer `println!`; después `v` recupera todos sus permisos y el `push` es válido.
+    - «Hasta el final del bloque» era la regla antigua, anterior a NLL.
+    - El `push` sí ocurre: el vector acaba con 4 elementos.
+  etiquetas: ["NLL", "último uso"]
+
+- id: m07-nll-mal
+  titulo: "Ahora el orden importa"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Es el mismo programa que la pregunta anterior con dos líneas intercambiadas. ¿Por qué ahora no compila?"
+  ej: m07/p-nll-mal
+  opciones:
+    - "`primero` se usa **después** del `push`: el préstamo sigue vivo cuando se pide el exclusivo (E0502)"
+    - "Un `println!` no puede ir al final de `main`"
+    - "Los dos programas fallan igual"
+    - "`push` siempre invalida todas las referencias del programa"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0502]: cannot borrow v as mutable because it is also borrowed as immutable`. La vida de un préstamo va desde que se crea hasta su último uso. Como el último uso está después del `push`, se solapan.
+    - El anterior compila (verificado).
+    - El `push` solo choca con préstamos **vivos**.
+  etiquetas: ["E0502", "NLL"]
+
+- id: m07-two-phase
+  titulo: "push de su propia longitud"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: dificil
+  tipo: predice
+  enunciado: "`v.push(...)` toma `&mut v` y `v.len()` toma `&v`. ¿Qué pasa?"
+  ej: m07/p-two-phase
+  opciones:
+    - "Compila e imprime `[1, 2, 3, 3]`"
+    - "No compila: E0502, préstamo compartido y exclusivo a la vez"
+    - "Compila e imprime `[1, 2, 3, 4]`"
+    - "Compila e imprime `[1, 2, 3]`"
+  correcta: 0
+  solucion: |
+    Funciona gracias a los **préstamos en dos fases** (*two-phase borrows*): el `&mut v` de la llamada se *reserva* primero y solo se *activa* cuando empiezan a ejecutarse las instrucciones de `push`. Antes se evalúan los argumentos: `v.len()` lee 3 con un préstamo compartido que ya ha terminado. Por eso se añade un 3.
+    - Sin esta regla daría E0502, pero sería un falso positivo: no hay peligro real.
+    - La longitud se lee **antes** de añadir.
+  etiquetas: ["two-phase borrows", "auto-ref"]
+
+- id: m07-reborrow
+  titulo: "Prestar lo prestado"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: dificil
+  tipo: predice
+  enunciado: "`&mut Vec<i32>` no es `Copy`. Aun así, ¿qué pasa?"
+  ej: m07/p-reborrow
+  opciones:
+    - "Compila e imprime `[0, 1, 9]`"
+    - "No compila: la primera llamada a `agregar` movió `r` (E0382)"
+    - "Compila e imprime `[9]`"
+    - "Compila e imprime `[1, 2, 9]`"
+  correcta: 0
+  solucion: |
+    Cuando pasas un `&mut` a una función que espera `&mut`, Rust no lo mueve: hace un **re-préstamo** implícito (`&mut *r`), un préstamo nuevo y más corto *a partir de* `r`, que termina al acabar la llamada. Después `r` vuelve a valer.
+    Cada `agregar` añade la longitud actual: 0, luego 1; y `r.push(9)` añade 9.
+    - Si `r` se moviera (como en `let r2 = r;`, pregunta siguiente), sí sería E0382.
+  etiquetas: ["reborrow", "&mut"]
+
+- id: m07-mover-mut-ref
+  titulo: "Un &mut sí se mueve"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué este no compila, si el de la pregunta anterior sí?"
+  ej: m07/p-mover-mut-ref
+  opciones:
+    - "`let r2 = r;` **mueve** la referencia exclusiva (no es `Copy`); `r` deja de valer (E0382). El re-préstamo implícito solo ocurre cuando el destino ya tiene tipo `&mut` conocido, como un parámetro"
+    - "No se puede tener una variable de tipo `&mut`"
+    - "`r2.push(2)` y `r.push(3)` modifican vectores distintos"
+    - "Falta `mut` en `r`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of moved value: r`, con «move occurs because `r` has type `&mut Vec<i32>`, which does not implement the `Copy` trait». Un `&mut` no puede copiarse: si pudiera, habría dos caminos exclusivos al mismo valor.
+    Arreglo comprobado: `let r2 = &mut *r;` (re-préstamo explícito). Compila, porque `r2` deja de usarse antes de volver a usar `r`.
+    - `r` no necesita `mut` para usar `push` a través de ella: lo que se modifica es `*r`.
+  etiquetas: ["E0382", "&mut", "reborrow"]
+
+- id: m07-ref-copy
+  titulo: "Las referencias compartidas se copian"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué pasa?"
+  ej: m07/p-ref-copy
+  opciones:
+    - "Compila e imprime `hola hola hola`"
+    - "No compila: `let r2 = r1;` movió `r1`"
+    - "No compila: no se puede usar `s` mientras está prestada"
+    - "Imprime `hola` y luego hace pánico"
+  correcta: 0
+  solucion: |
+    `&String` es `Copy`: copiar una referencia compartida solo crea otro lector, y tener muchos lectores es justo lo que la regla permite. Además, leer `s` mientras hay préstamos compartidos también es leer.
+  etiquetas: ["&T", "Copy"]
+
+- id: m07-slice-utf8-panico
+  titulo: "Cortar una ñ por la mitad"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué pasa al ejecutarlo?"
+  ej: m07/p-slice-utf8-panico
+  opciones:
+    - "Imprime `a` y luego pánico: «end byte index 2 is not a char boundary; it is inside 'ñ' (bytes 1..3 of string)»"
+    - "Imprime `a` y `añ`"
+    - "Imprime `a` y `a?`"
+    - "No compila: no se puede cortar un `String`"
+  correcta: 0
+  solucion: |
+    Los rangos de un `&str` cuentan **bytes**, no letras. En UTF-8, `a` ocupa 1 byte y `ñ` ocupa 2 (los bytes 1 y 2). `&s[0..1]` es `"a"`; `&s[0..2]` cortaría la `ñ` por la mitad y el resultado no sería UTF-8 válido. Un `&str` **siempre** es UTF-8 válido, así que Rust detiene el programa con un pánico (no hay comportamiento indefinido).
+    - `añ` sería `&s[0..3]`.
+    - Rust nunca inventa caracteres de reemplazo al cortar.
+    - Cortar compila: el problema se descubre al ejecutar.
+  etiquetas: ["&str", "UTF-8", "pánico", "slices"]
+
+- id: m07-len-ano
+  titulo: "¿Cuánto mide «año»?"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m07/p-len-ano
+  opciones:
+    - "`4 3`"
+    - "`3 3`"
+    - "`3 4`"
+    - "`4 4`"
+  correcta: 0
+  solucion: |
+    `len()` da el número de **bytes** (UTF-8): a (1) + ñ (2) + o (1) = 4. `chars().count()` cuenta caracteres: 3.
+  etiquetas: ["&str", "UTF-8"]
+
+- id: m07-get-o-insertar
+  titulo: "Buscar o insertar"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "La rama `None` no usa `v`. ¿Por qué no compila en Rust estable 1.99.1?"
+  ej: m07/p-get-o-insertar
+  opciones:
+    - "Como la rama `Some` **devuelve** el préstamo, el checker actual (NLL) lo considera vivo en toda la función, también en la rama `None` (E0502). Es una limitación: el programa sería seguro"
+    - "`insert` invalidaría `v`, que se usa después en la rama `None`"
+    - "Un `HashMap` no se puede modificar dentro de un `match`"
+    - "Falta `mut` en `mapa`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0502]: cannot borrow *mapa as mutable because it is also borrowed as immutable`, con «returning this value requires that `*mapa` is borrowed for `'1`». NLL calcula una sola región para el préstamo de `get`; como debe llegar hasta el retorno, la extiende a todos los caminos. Es el famoso «problema nº 3» de NLL.
+    Arreglo en estable (verificado, imprime `nuevo`): la API `entry`, `mapa.entry(k).or_insert_with(|| String::from("nuevo"))`.
+    El nuevo borrow checker, **Polonius alpha**, activo por defecto en nightly, lo acepta: comprobado con rustc 1.101.0-nightly (2026-11-01).
+    - En la rama `None` no hay ningún `v`.
+    - `mapa` es `&mut HashMap`: ya permite modificar.
+  etiquetas: ["E0502", "HashMap", "Polonius", "NLL"]
+
+- id: m07-entry
+  titulo: "Contar letras"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m07/p-entry
+  opciones:
+    - "`a=3 n=2 b=1`"
+    - "`a=1 n=1 b=1`"
+    - "`a=3 n=3 b=1`"
+    - "No compila: E0502 por usar el mapa dentro del bucle"
+  correcta: 0
+  solucion: |
+    `entry(c)` devuelve un préstamo exclusivo a la casilla (exista o no); `or_insert(0)` la crea si falta y devuelve `&mut u32`; `*... += 1` suma a través de él. Un solo préstamo, una sola búsqueda. «banana» tiene 3 aes, 2 enes y 1 be.
+  etiquetas: ["HashMap", "entry", "&mut"]
+
+- id: m07-swap-indices
+  titulo: "Intercambiar dos elementos"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "`v[0]` y `v[2]` son posiciones distintas. ¿Por qué no compila?"
+  ej: m07/p-swap-indices
+  opciones:
+    - "El checker no razona sobre índices: `&mut v[0]` toma prestado **todo** `v` en exclusiva, así que el segundo choca (E0499). Es seguro de verdad, pero se rechaza"
+    - "`std::mem::swap` no admite elementos de un Vec"
+    - "Porque 0 y 2 podrían ser el mismo índice en tiempo de ejecución"
+    - "El vector no es `mut`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0499]: cannot borrow v as mutable more than once at a time`, con la ayuda «use `.split_at_mut(position)` to obtain two mutable non-overlapping sub-slices».
+    Indexar pasa por un método que recibe `&mut v` entero. El borrow checker es **sólido pero incompleto**: nunca acepta código peligroso, pero a veces rechaza código seguro.
+    Arreglo verificado: `v.swap(0, 2)` imprime `[3, 2, 1]`.
+    - `mem::swap` acepta cualquier par de `&mut`.
+    - Con literales 0 y 2 nunca coinciden; el checker simplemente no mira los números.
+  etiquetas: ["E0499", "índices", "split_at_mut"]
+
+- id: m07-split-at-mut
+  titulo: "Dos mitades exclusivas"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m07/p-split-at-mut
+  opciones:
+    - "`[5, 2, 30, 4]`"
+    - "`[1, 2, 30, 4]`"
+    - "`[4, 2, 30, 4]`"
+    - "No compila: E0499"
+  correcta: 0
+  solucion: |
+    `split_at_mut(2)` devuelve dos préstamos exclusivos que **no se solapan**: `izq` = `[1, 2]`, `der` = `[3, 4]`. `izq[0] += der[1]` deja 1 + 4 = 5; `der[0] *= 10` deja 30. Por dentro usa `unsafe`, pero la función garantiza que las mitades no se tocan, así que es seguro.
+  etiquetas: ["split_at_mut", "slices", "&mut"]
+
+- id: m07-println-con-mut
+  titulo: "Solo quería mirar"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede imprimir `x`?"
+  ej: m07/p-println-con-mut
+  opciones:
+    - "`r` es un préstamo exclusivo que sigue vivo (se usa en `*r += 1`); mientras tanto `x` no tiene ni permiso de lectura (E0502)"
+    - "`println!` modifica lo que imprime"
+    - "Un entero no se puede imprimir si es `mut`"
+    - "`*r += 1` desborda"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0502]: cannot borrow x as immutable because it is also borrowed as mutable`. Exclusivo significa exclusivo: mientras viva `r`, **nadie más** accede a `x`, ni para leer. Si leer estuviera permitido, podrías ver un valor a medio escribir.
+    Arreglo: imprimir después del último uso de `r`.
+  etiquetas: ["E0502", "&mut", "exclusivo"]
+
+- id: m07-iter-mut
+  titulo: "Duplicar en el sitio"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m07/p-iter-mut
+  opciones:
+    - "`[2, 4, 6]`"
+    - "`[1, 2, 3]`"
+    - "No compila: no se puede modificar dentro de un `for`"
+    - "No compila: falta `*` en `x *= 2`, y ya está puesto"
+  correcta: 0
+  solucion: |
+    `for x in &mut v` presta cada elemento en exclusiva: `x` es `&mut i32`, y `*x *= 2` modifica el elemento real del vector. Se puede porque durante el bucle nadie más toca `v`.
+  etiquetas: ["&mut", "for", "iter_mut"]
+
+- id: m07-falta-deref
+  titulo: "Sumar a una referencia"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué falta?"
+  ej: m07/p-falta-deref
+  opciones:
+    - "Un `*`: hay que modificar el número apuntado (`*r += 1`), no la referencia (E0368)"
+    - "`mut` en `r`"
+    - "Que `x` sea `u32`"
+    - "Paréntesis: `(r) += 1`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0368]: binary assignment operation += cannot be applied to type &mut {integer}`. `r` es una dirección; `*r` es el entero al que apunta. Con `*r += 1` imprimiría `2`.
+  etiquetas: ["E0368", "desreferenciar"]
+
+- id: m07-campos-disjuntos
+  titulo: "Campos distintos, préstamos distintos"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: dificil
+  tipo: predice
+  enunciado: "Dos `&mut` vivos a la vez dentro de la misma tupla. ¿Qué pasa?"
+  ej: m07/p-campos-disjuntos
+  opciones:
+    - "Compila e imprime `(11, 22)`"
+    - "No compila: E0499, dos préstamos exclusivos de `t`"
+    - "Compila e imprime `(1, 2)`"
+    - "Compila e imprime `(11, 2)`"
+  correcta: 0
+  solucion: |
+    El borrow checker sigue las **rutas**: `t.0` y `t.1` son lugares distintos que nunca se solapan, así que puede prestarlos por separado. Con índices de un vector (`v[0]`, `v[1]`) no puede (mira `m07-indices-dos-mut`): un índice pasa por una función que toma todo el vector.
+  etiquetas: ["campos disjuntos", "&mut"]
+
+- id: m07-indices-dos-mut
+  titulo: "v[0] y v[1]"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Con una tupla funcionaba. ¿Por qué con un vector no?"
+  ej: m07/p-indices-dos-mut
+  opciones:
+    - "`&mut v[0]` llama a un método de indexado que toma prestado todo `v`; el checker no ve que 0 y 1 son distintos (E0499)"
+    - "Los vectores no permiten `&mut` a sus elementos"
+    - "`*a += *b` lee y escribe a la vez el mismo elemento"
+    - "Los vectores solo admiten un préstamo en toda su vida"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0499]: cannot borrow v as mutable more than once at a time`. Soluciones: `split_at_mut`, `v.swap(i, j)`, o trabajar con índices (`v[0] += v[1];`, que primero lee y luego escribe).
+    - `&mut v[0]` solo es válido mientras sea el único préstamo.
+    - `a` y `b` apuntan a elementos distintos; el problema es que el checker no lo sabe.
+  etiquetas: ["E0499", "índices"]
+
+- id: m07-ref-tras-clear
+  titulo: "Vaciar con alguien mirando"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "Si esto compilara, ¿qué pasaría en el `println!`?"
+  ej: m07/p-ref-tras-clear
+  opciones:
+    - "Uso tras liberar: `clear` libera el `String` de dentro y `primero` apuntaría a memoria liberada. Rust lo impide con E0502"
+    - "Imprimiría una cadena vacía"
+    - "Imprimiría `a` sin problema"
+    - "Haría pánico por índice fuera de rango"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0502]: cannot borrow v as mutable because it is also borrowed as immutable`. `clear` libera cada elemento; `primero` es una referencia al `String` que había dentro. Sin la regla, leerías memoria liberada: comportamiento indefinido, no un pánico ni una cadena vacía.
+  etiquetas: ["E0502", "uso tras liberar"]
+
+- id: m07-mut-mientras-compartido
+  titulo: "Una vista que cambia"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué regla rompe este programa?"
+  ej: m07/p-mut-mientras-compartido
+  opciones:
+    - "Muchos lectores **o** un escritor, nunca las dos cosas: `vista` lee mientras `push` escribe (E0502)"
+    - "No se puede tener una variable que se llame `vista`"
+    - "Un `String` no puede tener dos referencias"
+    - "`push` necesita un `&str`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0502]: cannot borrow s as mutable because it is also borrowed as immutable`. `push` puede tener que mudar el texto a otro bloque del heap; `vista` se quedaría apuntando al viejo.
+    - Un `String` puede tener muchas referencias compartidas a la vez; lo que no puede es tenerlas mientras alguien escribe.
+    - `String::push` recibe un `char`.
+  etiquetas: ["E0502", "regla de préstamos"]
+
+- id: m07-sacar-de-ref
+  titulo: "Devolver lo prestado como propio"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `primero`?"
+  ej: m07/p-sacar-de-ref
+  opciones:
+    - "Con un `&Vec<String>` solo puedes mirar; devolver `v[0]` como `String` sería **mover** algo que no es tuyo (E0507)"
+    - "Falta `return`"
+    - "Las funciones no pueden devolver `String`"
+    - "Hay que escribir `v.0`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0507]: cannot move out of index of Vec<String>`. Un préstamo no da el permiso O. Opciones según la intención: devolver `&String`/`&str` (otro préstamo), `v[0].clone()` (una copia propia) o recibir el `Vec` por valor.
+    - La última expresión ya es el valor devuelto: `return` no cambia nada.
+  etiquetas: ["E0507", "&T"]
+
+- id: m07-slice-suma
+  titulo: "Una función para todo"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m07/p-slice-suma
+  opciones:
+    - "`10 5 30`"
+    - "`10 6 30`"
+    - "`10 3 30`"
+    - "No compila: `suma` no acepta arrays"
+  correcta: 0
+  solucion: |
+    `&[i32]` es una **vista** a una secuencia contigua de `i32`, venga de donde venga: un `Vec` entero, un trozo (`&v[1..3]` = `[2, 3]`, suma 5) o un array. Por eso es mejor recibir `&[T]` que `&Vec<T>`. El rango `1..3` incluye el 1 y excluye el 3.
+  etiquetas: ["slices", "&[T]"]
+
+- id: m07-tamano-refs
+  titulo: "Punteros finos y gordos"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la primera línea?"
+  ej: m07/p-tamano-refs
+  opciones:
+    - "`true`: un `&str` ocupa el doble que un `&String`"
+    - "`false`: las dos referencias miden lo mismo"
+    - "`false`: `&str` mide la mitad"
+    - "No compila: no se puede medir una referencia"
+  correcta: 0
+  solucion: |
+    `&String` es un puntero **fino**: solo la dirección del `String`. `&str` es un puntero **gordo**: dirección de los bytes + longitud. Comprobado: `size_of_val(&v) == 2 * size_of_val(&r)` es `true` (8 y 16 bytes en 64 bits; 4 y 8 en el navegador).
+  etiquetas: ["&str", "puntero gordo", "layout"]
+
+- id: m07-muchos-compartidos
+  titulo: "Muchos lectores"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué pasa?"
+  ej: m07/p-muchos-compartidos
+  opciones:
+    - "Compila e imprime `hola hola hola 4`"
+    - "No compila: solo puede haber un préstamo a la vez"
+    - "No compila: `c = a` mueve `a`"
+    - "Compila e imprime `hola hola hola 3`"
+  correcta: 0
+  solucion: |
+    Préstamos compartidos: tantos como quieras, a la vez, siempre que nadie escriba. `&String` es `Copy`. `len()` es 4 bytes.
+  etiquetas: ["&T", "regla de préstamos"]
+
+- id: m07-auto-ref
+  titulo: "El punto que presta"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m07/p-auto-ref
+  opciones:
+    - "`2 2`"
+    - "`1 2`"
+    - "No compila: `Vec::push(&mut v, 2)` no es una forma válida"
+    - "`2 1`"
+  correcta: 0
+  solucion: |
+    `v.push(1)` es azúcar para `Vec::push(&mut v, 1)`: el operador `.` añade solo el `&mut` o el `&` que pide el método (**auto-referencia**). Igual `v.len()` es `Vec::len(&v)`. Las dos formas hacen lo mismo.
+  etiquetas: ["auto-ref", "métodos"]
+
+- id: m07-mut-tras-ultimo-uso
+  titulo: "Después del exclusivo"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué pasa?"
+  ej: m07/p-mut-tras-ultimo-uso
+  opciones:
+    - "Compila e imprime `6`"
+    - "No compila: `r` tiene `x` prestado hasta el final"
+    - "Compila e imprime `5`"
+    - "No compila: E0499"
+  correcta: 0
+  solucion: |
+    El último uso de `r` es `*r += 1`. Desde ahí `x` recupera todos sus permisos y se puede volver a prestar.
+  etiquetas: ["NLL", "&mut"]
+
+- id: m07-la-regla
+  titulo: "La regla en una frase"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál es la regla de los préstamos?"
+  opciones:
+    - "En cada momento, o muchos préstamos compartidos (`&T`) o un único préstamo exclusivo (`&mut T`), nunca ambos"
+    - "Solo puede haber un préstamo de cada valor en todo el programa"
+    - "Puede haber muchos `&mut` si están en funciones distintas"
+    - "Un préstamo compartido y uno exclusivo pueden convivir si el compartido no se usa"
+  correcta: 0
+  solucion: |
+    «Muchos lectores **o** un escritor». La última opción tiene trampa: si el compartido no se usa más, es que **ya murió** (NLL), así que no conviven.
+  etiquetas: ["regla de préstamos"]
+
+- id: m07-que-evita
+  titulo: "¿Qué evita la regla?"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué tienen en común el uso tras liberar de un iterador invalidado y una carrera de datos?"
+  opciones:
+    - "Los dos nacen de lo mismo: un dato con **alias** (varios caminos para llegar a él) que alguien **modifica**. La regla de préstamos prohíbe esa combinación"
+    - "Nada: son problemas distintos con soluciones distintas"
+    - "Los dos ocurren solo con hilos"
+    - "Los dos los detecta Rust al ejecutar, con un pánico"
+  correcta: 0
+  solucion: |
+    Aliasing + mutación = peligro. Con un hilo, la mutación puede mover o liberar lo que otro camino mira; con varios hilos, además, dos accesos simultáneos con al menos una escritura son una carrera de datos. Rust los evita **al compilar**, sin coste en ejecución.
+  etiquetas: ["aliasing", "UB", "carrera de datos"]
+
+- id: m07-mut-significa
+  titulo: "¿Qué significa &mut?"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "La mejor forma de leer `&mut T` es…"
+  opciones:
+    - "Préstamo **exclusivo**: el único acceso al valor mientras viva"
+    - "Referencia que cambia de destino"
+    - "Copia modificable"
+    - "Préstamo que dura para siempre"
+  correcta: 0
+  solucion: |
+    Que permita modificar es una *consecuencia* de que sea exclusivo: si nadie más mira, modificar es seguro. Por eso hablamos de préstamo compartido (`&`) y exclusivo (`&mut`).
+  etiquetas: ["&mut", "vocabulario"]
+
+- id: m07-permisos-compartido
+  titulo: "Permisos con un &"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: opcion
+  enunciado: "Tras `let mut v = vec![1]; let r = &v;` (con `r` aún viva), ¿qué permisos tienen `v`, `r` y `*r`?"
+  opciones:
+    - "`v`: `R--`; `r`: `R-O`; `*r`: `R--`"
+    - "`v`: `RWO`; `r`: `R-O`; `*r`: `R--`"
+    - "`v`: `---`; `r`: `RWO`; `*r`: `RW-`"
+    - "`v`: `R-O`; `r`: `R--`; `*r`: `R--`"
+  correcta: 0
+  solucion: |
+    Un préstamo compartido quita a `v` W y O (no se puede modificar ni mover mientras te miran) y deja R. `r` es una variable normal: la puedes leer y es dueña *de la referencia* (no del vector), pero no es `mut`. A través de `*r` solo se lee. Cuando `r` muere, `v` vuelve a `RWO`.
+  etiquetas: ["permisos", "&T"]
+
+- id: m07-permisos-exclusivo
+  titulo: "Permisos con un &mut"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: opcion
+  enunciado: "Tras `let mut v = vec![1]; let r = &mut v;` (con `r` aún viva), ¿qué permisos tienen `v` y `*r`?"
+  opciones:
+    - "`v`: ninguno (`---`); `*r`: `RW-`"
+    - "`v`: `R--`; `*r`: `RW-`"
+    - "`v`: `RWO`; `*r`: `RWO`"
+    - "`v`: `---`; `*r`: `RWO`"
+  correcta: 0
+  solucion: |
+    Un préstamo exclusivo le quita **todo** al dueño mientras viva (ni leer: comprobado en `m07/p-println-con-mut`). A través de `*r` se lee y escribe, pero no se posee: no puedes mover ni liberar el vector a través de un préstamo.
+  etiquetas: ["permisos", "&mut"]
+
+- id: m07-cuando-vuelven
+  titulo: "¿Cuándo vuelven los permisos?"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Un préstamo le quitó permisos a `v`. ¿Cuándo los recupera?"
+  opciones:
+    - "Tras el **último uso** de la referencia"
+    - "Al final del bloque `{}` donde se creó la referencia"
+    - "Al final de la función"
+    - "Nunca: hay que volver a crear `v`"
+  correcta: 0
+  solucion: |
+    Con NLL (desde la edición 2018), la vida de un préstamo acaba en su último uso. «Al final del bloque» es el malentendido más frecuente. Comprobado con `m07/p-nll-ok`.
+  etiquetas: ["NLL", "permisos"]
+
+- id: m07-incompleto
+  titulo: "Rechazado pero seguro"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Cuál de estos programas rechazados por el borrow checker sería **seguro** si se permitiera?"
+  opciones:
+    - "`std::mem::swap(&mut v[0], &mut v[2]);`"
+    - "`let p = &v[0]; v.push(4); println!(\"{p}\");`"
+    - "`let p = &v[0]; v.clear(); println!(\"{p}\");`"
+    - "`let a = &mut s; let b = &mut s; a.push('!'); b.push('?');`"
+  correcta: 0
+  solucion: |
+    Las posiciones 0 y 2 nunca se solapan, así que intercambiarlas es seguro; el checker lo rechaza porque no razona sobre índices (es **incompleto**). Los otros tres son peligrosos de verdad: `push` puede mudar los elementos, `clear` los libera, y dos `&mut` al mismo `String` pueden invalidarse entre sí.
+    Que el compilador rechace algo no siempre significa que sea incorrecto; pero cuando dudes, asume que tiene razón y busca la herramienta segura (`v.swap`, `split_at_mut`).
+  etiquetas: ["borrow checker", "incompletitud"]
+
+- id: m07-str-mejor-que-string
+  titulo: "¿&String o &str?"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: opcion
+  enunciado: "Una función solo lee un texto. ¿Qué tipo de parámetro es mejor?"
+  opciones:
+    - "`&str`: acepta un `&String` (se convierte solo), un literal y cualquier trozo de texto"
+    - "`&String`: es más rápido"
+    - "`String`: así la función es dueña"
+    - "Da igual: son el mismo tipo"
+  correcta: 0
+  solucion: |
+    `&str` es la vista general a texto UTF-8. Un `&String` se convierte solo en `&str` (coerción por `Deref`), pero un literal `"hola"` no es un `&String`. Recibir `String` obligaría a mover o clonar.
+  etiquetas: ["&str", "API"]
+
+- id: m07-str-es-slice
+  titulo: "¿Qué es un &str por dentro?"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué hay dentro de un `&str`?"
+  opciones:
+    - "La dirección del primer byte y una longitud en bytes; los bytes son UTF-8 y viven en otro sitio (el programa, un `String`…)"
+    - "Una copia del texto"
+    - "Solo una dirección; el final se marca con un byte cero"
+    - "Puntero, capacidad y longitud, como un `String`"
+  correcta: 0
+  solucion: |
+    Es un *slice* de bytes UTF-8 prestado: `&str` es a `String` lo que `&[u8]` es a `Vec<u8>`. No tiene capacidad porque no puede crecer: no es dueño. No hay byte cero final: la longitud lo dice todo.
+  etiquetas: ["&str", "slices", "UTF-8"]
+
+- id: m07-polonius-nightly
+  titulo: "El borrow checker que viene"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "El programa de `m07/p-get-o-insertar` da E0502 en estable 1.99.1. ¿Qué pasa con rustc 1.101 nightly (noviembre de 2026)?"
+  ej: m07/p-get-o-insertar
+  opciones:
+    - "Compila: Polonius alpha, activo por defecto en nightly, calcula los préstamos por cada camino y ve que en la rama `None` no hay ninguno vivo"
+    - "Da el mismo error: el programa es inseguro"
+    - "Compila, pero desactiva el borrow checker en esa función"
+    - "Da un error distinto: E0499"
+  correcta: 0
+  solucion: |
+    Verificado: con rustc 1.101.0-nightly (2026-11-01) compila sin errores. Polonius no relaja las reglas: es un análisis más preciso que acepta programas que ya eran seguros. Mientras llega a estable, en este caso concreto se usa la API `entry`.
+  etiquetas: ["Polonius", "nightly", "HashMap"]
+
+- id: m07-cuantos-exclusivos
+  titulo: "¿Cuántos exclusivos?"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuántos préstamos exclusivos vivos puede tener un valor a la vez? Escribe el número."
+  respuestas: ["1", "uno"]
+  solucion: |
+    Uno. Y mientras exista, ningún préstamo compartido.
+  etiquetas: ["&mut"]
+
+- id: m07-bytes-ano
+  titulo: "Bytes de «año»"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Qué devuelve `\"año\".len()`? Escribe el número."
+  respuestas: ["4", "cuatro"]
+  solucion: |
+    4 bytes: `a` (1) + `ñ` (2) + `o` (1). Comprobado en `m07/p-len-ano`. `len()` siempre cuenta bytes.
+  etiquetas: ["UTF-8", "&str"]
+
+- id: m07-two-phase-ultimo
+  titulo: "El número que se añade"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: respuesta
+  enunciado: "Con `let mut v = vec![10, 20];` y luego `v.push(v.len());`, ¿qué número queda al final del vector?"
+  respuestas: ["2", "dos"]
+  solucion: |
+    2. Primero se evalúa el argumento (`v.len()` = 2, préstamo compartido que termina enseguida) y después se activa el préstamo exclusivo de `push`. Es la misma idea que `m07/p-two-phase`, que imprime `[1, 2, 3, 3]`.
+  etiquetas: ["two-phase borrows"]
+
+- id: m07-recorrer-y-anadir
+  titulo: "Añadir lo recorrido"
+  mundo: 07-prestamos
+  tema: prestamos
+  dificultad: media
+  tipo: opcion
+  enunciado: "Quieres añadir al final de `v` el doble de cada elemento par. ¿Qué diseño compila y respeta la regla?"
+  opciones:
+    - "Recorrer `&v` recogiendo los dobles en un vector nuevo `extra`, y después `v.extend(extra)`"
+    - "Recorrer `&v` y hacer `v.push(2 * x)` dentro del bucle"
+    - "Recorrer `&mut v` y hacer `v.push(...)` dentro"
+    - "Clonar `v` en cada vuelta"
+  correcta: 0
+  solucion: |
+    Dentro del bucle `v` está prestado (compartido o exclusivo) y no puede crecer: E0502 o E0499 (ver `m07/p-mutar-mientras-recorre`). Separar «leer» de «escribir» en dos fases es la solución que sugiere el propio rustc. Clonar en cada vuelta es caro y no hace falta.
+  etiquetas: ["invalidación", "diseño"]

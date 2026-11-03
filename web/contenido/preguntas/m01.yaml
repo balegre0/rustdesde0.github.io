@@ -1,0 +1,894 @@
+# Banco de preguntas del mundo 01 (CONTENIDO.md §7.1). Todo verificado con rustc 1.99.1, ed. 2024, wasm32-wasip1.
+- id: m01-ciclo-cpu
+  titulo: "Lo que la CPU repite sin parar"
+  mundo: 01-la-maquina
+  tema: cpu
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué tres pasos repite la CPU con cada instrucción, y en qué orden?"
+  opciones:
+    - "Buscar, decodificar, ejecutar"
+    - "Decodificar, buscar, ejecutar"
+    - "Compilar, buscar, ejecutar"
+    - "Ejecutar, guardar, buscar"
+  correcta: 0
+  solucion: |
+    Primero trae la instrucción a la que apunta el contador de programa (buscar, *fetch*), luego averigua qué es (decodificar, *decode*) y por último la hace (ejecutar, *execute*).
+    - No se puede decodificar una instrucción que aún no se ha traído.
+    - Compilar no es parte del ciclo: lo hace `rustc` una sola vez, antes de ejecutar.
+    - «Guardar» no es un paso del ciclo, y ejecutar no puede ir antes de buscar.
+  etiquetas: ["fetch-decode-execute"]
+
+- id: m01-cpu-pasos
+  titulo: "Paso a paso"
+  mundo: 01-la-maquina
+  tema: cpu
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m01/cpu-pasos
+  opciones: ["`7`", "`10`", "`5`", "`4`"]
+  correcta: 0
+  solucion: |
+    Las instrucciones se ejecutan en orden: 0 + 5 = 5; 5 × 2 = 10; 10 − 3 = 7.
+    - 10 es el valor tras el paso 2: falta restar 3.
+    - 5 es el valor tras el paso 1.
+    - 4 saldría restando antes de multiplicar, pero el orden es el del texto.
+  etiquetas: ["instrucciones"]
+
+- id: m01-cpu-juguete
+  titulo: "La CPU de juguete"
+  mundo: 01-la-maquina
+  tema: cpu
+  dificultad: media
+  tipo: predice
+  enunciado: "La CPU de juguete ejecuta la memoria `[1, 7, 3, 1, 5, 2, 0]` (1 = cargar, 2 = A + B en A, 3 = copiar A en B, 0 = parar). ¿Qué muestra la línea de la instrucción «sumar»?"
+  ej: m01/cpu-juguete
+  opciones:
+    - "`sumar A + B en A      -> A=12 B=7`"
+    - "`sumar A + B en A      -> A=12 B=5`"
+    - "`sumar A + B en A      -> A=10 B=5`"
+    - "`sumar A + B en A      -> A=14 B=7`"
+  correcta: 0
+  solucion: |
+    Se carga 7 en A, se copia en B (B = 7), se carga 5 en A y se suma: A = 5 + 7 = 12, B sigue en 7.
+    - B no cambia al cargar 5: «cargar» solo escribe en A.
+    - 10 sería 5 + 5, pero B guarda el 7 que se copió antes.
+    - 14 sería 7 + 7, pero A ya se había sobrescrito con el 5.
+  etiquetas: ["registros", "contador de programa"]
+
+- id: m01-registro
+  titulo: "Casillas dentro de la CPU"
+  mundo: 01-la-maquina
+  tema: cpu
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué es un **registro**?"
+  opciones:
+    - "Una casilla diminuta y muy rápida dentro de la CPU"
+    - "Una zona de la memoria RAM"
+    - "La lista de instrucciones del programa"
+    - "Un archivo donde se anotan los errores"
+  correcta: 0
+  solucion: |
+    Los registros están dentro de la CPU, son pocos y son lo más rápido del ordenador. La CPU opera con los valores que tiene en ellos.
+    - La RAM está fuera de la CPU, es mucho más grande y más lenta.
+    - Las instrucciones están en la memoria; un registro especial (el contador de programa) solo dice dónde está la próxima.
+    - Ese es otro significado de la palabra fuera de la CPU.
+  etiquetas: ["registros"]
+
+- id: m01-contador-programa
+  titulo: "¿Por dónde vamos?"
+  mundo: 01-la-maquina
+  tema: cpu
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué guarda el **contador de programa** (*program counter*)?"
+  opciones:
+    - "La posición de la próxima instrucción"
+    - "Cuántas instrucciones se han ejecutado"
+    - "El resultado de la última operación"
+    - "Cuántos registros tiene la CPU"
+  correcta: 0
+  solucion: |
+    El paso «buscar» lee la instrucción a la que apunta el contador y lo avanza. Por eso en la CPU de juguete `pc` avanza dos veces con «cargar», que lleva un dato.
+    - No es un contador de instrucciones ejecutadas: un salto puede llevarlo atrás o adelante.
+    - El resultado va en otro registro (en la CPU de juguete, en A).
+    - El número de registros es fijo y no se guarda en ningún registro.
+  etiquetas: ["contador de programa"]
+
+- id: m01-codigo-maquina
+  titulo: "Lo que entiende la CPU"
+  mundo: 01-la-maquina
+  tema: cpu
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué entiende directamente la CPU?"
+  opciones:
+    - "Código máquina: instrucciones guardadas como bytes"
+    - "El código Rust de `main.rs`"
+    - "Cualquier texto con instrucciones en inglés"
+    - "Los mensajes de error de `rustc`"
+  correcta: 0
+  solucion: |
+    La CPU solo ejecuta código máquina. `rustc` traduce tu programa a código máquina antes de ejecutarlo; por eso muchos errores aparecen al compilar.
+    - La CPU nunca lee `main.rs`: lo lee el compilador.
+    - Un texto no es una instrucción para la CPU hasta que se traduce a bytes de código máquina.
+    - Los errores son para ti, no para la CPU.
+  etiquetas: ["código máquina", "rustc"]
+
+- id: m01-usize-navegador
+  titulo: "El tamaño de una dirección"
+  mundo: 01-la-maquina
+  tema: memoria
+  dificultad: facil
+  tipo: predice
+  enunciado: "Este programa se ejecuta en el navegador (wasm32). ¿Qué imprime?"
+  ej: m01/tamano-direccion
+  opciones: ["`4`", "`8`", "`32`", "`1`"]
+  correcta: 0
+  solucion: |
+    En wasm32 una dirección (y por tanto un `usize`) mide 32 bits = 4 bytes.
+    - 8 bytes es lo que mide en un PC de 64 bits.
+    - `size_of` cuenta bytes, no bits.
+    - Con 1 byte solo habría 256 direcciones posibles.
+  etiquetas: ["usize", "size_of", "wasm32"]
+
+- id: m01-casilla-byte
+  titulo: "Una casilla, un…"
+  mundo: 01-la-maquina
+  tema: memoria
+  dificultad: facil
+  tipo: opcion
+  enunciado: "La memoria se numera casilla a casilla. ¿Qué guarda cada casilla con dirección propia?"
+  opciones: ["Un byte", "Un bit", "Una variable completa", "Un `u32`"]
+  correcta: 0
+  solucion: |
+    Cada dirección corresponde a un byte.
+    - Un bit suelto no tiene dirección propia.
+    - Una variable de varios bytes ocupa varias casillas seguidas; su dirección es la de la primera.
+    - Un `u32` ocupa 4 casillas.
+  etiquetas: ["dirección", "byte"]
+
+- id: m01-distancia-array
+  titulo: "Vecinos en memoria"
+  mundo: 01-la-maquina
+  tema: memoria
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la **primera** línea?"
+  ej: m01/casillas-seguidas
+  opciones:
+    - "`de [0] a [1] hay 4 bytes`"
+    - "`de [0] a [1] hay 1 bytes`"
+    - "`de [0] a [1] hay 32 bytes`"
+    - "`de [0] a [1] hay 100 bytes`"
+  correcta: 0
+  solucion: |
+    Los elementos de un array van seguidos, y cada `u32` ocupa 4 bytes.
+    - 1 sería contar elementos, pero las direcciones cuentan bytes.
+    - 32 son los bits de un `u32`, no los bytes.
+    - 100 es el valor del elemento `[0]`, no su tamaño.
+  etiquetas: ["array", "dirección"]
+
+- id: m01-direccion-fija
+  titulo: "La dirección de la otra vez"
+  mundo: 01-la-maquina
+  tema: memoria
+  dificultad: media
+  tipo: opcion
+  enunciado: "Imprimes la dirección de `x` con `{:p}` y sale cierto número. ¿Puedes contar con que la próxima ejecución salga el mismo?"
+  opciones:
+    - "No: depende de la máquina, del sistema y de cada ejecución"
+    - "Sí: cada variable tiene una dirección fija para siempre"
+    - "Sí, pero solo si no cambias el código"
+    - "No, porque `{:p}` imprime un número al azar"
+  correcta: 0
+  solucion: |
+    Cada programa tiene su espacio de direcciones virtual, y dónde cae cada dato depende de muchos factores. Lo fiable son las distancias entre datos que van seguidos a propósito, como en un array.
+    - Las direcciones no son fijas: se asignan al ejecutar.
+    - Aun con el mismo código, otra máquina u otro sistema puede colocar los datos en otro sitio.
+    - `{:p}` imprime la dirección real de ese momento, no un número al azar.
+  etiquetas: ["dirección", "{:p}", "memoria virtual"]
+
+- id: m01-size-u32
+  titulo: "Bits o bytes"
+  mundo: 01-la-maquina
+  tema: binario
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m01/tamano-u32
+  opciones: ["`4`", "`32`", "`8`", "`2`"]
+  correcta: 0
+  solucion: |
+    `u32` son 32 bits, y 32 ÷ 8 = 4 bytes. `size_of` cuenta bytes.
+    - 32 son los bits.
+    - 8 son los bits de un byte (o los bytes de un `u64`).
+    - 2 bytes es un `u16`.
+  etiquetas: ["size_of", "u32"]
+
+- id: m01-valores-byte
+  titulo: "¿Cuántos caben?"
+  mundo: 01-la-maquina
+  tema: binario
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuántos valores distintos puede tomar un byte? Escribe solo el número."
+  respuestas: ["256"]
+  solucion: |
+    8 bits con 2 posibilidades cada uno: 2⁸ = 256. Si se leen sin signo, van del 0 al 255. (255 es el máximo, no la cantidad de valores: falta contar el 0.)
+  etiquetas: ["byte", "2^8"]
+
+- id: m01-byte-tipo
+  titulo: "El mismo byte, otro tipo"
+  mundo: 01-la-maquina
+  tema: binario
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la **última** línea?"
+  ej: m01/un-byte-tres-lecturas
+  opciones:
+    - "`como i8:      -1`"
+    - "`como i8:      255`"
+    - "`como i8:      -127`"
+    - "`como i8:      -255`"
+  correcta: 0
+  solucion: |
+    Los bits `11111111` leídos como `i8` (complemento a dos) son −128 + 127 = −1. El byte no cambia: cambia el tipo.
+    - 255 es la lectura como `u8`; un `i8` no llega a 255.
+    - −127 sería `10000001`.
+    - −255 ni siquiera cabe en un `i8`, cuyo mínimo es −128.
+  etiquetas: ["as", "i8", "u8"]
+
+- id: m01-bool-byte
+  titulo: "Un bit que ocupa un byte"
+  mundo: 01-la-maquina
+  tema: binario
+  dificultad: media
+  tipo: opcion
+  enunciado: "`size_of::<bool>()` devuelve 1. ¿Por qué ocupa un byte si un `bool` solo necesita un bit?"
+  ej: m01/tamanos
+  opciones:
+    - "Porque la memoria se numera por bytes y un bit suelto no tiene dirección"
+    - "Porque Rust guarda `true` como el texto «true»"
+    - "Porque los otros 7 bits guardan una copia de seguridad"
+    - "Porque `size_of` redondea siempre hacia arriba a 1"
+  correcta: 0
+  solucion: |
+    La unidad direccionable es el byte. Rust guarda `false` como `00000000` y `true` como `00000001`.
+    - No es texto: es un byte con valor 0 o 1.
+    - Los 7 bits sobrantes valen siempre 0.
+    - `size_of` no redondea: da el tamaño real del tipo, que en este caso es 1 byte.
+  etiquetas: ["bool", "size_of"]
+
+- id: m01-binario-5
+  titulo: "El 5 en ocho cifras"
+  mundo: 01-la-maquina
+  tema: binario
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m01/binario-predice
+  opciones: ["`00000101`", "`101`", "`10100000`", "`00000005`"]
+  correcta: 0
+  solucion: |
+    5 = 4 + 1 → `101`, y `08` rellena con ceros a la izquierda hasta 8 cifras.
+    - `101` es lo que daría `{:b}` sin el `08`.
+    - Los ceros van a la izquierda; `10100000` es 160.
+    - En binario solo hay ceros y unos.
+  etiquetas: ["{:08b}"]
+
+- id: m01-binario-42
+  titulo: "Leer un byte"
+  mundo: 01-la-maquina
+  tema: binario
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuánto vale en decimal `0b0010_1010`? Escribe solo el número."
+  ej: m01/binario-reto
+  respuestas: ["42"]
+  solucion: |
+    Las posiciones encendidas valen 32, 8 y 2: 32 + 8 + 2 = 42. Los `_` solo separan visualmente; no cambian el valor.
+  etiquetas: ["0b", "binario"]
+
+- id: m01-sin-ceros
+  titulo: "Los ceros que se van"
+  mundo: 01-la-maquina
+  tema: binario
+  dificultad: facil
+  tipo: predice
+  enunciado: "La última línea del programa es `println!(\"{:b}\", 5);`. ¿Qué imprime esa línea?"
+  ej: m01/contar-en-binario
+  opciones: ["`101`", "`00000101`", "`5`", "`0b101`"]
+  correcta: 0
+  solucion: |
+    `{:b}` escribe solo las cifras necesarias, sin ceros a la izquierda.
+    - Para ver 8 cifras hay que pedir `{:08b}`.
+    - La `b` pide binario, no decimal.
+    - El prefijo `0b` solo aparece con `{:#b}`.
+  etiquetas: ["{:b}"]
+
+- id: m01-hex-255
+  titulo: "255 en hex"
+  mundo: 01-la-maquina
+  tema: hexadecimal
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m01/hex-predice
+  opciones: ["`0xff`", "`ff`", "`0x255`", "`0xFF`"]
+  correcta: 0
+  solucion: |
+    255 = 15 × 16 + 15 = `ff`, y `#` añade el prefijo `0x`.
+    - Sin `#` saldría `ff`.
+    - El número hay que pasarlo a base 16; no se copia tal cual.
+    - `{:x}` usa minúsculas; las mayúsculas salen con `{:X}`.
+  etiquetas: ["{:#x}"]
+
+- id: m01-hex-2a
+  titulo: "Del hex al decimal"
+  mundo: 01-la-maquina
+  tema: hexadecimal
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuánto vale `0x2a` en decimal? Escribe solo el número."
+  ej: m01/hexadecimal
+  respuestas: ["42"]
+  solucion: |
+    La cifra de la izquierda vale 16 veces más: 2 × 16 + 10 (la `a`) = 42. El programa de ejemplo lo confirma: `0x2a vale 42`.
+  etiquetas: ["0x", "hexadecimal"]
+
+- id: m01-hex-cifras-u32
+  titulo: "¿Cuántas cifras?"
+  mundo: 01-la-maquina
+  tema: hexadecimal
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuántas cifras hexadecimales hacen falta para escribir un `u32` completo?"
+  opciones: ["8", "4", "32", "16"]
+  correcta: 0
+  solucion: |
+    Cada cifra hex resume 4 bits: 32 ÷ 4 = 8 cifras (2 por cada uno de los 4 bytes).
+    - 4 son los bytes, y cada byte necesita 2 cifras.
+    - 32 son los bits.
+    - 16 es la base del hexadecimal, no el número de cifras.
+  etiquetas: ["nibble", "u32"]
+
+- id: m01-hex-10
+  titulo: "El 10 que no es diez"
+  mundo: 01-la-maquina
+  tema: hexadecimal
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuánto vale `0x10`?"
+  ej: m01/hexadecimal
+  opciones: ["16", "10", "2", "1"]
+  correcta: 0
+  solucion: |
+    En hex, `10` es un dieciséis y cero unidades. En el ejemplo, el 16 sale como `10` con `{:02x}`.
+    - 10 sería leerlo en decimal, ignorando el `0x`.
+    - 2 sería `0b10`, en binario.
+    - 1 es `0x01`.
+  etiquetas: ["0x"]
+
+- id: m01-u8-max
+  titulo: "El tope de un byte"
+  mundo: 01-la-maquina
+  tema: enteros
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m01/u8-max
+  opciones: ["`255`", "`256`", "`128`", "`127`"]
+  correcta: 0
+  solucion: |
+    Ocho bits a 1: 128 + 64 + … + 1 = 255 = 2⁸ − 1.
+    - Hay 256 valores, pero el primero es el 0.
+    - 128 es solo el bit de la izquierda.
+    - 127 es el máximo de un `i8`, que tiene signo.
+  etiquetas: ["u8::MAX"]
+
+- id: m01-u16-max
+  titulo: "El tope de 16 bits"
+  mundo: 01-la-maquina
+  tema: enteros
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuál es el valor máximo de un `u16`? Escribe solo el número, sin separadores."
+  ej: m01/sin-signo
+  respuestas: ["65535"]
+  solucion: |
+    2¹⁶ − 1 = 65 535 (`0xffff`). El ejemplo lo imprime: `u16: de 0 a 65535`. 65 536 es la cantidad de valores, no el máximo.
+  etiquetas: ["u16::MAX"]
+
+- id: m01-checked-none
+  titulo: "Una suma que no cabe"
+  mundo: 01-la-maquina
+  tema: enteros
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la **primera** línea?"
+  ej: m01/no-cabe
+  opciones:
+    - "`255 + 1 comprobado:  None`"
+    - "`255 + 1 comprobado:  Some(256)`"
+    - "`255 + 1 comprobado:  Some(0)`"
+    - "`255 + 1 comprobado:  255`"
+  correcta: 0
+  solucion: |
+    `checked_add` devuelve `None` cuando el resultado no cabe en el tipo; 256 no cabe en un `u8`.
+    - `Some(256)` es imposible: un `u8` no puede valer 256.
+    - Dar la vuelta a 0 es lo que hace `wrapping_add`, no `checked_add`.
+    - Quedarse en el máximo es lo que hace `saturating_add` (Mundo 3).
+  etiquetas: ["checked_add", "overflow"]
+
+- id: m01-wrapping
+  titulo: "Dar la vuelta"
+  mundo: 01-la-maquina
+  tema: enteros
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la **segunda** línea?"
+  ej: m01/no-cabe
+  opciones:
+    - "`255 + 1 con vuelta:  0`"
+    - "`255 + 1 con vuelta:  256`"
+    - "`255 + 1 con vuelta:  255`"
+    - "`255 + 1 con vuelta:  1`"
+  correcta: 0
+  solucion: |
+    255 + 1 = `1_0000_0000` en binario: 9 bits. En un `u8` caben 8, el bit de delante se pierde y queda 0.
+    - 256 no cabe en un `u8`.
+    - Quedarse en 255 sería saturar, no dar la vuelta.
+    - Se pierde el bit de delante; los 8 de detrás son todos 0.
+  etiquetas: ["wrapping_add", "overflow"]
+
+- id: m01-menos-uno-bits
+  titulo: "Los bits del −1"
+  mundo: 01-la-maquina
+  tema: complemento-a-dos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m01/menos-uno-predice
+  opciones: ["`11111111`", "`10000001`", "`-0000001`", "`00000001`"]
+  correcta: 0
+  solucion: |
+    En complemento a dos, −1 son todos los bits a 1: −128 + 64 + 32 + 16 + 8 + 4 + 2 + 1 = −1.
+    - `10000001` es −127 en complemento a dos («signo y valor» no es lo que usa la máquina).
+    - En los bits no hay sitio para un «−».
+    - `00000001` es +1.
+  etiquetas: ["i8", "{:08b}"]
+
+- id: m01-receta-negar
+  titulo: "Cambiar de signo con bits"
+  mundo: 01-la-maquina
+  tema: complemento-a-dos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "En complemento a dos, ¿cómo se obtiene −x a partir de los bits de x?"
+  ej: m01/complemento-a-dos
+  opciones:
+    - "Invirtiendo todos los bits y sumando 1 (`!x + 1`)"
+    - "Cambiando solo el bit de la izquierda"
+    - "Invirtiendo todos los bits, sin sumar nada"
+    - "Leyendo los bits de derecha a izquierda"
+  correcta: 0
+  solucion: |
+    El ejemplo lo muestra: 5 = `00000101`, `!5` = `11111010`, `!5 + 1` = `11111011` = −5.
+    - Cambiar solo el bit de signo daría `10000101` = −123, no −5.
+    - Invertir sin sumar da −x − 1 (para el 5, −6).
+    - Leer al revés no tiene nada que ver con el signo.
+  etiquetas: ["!", "negación"]
+
+- id: m01-i8-rango
+  titulo: "El rango torcido"
+  mundo: 01-la-maquina
+  tema: complemento-a-dos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál es el rango de un `i8`?"
+  ej: m01/sin-opuesto
+  opciones: ["De −128 a 127", "De −127 a 127", "De −128 a 128", "De 0 a 255"]
+  correcta: 0
+  solucion: |
+    El bit de la izquierda vale −128; los otros siete suman como mucho 127. El ejemplo imprime `i8: de -128 a 127`.
+    - −127 a 127 tendría dos ceros; el complemento a dos aprovecha esa combinación para el −128.
+    - 128 no cabe: necesitaría el bit que vale −128.
+    - 0 a 255 es el rango de un `u8`.
+  etiquetas: ["i8::MIN", "i8::MAX"]
+
+- id: m01-sin-opuesto
+  titulo: "El que no tiene opuesto"
+  mundo: 01-la-maquina
+  tema: complemento-a-dos
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la **última** línea?"
+  ej: m01/sin-opuesto
+  opciones:
+    - "`opuesto de -128: None`"
+    - "`opuesto de -128: Some(128)`"
+    - "`opuesto de -128: Some(127)`"
+    - "`opuesto de -128: Some(-128)`"
+  correcta: 0
+  solucion: |
+    El opuesto de −128 sería 128, que no cabe en un `i8`; `checked_neg` lo dice con `None`.
+    - 128 no es un valor posible de `i8`.
+    - 127 no es el opuesto de −128: `checked_neg` nunca devuelve un resultado aproximado.
+    - `checked_neg` no da la vuelta: devuelve `None` cuando no cabe.
+  etiquetas: ["checked_neg", "i8::MIN"]
+
+- id: m01-200-como-i8
+  titulo: "Doscientos con signo"
+  mundo: 01-la-maquina
+  tema: complemento-a-dos
+  dificultad: media
+  tipo: respuesta
+  enunciado: "Los bits `11001000` valen 200 como `u8`. ¿Cuánto valen como `i8`? Escribe el número con su signo."
+  ej: m01/complemento-a-dos
+  respuestas: ["-56", "−56"]
+  solucion: |
+    −128 + 64 + 8 = −56. Otra forma: un byte con el bit de signo a 1 vale con signo lo mismo que sin signo menos 256: 200 − 256 = −56. El ejemplo imprime `11001000 como u8 = 200, como i8 = -56`.
+  etiquetas: ["as", "i8"]
+
+- id: m01-decimas
+  titulo: "0.1 + 0.2"
+  mundo: 01-la-maquina
+  tema: flotantes
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m01/decimas-predice
+  opciones: ["`false`", "`true`", "No compila", "`0.3`"]
+  correcta: 0
+  solucion: |
+    0.1 y 0.2 no tienen representación binaria exacta; la suma da `0.30000000000000004`, que no es el 0.3 guardado.
+    - Con papel y lápiz sería `true`, pero la máquina guarda aproximaciones.
+    - Los flotantes sí se pueden comparar con `==`; lo que pasa es que el resultado engaña.
+    - Se imprime un `bool`, no la suma.
+  etiquetas: ["f64", "IEEE 754"]
+
+- id: m01-partes-f32
+  titulo: "Las tres piezas de un f32"
+  mundo: 01-la-maquina
+  tema: flotantes
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cómo se reparten los 32 bits de un `f32`?"
+  ej: m01/bits-de-un-f32
+  opciones:
+    - "1 de signo, 8 de exponente y 23 de mantisa"
+    - "1 de signo, 11 de exponente y 20 de mantisa"
+    - "16 para la parte entera y 16 para la decimal"
+    - "8 de signo, 8 de exponente y 16 de mantisa"
+  correcta: 0
+  solucion: |
+    Es el formato binary32 de IEEE 754. Un `f64` usa 1 + 11 + 52.
+    - 11 bits de exponente son los de un `f64`.
+    - No hay parte entera y decimal separadas: es notación científica en base 2.
+    - El signo es un solo bit.
+  etiquetas: ["f32", "IEEE 754"]
+
+- id: m01-nan
+  titulo: "Ni igual a sí mismo"
+  mundo: 01-la-maquina
+  tema: flotantes
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la línea que compara `NaN == NaN`?"
+  ej: m01/flotantes-especiales
+  opciones:
+    - "`NaN == NaN: false`"
+    - "`NaN == NaN: true`"
+    - "Un pánico al comparar"
+    - "`NaN == NaN: NaN`"
+  correcta: 0
+  solucion: |
+    NaN no es igual a nada, ni a sí mismo. Para detectarlo se usa `is_nan()`.
+    - Cualquier otro valor sí es igual a sí mismo; NaN es la excepción.
+    - Comparar flotantes nunca entra en pánico.
+    - `==` siempre devuelve un `bool`.
+  etiquetas: ["NaN", "is_nan"]
+
+- id: m01-sesgo
+  titulo: "Quitar el sesgo"
+  mundo: 01-la-maquina
+  tema: flotantes
+  dificultad: media
+  tipo: respuesta
+  enunciado: "Los 8 bits de exponente de un `f32` guardan el número 130. ¿Cuál es el exponente real (la potencia de 2)? Escribe solo el número."
+  respuestas: ["3"]
+  solucion: |
+    Al exponente real se le suma un sesgo de 127 para guardarlo; para recuperarlo se resta: 130 − 127 = 3. Ejemplos verificados: el 1.0 guarda 127 (2⁰) y el 2.0 guarda 128 (2¹).
+  etiquetas: ["sesgo", "exponente"]
+
+- id: m01-float-bits-2
+  titulo: "Un exponente más"
+  mundo: 01-la-maquina
+  tema: flotantes
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "`f32::from_bits(0x3f80_0000)` es 1.0. ¿Qué bits dan 2.0?"
+  ej: m01/float-reto
+  opciones: ["`0x4000_0000`", "`0x3f80_0001`", "`0x7f00_0000`", "`0xbf80_0000`"]
+  correcta: 0
+  solucion: |
+    2.0 tiene el mismo signo y la misma mantisa que 1.0, pero un exponente más: 127 (`01111111`) pasa a 128 (`10000000`), y los bits quedan `0x40000000`.
+    - Sumar 1 al final toca la **mantisa** y da un número apenas mayor que 1.
+    - `0x7f00_0000` es duplicar todo el número entero de bits, no el valor.
+    - `0xbf80_0000` solo enciende el bit de signo: es −1.0.
+  etiquetas: ["from_bits", "exponente"]
+
+- id: m01-le-orden
+  titulo: "Bytes al revés"
+  mundo: 01-la-maquina
+  tema: endianness
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m01/orden-predice
+  opciones: ["`78 56 34 12`", "`12 34 56 78`", "`87 65 43 21`", "`12345678`"]
+  correcta: 0
+  solucion: |
+    `to_le_bytes` pone primero el byte menos significativo.
+    - `12 34 56 78` es el orden big-endian (`to_be_bytes`).
+    - Se invierten los bytes, no las cifras: `78` sigue siendo `78`.
+    - Cada byte se imprime por separado con un espacio.
+  etiquetas: ["to_le_bytes", "little-endian"]
+
+- id: m01-le-300
+  titulo: "Leer con el orden equivocado"
+  mundo: 01-la-maquina
+  tema: endianness
+  dificultad: media
+  tipo: predice
+  enunciado: "Los bytes `[0x2c, 0x01, 0x00, 0x00]`, ¿qué dan con `u32::from_le_bytes`? (Es la penúltima línea del programa.)"
+  ej: m01/orden-de-los-bytes
+  opciones:
+    - "`leídos como le: 300`"
+    - "`leídos como le: 738263040`"
+    - "`leídos como le: 44`"
+    - "`leídos como le: 2c010000`"
+  correcta: 0
+  solucion: |
+    En little-endian el primer byte es el de menos peso: el número es `0x0000012c` = 300.
+    - 738 263 040 (`0x2c010000`) es la lectura big-endian.
+    - 44 (`0x2c`) es solo el primer byte.
+    - `{}` imprime en decimal, no en hex.
+  etiquetas: ["from_le_bytes", "from_be_bytes"]
+
+- id: m01-red-be
+  titulo: "El orden de la red"
+  mundo: 01-la-maquina
+  tema: endianness
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Un número de 2 bytes llega por la red como `[0x1f, 0x90]`. ¿Con qué función lo lees para obtener 8080?"
+  ej: m01/orden-reto
+  opciones: ["`u16::from_be_bytes`", "`u16::from_le_bytes`", "`u16::from_ne_bytes`", "Da igual: todas dan 8080"]
+  correcta: 0
+  solucion: |
+    Los protocolos de red usan big-endian: `0x1f90` = 8080.
+    - `from_le_bytes` da `0x901f` = 36 895.
+    - `from_ne_bytes` usa el orden de tu máquina (little-endian en un PC o en el navegador), así que también daría 36 895.
+    - El orden cambia el resultado en cuanto el número tiene más de un byte.
+  etiquetas: ["big-endian", "red"]
+
+- id: m01-u8-sin-orden
+  titulo: "¿A quién no le afecta?"
+  mundo: 01-la-maquina
+  tema: endianness
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿A cuál de estos datos **no** le afecta el orden de los bytes?"
+  opciones: ["Un `u8`", "Un `u32`", "Un `f32`", "Un `i64`"]
+  correcta: 0
+  solucion: |
+    Un solo byte no tiene orden: dentro de un byte los bits no se reordenan.
+    - Un `u32` tiene 4 bytes que se pueden colocar en dos órdenes.
+    - Los flotantes también tienen varios bytes (`f32::to_le_bytes` existe).
+    - Un `i64` tiene 8 bytes.
+  etiquetas: ["endianness"]
+
+- id: m01-anio-len
+  titulo: "Los bytes del año"
+  mundo: 01-la-maquina
+  tema: utf8
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m01/anio-predice
+  opciones: ["`4`", "`3`", "`6`", "`12`"]
+  correcta: 0
+  solucion: |
+    `len()` cuenta bytes: `a` (1) + `ñ` (2) + `o` (1) = 4.
+    - 3 son los caracteres (`chars().count()`).
+    - Solo la ñ ocupa 2 bytes; la a y la o ocupan 1.
+    - Un texto no guarda `char`s de 4 bytes: guarda UTF-8.
+  etiquetas: ["len", "UTF-8", "ñ"]
+
+- id: m01-enie-bytes
+  titulo: "La ñ por dentro"
+  mundo: 01-la-maquina
+  tema: utf8
+  dificultad: media
+  tipo: opcion
+  enunciado: "La ñ tiene el punto de código 241 (`0xf1`). ¿Cuáles son sus bytes en UTF-8?"
+  ej: m01/utf8
+  opciones: ["`c3 b1`", "`f1`", "`00 f1`", "`f1 00 00 00`"]
+  correcta: 0
+  solucion: |
+    241 necesita 8 bits, más de los 7 del formato de 1 byte, así que usa el de 2 bytes `110xxxxx 10xxxxxx`: `11000011 10110001` = `c3 b1`.
+    - `f1` es el número, pero UTF-8 no lo guarda tal cual: un byte suelto que empieza por `1` no es un carácter válido.
+    - `00 f1` sería guardar el número en 2 bytes sin las marcas de UTF-8.
+    - 4 bytes es lo que ocupa un `char` en memoria, no la ñ dentro de un texto.
+  etiquetas: ["UTF-8", "as_bytes", "punto de código"]
+
+- id: m01-indexar
+  titulo: "La letra número 0"
+  mundo: 01-la-maquina
+  tema: utf8
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m01/indexar-texto
+  opciones:
+    - "Un texto no se puede indexar con un número: el byte 0 podría ser solo medio carácter (E0277)"
+    - "Porque los índices empiezan en 1"
+    - "Porque `s` no es `mut`"
+    - "Porque «ñu» tiene caracteres no ingleses y Rust no los admite"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0277]: the type str cannot be indexed by {integer}` y sugiere `.chars().nth()` o `.bytes().nth()`. En «ñu» el byte 0 es `c3`, media ñ.
+    - En Rust los índices empiezan en 0; el problema es indexar texto, no el número.
+    - Leer no necesita `mut`.
+    - Rust admite cualquier carácter Unicode: todo texto es UTF-8.
+  etiquetas: ["E0277", "str", "UTF-8"]
+
+- id: m01-chars-count
+  titulo: "Contar letras de verdad"
+  mundo: 01-la-maquina
+  tema: utf8
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Qué devuelve `\"año\".chars().count()`? Escribe solo el número."
+  ej: m01/utf8
+  respuestas: ["3"]
+  solucion: |
+    `chars()` recorre el texto carácter a carácter: a, ñ, o. El ejemplo imprime `bytes: 4, caracteres: 3`. (4 sería `len()`, que cuenta bytes.)
+  etiquetas: ["chars", "UTF-8"]
+
+- id: m01-string-wasm
+  titulo: "Lo que mide un String"
+  mundo: 01-la-maquina
+  tema: pila-heap
+  dificultad: facil
+  tipo: predice
+  enunciado: "Este programa se ejecuta en el navegador (wasm32). ¿Qué imprime?"
+  ej: m01/tamano-string
+  opciones: ["`12`", "`24`", "`0`", "`4`"]
+  correcta: 0
+  solucion: |
+    La ficha de un `String` son 3 valores del tamaño de un `usize` (puntero, longitud, capacidad): 3 × 4 = 12 en wasm32.
+    - 24 es en un PC de 64 bits (3 × 8).
+    - `size_of` mide el tipo, no un texto concreto; las letras están en el heap.
+    - 4 es un solo `usize`.
+  etiquetas: ["String", "size_of", "wasm32"]
+
+- id: m01-string-pc
+  titulo: "Un String en tu PC"
+  mundo: 01-la-maquina
+  tema: pila-heap
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Este archivo compila para `x86_64-pc-windows-msvc`. ¿Cuánto mide entonces `size_of::<String>()` en un PC de 64 bits?"
+  ej: m01/string-24-en-pc
+  opciones: ["24", "12", "8", "Depende del texto"]
+  correcta: 0
+  solucion: |
+    Las aserciones `const` del archivo se comprueban al compilar, y para x86-64 compila sin errores: un `String` mide 24 bytes y un `usize` 8. Para wasm32 el mismo archivo falla con E0080, porque allí mide 12.
+    - 12 es en wasm32.
+    - 8 es un solo `usize`.
+    - `size_of` no depende del contenido.
+  etiquetas: ["String", "const assert", "x86-64"]
+
+- id: m01-letras-heap
+  titulo: "¿Dónde están las letras?"
+  mundo: 01-la-maquina
+  tema: pila-heap
+  dificultad: facil
+  tipo: opcion
+  enunciado: "En `let nombre = String::from(\"Ana\");`, ¿dónde están las letras A, n, a?"
+  ej: m01/pila-y-heap
+  opciones:
+    - "En el heap; la ficha de la pila apunta a ellas"
+    - "En la pila, dentro de la ficha"
+    - "En un registro de la CPU"
+    - "En ningún sitio: se calculan cada vez"
+  correcta: 0
+  solucion: |
+    `String` guarda sus bytes en el heap para poder crecer; la ficha (puntero, longitud, capacidad) está en la pila. En el ejemplo, `as_ptr()` da una dirección lejos de las de la pila.
+    - La ficha solo tiene tres números.
+    - Los registros son pocos y temporales.
+    - Las letras se guardan de verdad, en el heap.
+  etiquetas: ["String", "heap", "as_ptr"]
+
+- id: m01-pila-criterio
+  titulo: "¿Pila o heap?"
+  mundo: 01-la-maquina
+  tema: pila-heap
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué decide que un dato pueda ir en la pila?"
+  opciones:
+    - "Que su tamaño se conozca al compilar y no cambie"
+    - "Que ocupe menos de 8 bytes"
+    - "Que sea un número"
+    - "Que se use poco"
+  correcta: 0
+  solucion: |
+    La pila coloca y quita marcos de tamaño fijo, así que necesita saber cuánto ocupa cada dato al compilar.
+    - Un array de 1000 `u32` (4000 bytes) va en la pila; lo que importa es conocer el tamaño, no que sea pequeño.
+    - Un `bool`, un array o la ficha de un `String` también van en la pila.
+    - Cuánto se use no influye.
+  etiquetas: ["pila", "heap"]
+
+- id: m01-orden-drop
+  titulo: "Quién se va primero"
+  mundo: 01-la-maquina
+  tema: pila-heap
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprimen las **dos últimas** líneas?"
+  ej: m01/orden-de-liberar-predice
+  opciones:
+    - "`libero c` y luego `libero a`"
+    - "`libero a` y luego `libero c`"
+    - "`libero b` y luego `libero c`"
+    - "`fin de main` y luego `libero a`"
+  correcta: 0
+  solucion: |
+    Al final de `main` quedan `a` y `c`, y se liberan en orden inverso al de creación: primero `c`, luego `a`.
+    - Es al revés: la última en crearse es la primera en liberarse.
+    - `b` ya se liberó antes, al cerrar su bloque.
+    - `fin de main` sale antes de las liberaciones, que ocurren en la `}` final.
+  etiquetas: ["drop", "ámbito"]
+
+- id: m01-movido
+  titulo: "Dos dueños para un texto"
+  mundo: 01-la-maquina
+  tema: pila-heap
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m01/dos-duenos
+  opciones:
+    - "`let b = a;` mueve el `String` a `b`, y `a` ya no se puede usar (E0382)"
+    - "Porque dos variables no pueden guardar el mismo texto"
+    - "Porque falta `mut` en `a`"
+    - "Porque `println!` no puede mostrar dos variables a la vez"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0382]: borrow of moved value: a`. Si `a` siguiera valiendo, habría dos fichas apuntando a las mismas letras y, al final, dos liberaciones del mismo hueco (doble liberación). La sugerencia de rustc, `a.clone()`, crea una copia independiente.
+    - Dos variables sí pueden tener textos iguales, cada una con su propia copia (`clone`).
+    - No se modifica nada: `mut` no tiene que ver.
+    - `println!` admite tantos valores como quieras.
+  etiquetas: ["E0382", "mover", "propiedad"]
+
+- id: m01-tres-errores
+  titulo: "Devolver dos veces"
+  mundo: 01-la-maquina
+  tema: pila-heap
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Dos partes de un programa devuelven al asignador el mismo hueco del heap. ¿Cómo se llama este error?"
+  opciones: ["Doble liberación", "Fuga de memoria", "Uso tras liberar", "Desbordamiento de pila"]
+  correcta: 0
+  solucion: |
+    Es una doble liberación (*double free*). Rust la evita porque cada valor tiene un solo dueño, que lo libera una sola vez.
+    - Una fuga es lo contrario: nadie lo devuelve.
+    - Uso tras liberar es seguir leyendo o escribiendo memoria ya devuelta.
+    - El desbordamiento de pila es quedarse sin espacio en la pila, no tiene que ver con el heap.
+  etiquetas: ["double free", "propiedad"]

@@ -1,0 +1,92 @@
+---
+title: "Coerciones"
+description: "Las conversiones de tipo que el compilador hace solo: dónde pueden ocurrir y entre qué tipos."
+sidebar:
+  order: 102
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Una **coerción** es una conversión de tipo **implícita**: el compilador la hace sin que escribas `as` ni llames a nada. Son pocas, y solo ocurren en sitios concretos.
+
+## En una frase
+
+Cuando el tipo esperado se conoce (por una anotación, un parámetro, un campo o un retorno), el compilador puede convertir, por ejemplo, `&String` en `&str`, `&[T; N]` en `&[T]` o `&T` en `&dyn Trait`.
+
+## La regla, paso a paso
+
+### Dónde pueden ocurrir (sitios de coerción)
+
+- `let` **con tipo explícito**: `let s: &str = &cadena;`
+- inicializadores de `static` y `const`;
+- **argumentos** de una llamada (el parámetro fija el tipo);
+- campos al construir un struct, enum o union;
+- el valor devuelto por una función (última expresión o `return`);
+- la parte derecha de una asignación.
+
+Si una de esas expresiones es un array, una tupla, un bloque o un paréntesis, la coerción se propaga a sus partes.
+
+Donde **no** ocurren: cuando el tipo se está **deduciendo** (por ejemplo, el argumento de una función genérica `fn f<T>(x: T)`), ni «dentro» de otro tipo: `Vec<&String>` no se convierte en `Vec<&str>`.
+
+### Qué conversiones existen
+
+| De | A | Nombre |
+|---|---|---|
+| `T` | `U` si `T` es subtipo de `U` | subtipado (tiempos de vida) |
+| `&mut T` | `&T` | |
+| `*mut T` | `*const T` | |
+| `&T` / `&mut T` | `*const T` / `*mut T` | |
+| `&T` o `&mut T` | `&U` si `T: Deref<Target = U>` | *deref coercion* (`&String` → `&str`, `&Box<T>` → `&T`, `&Vec<T>` → `&[T]`) |
+| `&mut T` | `&mut U` si `T: DerefMut<Target = U>` | |
+| `&[T; N]`, `Box<[T; N]>`… | `&[T]`, `Box<[T]>`… | *unsize* |
+| `&T`, `Box<T>`… | `&dyn Trait`, `Box<dyn Trait>`… si `T: Trait` | *unsize* |
+| `&dyn Sub` | `&dyn Super` | conversión al supertrait (1.86) |
+| item de función | `fn(…) -> …` | |
+| closure **sin capturas** | `fn(…) -> …` | |
+| `!` | cualquier tipo | |
+
+La deref coercion puede aplicarse **varias veces** seguidas (`&Rc<String>` → `&String` → `&str`).
+
+### Coerción de «tipo común»
+
+En las ramas de un `if`/`match` o en los elementos de un array, el compilador busca un tipo común. Por ejemplo, si una rama es un item de función y otra otro distinto, ambas se convierten a puntero a función.
+
+### Coerciones y llamadas a métodos
+
+La llamada `x.metodo()` no usa coerciones, sino **autorreferencia y autodesreferencia**: el compilador prueba `x`, `&x`, `&mut x`, `*x`, `&*x`… hasta encontrar un método que encaje.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/coerciones-sitios" />
+
+Salida:
+
+```text
+4
+6
+42
+5
+20 11
+Toby
+1
+true
+```
+
+## Errores típicos
+
+<NoCompila ej="ref-lenguaje/coerciones-error" />
+
+`error[E0308]: mismatched types` con `expected &[&str], found &Vec<&String>`. El `&Vec` sí se convertiría en slice, pero sus **elementos** `&String` no se convierten uno a uno. El arreglo los convierte con `map(|s| s.as_str())`.
+
+## Desde
+
+Rust 1.0. Conversión al supertrait: 1.86. Desde 1.98, un `&mut` puede acortar su tiempo de vida en una coerción *unsize* en posición invariante.
+
+## Ver también
+
+- [Subtipos y varianza](/ref/lenguaje/subtipos-y-varianza/) · [`as`](/ref/lenguaje/palabras-clave/as/) (conversiones explícitas) · [`dyn`](/ref/lenguaje/palabras-clave/dyn/) · [Tipos](/ref/lenguaje/tipos/)
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

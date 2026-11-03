@@ -1,0 +1,130 @@
+---
+title: "Casillas con número"
+description: "Entiende la memoria como una fila de casillas numeradas y aprende a ver dónde vive cada dato de tu programa."
+sidebar:
+  order: 2
+duracion: 10
+desde: "1.0"
+requiere: ["01-la-maquina/01-el-procesador"]
+tarjetas:
+  - p: "¿Qué es una dirección de memoria?"
+    r: "El número de una casilla de la memoria. Cada casilla guarda un byte, y cada byte tiene su propia dirección."
+  - p: "¿Qué muestra `{:p}` en un `println!`?"
+    r: "La dirección de memoria de un dato (de una referencia a él, como `&x`), escrita en hexadecimal."
+  - p: "¿Cuánto mide una dirección en el navegador (wasm32)? ¿Y en un PC de 64 bits?"
+    r: "4 bytes en wasm32 y 8 bytes en un PC de 64 bits. Es lo mismo que mide un `usize`."
+  - p: "¿Puedes contar con que un dato tenga la misma dirección cada vez que ejecutas el programa?"
+    r: "No. Las direcciones dependen de la máquina, del sistema y de cada ejecución. Lo que sí se puede razonar es la distancia entre datos que van seguidos."
+---
+
+import { Ejecutar, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Vas a ver dónde guarda tu programa sus datos: en casillas numeradas, una detrás de otra.
+
+## Predice
+
+`std::mem::size_of::<usize>()` pregunta cuántos bytes mide un `usize`, el tipo de número que tiene el tamaño de una dirección de memoria. Este programa se ejecuta **en tu navegador**. ¿Qué imprime?
+
+<Predice
+  ej="m01/tamano-direccion"
+  opciones={["`4`", "`8`", "`1`", "`64`"]}
+  correcta={0}
+  explicacion="El navegador ejecuta WebAssembly de 32 bits (`wasm32`): sus direcciones miden 32 bits, es decir, **4 bytes**. En un PC de 64 bits este mismo programa imprimiría 8."
+  porque={["Correcto: 32 bits = 4 bytes.", "8 sería en un PC de 64 bits. Aquí el programa corre en wasm32, dentro del navegador.", "1 byte solo daría para 256 direcciones distintas: una memoria ridículamente pequeña.", "`size_of` cuenta **bytes**, no bits. 64 bits serían 8 bytes, y además aquí son 32 bits."]}
+/>
+
+## La idea
+
+La **memoria** (*memory*, o *RAM*) es como una calle larguísima de casillas iguales. Cada casilla guarda **un byte** (lo verás en la lección 3: ocho ceros y unos). Y cada casilla tiene un número, igual que cada casa tiene su número en la calle. Ese número es su **dirección** (*address*).
+
+Cuando la CPU necesita un dato, no lo pide por su nombre. Los nombres como `x` o `edad` solo existen en tu código; después de compilar desaparecen. La CPU pide «el byte de la dirección tal». Por eso una dirección es simplemente un número, y mide lo que mida un número de dirección en esa máquina: 4 bytes en `wasm32`, 8 bytes en un PC de 64 bits.
+
+Un dato que ocupa varios bytes, como un número `u32` (4 bytes), ocupa **varias casillas seguidas**. Su dirección es la de la primera.
+
+## Pruébalo
+
+En Rust, `&x` es una **referencia** (*reference*) a `x`: un valor que sabe dónde está `x`. Con `{:p}` (de *pointer*, «puntero»), `println!` escribe esa dirección.
+
+<Ejecutar ej="m01/direcciones" />
+
+Salida real (en tu ejecución los números de las direcciones pueden ser otros):
+
+```text
+x vale 10 y vive en 0xfffc9
+y vale 20 y vive en 0xfffca
+z vale 30 y vive en 0xfffcb
+una dirección mide 4 bytes
+un usize mide 4 bytes
+```
+
+Las direcciones salen en **hexadecimal** (el `0x` del principio). Lo aprenderás en la lección 5. No te fijes en el número concreto. Fíjate en que **cada dato tiene la suya**.
+
+Lo que sí es fiable es la **distancia** entre datos que el programa guarda seguidos a propósito, como los elementos de una lista de tamaño fijo (un *array*):
+
+<Ejecutar ej="m01/casillas-seguidas" />
+
+Salida real:
+
+```text
+de [0] a [1] hay 4 bytes
+de [1] a [2] hay 4 bytes
+un u32 mide 4 bytes
+```
+
+Cada elemento es un `u32` de 4 bytes, y el siguiente empieza justo donde termina el anterior.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Las direcciones que ve tu programa **no son** posiciones físicas de los chips de memoria. El sistema operativo le da a cada programa su propio **espacio de direcciones** (*address space*) imaginario, y el hardware traduce cada dirección a una posición real. A esto se le llama **memoria virtual** (*virtual memory*). Dos programas pueden usar la misma dirección sin pisarse: cada uno ve la suya.
+
+Hay una consecuencia práctica: que un dato tenga una dirección u otra depende del sistema, de la máquina y a veces de cada ejecución. Por eso ningún programa correcto depende del valor exacto de una dirección.
+
+¿Y por qué importa cuánto mide una dirección? Porque limita cuánta memoria se puede numerar. Con direcciones de 4 bytes (32 bits) hay 2³² direcciones distintas, unos 4 000 millones de bytes. Con 8 bytes (64 bits), muchísimas más.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Apuntarse la dirección">
+
+❌ «`x` vive en `0xfffc9`; la próxima vez la buscaré ahí.»
+
+✅ La dirección es válida **solo** mientras el programa está en marcha y el dato existe. En otra ejecución, en otro sistema o en tu PC, `x` puede estar en otro sitio. En Rust nunca escribirás direcciones a mano: usarás **referencias** (`&x`), y el compilador comprobará que siempre apuntan a algo que existe. Eso lo verás a fondo en el mundo de los préstamos.
+
+</Trampa>
+
+## Tu turno
+
+Ordena las líneas para que el programa imprima la dirección de una variable `x`. Sobran dos.
+
+<Ordena
+  lineas={["fn main() {", "    let x: u8 = 7;", '    println!("{:p}", &x);', "}"]}
+  distractores={['    println!("{:p}", x);', "    let x: u8 = 0xfffc9;"]}
+  explicacion="`{:p}` necesita una referencia (`&x`), no el valor `x`. Y una dirección no se elige ni se escribe a mano: `0xfffc9` sería solo un número guardado en `x`, no la dirección de `x`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué guarda cada casilla de la memoria?"
+  opciones={["Un byte", "Un bit", "Una variable entera, mida lo que mida", "Una instrucción completa"]}
+  correcta={0}
+  porque={["Correcto: la memoria se numera de byte en byte.", "Un bit es demasiado pequeño para tener dirección propia; se numeran bytes (grupos de 8 bits).", "Un dato de varios bytes ocupa **varias** casillas seguidas.", "Una instrucción también son bytes, y puede ocupar varias casillas."]}
+/>
+
+<Pregunta
+  pregunta="Un array `[u32; 3]` empieza en cierta dirección. ¿Cuántos bytes más allá empieza el elemento `[2]`?"
+  opciones={["8", "2", "3", "12"]}
+  correcta={0}
+  explicacion="Cada `u32` ocupa 4 bytes: `[0]` en +0, `[1]` en +4, `[2]` en +8."
+  porque={["Correcto: 2 elementos × 4 bytes.", "2 sería contar elementos, no bytes.", "3 es la cantidad de elementos del array.", "12 es lo que ocupa el array **entero**; el `[2]` empieza antes."]}
+/>
+
+<Pregunta
+  pregunta="Ejecutas el mismo programa en el navegador y en tu PC de 64 bits. ¿Qué cambia seguro?"
+  opciones={["El tamaño de una dirección: 4 bytes frente a 8", "El tamaño de un `u32`: 4 bytes frente a 8", "Nada: Rust hace que todo sea idéntico", "El número de bits de un byte"]}
+  correcta={0}
+  porque={["Correcto: `usize` y las direcciones dependen de la máquina.", "Un `u32` mide 4 bytes en cualquier máquina: su nombre lo dice (32 bits).", "Los tamaños de `usize` y de las direcciones sí dependen de la plataforma.", "Un byte son 8 bits en las dos."]}
+/>

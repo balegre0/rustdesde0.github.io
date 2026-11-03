@@ -1,0 +1,85 @@
+---
+title: "E0072: tipo recursivo de tamaño infinito"
+description: "Un struct o enum se contiene a sí mismo directamente, así que su tamaño sería infinito."
+sidebar:
+  order: 13
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` recursive type `Lista` has infinite size ``
+
+## Qué significa
+
+Para guardar un valor en la pila, el compilador necesita saber su **tamaño exacto**. `Lista::Nodo(i32, Lista)` contiene otra `Lista`, que contiene otra… el tamaño no tiene fin. Una `Box<Lista>` mide siempre lo mismo (un puntero), porque el siguiente nodo vive en el montón.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0072" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0072]: recursive type `Lista` has infinite size
+ --> E0072.rs:1:1
+  |
+1 | enum Lista {
+  | ^^^^^^^^^^
+2 |     Nodo(i32, Lista),
+  |               ----- recursive without indirection
+  |
+help: insert some indirection (e.g., a `Box`, `Rc`, or `&`) to break the cycle
+  |
+2 |     Nodo(i32, Box<Lista>),
+  |               ++++     +
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Listas, árboles o grafos que se contienen directamente.
+
+## Cómo arreglarlo
+
+Pon una indirección: `Box<Lista>`, `Option<Box<Nodo>>`, `Rc<...>` o un índice en un `Vec`. rustc lo sugiere en su `help`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+enum Lista {
+    Nodo(i32, Box<Lista>), // un Box mide siempre lo mismo: un puntero
+    Fin,
+}
+
+fn suma(l: &Lista) -> i32 {
+    match l {
+        Lista::Nodo(v, resto) => v + suma(resto),
+        Lista::Fin => 0,
+    }
+}
+
+fn main() {
+    let l = Lista::Nodo(1, Box::new(Lista::Nodo(2, Box::new(Lista::Fin))));
+    println!("{}", suma(&l));
+}
+```
+
+**Salida:**
+
+```text
+3
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0072` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0277](/errores/e0277/): un tipo no implementa el trait que se necesita
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

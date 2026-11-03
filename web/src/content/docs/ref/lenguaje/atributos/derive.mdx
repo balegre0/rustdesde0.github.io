@@ -1,0 +1,57 @@
+---
+title: "#[derive] y #[automatically_derived]"
+description: "derive genera implementaciones de traits a partir de la definición del tipo. Qué traits estándar se pueden derivar y qué hace cada uno."
+sidebar:
+  order: 9
+insignias: ["Desde 1.0", "Derive"]
+---
+import { Ejecutar } from '~/components';
+
+`#[derive(…)]` le pide al compilador que **escriba** implementaciones de traits por ti, a partir de los campos del tipo.
+
+## Sinopsis
+
+```text
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+struct S { … }
+#[derive(Serialize)]   // derives de crates (macros procedurales)
+```
+
+## Qué hace
+
+| Trait | Lo que genera |
+|---|---|
+| `Debug` | formato `{:?}` con el nombre y los campos |
+| `Clone` | `clone()` campo a campo |
+| `Copy` | marca el tipo como copiable (exige `Clone` y que todos los campos sean `Copy`) |
+| `PartialEq`, `Eq` | igualdad campo a campo (en enums, misma variante y mismos datos) |
+| `PartialOrd`, `Ord` | orden **lexicográfico**: por el primer campo, luego el segundo… En enums, por el orden de las variantes |
+| `Hash` | combina el hash de todos los campos |
+| `Default` | todos los campos con su valor por defecto; en enums, la variante marcada `#[default]` |
+
+En tipos genéricos, el derive añade la cota a cada parámetro: `#[derive(Clone)] struct Caja<T>(T)` genera `impl<T: Clone> Clone for Caja<T>`.
+
+Las implementaciones generadas llevan el atributo **`#[automatically_derived]`**, que no tienes que escribir tú: sirve para que el compilador y las herramientas las distingan (por ejemplo, para no contarlas en el análisis de código muerto).
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-derive" />
+
+`a < b` es `true` porque compara `mayor` (igual) y después `menor` (4 < 10).
+
+## Bajo el capó
+
+`derive` es una macro: para los traits estándar la implementa el compilador; para los de crates (`serde::Serialize`) es una macro procedural derive ([`proc_macro_derive`](/ref/lenguaje/atributos/proc_macro/)). Puedes ver el código generado con `cargo expand`.
+
+## Errores típicos
+
+- `#[derive(Copy)]` en un tipo con un campo `String`: E0204.
+- Derivar `PartialOrd` y esperar otro orden: el orden es el de los campos tal como están escritos.
+
+## Desde
+
+Rust 1.0. `#[default]` en enums: 1.62.
+
+## Ver también
+
+[Derive y comparar](/curso/13-traits-y-genericos/08-derive-y-comparar/) · [Macros](/ref/lenguaje/macros/)

@@ -1,0 +1,109 @@
+---
+title: "Vec por dentro: puntero, capacidad y longitud"
+description: "Mira qué hay dentro de un Vec, cómo crece al hacer push y por qué el borrow checker no te deja hacer push mientras tienes un préstamo."
+sidebar:
+  order: 2
+duracion: 13
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/01-vec", "07-prestamos"]
+tarjetas:
+  - p: "¿Qué tres datos guarda un `Vec` en la pila?"
+    r: "Un puntero al bloque del heap, la capacidad (cuántos elementos caben) y la longitud (cuántos hay). 12 bytes en wasm32, 24 en un PC de 64 bits."
+  - p: "¿Qué pasa cuando haces `push` y `len == capacity`?"
+    r: "El Vec reserva un bloque más grande (en la práctica, el doble), copia los elementos y libera el viejo. Los elementos pueden cambiar de dirección."
+  - p: "¿Por qué no compila `let p = &v[0]; v.push(4); println!(\"{p}\");`?"
+    r: "Porque `push` necesita un préstamo exclusivo mientras `p` (compartido) sigue vivo (E0502). Si `push` mudara los datos, `p` apuntaría a memoria liberada: uso tras liberar."
+  - p: "¿Para qué sirve `Vec::with_capacity(n)`?"
+    r: "Para reservar de una vez sitio para `n` elementos y evitar mudanzas sucesivas cuando sabes cuántos vas a meter."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Prestamos } from '~/components';
+
+Vas a abrir un `Vec` y ver sus tres piezas. Con ellas entenderás uno de los errores más famosos del borrow checker.
+
+## Predice
+
+<Predice
+  ej="m11/capacidad-predice"
+  opciones={["`0 4 8 (len 5)`", "`0 1 5 (len 5)`", "`5 5 5 (len 5)`", "`0 1 2 (len 5)`"]}
+  correcta={0}
+  explicacion="Un `Vec` vacío no reserva nada (capacidad 0). En el primer `push` reserva sitio para 4 `u32`. Al llegar al quinto, ya no cabe y duplica: 8."
+  porque={["Correcto (medido en el navegador con rustc 1.99.1).", "La capacidad no crece de uno en uno: eso obligaría a mudarse en cada `push`.", "Un `Vec::new()` empieza sin capacidad.", "La capacidad crece a saltos, no elemento a elemento."]}
+/>
+
+## La idea
+
+Un `Vec<T>` son **tres números** que viven donde viva la variable (normalmente, en la pila):
+
+| Campo | Qué es |
+|---|---|
+| **puntero** (*pointer*) | dirección del bloque de memoria del heap donde están los elementos |
+| **capacidad** (*capacity*) | cuántos elementos **caben** en ese bloque |
+| **longitud** (*length*) | cuántos elementos **hay** de verdad (`len()`) |
+
+Mientras `len < capacity`, un `push` solo escribe el elemento en el hueco siguiente y suma 1 a la longitud. Cuando el bloque está lleno, `push` tiene que **mudarse**: pide un bloque más grande (normalmente el doble), copia allí los elementos, libera el bloque viejo y actualiza el puntero. Duplicar hace que, en promedio, cada `push` cueste poco aunque de vez en cuando toque mudanza.
+
+Esa mudanza es la clave: **después de un `push`, los elementos pueden estar en otra dirección**.
+
+## Pruébalo
+
+<Ejecutar ej="m11/vec-por-dentro" />
+
+En el navegador, el gestor de memoria a veces puede **ampliar el bloque en el mismo sitio** (por eso solo la primera vez se ve «se han movido»). Pero no hay ninguna garantía: en otro momento o en otro sistema, se moverán. El código debe ser correcto en los dos casos.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+```text
+pila (variable v: 12 bytes en wasm32)       heap
+┌──────────┬──────────┬──────────┐         ┌────┬────┬────┬────┬────┬────┬────┬────┐
+│ puntero ─┼────────────────────────────▶  │ 0  │ 1  │ 2  │ 3  │ 4  │ ·· │ ·· │ ·· │
+│          │ cap = 8  │ len = 5  │         └────┴────┴────┴────┴────┴────┴────┴────┘
+└──────────┴──────────┴──────────┘           ◀──── len = 5 ────▶  ◀─ libres ─▶
+```
+
+`size_of::<Vec<T>>()` es siempre tres veces el tamaño de un puntero, **sea cual sea `T`**: los elementos no están dentro de la variable. En un PC de 64 bits son 24 bytes. El orden interno de los tres campos no está garantizado.
+
+Detalles finos de la biblioteca estándar actual: la capacidad mínima de la primera reserva depende del tamaño del elemento (con `u32`, 4); y un `Vec` de un tipo de tamaño cero nunca reserva memoria. `truncate` y `clear` bajan la longitud, pero **no** devuelven memoria; `shrink_to_fit` sí.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Si guardas una referencia a un elemento y luego haces `push`, el `push` podría mudar los datos y tu referencia apuntaría a un bloque **ya liberado**: un **uso tras liberar**. El borrow checker lo impide con su regla de siempre: mientras haya un préstamo compartido vivo, nadie puede tomar uno exclusivo.
+
+<Prestamos lineas={[
+  { codigo: "let mut v = vec![1, 2, 3];", permisos: { v: "RWO" } },
+  { codigo: "let primero = &v[0];", permisos: { v: "R--", primero: "R-O" }, nota: "v pierde W y O mientras primero viva" },
+  { codigo: "v.push(4);", permisos: { v: "R--", primero: "R-O" }, nota: "✗ push necesita W sobre v" },
+  { codigo: "println!(\"{primero}\");", permisos: { v: "RWO" }, nota: "último uso de primero" }
+]} />
+
+<NoCompila
+  ej="m11/push-con-prestamo"
+  explicacion="E0502: no se puede tomar `v` como mutable (para `push`) mientras `primero` lo tiene prestado y se usa después. El arreglo copia el número (`let primero = v[0];`): un `i32` es `Copy`, así que no hay préstamo."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m11/reservar"
+  enunciado="Crea un `Vec<u64>` con `with_capacity(50)`, mete los cuadrados de 1 a 50 y muestra `len 50, cap 50` y `último: 2500`. Así compruebas que no hubo ninguna mudanza."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En wasm32, ¿cuánto ocupa la variable `v` si es un `Vec<u64>` con un millón de elementos?"
+  opciones={["12 bytes (los elementos están en el heap)", "8 000 000 bytes", "8 000 012 bytes", "Depende de la capacidad"]}
+  correcta={0}
+  porque={["Correcto: puntero + capacidad + longitud.", "Eso ocupan los elementos, pero están en el heap, no en la variable.", "La variable solo guarda los tres números.", "La capacidad es un número dentro de la variable; no cambia su tamaño."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué error del programa evita el E0502 de `push` con un préstamo vivo?"
+  opciones={["Un uso tras liberar: la referencia apuntaría al bloque viejo, ya liberado", "Una doble liberación del Vec", "Un desbordamiento de enteros", "Una carrera de datos entre hilos"]}
+  correcta={0}
+  porque={["Correcto: tras la mudanza, el bloque viejo se libera.", "El Vec se libera una sola vez; el problema es la referencia colgante.", "No hay ninguna operación aritmética implicada.", "No hay hilos en el ejemplo."]}
+/>

@@ -1,0 +1,79 @@
+---
+title: "Option: todos los métodos"
+description: "Catálogo completo de los métodos estables de Option<T>, agrupados: preguntar, sacar el valor, transformar, combinar, convertir y modificar en el sitio."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+Todos estos métodos existen en Rust estable 1.99 (comprobado compilando cada uno).
+
+## Preguntar
+
+| Método | Devuelve |
+|---|---|
+| `is_some()`, `is_none()` | `bool` |
+| `is_some_and(p)` | `Some` y además cumple `p` (1.70) |
+| `is_none_or(p)` | `None`, o cumple `p` (1.82) |
+
+## Sacar el valor
+
+| Método | Si es `None`… |
+|---|---|
+| `unwrap()` | pánico |
+| `expect("mensaje")` | pánico con tu mensaje |
+| `unwrap_or(v)` | devuelve `v` |
+| `unwrap_or_else(f)` | devuelve `f()` (solo se llama si hace falta) |
+| `unwrap_or_default()` | devuelve `T::default()` |
+| `unsafe unwrap_unchecked()` | comportamiento indefinido (tú garantizas que es `Some`) |
+
+## Transformar
+
+| Método | Qué hace |
+|---|---|
+| `map(f)` | `Some(x)` → `Some(f(x))` |
+| `map_or(v, f)`, `map_or_else(g, f)` | `map` + valor si es `None` |
+| `and_then(f)` | `f` devuelve otro `Option` (encadenar pasos que pueden faltar) |
+| `filter(p)` | `None` si no cumple `p` |
+| `inspect(f)` | mirar el valor sin cambiarlo (1.76) |
+| `flatten()` | `Option<Option<T>>` → `Option<T>` |
+| `copied()`, `cloned()` | `Option<&T>` → `Option<T>` |
+
+## Combinar
+
+| Método | Resultado |
+|---|---|
+| `and(otro)` | `otro` si este es `Some`; si no, `None` |
+| `or(otro)`, `or_else(f)` | este si es `Some`; si no, `otro` |
+| `xor(otro)` | `Some` si exactamente uno de los dos lo es |
+| `zip(otro)` | `Some((a, b))` si los dos son `Some` |
+| `unzip()` | `Option<(A, B)>` → `(Option<A>, Option<B>)` (1.66) |
+
+## Convertir
+
+| Método | De → a |
+|---|---|
+| `ok_or(e)`, `ok_or_else(f)` | `Option<T>` → `Result<T, E>` |
+| `transpose()` | `Option<Result<T, E>>` → `Result<Option<T>, E>` |
+| `as_ref()`, `as_mut()` | `&Option<T>` → `Option<&T>` / `Option<&mut T>` |
+| `as_deref()`, `as_deref_mut()` | `Option<String>` → `Option<&str>` (por `Deref`) |
+| `iter()`, `iter_mut()`, `as_slice()` | como colección de 0 o 1 elementos (`as_slice`: 1.75) |
+
+## Modificar en el sitio (`&mut self`)
+
+| Método | Qué hace |
+|---|---|
+| `take()` | saca el valor y deja `None` |
+| `take_if(p)` | lo saca solo si cumple `p` (1.80) |
+| `replace(v)` | pone `Some(v)` y devuelve el anterior |
+| `insert(v)` | pone `Some(v)` y devuelve `&mut` al nuevo |
+| `get_or_insert(v)`, `get_or_insert_with(f)` | si es `None`, lo rellena; devuelve `&mut` al valor |
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/cat-option" />
+
+## Ver también
+
+[`Option`](/ref/std/option/option/) · [`Result`: todos los métodos](/ref/std/result/catalogo/) · [Mundo 09](/curso/09-structs-enums-y-patrones/)

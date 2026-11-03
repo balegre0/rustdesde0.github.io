@@ -1,0 +1,69 @@
+---
+title: "break"
+description: "Palabra clave estricta: sale de un bucle o de un bloque etiquetado, opcionalmente con un valor."
+sidebar:
+  order: 5
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`break` termina **ya** el bucle en el que estás. Con un `loop` o un bloque etiquetado, además puede **entregar un valor**.
+
+## Sinopsis
+
+```text
+break                 // sale del bucle más interior
+break 'etiqueta       // sale del bucle o bloque con esa etiqueta
+break valor           // sale de un `loop` y le da un valor
+break 'etiqueta valor // sale de un `loop` o bloque etiquetado con un valor
+```
+
+## Qué hace
+
+### Uso 1 · Salir de un bucle
+
+Dentro de `loop`, `while` o `for`, `break` salta justo después del bucle. Si hay bucles anidados, sale del más interior.
+
+### Uso 2 · Etiquetas
+
+Una etiqueta se escribe `'nombre:` delante de un bucle o de un bloque. `break 'nombre` sale de ese, aunque estés dentro de otros bucles.
+
+### Uso 3 · Devolver un valor
+
+`loop` es una expresión, y su valor es el que lleva el `break`. Lo mismo vale para un **bloque etiquetado** `'b: { … }`. Un `while` o un `for` **no** pueden llevar valor: podrían terminar sin pasar nunca por el `break`, y entonces no habría valor que dar.
+
+El tipo de la expresión `break` en sí es `!` (*never*): el código que la sigue nunca se ejecuta.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-break" />
+
+Salida:
+
+```text
+i = 3
+64
+encontrado: 2 * 3
+no negativo
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-break-error" />
+
+`error[E0571]: break with value from a while loop`. Usa `loop` si necesitas un valor.
+
+## Desde
+
+Rust 1.0. `break valor` en `loop`, desde 1.19. `break` desde un bloque etiquetado cualquiera, desde 1.65.
+
+## Ver también
+
+- [`loop`](/ref/lenguaje/palabras-clave/loop/) · [`continue`](/ref/lenguaje/palabras-clave/continue/) · [`while`](/ref/lenguaje/palabras-clave/while/) · [`for`](/ref/lenguaje/palabras-clave/for/)
+- [Expresiones](/ref/lenguaje/expresiones/): el tipo `!` y la divergencia.
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/)

@@ -1,0 +1,74 @@
+---
+title: "std::future (y std::task)"
+description: "El trait Future, Poll, Context y Waker: las piezas sobre las que funcionan async y .await."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::future, std::task`
+
+## Para qué sirve
+
+Un **future** es un cálculo que quizá todavía no ha terminado. Una `async fn` devuelve un future; `.await` espera a otro future dentro de un `async`. Pero un future **no hace nada solo**: alguien (un **ejecutor**) tiene que llamar a su método `poll` repetidamente. Cada `poll` devuelve `Poll::Ready(valor)` si terminó o `Poll::Pending` si aún no; en ese caso, el future guarda el `Waker` del `Context` para avisar cuando valga la pena volver a sondearlo.
+
+La biblioteca estándar define estas piezas pero **no incluye un ejecutor completo**: normalmente se usa uno de un crate (como Tokio). El ejemplo construye uno mínimo con `Waker::noop()` (estable desde Rust 1.85).
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| `Future` | El trait de los cálculos asíncronos. | 1.36 |
+| `IntoFuture` | Lo que se puede usar con `.await`. | 1.64 |
+| `ready, pending, poll_fn` | Futures sencillos ya hechos. | 1.48 |
+| `Poll` | `Ready(T)` o `Pending`. | 1.36 |
+| `Context, Waker` | Cómo avisa un future de que puede avanzar. | 1.36 |
+
+**Ficha detallada:** [Future, Poll y pin!](/ref/std/future/future-y-pin/)
+
+## Conceptos clave
+
+- **Perezosos**: crear un future (llamar a una `async fn`) no ejecuta nada hasta el primer `poll`.
+- **Máquina de estados**: el compilador convierte cada `async fn` en un tipo que guarda en qué `.await` se quedó y las variables vivas en ese punto.
+- **[E0728](/errores/e0728/)**: `.await` solo dentro de `async`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/future-basico" />
+
+**Salida:**
+
+```text
+creado
+  sondeo 1
+  sondeo 2
+  sondeo 3
+TresPasos: listo
+resultado: 6
+```
+
+## Sinopsis
+
+```rust
+pub trait Future {
+    type Output;
+
+    // Required method
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
+}
+
+pub enum Poll<T> {
+    Ready(T),
+    Pending,
+}
+```
+
+## Ver también
+
+- [std::pin](/ref/std/pin/)
+- [E0728](/errores/e0728/)
+
+## Aprende esto en
+
+- [Mundo 18 · Async](/curso/18-async/)

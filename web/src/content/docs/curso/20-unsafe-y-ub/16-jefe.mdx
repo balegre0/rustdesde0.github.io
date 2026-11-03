@@ -1,0 +1,117 @@
+---
+title: "Jefe: tu propio Vec"
+description: "Construyes un vector con memoria del heap, punteros crudos y invariantes documentadas, unsafe por dentro y sound por fuera."
+sidebar:
+  order: 16
+duracion: 15
+desde: "1.0"
+requiere: ["20-unsafe-y-ub/04-abstracciones-seguras", "20-unsafe-y-ub/07-maybeuninit", "20-unsafe-y-ub/15-auditar-unsafe"]
+tarjetas:
+  - p: "¿Cuáles son las invariantes de MiVec?"
+    r: "ptr apunta a una asignación de cap elementos (o es dangling si cap == 0); las posiciones 0..len están inicializadas; len <= cap."
+  - p: "¿Por qué push usa `write` y no `*p = valor`?"
+    r: "Porque `*p = valor` destruiría primero lo que hay en *p, y ahí no hay nada inicializado. `write` escribe sin leer ni destruir."
+  - p: "¿Por qué pop baja `len` ANTES de leer con `read`?"
+    r: "Porque `read` copia los bits: tras sacarlo, esa casilla ya no debe contar como viva, o el Drop del vector la destruiría por segunda vez (doble liberación)."
+  - p: "¿Por qué MiVec rechaza los tipos de tamaño cero?"
+    r: "Porque Layout::array de un ZST mide 0 bytes y pedir 0 bytes al asignador es UB; el Vec real los trata aparte."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+El jefe de este mundo: un vector propio que reserva memoria en el heap, crece, guarda `String`s y las libera todas al final. Todo con punteros crudos… y sin que ningún código seguro que lo use pueda causar UB.
+
+## Predice
+
+<Pregunta
+  pregunta="Un vector propio tiene `ptr`, `cap` y `len`. En `push`, la casilla `ptr + len` no está inicializada. ¿Qué pasa si escribes `*ptr.add(len) = valor;` en vez de `ptr.add(len).write(valor);`?"
+  opciones={["Es lo mismo", "La asignación con `=` intenta destruir antes el valor «viejo» de esa casilla, que no existe: UB si el tipo tiene Drop", "No compila", "Es más rápido"]}
+  correcta={1}
+  explicacion="Asignar con `=` ejecuta el drop del valor anterior. Con un `String`, eso liberaría un puntero basura. `write` escribe sin mirar lo que había."
+  porque={["Solo es igual para tipos sin destructor (como i32).", "Correcto.", "Compila: el compilador no sabe que la casilla está vacía.", "La diferencia no es de velocidad sino de corrección."]}
+/>
+
+## La idea
+
+Un `Vec<T>` son tres números: un **puntero** a memoria del heap, la **capacidad** (cuántos `T` caben) y la **longitud** (cuántos hay de verdad). Toda su seguridad descansa en tres **invariantes**, que se escriben en un comentario junto al struct y que **cada método** debe mantener:
+
+1. `ptr` apunta a una asignación de `cap` elementos (o es un puntero *dangling* si `cap == 0`).
+2. Las casillas `0..len` están inicializadas; las de `len..cap`, no.
+3. `len <= cap`.
+
+Los campos son privados: solo los métodos del módulo los tocan, así que basta con revisar esos métodos (la frontera de privacidad). Cada `unsafe` cita la invariante que lo justifica.
+
+## Pruébalo
+
+<Ejecutar ej="m20/mi-vec" />
+
+Los cinco `push` llaman dos veces a `crecer` (capacidad 0 → 4 y 4 → 8). `get(9)` devuelve `None` en vez de leer fuera. `pop` saca la última `String` **moviéndola**. Y al final de `main`, `Drop` destruye las 4 `String` que quedan y devuelve la memoria al asignador.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Memoria tras los cinco `push`** (capacidad 8, longitud 5; en el navegador cada `String` mide 12 bytes):
+
+| Casilla | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|---|
+| Estado | `"uno"` | `"dos"` | `"tres"` | `"cuatro"` | `"cinco"` | sin inicializar | sin inicializar | sin inicializar |
+
+**Cada método y su argumento de solidez:**
+
+| Método | Qué podría salir mal | Por qué no pasa |
+|---|---|---|
+| `crecer` | pedir 0 bytes al asignador (UB); no comprobar si falla | `new` rechaza los ZST; `NonNull::new` + `handle_alloc_error` si devuelve nulo |
+| `push` | escribir fuera; destruir basura | `crecer` garantiza `len < cap`; `write` no destruye |
+| `pop` | doble liberación | baja `len` antes de `read`: la casilla deja de contar como viva |
+| `get` | leer sin inicializar; préstamo que sobrevive al vector | `i < len`; el `&T` queda atado a `&self` por la firma |
+| `drop` | fugas o doble liberación | destruye `0..len` una vez y libera con el mismo `Layout` con el que reservó |
+
+**Lo que falta para un `Vec` de verdad:** tipos de tamaño cero, `PhantomData<T>` para el drop check (lección 11), `Send`/`Sync` condicionales, `Deref<Target = [T]>`, iteradores y la protección contra pánicos a mitad de una operación. Si quieres el camino completo, el *Rustonomicon* tiene un capítulo entero que implementa `Vec` paso a paso.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="`read` sin bajar `len`">
+
+❌ En `pop`, hacer `let v = ptr.add(len - 1).read();` y **no** decrementar `len`. Ahora hay dos dueños de la misma `String`: el valor devuelto y la casilla que el vector sigue creyendo viva. Cuando ambos se destruyan, la memoria de la `String` se libera dos veces.
+
+✅ Primero `self.len -= 1;`, después `read()`. La casilla ya está fuera de `0..len`, así que el `Drop` del vector no la tocará. Pásalo por Miri: detecta la doble liberación si la cometes.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m20/pila-fija" enunciado={'Implementa `push` y `pop` de `PilaFija<T, N>`, una pila de capacidad fija sin heap, con un array de `MaybeUninit<T>`. `push` devuelve `Err(v)` si está llena; `pop` baja `len` y saca el valor con `assume_init_read` (con su `// SAFETY:`). Debe imprimir `Ok(())`, `Ok(())`, `Err("c")`, `Some("b")`, `Ok(())` y `Some("d") Some("a") None`.'} />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué los campos de `MiVec` deben ser privados?"
+  opciones={["Por estilo", "Porque si código de fuera pudiera cambiar `len`, rompería la invariante y los métodos seguros causarían UB", "Para que sea más rápido", "Porque los punteros no pueden ser públicos"]}
+  correcta={1}
+  explicacion="`len = 1000` desde fuera haría que `get` leyera memoria sin inicializar o fuera de la asignación, desde código seguro. La privacidad es la que hace sound la API."
+  porque={["Es una cuestión de solidez, no de estilo.", "Correcto.", "No afecta al rendimiento.", "Pueden serlo; aquí no deben."]}
+/>
+
+<Pregunta
+  pregunta="En `drop`, ¿por qué se usa `Layout::array::<T>(self.cap)` y no `Layout::array::<T>(self.len)`?"
+  opciones={["Da igual", "Porque hay que liberar con el mismo layout con el que se reservó, y se reservó `cap`", "Porque `len` siempre es 0 en ese punto", "Porque es más corto"]}
+  correcta={1}
+  explicacion="`dealloc` exige exactamente el mismo layout de la reserva. Con `len` (que puede ser menor que `cap`) sería UB."
+  porque={["No: es una precondición de `dealloc`.", "Correcto.", "Sí es 0 tras el bucle, pero no es el tamaño reservado.", "No tiene que ver con la longitud del código."]}
+/>
+
+<Pregunta
+  pregunta="`get` devuelve `Option<&T>`. ¿Qué impide que ese `&T` siga vivo después de un `push` que mueve los datos al crecer?"
+  opciones={["Nada: es un bug", "La firma: el `&T` toma prestado `&self`, y `push` necesita `&mut self`, así que el borrow checker no deja hacer las dos cosas a la vez", "Que `push` nunca mueve los datos", "Un contador en tiempo de ejecución"]}
+  correcta={1}
+  explicacion="Es la combinación ganadora: unsafe dentro, pero la **firma** segura hace que el borrow checker siga protegiendo al usuario. Un `realloc` puede mover los datos, y no puede haber ningún `&T` vivo cuando ocurre."
+  porque={["No es un bug: lo impide el compilador.", "Correcto.", "`realloc` puede moverlos a otra dirección.", "No hace falta: lo garantiza la compilación."]}
+/>
+
+## Para saber más
+
+- *The Rustonomicon*, «Implementing Vec» (en inglés).
+- Problemas de este mundo: `m20-partir-mut`, `m20-invertir-crudo`, `m20-mi-cell`.

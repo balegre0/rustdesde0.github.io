@@ -1,0 +1,55 @@
+---
+title: "loop"
+description: "Palabra clave estricta: bucle infinito que solo termina con break, y que puede devolver un valor."
+sidebar:
+  order: 20
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`loop` repite su bloque **para siempre**, hasta que un `break` (o un `return`) lo detiene.
+
+## Sinopsis
+
+```text
+'etiqueta: loop { cuerpo }       // la etiqueta es opcional
+let v = loop { … break valor; };
+```
+
+## Qué hace
+
+- `loop` es una **expresión**. Su valor es el que lleva el `break` que lo termina. Todos los `break` de un mismo `loop` deben dar valores del mismo tipo.
+- Un `loop` sin ningún `break` tiene tipo `!` (*never*): el compilador sabe que el código detrás nunca se ejecuta. Por eso `fn servidor() -> ! { loop { … } }` es válido.
+- El compilador entiende que un `loop` siempre entra en el cuerpo. Gracias a eso, una variable asignada dentro antes del `break` cuenta como inicializada después.
+- Úsalo cuando la condición de salida está **en medio** del cuerpo o cuando necesitas reintentar algo hasta que funcione.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-loop" />
+
+Salida:
+
+```text
+intentos: 3
+144
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-loop-error" />
+
+`error[E0308]: mismatched types`: el primer `break` fija el tipo (entero) y el segundo da un `&str`.
+
+## Desde
+
+Rust 1.0. `break valor`: 1.19.
+
+## Ver también
+
+- [`break`](/ref/lenguaje/palabras-clave/break/) · [`continue`](/ref/lenguaje/palabras-clave/continue/) · [`while`](/ref/lenguaje/palabras-clave/while/) · [`for`](/ref/lenguaje/palabras-clave/for/)
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/)

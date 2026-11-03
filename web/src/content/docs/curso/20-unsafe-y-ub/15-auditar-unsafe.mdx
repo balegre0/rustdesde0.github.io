@@ -1,0 +1,124 @@
+---
+title: "Auditar unsafe"
+description: "Documentas, limitas y revisas el unsafe de tu código y de tus dependencias con las herramientas del ecosistema."
+sidebar:
+  order: 15
+duracion: 12
+desde: "1.0"
+requiere: ["20-unsafe-y-ub/06-miri", "20-unsafe-y-ub/14-agujeros-de-solidez"]
+tarjetas:
+  - p: "¿Qué va en un comentario `// SAFETY:` y qué en una sección `# Safety`?"
+    r: "`// SAFETY:` (encima de un bloque unsafe) explica por qué se cumplen las condiciones; `# Safety` (en la documentación de una unsafe fn) dice qué condiciones debe cumplir quien llama."
+  - p: "¿Qué hace `#![forbid(unsafe_code)]`?"
+    r: "Convierte en error cualquier unsafe del crate, sin que un `allow` posterior pueda reactivarlo."
+  - p: "Cita tres lints de Clippy para unsafe."
+    r: "undocumented_unsafe_blocks, missing_safety_doc y multiple_unsafe_ops_per_block (también ptr_as_ptr, transmute_ptr_to_ref…)."
+  - p: "¿Para qué sirven cargo audit, cargo-geiger y cargo vet?"
+    r: "audit: compara Cargo.lock con los avisos de RustSec; geiger: cuenta el unsafe del árbol de dependencias; vet: registra qué dependencias ha revisado una persona de confianza."
+---
+
+import { Ejecutar, NoCompila, Ordena, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Vas a aprender cómo trabajan con `unsafe` los equipos que lo hacen bien: **poco, encapsulado, documentado y vigilado por herramientas**.
+
+## Predice
+
+<NoCompila ej="m20/forbid-unsafe" explicacion="`#![forbid(unsafe_code)]` al principio del crate convierte cualquier bloque unsafe en un error. Muchas aplicaciones lo usan para garantizar que todo su unsafe vive en dependencias auditadas." />
+
+## La idea
+
+Auditar `unsafe` es responder, para cada bloque, a una pregunta: **¿qué condición hace falta y por qué se cumple aquí?** Las convenciones del ecosistema existen para que esa respuesta esté escrita:
+
+- Cada `unsafe fn` lleva en su documentación una sección **`# Safety`** con lo que debe garantizar quien la llama.
+- Cada bloque `unsafe { }` lleva encima un comentario **`// SAFETY:`** que explica por qué, en ese punto, las condiciones se cumplen.
+- Los bloques son **pequeños**: una operación insegura por bloque, para que cada justificación sea concreta.
+- El `unsafe` se **encapsula** en un módulo con campos privados (la frontera de la lección 4) y el resto del programa usa la API segura.
+- Si una aplicación no necesita `unsafe` propio, lo **prohíbe** con `#![forbid(unsafe_code)]`.
+
+## Pruébalo
+
+Así se ve un `unsafe` bien documentado: contrato en `# Safety`, comprobación de depuración con `debug_assert!`, y la función segura que comprueba y delega.
+
+<Ejecutar ej="m20/safety-doc" />
+
+`ultimo` es segura: su `// SAFETY:` explica por qué el índice es válido. `tomar_sin_comprobar` traslada la obligación a quien la llama, y además se protege en modo debug con un `debug_assert!`, que en release desaparece.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Lints para unsafe** (actívalos en `Cargo.toml`, sección `[lints.clippy]`):
+
+| Lint | Qué exige |
+|---|---|
+| `undocumented_unsafe_blocks` | un `// SAFETY:` encima de cada bloque |
+| `missing_safety_doc` | sección `# Safety` en cada `unsafe fn` pública |
+| `multiple_unsafe_ops_per_block` | una sola operación insegura por bloque |
+| `ptr_as_ptr`, `transmute_ptr_to_ref` | conversiones explícitas y con tipo, sin `as` ni `transmute` sueltos |
+
+Y de `rustc`: `unsafe_op_in_unsafe_fn` (aviso por defecto en 2024) y `unsafe_code` (para `forbid`).
+
+**Las dependencias también cuentan.** Tu programa es tan seguro como el `unsafe` de todo su árbol de dependencias:
+
+| Herramienta | Qué hace |
+|---|---|
+| `cargo audit` | compara tu `Cargo.lock` con la base de datos de avisos **RustSec** (vulnerabilidades, crates *unsound*, sin mantenimiento) |
+| `cargo deny` | política: avisos, licencias, crates duplicados, orígenes permitidos |
+| `cargo geiger` | cuenta cuánto `unsafe` hay en cada dependencia (no dice si es correcto: dice dónde mirar) |
+| `cargo vet` | registra qué versiones ha revisado una persona u organización de confianza |
+| Miri en CI | `cargo +nightly miri test` en cada cambio, como hace la biblioteca estándar |
+
+**Compilar es ejecutar.** Un `build.rs` y una macro procedural son programas que se ejecutan **al compilar** tu proyecto. Añadir una dependencia nueva es confiar en su código antes incluso de usarlo: revísala, fija versiones y prefiere crates con historial.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Un `// SAFETY:` que no justifica nada">
+
+❌ `// SAFETY: es seguro` o `// SAFETY: confía en mí`. El lint queda contento y el auditor no sabe nada más.
+
+✅ Nombra la condición y di por qué se cumple aquí: `// SAFETY: i < v.len() porque el bucle recorre 0..v.len() y v no cambia dentro del bucle.` Si no puedes escribir esa frase, probablemente el bloque no es correcto.
+
+</Trampa>
+
+## Tu turno
+
+Ordena las líneas de una función segura bien auditada que devuelve el primer byte de un slice sin comprobar el índice dos veces:
+
+<Ordena
+  lineas={["fn primero(v: &[u8]) -> Option<u8> {", "    if v.is_empty() { return None; }", "    // SAFETY: v no está vacío, así que el índice 0 es válido.", "    Some(unsafe { *v.get_unchecked(0) })", "}"]}
+  distractores={["    // SAFETY: es seguro.", "    Some(unsafe { *v.as_ptr().add(1) })"]}
+  explicacion="Primero la comprobación que hace sound la función, después el comentario que la cita, y por último el bloque mínimo. `add(1)` leería el segundo byte (que quizá no existe) y «es seguro» no justifica nada."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`cargo geiger` dice que una dependencia tiene 200 bloques unsafe. ¿Qué concluyes?"
+  opciones={["Que es insegura y hay que quitarla", "Que hay unsafe que merece revisión; la cantidad no dice si es correcto", "Que es segura porque es popular", "Que tu crate no compila"]}
+  correcta={1}
+  explicacion="geiger mide **dónde** hay unsafe, no si es sound. Muchas bibliotecas fundamentales están llenas de unsafe bien auditado. Para saber si hay problemas conocidos, `cargo audit`; para revisión humana, `cargo vet`."
+  porque={["Mucho unsafe no implica UB.", "Correcto.", "La popularidad no prueba solidez.", "No tiene relación con compilar."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué diferencia hay entre `#![deny(unsafe_code)]` y `#![forbid(unsafe_code)]`?"
+  opciones={["Ninguna", "Con `forbid`, ningún `#[allow(unsafe_code)]` posterior puede volver a permitirlo", "`deny` es solo un aviso", "`forbid` también prohíbe unsafe en las dependencias"]}
+  correcta={1}
+  explicacion="`deny` se puede relajar más adentro con `allow`; `forbid` no. Ninguno de los dos afecta a las dependencias: cada crate decide por sí mismo."
+  porque={["Sí la hay: la posibilidad de anularlo.", "Correcto.", "Los dos producen error.", "Solo afectan al crate donde se escriben."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué revisar el `build.rs` de una dependencia nueva?"
+  opciones={["Porque ralentiza la compilación", "Porque se ejecuta en tu máquina al compilar, con tus permisos", "Porque contiene unsafe siempre", "No hace falta"]}
+  correcta={1}
+  explicacion="Los scripts de compilación y las macros procedurales son código que se ejecuta durante `cargo build`. Una dependencia maliciosa puede actuar antes de que ejecutes tu programa."
+  porque={["Es lo menos importante.", "Correcto.", "No tiene por qué contener unsafe.", "Es una de las defensas básicas de la cadena de suministro."]}
+/>
+
+## Para saber más
+
+- Base de datos de avisos de RustSec (rustsec.org).
+- *Clippy*, lista de lints (grupo de restricción, sección de unsafe).

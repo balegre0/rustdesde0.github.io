@@ -1,0 +1,102 @@
+---
+title: "E0746: devolver dyn Trait sin indirección"
+description: "Una función declara que devuelve dyn Trait directamente, cuyo tamaño no se conoce al compilar."
+sidebar:
+  order: 70
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` return type cannot be a trait object without pointer indirection ``
+
+## Qué significa
+
+`dyn Animal` puede ser un `Perro`, un `Gato`… cada uno con un tamaño distinto. Una función tiene que saber cuántos bytes devuelve, así que `dyn Animal` a secas no vale (por eso aparece también un E0277 sobre `Sized`).
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0746" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0746]: return type cannot be a trait object without pointer indirection
+  --> E0746.rs:13:15
+   |
+13 | fn crear() -> dyn Animal {
+   |               ^^^^^^^^^^ doesn't have a size known at compile-time
+   |
+help: consider returning an `impl Trait` instead of a `dyn Trait`
+   |
+13 - fn crear() -> dyn Animal {
+13 + fn crear() -> impl Animal {
+   |
+help: alternatively, box the return type, and wrap all of the returned values in `Box::new`
+   |
+13 ~ fn crear() -> Box<dyn Animal> {
+14 ~     Box::new(Perro)
+   |
+
+error[E0277]: the size for values of type `(dyn Animal + 'static)` cannot be known at compilation time
+  --> E0746.rs:18:20
+   |
+18 |     println!("{}", crear().sonido());
+   |                    ^^^^^^^ doesn't have a size known at compile-time
+   |
+   = help: the trait `Sized` is not implemented for `(dyn Animal + 'static)`
+   = note: the return type of a function must have a statically known size
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Escribir `-> dyn Trait` en lugar de `-> Box<dyn Trait>` o `-> impl Trait`.
+
+## Cómo arreglarlo
+
+Si siempre devuelves el mismo tipo concreto, usa `-> impl Animal`. Si puedes devolver tipos distintos según el caso, usa `-> Box<dyn Animal>` y envuelve con `Box::new(...)`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+trait Animal {
+    fn sonido(&self) -> String;
+}
+
+struct Perro;
+
+impl Animal for Perro {
+    fn sonido(&self) -> String {
+        String::from("guau")
+    }
+}
+
+fn crear() -> Box<dyn Animal> {
+    Box::new(Perro)
+}
+
+fn main() {
+    println!("{}", crear().sonido());
+}
+```
+
+**Salida:**
+
+```text
+guau
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0746` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0038](/errores/e0038/): el trait no es compatible con dyn
+- [E0277](/errores/e0277/): un tipo no implementa el trait que se necesita
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

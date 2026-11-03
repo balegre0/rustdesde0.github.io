@@ -1,0 +1,117 @@
+---
+title: "El trait Iterator y la pereza"
+description: "Entiende qué es un iterador por dentro, qué hace realmente un for y por qué un iterador no hace nada hasta que lo consumes."
+sidebar:
+  order: 5
+duracion: 12
+desde: "1.0"
+requiere: ["14-closures-e-iteradores/04-closures-como-parametros", "09-structs-enums-y-patrones"]
+tarjetas:
+  - p: "¿Qué dos piezas necesita el trait `Iterator`?"
+    r: "El tipo asociado `type Item` (qué entrega) y el método `fn next(&mut self) -> Option<Self::Item>`. Todo lo demás (`map`, `sum`…) viene gratis."
+  - p: "¿Qué devuelve `next()` cuando el iterador se acaba?"
+    r: "`None`. Mientras quedan elementos, `Some(elemento)`."
+  - p: "¿Qué significa que los iteradores son perezosos?"
+    r: "Que preparar `v.iter().map(f)` no ejecuta nada: `f` solo se llama cuando alguien pide elementos con `next()` (un `for`, `sum`, `collect`…)."
+  - p: "¿En qué se convierte `for x in algo { … }`?"
+    r: "En `let mut it = IntoIterator::into_iter(algo);` seguido de un bucle que llama a `it.next()` hasta recibir `None`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Vas a abrir el capó de los **iteradores** (*iterators*): qué son, cómo entregan valores de uno en uno y por qué preparar una cadena de operaciones no ejecuta **nada** hasta el último momento.
+
+## Predice
+
+<Predice
+  ej="m14/perezoso"
+  opciones={["`receta preparada` primero, y luego `calculando` y `recibo` alternados", "Los tres `calculando` primero, luego `receta preparada`, luego los tres `recibo`", "`receta preparada` y después los tres `calculando` seguidos de los tres `recibo`", "No imprime ningún `calculando`: `map` no ejecuta el closure"]}
+  correcta={0}
+  explicacion="`map` solo **prepara** la receta. Cada vuelta del `for` pide un elemento: en ese momento se calcula uno (y solo uno) y se entrega."
+  porque={["Correcto.", "Si fuera así, `map` habría calculado todo al crearse; no lo hace.", "No se calcula todo de golpe: un elemento cada vez, justo cuando se pide.", "Sí lo ejecuta, pero solo cuando el `for` pide elementos."]}
+/>
+
+## La idea
+
+Un iterador es cualquier cosa que implemente este trait (la versión real tiene muchísimos métodos más, todos con implementación por defecto):
+
+```rust
+trait Iterator {
+    type Item;                                   // qué tipo entrega
+    fn next(&mut self) -> Option<Self::Item>;    // el siguiente, o None si se acabó
+}
+```
+
+Eso es todo el contrato: **cada vez que llamas a `next()`, te da el siguiente elemento envuelto en `Some`, o `None` si ya no quedan**. Pide `&mut self` porque avanzar cambia su estado interno (por dónde va).
+
+Lo importante es la **pereza** (*laziness*): crear un iterador, o encadenarle un `map`, no recorre nada. Solo se trabaja cuando alguien **consume** el iterador llamando a `next()`: un `for`, `sum`, `collect`, `count`… Esto tiene dos ventajas. No se crean listas intermedias. Y puedes trabajar con iteradores **infinitos** como `1..` (todos los números desde el 1) siempre que al final solo pidas unos pocos.
+
+## Pruébalo
+
+<Ejecutar ej="m14/next-a-mano" />
+
+<Ejecutar ej="m14/for-por-dentro" titulo="Lo que hace un for por dentro" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+El `for` es **azúcar sintáctico**. El compilador lo reescribe así (lo ves casi igual en el paso 2 del ejemplo):
+
+```rust
+let mut it = IntoIterator::into_iter(algo);
+loop {
+    match it.next() {
+        Some(x) => { /* cuerpo del for */ }
+        None => break,
+    }
+}
+```
+
+`IntoIterator` es el trait de «las cosas que se pueden convertir en un iterador»: un `Vec`, un `&Vec`, un rango `0..10`, un array… Un iterador también lo implementa (se devuelve a sí mismo). La lección siguiente explica qué sale de cada uno.
+
+`Iterator` tiene un **tipo asociado** (`Item`, mundo 13) y no un parámetro genérico: un iterador concreto entrega un único tipo de elemento, y así el compilador siempre sabe qué sale de `next()` sin que tengas que anotarlo.
+
+Muchos tipos de iteradores llevan el atributo `#[must_use]`: si creas uno y no lo usas, el compilador te avisa con la nota «iterators are lazy and do nothing unless consumed».
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Usar map para «hacer algo con cada elemento»">
+
+`map` es para **transformar** elementos, no para provocar efectos como imprimir. Esta línea no imprime nada:
+
+```rust
+v.iter().map(|x| println!("{x}"));
+```
+
+Compilándola de verdad, el compilador da dos avisos: uno dice que la llamada a `map` descarta los valores y sugiere `for_each`; el otro, «unused `Map` that must be used», con la nota «iterators are lazy and do nothing unless consumed». En el ejemplo `m14/map-sin-consumir` subimos ese aviso a error con `#![deny(unused_must_use)]`, y la compilación falla. Para recorrer y actuar usa un `for` (o `for_each`).
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["let mut it = [1, 2].iter();", "while let Some(x) = it.next() {", '    println!("{x}");', "}"]}
+  distractores={["let it = [1, 2].iter();", "while it.next() {"]}
+  explicacion="`next()` pide `&mut self`, así que el iterador tiene que estar en una variable `mut`. Y `next()` devuelve un `Option`, no un `bool`: se desmonta con `while let Some(x)`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `next` recibe `&mut self` y no `&self`?"
+  opciones={["Porque avanzar cambia el estado interno del iterador", "Porque modifica la colección que recorre", "Porque devuelve un `Option`", "Por costumbre: podría ser `&self`"]}
+  correcta={0}
+  explicacion="El iterador recuerda por dónde va; entregar un elemento significa avanzar esa posición."
+  porque={["Correcto.", "`v.iter()` no modifica `v`: solo avanza su propia posición.", "El tipo de retorno no tiene nada que ver.", "Con `&self` no podría avanzar sin mutabilidad interior."]}
+/>
+
+<Pregunta
+  pregunta="`let s: u64 = (1..).map(|x| x * x).take(3).sum();` — ¿qué pasa?"
+  opciones={["`s` vale 14", "Se queda colgado: `1..` no tiene fin", "Pánico por desbordamiento", "No compila: los rangos sin fin no existen"]}
+  correcta={0}
+  explicacion="Por la pereza, `take(3)` solo pide tres elementos: 1 + 4 + 9 = 14. Nadie calcula el resto."
+  porque={["Correcto.", "Solo se generan los elementos que alguien pide.", "Solo se calculan tres cuadrados pequeños.", "`1..` es un rango válido e infinito."]}
+/>

@@ -1,0 +1,37 @@
+---
+title: "std::vec"
+description: "Vec<T>: la lista que crece. Añadir, quitar, indexar, recorrer y cómo gestiona su memoria."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "alloc"]
+---
+**Ruta:** `std::vec`
+
+## Para qué sirve
+
+`Vec<T>` es la colección más usada: una lista de valores del mismo tipo, **contiguos** en memoria (uno detrás de otro en el montón), que puede crecer y encoger. La macro `vec![...]` crea uno con elementos.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Vec`](/ref/std/vec/vec/) | La lista que crece. | 1.0 |
+| [`vec!`](/ref/std/macros/vec/) | Crea un `Vec` con elementos. | 1.0 |
+| `IntoIter, Drain, Splice` | Iteradores que sacan elementos de un `Vec`. | 1.0 |
+
+**Catálogo completo:** [Vec: todos los métodos](/ref/std/vec/catalogo/)
+
+## Conceptos clave
+
+- **Tres números en la pila**: puntero al bloque del montón, **capacidad** (cuántos caben) y **longitud** (cuántos hay).
+- **Crecer cuesta poco**: cuando se llena, reserva un bloque más grande (normalmente el doble), copia los elementos y libera el viejo. Por eso una referencia a un elemento no puede vivir mientras haces `push` ([E0502](/errores/e0502/)).
+- **`&Vec<T>` se convierte en `&[T]`**: recibe `&[T]` en tus funciones y aceptarás arrays, vectores y trozos.
+
+## Ver también
+
+- [slices](/ref/std/slice/)
+- [VecDeque](/ref/std/collections/vecdeque/)
+
+## Aprende esto en
+
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

@@ -1,0 +1,35 @@
+---
+title: "#![windows_subsystem]"
+description: "En Windows, elige si el ejecutable abre una ventana de consola (console) o no (windows)."
+sidebar:
+  order: 24
+insignias: ["Desde 1.18", "Runtime"]
+---
+import { Ejecutar } from '~/components';
+
+Un `.exe` de Windows declara a qué **subsistema** pertenece. El de consola abre una ventana negra al arrancar; el de ventanas, no.
+
+## Sinopsis
+
+```text
+#![windows_subsystem = "console"]   // por defecto
+#![windows_subsystem = "windows"]   // sin consola
+```
+
+## Qué hace
+
+Con `"windows"`, al hacer doble clic en el programa no aparece la consola. Es lo que quieres en un programa con interfaz gráfica. A cambio, `println!` no se ve. Se ignora fuera de Windows.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-windows-subsystem" />
+
+El truco habitual: con `cfg_attr(not(debug_assertions), …)`, solo se quita la consola en release, y al depurar sigues viendo los mensajes.
+
+## Desde
+
+Rust 1.18.
+
+## Ver también
+
+[`#[cfg_attr]`](/ref/lenguaje/atributos/cfg/)

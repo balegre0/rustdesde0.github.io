@@ -1,0 +1,110 @@
+---
+title: "Jefe del mundo: tu tarjeta"
+description: "Junta todo el mundo: imprime una tarjeta de presentación con bordes, texto centrado y columnas alineadas al carácter."
+sidebar:
+  order: 11
+duracion: 15
+desde: "1.58"
+requiere: ["02-tu-primer-programa/04-formato-avanzado", "02-tu-primer-programa/07-leer-errores-del-compilador"]
+tarjetas:
+  - p: "¿Cómo se imprime una línea de 26 guiones con una sola especificación de formato?"
+    r: "Rellenando un texto vacío: `{:-<26}` con `\"\"` como argumento."
+  - p: "¿Qué cuenta el ancho de `{:^24}`: bytes o caracteres?"
+    r: "Caracteres (`char`): `\"Ana Martínez\"` cuenta 12, aunque ocupe 13 bytes en UTF-8."
+  - p: "¿Cómo combinas ancho y decimales para que 2.5 se vea como `      2.50` (10 columnas)?"
+    r: "`{:>10.2}` (o `{:10.2}`, porque los números ya se alinean a la derecha)."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Has llegado al final del mundo. Hoy no hay ideas nuevas: hay una tarjeta de presentación que imprimir con precisión de carácter. Bordes, texto centrado, etiquetas a la izquierda, valores a la derecha y decimales fijos. Si la salida coincide letra a letra, has vencido al jefe.
+
+## Predice
+
+Este es el programa terminado. Su segunda línea es `println!("| {:^24} |", nombre);` con `nombre = "Ana Martínez"`, que tiene 12 caracteres pero ocupa 13 bytes (la `í` ocupa 2). ¿Qué imprime esa línea?
+
+<Predice
+  ej="m02/tarjeta"
+  opciones={["`|       Ana Martínez       |` (7 espacios a cada lado)", "`|      Ana Martínez       |` (6 a la izquierda, 7 a la derecha)", "`| Ana Martínez             |`", "`|Ana Martínez|`"]}
+  correcta={0}
+  explicacion="El ancho cuenta **caracteres**: sobran 24 − 12 = 12 columnas, 6 a cada lado, más el espacio que ya hay entre la barra y el hueco. Total: 7 espacios a cada lado, simétrico."
+  porque={["", "Eso es lo que saldría si el ancho contara **bytes** (13): sobrarían 11 columnas, repartidas 5 y 6.", "Eso sería alinear a la izquierda, con `<`. La `^` centra.", "Sin ancho no hay relleno; aquí el ancho es 24."]}
+/>
+
+## La idea
+
+Antes de escribir, **diseña en papel**. La tarjeta mide 28 caracteres de ancho:
+
+- Bordes: `+`, 26 guiones, `+`. En vez de escribir los 26 guiones a mano, rellena un texto vacío: `println!("+{:-<26}+", "");`.
+- Líneas de cabecera: `| `, 24 columnas centradas, ` |`. Son 2 + 24 + 2 = 28.
+- Líneas de datos: `| `, una etiqueta en 14 columnas a la izquierda, un valor en 10 columnas a la derecha, ` |`. Otra vez 2 + 14 + 10 + 2 = 28.
+
+Ese es el truco de todas las tablas: **fija los anchos y haz que sumen lo mismo en cada línea**.
+
+## Pruébalo
+
+<Ejecutar ej="m02/tarjeta" />
+
+Salida real:
+
+```text
++--------------------------+
+|       Ana Martínez       |
+|   Programadora en Rust   |
++--------------------------+
+| Edad:                 30 |
+| Ciudad:          Sevilla |
+| Café al día:        2.50 |
++--------------------------+
+```
+
+Cambia el nombre por el tuyo y vuelve a ejecutar. Mientras tenga 24 caracteres o menos, la tarjeta sigue cuadrada.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Qué pasa si un valor no cabe">
+El ancho es un **mínimo**, no un máximo: si el valor es más largo, se imprime entero y empuja todo lo que va detrás. Con un nombre de 30 caracteres, la segunda línea se saldría del borde. Si quisieras cortarlo, tendrías la precisión de los textos: `{:^24.24}` centra en 24 columnas y, además, corta a 24 caracteres como mucho.
+
+Hay un segundo límite, más sutil: el ancho cuenta valores `char` (valores escalares Unicode), pero la terminal dibuja **grafemas** (lo que el ojo ve como una letra). Para letras con tilde escritas de la forma habitual, coinciden. Para algunos emojis o letras con acentos combinados, no, y la tarjeta se descuadraría. Lo entenderás del todo en el mundo 11, con las cadenas a fondo.
+
+Y todo esto se decide **al compilar**: si te equivocas en una especificación (por ejemplo, poniendo el ancho antes de la alineación, `{:24^}`), el error sale antes de ejecutar: «invalid format string: expected alignment specifier after `:` in format string». Las piezas de la especificación tienen un orden fijo, el de la tabla de la lección de formato avanzado.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Contar los anchos a ojo">
+❌ Escribir las líneas de una en una y ajustar espacios «hasta que quede bien». En cuanto cambia un dato, se descuadra todo.
+
+✅ Decide los anchos primero (aquí, 2 + 14 + 10 + 2 = 28) y escríbelos en la especificación de formato. Deja que `println!` ponga los espacios: no los escribas tú dentro del texto.
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m02/tarjeta"
+  enunciado="Completa el programa para que imprima exactamente la tarjeta de arriba: bordes de 28 caracteres (`+`, 26 guiones, `+`) arriba, debajo de la cabecera y abajo; nombre y oficio centrados en 24 columnas entre `| ` y ` |`; etiquetas alineadas a la izquierda en 14 columnas y valores a la derecha en 10; el café con 2 decimales."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta='¿Qué imprime `println!("[{:>5}]", "Sevilla");`?'
+  opciones={["`[Sevil]`", "`[Sevilla]`", "`[  Sevilla]`", "No compila: no cabe"]}
+  correcta={1}
+  explicacion="El ancho es un mínimo. `Sevilla` tiene 7 caracteres, más que 5, así que se imprime entero, sin relleno."
+  porque={["Para cortar hace falta la precisión: `{:>5.5}`.", "", "Solo se rellena hasta el ancho; si el valor ya lo supera, no se añade nada.", "El formato nunca falla porque un valor sea largo."]}
+/>
+
+<Pregunta
+  pregunta="Quieres una línea de datos de 28 caracteres: `| `, etiqueta, valor, ` |`. Si la etiqueta ocupa 16 columnas, ¿cuántas deben ser para el valor?"
+  opciones={["8", "10", "12", "14"]}
+  correcta={0}
+  explicacion="2 + 16 + valor + 2 = 28, así que el valor ocupa 8 columnas."
+  porque={["", "Con 10, la línea mediría 30.", "Con 12, mediría 32.", "Con 14, mediría 34."]}
+/>
+
+<Respuesta
+  pregunta="¿Qué especificación de formato imprime 2.5 como `2.50` alineado a la derecha en 10 columnas?"
+  respuestas={["{:>10.2}", "{:10.2}", ":>10.2", ":10.2"]}
+  explicacion="Ancho 10, precisión 2. La `>` es opcional: los números ya se alinean a la derecha."
+/>

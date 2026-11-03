@@ -1,0 +1,62 @@
+---
+title: "scope"
+description: "Hilos con ámbito: todos terminan antes de salir de scope, así que pueden tomar prestados datos locales."
+sidebar:
+  order: 2
+insignias: ["Desde 1.63", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::thread::scope`
+
+## Sinopsis
+
+```rust
+pub fn scope<'env, F, T>(f: F) -> T
+where
+    F: for<'scope> FnOnce(&'scope Scope<'scope, 'env>) -> T,
+```
+
+## Qué hace
+
+`thread::scope` crea un **ámbito** donde lanzar hilos con `s.spawn(...)`. Antes de que `scope` vuelva, espera a **todos** esos hilos. Gracias a esa garantía, los hilos pueden tomar prestados datos locales sin `move`, `Arc` ni `'static`, y el borrow checker sigue comprobando las reglas de préstamo entre ellos.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`spawn`](#spawn) | Lanza un hilo dentro del ámbito. | 1.63 |
+
+### `spawn`
+
+```rust
+pub fn spawn<F, T>(&'scope self, f: F) -> ScopedJoinHandle<'scope, T>
+where
+    F: FnOnce() -> T + Send + 'scope,
+    T: Send + 'scope,
+```
+
+Lanza un hilo dentro del ámbito.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/thread-scope-hilos" />
+
+Este ejemplo crea **hilos**, y el navegador no puede ejecutarlos: el botón lo envía al Playground de Rust (play.rust-lang.org). Aquí se ha comprobado que compila; su salida no se reproduce en esta página porque solo la da una ejecución real.
+
+## Pánicos
+
+Si algún hilo del ámbito entra en pánico y nadie lo recoge con `join`, `scope` entra en pánico al terminar.
+
+## Desde
+
+Rust 1.63 (estable).
+
+## Ver también
+
+- [spawn](/ref/std/thread/spawn/)
+- [slice::split_at](/ref/std/slice/)
+
+## Aprende esto en
+
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

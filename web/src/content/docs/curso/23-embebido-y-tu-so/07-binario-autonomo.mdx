@@ -1,0 +1,77 @@
+---
+title: "Un binario autónomo: el primer paso de tu núcleo"
+description: "Empieza tu sistema operativo: un binario sin std ni main, con su propio punto de entrada, para el target x86_64-unknown-none, siguiendo la serie blog_os."
+sidebar:
+  order: 7
+duracion: 13
+requiere: ["23-embebido-y-tu-so/06-de-tu-pc-a-la-placa"]
+tarjetas:
+  - p: "¿Qué tres cosas necesita el binario más simple de un núcleo en Rust?"
+    r: "`#![no_std]`, `#![no_main]` con un punto de entrada propio (`_start`) y un `#[panic_handler]`."
+  - p: "¿Qué es blog_os?"
+    r: "*Writing an OS in Rust*, la serie de Philipp Oppermann que construye paso a paso un núcleo para x86_64 en Rust."
+  - p: "¿Qué hace un cargador de arranque (bootloader)?"
+    r: "Lo que ejecuta la máquina al encenderse: prepara la CPU (modo de 64 bits, paginación básica), carga tu núcleo en memoria y salta a su punto de entrada."
+---
+
+import { Pregunta, BajoElCapo } from '~/components';
+
+La segunda parte de este mundo sigue el camino de **blog_os** (*Writing an OS in Rust*, de Philipp Oppermann), la serie más conocida para escribir un sistema operativo en Rust. Aquí tienes el mapa y las ideas de cada paso; el código completo y actualizado está en la serie.
+
+## La idea
+
+Un núcleo es un programa al que **nadie le da nada**: ni `main`, ni consola, ni memoria. El binario mínimo:
+
+```rust
+#![no_std]   // sin biblioteca estándar
+#![no_main]  // sin el punto de entrada habitual
+
+use core::panic::PanicInfo;
+
+#[unsafe(no_mangle)]                 // el cargador busca el símbolo «_start»
+pub extern "C" fn _start() -> ! {
+    loop {}                          // un núcleo no termina
+}
+
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    loop {}
+}
+```
+
+Se compila para **`x86_64-unknown-none`**: procesador de PC, sin sistema operativo. Ese target viene con Rust (`rustup target add x86_64-unknown-none`) y se enlaza con `rust-lld`.
+
+Para arrancarlo hace falta un **cargador de arranque** (*bootloader*): el crate `bootloader` (el que usa blog_os) prepara la CPU, crea una imagen de disco y salta a tu `_start`. Con **QEMU** (`qemu-system-x86_64 -drive format=raw,file=imagen.img`) lo pruebas sin reiniciar tu PC.
+
+## El camino de blog_os
+
+| Bloque | Pasos |
+|---|---|
+| Lo básico | binario autónomo · núcleo mínimo · texto en pantalla (VGA) · pruebas |
+| Interrupciones | excepciones de la CPU · fallos dobles · interrupciones del hardware (teclado, temporizador) |
+| Memoria | paginación · implementación de la paginación · el heap · diseños de asignadores |
+| Multitarea | async/await con un ejecutor propio |
+
+Las lecciones siguientes explican la idea de cada bloque con un ejemplo que puedes ejecutar.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué `extern "C"` y `no_mangle`.** El cargador no sabe nada de Rust: salta a una dirección que encuentra buscando el símbolo `_start`, y llama con la convención de C. `no_mangle` hace que el símbolo se llame así de verdad.
+
+**`-> !`.** Un núcleo no tiene a quién volver. El tipo `!` lo deja escrito, y el compilador comprueba que la función de verdad no termina.
+
+**Pánico = abortar.** Sin `std` no hay desenrollado de pila. En `Cargo.toml` se pone `panic = "abort"` en los dos perfiles.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `_start` devuelve `!`?"
+  opciones={["Porque así lo exige el compilador para cualquier función", "Porque un núcleo no tiene a quién volver: si terminara, la CPU ejecutaría lo que hubiera después en memoria", "Porque es asíncrona", "Para que sea más rápida"]}
+  correcta={1}
+  explicacion="No hay sistema operativo que recoja un código de salida. La función tiene que quedarse en un bucle (o apagar la máquina)."
+  porque={["Solo las funciones que no terminan devuelven `!`.", "", "No tiene nada de asíncrono.", "No afecta a la velocidad."]}
+/>

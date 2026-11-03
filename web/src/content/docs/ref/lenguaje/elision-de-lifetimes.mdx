@@ -1,0 +1,85 @@
+---
+title: "Elisión de lifetimes"
+description: "Las reglas con las que el compilador rellena los tiempos de vida que no escribes."
+sidebar:
+  order: 105
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Casi nunca escribes tiempos de vida en las firmas de las funciones. No es que no estén: el compilador los **rellena** con unas pocas reglas fijas. Eso se llama **elisión** (*lifetime elision*).
+
+## En una frase
+
+Cada referencia de entrada recibe su propio tiempo de vida; si hay **una sola** entrada, o si hay `&self`/`&mut self`, las referencias de salida toman ese tiempo de vida; en cualquier otro caso tienes que escribirlo.
+
+## La regla, paso a paso
+
+### En funciones y métodos
+
+1. Cada tiempo de vida omitido en los **parámetros** se convierte en un parámetro de tiempo de vida **distinto**.
+2. Si en los parámetros hay **exactamente un** tiempo de vida (escrito u omitido), se asigna a **todos** los tiempos de vida omitidos de la salida.
+3. Si hay varios, pero uno de ellos es el de `&self` o `&mut self`, la salida toma **el de `self`**.
+4. Si nada de lo anterior se aplica, omitir un tiempo de vida en la salida es un **error** (E0106).
+
+Ejemplos de lo que significa cada firma:
+
+```text
+fn f(s: &str) -> &str                      // fn f<'a>(s: &'a str) -> &'a str
+fn f(a: &str, b: &str)                     // fn f<'a, 'b>(a: &'a str, b: &'b str)
+fn f(a: &str, b: &str) -> &str             // ERROR: ¿de a o de b?
+fn m(&self, x: &str) -> &str               // la salida toma el tiempo de vida de self
+fn nuevo(s: &str) -> Vista<'_>             // '_ = «el que toque por elisión»
+```
+
+### `'_`: el tiempo de vida anónimo
+
+`'_` dice «aquí hay un tiempo de vida; aplica la elisión». Es útil en tipos que llevan parámetros de tiempo de vida (`Vista<'_>`, `impl Trait for Ref<'_>`), para que se vea que hay un préstamo. El lint `mismatched_lifetime_syntaxes` (1.89) avisa cuando la entrada y la salida usan estilos inconsistentes, como `&str` de entrada y `Vista` sin `'_` de salida.
+
+### Objetos trait
+
+Si no escribes el tiempo de vida de un `dyn Trait`:
+
+- en `Box<dyn Trait>` es `'static`;
+- en `&'a dyn Trait` es `'a`;
+- si el trait exige `Trait: 'x`, se usa ese.
+
+### `const` y `static`
+
+En el tipo de un `const` o `static`, las referencias sin tiempo de vida escrito son `'static`: `const NOMBRE: &str = "x";`.
+
+### Closures
+
+Las reglas de elisión de funciones **no** se aplican igual a las closures: el compilador deduce los tiempos de vida de una closure por su uso, y a veces necesitas anotar los tipos de sus parámetros.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/elision-reglas" />
+
+Salida:
+
+```text
+hola
+hola
+Rust
+hola mundo
+```
+
+## Errores típicos
+
+<NoCompila ej="ref-lenguaje/elision-error" />
+
+`error[E0106]: missing lifetime specifier`, con la explicación `the signature does not say whether it is borrowed from x or y` y la firma corregida: `fn mas_larga<'a>(x: &'a str, y: &'a str) -> &'a str`.
+
+## Desde
+
+Rust 1.0. `'_` y la elisión en `impl`: edición 2018. Lint `mismatched_lifetime_syntaxes`: 1.89.
+
+## Ver también
+
+- [Subtipos y varianza](/ref/lenguaje/subtipos-y-varianza/) · [`'static`](/ref/lenguaje/palabras-clave/static-lifetime/) · [`fn`](/ref/lenguaje/palabras-clave/fn/)
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/)

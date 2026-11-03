@@ -1,0 +1,73 @@
+---
+title: "impl"
+description: "Palabra clave estricta: bloques de implementación y tipos impl Trait en argumentos y retornos."
+sidebar:
+  order: 17
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`impl` sirve para **dar comportamiento** a un tipo (métodos, implementaciones de traits) y para escribir tipos del estilo «algo que implementa este trait».
+
+## Sinopsis
+
+```text
+impl<genéricos> Tipo where … { elementos }               // implementación inherente
+unsafe? impl<genéricos> Trait for Tipo where … { … }     // implementación de un trait
+fn f(x: impl Trait)                                       // argumento: genérico anónimo
+fn f() -> impl Trait + use<'a, T>                          // retorno: tipo opaco
+```
+
+## Qué hace
+
+### Uso 1 · Implementación inherente
+
+`impl Tipo { … }` añade funciones asociadas (`Tipo::nueva()`) y métodos (`valor.metodo()`) al tipo. Solo puede escribirse en el crate que define el tipo.
+
+### Uso 2 · Implementar un trait
+
+`impl Trait for Tipo { … }` cumple el contrato del trait. Reglas de **coherencia**:
+
+- Como mucho una implementación por pareja (trait, tipo); si dos se solapan, error E0119.
+- **Regla del huérfano** (*orphan rule*): el trait o el tipo deben ser de tu crate (E0117). Si no, envuelve el tipo en uno tuyo (*newtype*).
+
+Para traits `unsafe` (como `Send`) se escribe `unsafe impl`: prometes cumplir sus requisitos.
+
+### Uso 3 · `impl Trait` en argumentos
+
+`fn f(x: impl Display)` es azúcar de `fn f<T: Display>(x: T)`: se genera una copia por tipo concreto.
+
+### Uso 4 · `impl Trait` en el retorno
+
+`fn f() -> impl Iterator<Item = u32>` devuelve **un** tipo concreto que el llamante no puede nombrar; solo sabe qué traits cumple. En la edición 2024 este tipo **captura** todos los parámetros genéricos y tiempos de vida en ámbito; con `use<…>` dices exactamente cuáles.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-impl" />
+
+Salida:
+
+```text
+(3, 0)
+[0, 2, 4, 6, 8]
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-impl-error" />
+
+`error[E0117]: only traits defined in the current crate can be implemented for types defined outside of the crate`. Esta regla evita que dos crates distintos implementen lo mismo de dos formas incompatibles.
+
+## Desde
+
+Rust 1.0. `impl Trait` en argumentos y retornos: 1.26. En retornos de métodos de traits: 1.75. `use<…>`: 1.82 (en traits, 1.87).
+
+## Ver también
+
+- [`trait`](/ref/lenguaje/palabras-clave/trait/) · [`dyn`](/ref/lenguaje/palabras-clave/dyn/) · [`Self`](/ref/lenguaje/palabras-clave/self-tipo/) · [`where`](/ref/lenguaje/palabras-clave/where/) · [Ediciones](/ref/ediciones/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

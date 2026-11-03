@@ -1,0 +1,124 @@
+---
+// /preguntas/<id>/ — una pregunta de la biblioteca: respuesta interactiva, solución detallada tras responder,
+// relacionadas (mismo tema) y anterior/siguiente.
+import Practica from '../../components/paginas/Practica.astro';
+import { Code } from '@astrojs/starlight/components';
+import PreguntaIsla from '../../components/islas/Pregunta';
+import RespuestaIsla from '../../components/islas/Respuesta';
+import Predice from '../../components/Predice.astro';
+import Ejecutable from '../../components/interno/Ejecutable.astro';
+import Diagnostico from '../../components/interno/Diagnostico.astro';
+import { preguntas, md, codigoHtml, DIFICULTAD, TIPO, nombreMundo, nombreTema, numMundo, ordenDif, type Pregunta } from '../../lib/practica';
+import { ejemplo, nombreArchivo } from '../../lib/ejemplos';
+import { mundos } from '../../lib/lecciones';
+
+export function getStaticPaths() {
+  return preguntas.map((p) => ({ params: { id: p.id } }));
+}
+const { id } = Astro.params;
+const orden = [...preguntas].sort((a, b) => numMundo(a.mundo) - numMundo(b.mundo) || ordenDif(a.dificultad) - ordenDif(b.dificultad) || a.titulo.localeCompare(b.titulo, 'es'));
+const i = orden.findIndex((p) => p.id === id);
+const p = orden[i] as Pregunta;
+const anterior = orden[i - 1], siguiente = orden[i + 1];
+const relacionadas = orden.filter((x) => x.tema === p.tema && x.id !== p.id).slice(0, 6);
+const titulos = new Map((await mundos()).map((m) => [m.slug, m.titulo]));
+const mundoHref = p.mundo && titulos.has(p.mundo) ? `/curso/${p.mundo}/` : null;
+
+const e = p.ej ? ejemplo(p.ej, `pregunta ${p.id}`) : null;
+const enunciado = await md(p.enunciado);
+const solucion = await md(p.solucion);
+const codigo = p.codigo ? await codigoHtml(p.codigo) : null;
+const esPredice = p.tipo === 'predice' && e && !e.debeFallar && e.plataforma === 'wasm';
+---
+<Practica titulo={p.titulo} descripcion={`Pregunta de Rust (${nombreTema(p.tema)}, ${DIFICULTAD[p.dificultad].toLowerCase()}): ${p.enunciado.replace(/[`*]/g, '').slice(0, 140)}`} ancho="normal">
+  <nav class="rdc-migas" aria-label="Migas de pan"><a href="/preguntas/">Preguntas</a> <span aria-hidden="true">/</span> <a href={`/preguntas/?tema=${p.tema}`}>{nombreTema(p.tema)}</a></nav>
+  <div class="rdc-pregunta-meta">
+    <span class="rdc-dif" data-dif={p.dificultad}>{DIFICULTAD[p.dificultad]}</span>
+    <span class="rdc-chip">{TIPO[p.tipo]}</span>
+    {p.mundo && (mundoHref ? <a class="rdc-chip" href={mundoHref}>Mundo {nombreMundo(p.mundo, titulos)}</a> : <span class="rdc-chip">Mundo {nombreMundo(p.mundo, titulos)}</span>)}
+    {p.etiquetas.map((t) => <span class="rdc-etiqueta">{t}</span>)}
+    <span class="rdc-pregunta-estado" data-mi-estado hidden></span>
+  </div>
+
+  <div class="rdc-pregunta" data-pregunta={p.id}>
+    <div class="rdc-pregunta-enunciado sl-markdown-content" set:html={enunciado} />
+
+    {esPredice ? (
+      <Predice ej={p.ej!} opciones={p.opciones} correcta={p.correcta} pregunta="Elige tu respuesta (después podrás ejecutarlo)." idPregunta={p.id} />
+    ) : (
+      <>
+        {e && (e.debeFallar || e.plataforma !== 'wasm') && <Code code={e.codigo.replace(/\n$/, '')} lang="rust" title={nombreArchivo(e)} />}
+        {e && !e.debeFallar && e.plataforma === 'wasm' && <Ejecutable ej={p.ej!} componente={`pregunta ${p.id}`} />}
+        {codigo && <div class="rdc-shiki" set:html={codigo} />}
+        {p.tipo === 'respuesta'
+          ? <RespuestaIsla client:load pregunta="Tu respuesta:" respuestas={p.respuestas} idPregunta={p.id} />
+          : <PreguntaIsla client:load pregunta="Elige tu respuesta:" opciones={p.opciones} correcta={p.correcta} idPregunta={p.id} />}
+      </>
+    )}
+
+    <section class="rdc-solucion-pregunta" data-solucion-pregunta hidden aria-labelledby="sol-titulo" tabindex="-1">
+      <h2 id="sol-titulo">Solución</h2>
+      {p.tipo === 'respuesta' && <p class="rdc-sol-correcta">Respuesta: <code>{p.respuestas[0]}</code></p>}
+      {p.tipo !== 'respuesta' && <p class="rdc-sol-correcta">Correcta: <strong>{String.fromCharCode(65 + p.correcta)}</strong></p>}
+      <div class="sl-markdown-content" set:html={solucion} />
+      {e?.debeFallar && e.diagnosticos && <Diagnostico diagnosticos={e.diagnosticos} />}
+      {e?.debeFallar && e.arreglo && (
+        <details class="rdc-arreglo">
+          <summary>Ver arreglo</summary>
+          <Ejecutable ej={p.ej!} arreglo componente={`pregunta ${p.id}`} titulo={`${nombreArchivo(e).replace(/\.rs$/, '')}.arreglo.rs`} />
+        </details>
+      )}
+    </section>
+    <p class="rdc-pregunta-pista" data-pista>La solución detallada aparece al responder.</p>
+    <button type="button" class="rdc-boton sutil pequeno" data-revelar>Ver la solución sin responder</button>
+  </div>
+
+  <nav class="rdc-anterior-siguiente" aria-label="Más preguntas">
+    {anterior ? <a href={`/preguntas/${anterior.id}/`} rel="prev"><span>← Anterior</span><strong>{anterior.titulo}</strong></a> : <span />}
+    {siguiente ? <a href={`/preguntas/${siguiente.id}/`} rel="next" class="sig"><span>Siguiente →</span><strong>{siguiente.titulo}</strong></a> : <span />}
+  </nav>
+
+  {relacionadas.length > 0 && (
+    <section class="rdc-relacionadas" aria-labelledby="rel-titulo">
+      <h2 id="rel-titulo">Relacionadas · {nombreTema(p.tema)}</h2>
+      <ul>
+        {relacionadas.map((r) => (
+          <li data-rel={r.id}><a href={`/preguntas/${r.id}/`}>{r.titulo}</a> <span class="rdc-dif" data-dif={r.dificultad}>{DIFICULTAD[r.dificultad]}</span> <span class="rdc-estado" data-estado="nueva"></span></li>
+        ))}
+      </ul>
+    </section>
+  )}
+</Practica>
+
+<script>
+  import { leer, EVENTO } from '../../runtime/progreso';
+  const raiz = document.querySelector<HTMLElement>('[data-pregunta]')!;
+  const id = raiz.dataset.pregunta!;
+  const sol = raiz.querySelector<HTMLElement>('[data-solucion-pregunta]')!;
+  const pista = raiz.querySelector<HTMLElement>('[data-pista]')!;
+  const revelar = raiz.querySelector<HTMLButtonElement>('[data-revelar]')!;
+  const mostrar = (foco: boolean) => {
+    if (!sol.hidden) return;
+    sol.hidden = false;
+    pista.hidden = true;
+    revelar.hidden = true;
+    if (foco) sol.focus({ preventScroll: true });
+  };
+  raiz.addEventListener('rdc-respondida', () => setTimeout(() => mostrar(false), 50));
+  revelar.addEventListener('click', () => mostrar(true));
+  const pintar = () => {
+    const p = leer();
+    const r = p.preguntas[id];
+    const est = document.querySelector<HTMLElement>('[data-mi-estado]')!;
+    if (r) { est.hidden = false; est.dataset.estado = r.primera ? 'ok' : 'mal'; est.textContent = r.primera ? '✓ Acertada a la primera' : r.ok ? '✗ Fallada a la primera · luego acertada' : '✗ Fallada a la primera'; }
+    for (const li of document.querySelectorAll<HTMLElement>('[data-rel]')) {
+      const x = p.preguntas[li.dataset.rel!];
+      const s = li.querySelector<HTMLElement>('.rdc-estado')!;
+      s.dataset.estado = x ? (x.primera ? 'ok' : 'mal') : 'nueva';
+      s.textContent = x ? (x.primera ? '✓' : '✗') : '';
+      s.title = x ? (x.primera ? 'Acertada a la primera' : 'Fallada a la primera') : '';
+    }
+  };
+  pintar();
+  window.addEventListener(EVENTO, pintar);
+</script>

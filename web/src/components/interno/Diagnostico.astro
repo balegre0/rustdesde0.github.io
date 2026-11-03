@@ -1,0 +1,55 @@
+---
+// Error real de rustc (capturado en build con --error-format=json), pintado como en el terminal:
+// cabecera «error[E0499]: mensaje», «--> src/main.rs:4:13», marco de código con ^^^ (principal) y --- (secundarios).
+import { getCollection } from 'astro:content';
+import type { Diagnostico } from '../../lib/ejemplos';
+
+interface Props { diagnosticos: Diagnostico[]; enlace?: boolean }
+const { diagnosticos, enlace = true } = Astro.props;
+
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const fichas = new Set((await getCollection('docs', (e) => e.id.startsWith('errores/'))).map((e) => e.id.replace(/^errores\//, '').toUpperCase()));
+
+function pintar(d: Diagnostico): string {
+  const lineas = d.renderizado.split('\n');
+  return lineas.map((l, i) => {
+    if (i === 0) {
+      const m = l.match(/^(error|warning)(\[E\d+\])?(: )(.*)$/);
+      if (m) return `<span class="rdc-dx-nivel" data-nivel="${m[1]}">${m[1]}${m[2] ?? ''}</span><span class="rdc-dx-msg">${esc(m[3] + m[4])}</span>`;
+    }
+    if (/^\s*-->/.test(l) || /^\s*:::/.test(l)) return `<span class="rdc-dx-gut">${esc(l)}</span>`;
+    const g = l.match(/^(\s*\d*\s*\|)(.*)$/);
+    if (g) {
+      const num = Number(g[1].replace(/[^\d]/g, '')) || 0;
+      const resto = g[2];
+      const mm = !num && /^[\s|_/\\]*[\^\-]/.test(resto) ? resto.match(/^([^a-zA-Z0-9`(]*[\^\-])(\s+.+)?$/) : null;
+      if (mm) {
+        // Línea de marcas: ^^^ principal (rojo), --- secundaria (azul), con la etiqueta de la última marca
+        const pri = mm[1].trimEnd().endsWith('^');
+        const pref = esc(mm[1]).replace(/\^+|-+/g, (s) => `<span class="${s[0] === '^' ? 'rdc-dx-pri' : 'rdc-dx-sec'}">${s}</span>`);
+        const et = mm[2] ? `<span class="${pri ? 'rdc-dx-pri' : 'rdc-dx-sec'}">${esc(mm[2])}</span>` : '';
+        return `<span class="rdc-dx-gut">${esc(g[1])}</span>${pref}${et}`;
+      }
+      const marcada = num && num === d.linea;
+      return `<span class="rdc-dx-gut">${esc(g[1])}</span><span class="${marcada ? 'rdc-dx-linea marcada' : 'rdc-dx-linea'}">${esc(resto)}</span>`;
+    }
+    const n = l.match(/^(\s*= )(note|help)(:.*)$/) ?? l.match(/^()(note|help)(:.*)$/);
+    if (n) return `${esc(n[1])}<span class="rdc-dx-nota" data-tipo="${n[2]}">${n[2]}</span>${esc(n[3])}`;
+    return esc(l);
+  }).join('\n');
+}
+const principal = diagnosticos.find((d) => d.nivel === 'error') ?? diagnosticos[0];
+const codigo = principal?.codigo ?? null;
+const href = codigo ? (fichas.has(codigo) ? `/errores/${codigo.toLowerCase()}/` : `https://doc.rust-lang.org/error_codes/${codigo}.html`) : null;
+---
+<div class="rdc-diagnostico" data-diagnostico>
+  <div class="rdc-diagnostico-cab">
+    <span class="rdc-diagnostico-titulo">rustc · error real del compilador</span>
+    {enlace && href && (
+      <a href={href} class="rdc-diagnostico-enlace" target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noopener' : undefined}>
+        Qué significa {codigo}{href.startsWith('http') ? ' ↗' : ''}
+      </a>
+    )}
+  </div>
+  <pre class="rdc-diagnostico-texto" tabindex="0" aria-label={`Error del compilador${codigo ? ' ' + codigo : ''}`}><code set:html={diagnosticos.map(pintar).join('\n\n')} /></pre>
+</div>

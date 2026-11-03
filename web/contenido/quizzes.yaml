@@ -1,0 +1,218 @@
+# Quizzes cronometrados (CONTENIDO.md §7.3). Uno por mundo (10 preguntas, 5 minutos) y varios mixtos.
+- id: quiz-00
+  titulo: "Quiz · Mundo 00: El taller"
+  descripcion: "Diez preguntas del mundo 00 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 00-el-taller
+    n: 10
+
+- id: quiz-01
+  titulo: "Quiz · Mundo 01: La máquina"
+  descripcion: "Diez preguntas del mundo 01 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 01-la-maquina
+    n: 10
+
+- id: quiz-02
+  titulo: "Quiz · Mundo 02: Tu primer programa"
+  descripcion: "Diez preguntas del mundo 02 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 02-tu-primer-programa
+    n: 10
+
+- id: quiz-03
+  titulo: "Quiz · Mundo 03: Valores y tipos"
+  descripcion: "Diez preguntas del mundo 03 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 03-valores-y-tipos
+    n: 10
+
+- id: quiz-04
+  titulo: "Quiz · Mundo 04: Expresiones y control"
+  descripcion: "Diez preguntas del mundo 04 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 04-expresiones-y-control
+    n: 10
+
+- id: quiz-05
+  titulo: "Quiz · Mundo 05: Funciones y la pila"
+  descripcion: "Diez preguntas del mundo 05 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 05-funciones-y-la-pila
+    n: 10
+
+- id: quiz-06
+  titulo: "Quiz · Mundo 06: Ownership"
+  descripcion: "Diez preguntas del mundo 06 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 06-ownership
+    n: 10
+
+- id: quiz-07
+  titulo: "Quiz · Mundo 07: Préstamos"
+  descripcion: "Diez preguntas del mundo 07 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 07-prestamos
+    n: 10
+
+- id: quiz-08
+  titulo: "Quiz · Mundo 08: Lifetimes"
+  descripcion: "Diez preguntas del mundo 08 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 08-lifetimes
+    n: 10
+
+- id: quiz-09
+  titulo: "Quiz · Mundo 09: Structs, enums y patrones"
+  descripcion: "Diez preguntas del mundo 09 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 09-structs-enums-y-patrones
+    n: 10
+
+- id: quiz-10
+  titulo: "Quiz · Mundo 10: Errores"
+  descripcion: "Diez preguntas del mundo 10 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 10-errores
+    n: 10
+
+- id: quiz-11
+  titulo: "Quiz · Mundo 11: Colecciones y texto"
+  descripcion: "Diez preguntas del mundo 11 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 11-colecciones-y-texto
+    n: 10
+
+- id: quiz-12
+  titulo: "Quiz · Mundo 12: Módulos, crates y Cargo"
+  descripcion: "Diez preguntas del mundo 12 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 12-modulos-crates-y-cargo
+    n: 10
+
+- id: quiz-13
+  titulo: "Quiz · Mundo 13: Traits y genéricos"
+  descripcion: "Diez preguntas del mundo 13 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 13-traits-y-genericos
+    n: 10
+
+- id: quiz-14
+  titulo: "Quiz · Mundo 14: Closures e iteradores"
+  descripcion: "Diez preguntas del mundo 14 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 14-closures-e-iteradores
+    n: 10
+
+- id: quiz-15
+  titulo: "Quiz · Mundo 15: Punteros inteligentes y mutabilidad interior"
+  descripcion: "Diez preguntas del mundo 15 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 15-punteros-inteligentes
+    n: 10
+
+- id: quiz-16
+  titulo: "Quiz · Mundo 16: Pruebas y herramientas"
+  descripcion: "Diez preguntas del mundo 16 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 16-pruebas-y-herramientas
+    n: 10
+
+- id: quiz-17
+  titulo: "Quiz · Mundo 17: Concurrencia"
+  descripcion: "Diez preguntas del mundo 17 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 17-concurrencia
+    n: 10
+
+- id: quiz-18
+  titulo: "Quiz · Mundo 18: Async"
+  descripcion: "Diez preguntas del mundo 18 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 18-async
+    n: 10
+
+- id: quiz-19
+  titulo: "Quiz · Mundo 19: Macros"
+  descripcion: "Diez preguntas del mundo 19 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 19-macros
+    n: 10
+
+- id: quiz-20
+  titulo: "Quiz · Mundo 20: Unsafe y comportamiento indefinido"
+  descripcion: "Diez preguntas del mundo 20 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 20-unsafe-y-ub
+    n: 10
+
+- id: quiz-21
+  titulo: "Quiz · Mundo 21: El compilador por dentro"
+  descripcion: "Diez preguntas del mundo 21 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 21-el-compilador-por-dentro
+    n: 10
+
+- id: quiz-22
+  titulo: "Quiz · Mundo 22: Sistemas y FFI"
+  descripcion: "Diez preguntas del mundo 22 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 22-sistemas-y-ffi
+    n: 10
+
+- id: quiz-23
+  titulo: "Quiz · Mundo 23: Embebido y tu sistema operativo"
+  descripcion: "Diez preguntas del mundo 23 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 23-embebido-y-tu-so
+    n: 10
+
+- id: quiz-24
+  titulo: "Quiz · Mundo 24: Teoría y diseño del lenguaje"
+  descripcion: "Diez preguntas del mundo 24 en cinco minutos."
+  tiempo: 300
+  filtro:
+    mundo: 24-teoria-y-diseno
+    n: 10
+
+- id: relampago-mixto
+  titulo: "Relámpago: todo el curso"
+  descripcion: "Diez preguntas de cualquier mundo en dos minutos."
+  tiempo: 120
+  preguntas: [m12-pub-crate, m05-suma-cifras, m15-drop-movido, m22-global-alloc, m01-red-be, m02-hex, m19-items-no-higienicos, m03-usize-navegador, m14-orden-perezoso, m20-varianza-cell]
+
+- id: relampago-no-compila
+  titulo: "Relámpago: ¿por qué no compila?"
+  descripcion: "Diez errores reales del compilador en tres minutos."
+  tiempo: 180
+  preguntas: [err-e0382-1, m14-fn-puntero-captura, m03-push-en-literal, err-e0204-1, err-e0505-1, m10-result-multiplicar, m09-lista-infinita, err-e0423-1, m04-loop-dos-tipos, err-e0507-1]
+
+- id: desafio-dificil
+  titulo: "Desafío: solo difíciles"
+  descripcion: "Diez preguntas difíciles en diez minutos."
+  tiempo: 600
+  preguntas: [m22-cstring-temporal, m18-cancel-safety, m03-tamano-string, m23-volatile-no-sync, m06-mem-take, m09-binding-ref, m24-impl-existencial, m24-match-vacio, m17-condvar, m03-as-con-signo]

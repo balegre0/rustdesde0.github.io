@@ -1,0 +1,409 @@
+# Banco de preguntas del mundo 22 — Sistemas y FFI (CONTENIDO.md §7.1).
+# Código citado: ejemplos/m22/*.rs, comprobado con rustc 1.99.1, edición 2024.
+
+- id: m22-extern-sin-unsafe
+  titulo: "Un bloque extern en 2024"
+  mundo: 22-sistemas-y-ffi
+  tema: ffi
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué hay que cambiar en la edición 2024?"
+  ej: m22/extern-sin-unsafe
+  opciones:
+    - "Escribir `unsafe extern \"C\" { … }`: declarar funciones de fuera es una promesa que el compilador no puede comprobar"
+    - "Quitar el `unsafe` de la llamada"
+    - "Cambiar `\"C\"` por `\"Rust\"`"
+    - "Nada: compila igual"
+  correcta: 0
+  solucion: |
+    rustc: `extern blocks must be unsafe`. Si la firma declarada no coincide con la real, el programa tendría comportamiento indefinido; `unsafe extern` deja claro quién lo garantiza. Dentro, cada función puede marcarse `safe fn` (llamarla no es `unsafe`) o `unsafe fn` (por defecto).
+  etiquetas: ["unsafe extern", "edición 2024"]
+
+- id: m22-llamar-sin-unsafe
+  titulo: "Llamar a una función de fuera"
+  mundo: 22-sistemas-y-ffi
+  tema: ffi
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da `abs(-3)` si `abs` está declarada en un `unsafe extern \"C\"` sin `safe`?"
+  ej: m22/llamar-sin-unsafe
+  opciones:
+    - "E0133: llamar a una función `unsafe` exige un bloque `unsafe`"
+    - "E0425: `abs` no existe"
+    - "E0308: tipos que no coinciden"
+    - "Ninguno"
+  correcta: 0
+  solucion: |
+    Las funciones de un bloque `extern` son `unsafe` salvo que se marquen `safe fn`. Para `abs` de la biblioteca de C, que no tiene requisitos, `safe fn abs(x: i32) -> i32;` es correcto y evita el `unsafe` en cada llamada.
+  etiquetas: ["E0133", "FFI"]
+
+- id: m22-falta-write
+  titulo: "writeln! sin Write"
+  mundo: 22-sistemas-y-ffi
+  tema: io
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué falta?"
+  ej: m22/falta-write
+  opciones:
+    - "`use std::io::Write;`: `writeln!` llama a `write_fmt`, un método del trait `Write`, que tiene que estar en el ámbito (E0599)"
+    - "Declarar `salida` como `mut`"
+    - "Cambiar `writeln!` por `println!`"
+    - "Llamar a `flush()`"
+  correcta: 0
+  solucion: |
+    Los métodos de un trait solo se pueden llamar si el trait está importado. `salida` ya es `mut`.
+  etiquetas: ["E0599", "Write"]
+
+- id: m22-path-pathbuf
+  titulo: "Path y PathBuf"
+  mundo: 22-sistemas-y-ffi
+  tema: archivos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "La función debe devolver `PathBuf`. ¿Cómo se arregla?"
+  ej: m22/path-no-es-pathbuf
+  opciones:
+    - "Devolver `base.join(\"config.toml\")` sin `.as_path()`: `join` ya devuelve un `PathBuf` propio"
+    - "Cambiar el tipo de retorno a `&Path`"
+    - "Añadir `.clone()`"
+    - "Usar `String` en vez de `PathBuf`"
+  correcta: 0
+  solucion: |
+    `Path` es a `PathBuf` lo que `str` es a `String`: una vista y su versión propia. `as_path()` devuelve una vista prestada (E0308: se esperaba `PathBuf`). Y devolver `&Path` tampoco valdría: apuntaría a un temporal.
+  etiquetas: ["E0308", "Path", "PathBuf"]
+
+- id: m22-main-result
+  titulo: "main que devuelve Result"
+  mundo: 22-sistemas-y-ffi
+  tema: procesos
+  dificultad: media
+  tipo: opcion
+  enunciado: "En `m22/main-con-error`, `main` devuelve `Result<(), ParseIntError>` y el segundo `edad(\"cuatrocientos\")?` falla. ¿Qué pasa?"
+  opciones:
+    - "Se imprime `edad = 41`; luego Rust escribe el error (`Error: ParseIntError { kind: InvalidDigit }`) en la salida de errores y el programa termina con código 1"
+    - "El programa entra en pánico"
+    - "Se imprimen las tres líneas"
+    - "No compila: `main` no puede devolver nada"
+  correcta: 0
+  solucion: |
+    Si `main` devuelve `Err(e)`, el runtime imprime `Error: {e:?}` en stderr y sale con código distinto de cero. La última línea no se ejecuta por el `?`.
+  etiquetas: ["main", "Result", "código de salida"]
+
+- id: m22-stdin-lineas
+  titulo: "Sumar lo que llega por la entrada"
+  mundo: 22-sistemas-y-ffi
+  tema: io
+  dificultad: media
+  tipo: opcion
+  enunciado: "El programa `m22/suma-lineas` recibe por la entrada las líneas `10`, `20`, `treinta` y ` -5 `. ¿Qué imprime en la salida estándar?"
+  opciones:
+    - "`total = 25 (1 línea(s) ignorada(s))`"
+    - "`total = 30 (1 línea(s) ignorada(s))`"
+    - "`total = 25 (0 línea(s) ignorada(s))`"
+    - "Entra en pánico al llegar a `treinta`"
+  correcta: 0
+  solucion: |
+    `trim()` quita los espacios de ` -5 `, así que se suma (10 + 20 − 5 = 25). `treinta` no se puede convertir y se cuenta como ignorada; su aviso va a stderr con `eprintln!`.
+  etiquetas: ["stdin", "BufRead", "parse"]
+
+- id: m22-bufread
+  titulo: "Leer de cualquier sitio"
+  mundo: 22-sistemas-y-ffi
+  tema: io
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué `fn contar(entrada: impl BufRead)` es mejor que una función que lee directamente de `stdin`?"
+  opciones:
+    - "Porque acepta la entrada estándar, un archivo (`BufReader<File>`) o un texto en memoria (`Cursor`), así que se puede probar sin teclado ni archivos"
+    - "Porque es más rápida"
+    - "Porque `stdin` no implementa `BufRead`"
+    - "No hay diferencia"
+  correcta: 0
+  solucion: |
+    Programar contra un trait de E/S separa la lógica de dónde vienen los datos. El ejemplo `m22/contar-palabras` usa `Cursor::new(texto)` e imprime `3 líneas, 5 palabras`.
+  etiquetas: ["BufRead", "Cursor", "pruebas"]
+
+- id: m22-stdout-lock
+  titulo: "Escribir mucho más rápido"
+  mundo: 22-sistemas-y-ffi
+  tema: io
+  dificultad: media
+  tipo: opcion
+  enunciado: "Un programa imprime un millón de líneas con `println!` y va lento. ¿Qué lo acelera más?"
+  opciones:
+    - "Tomar `io::stdout().lock()` una vez, envolverlo en un `BufWriter` y escribir con `writeln!`"
+    - "Usar `print!` en vez de `println!`"
+    - "Compilar en modo debug"
+    - "Usar `eprintln!`"
+  correcta: 0
+  solucion: |
+    `println!` bloquea la salida en cada llamada y la salida estándar va por líneas cuando es una terminal. Con un único bloqueo y un búfer grande, se hacen muchas menos llamadas al sistema. Recuerda que `BufWriter` vacía el búfer al destruirse (o con `flush()`).
+  etiquetas: ["stdout", "BufWriter", "rendimiento"]
+
+- id: m22-args
+  titulo: "Argumentos del programa"
+  mundo: 22-sistemas-y-ffi
+  tema: procesos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Ejecutas `minigrep hola notas.txt`. ¿Qué contiene `std::env::args().collect::<Vec<String>>()`?"
+  opciones:
+    - "`[\"minigrep\", \"hola\", \"notas.txt\"]`: el primer elemento es el nombre del programa"
+    - "`[\"hola\", \"notas.txt\"]`"
+    - "`[\"notas.txt\"]`"
+    - "Una sola cadena con todo"
+  correcta: 0
+  solucion: |
+    Por convención, el primer argumento es la ruta del ejecutable. Por eso se suele empezar con `.skip(1)`. Si algún argumento no es UTF-8 válido, `args()` entra en pánico; `args_os()` lo evita.
+  etiquetas: ["env::args"]
+
+- id: m22-env-var
+  titulo: "Variables de entorno"
+  mundo: 22-sistemas-y-ffi
+  tema: procesos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué devuelve `std::env::var(\"IDIOMA\")` si la variable no existe?"
+  opciones:
+    - "`Err(VarError::NotPresent)`"
+    - "`Ok(\"\")`"
+    - "Entra en pánico"
+    - "`None`"
+  correcta: 0
+  solucion: |
+    Devuelve un `Result<String, VarError>`: también falla con `NotUnicode` si el valor no es UTF-8. Lo habitual: `env::var("IDIOMA").unwrap_or_else(|_| "es".into())`.
+  etiquetas: ["env::var", "Result"]
+
+- id: m22-osstr
+  titulo: "Texto del sistema"
+  mundo: 22-sistemas-y-ffi
+  tema: cadenas
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué existen `OsString` y `OsStr` además de `String` y `str`?"
+  opciones:
+    - "Porque los nombres de archivo y las variables del sistema no tienen por qué ser UTF-8 válido (en Windows son UTF-16 que puede estar mal formado; en Unix, bytes cualesquiera)"
+    - "Porque son más rápidos"
+    - "Porque `String` no funciona en Windows"
+    - "Por compatibilidad con versiones antiguas de Rust"
+  correcta: 0
+  solucion: |
+    Un `String` garantiza UTF-8. Para no perder información, la biblioteca estándar usa `OsString` en las fronteras con el sistema y te deja convertir con `to_str()` (que devuelve `Option`) o `to_string_lossy()`.
+  etiquetas: ["OsString", "UTF-8"]
+
+- id: m22-cstring
+  titulo: "Texto para una biblioteca de C"
+  mundo: 22-sistemas-y-ffi
+  tema: ffi
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿En qué se diferencia un `CString` de un `String`?"
+  opciones:
+    - "Termina en un byte 0 y no puede contener ningún 0 en medio; es lo que esperan las funciones de C que reciben `const char*`"
+    - "Está en UTF-16"
+    - "Es más rápido"
+    - "No se diferencian"
+  correcta: 0
+  solucion: |
+    `CString::new("año")` devuelve `Err` si el texto contiene un 0. El ejemplo `m22/cadenas-c` muestra los bytes de `"hola"` con el 0 final: `[104, 111, 108, 97, 0]`.
+  etiquetas: ["CString", "FFI"]
+
+- id: m22-cstring-temporal
+  titulo: "El puntero que cuelga"
+  mundo: 22-sistemas-y-ffi
+  tema: ffi
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Qué tiene de malo `let p = CString::new(\"hola\").unwrap().as_ptr();`?"
+  opciones:
+    - "El `CString` es un temporal que se destruye al final de la sentencia: `p` apunta a memoria liberada. Hay que guardar el `CString` en una variable"
+    - "Nada"
+    - "Que `as_ptr` copia el texto"
+    - "Que no compila"
+  correcta: 0
+  solucion: |
+    Compila (los punteros crudos no tienen lifetime), pero rustc da el aviso `dangling_pointers_from_temporaries`. Usar `p` después sería comportamiento indefinido.
+  etiquetas: ["CString", "punteros colgantes"]
+
+- id: m22-repr-c
+  titulo: "Un struct para C"
+  mundo: 22-sistemas-y-ffi
+  tema: ffi
+  dificultad: media
+  tipo: opcion
+  enunciado: "Pasas un `struct Punto { x: f64, y: f64 }` a una función de C. ¿Qué le falta?"
+  opciones:
+    - "`#[repr(C)]`: sin él, Rust no garantiza el orden ni el relleno de los campos"
+    - "`#[derive(Debug)]`"
+    - "`#[no_mangle]`"
+    - "Nada"
+  correcta: 0
+  solucion: |
+    Con `repr(Rust)` (el de por defecto) el compilador puede reordenar campos. `repr(C)` fija el layout que espera el otro lado.
+  etiquetas: ["repr(C)", "FFI"]
+
+- id: m22-no-mangle
+  titulo: "Que te llamen desde C"
+  mundo: 22-sistemas-y-ffi
+  tema: ffi
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué necesita una función de Rust para que un programa en C pueda llamarla por su nombre?"
+  opciones:
+    - "`#[unsafe(no_mangle)]` y `pub extern \"C\" fn`, dentro de un crate `cdylib` o `staticlib`"
+    - "Solo `pub`"
+    - "`#[inline]`"
+    - "Estar en `main.rs`"
+  correcta: 0
+  solucion: |
+    `extern "C"` fija la convención de llamada; `no_mangle` mantiene el nombre del símbolo; el tipo de crate produce una biblioteca enlazable. En la edición 2024, `no_mangle` se escribe dentro de `unsafe(…)`.
+  etiquetas: ["no_mangle", "extern C", "cdylib"]
+
+- id: m22-panico-ffi
+  titulo: "Un pánico que cruza la frontera"
+  mundo: 22-sistemas-y-ffi
+  tema: ffi
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Una función `extern \"C\"` escrita en Rust entra en pánico. ¿Qué pasa?"
+  opciones:
+    - "El programa aborta: desde Rust 1.81, un pánico que intenta salir de una función `extern \"C\"` no desenrolla hacia el código de C, sino que aborta"
+    - "El pánico se propaga al código de C como una excepción"
+    - "La función devuelve 0"
+    - "No compila"
+  correcta: 0
+  solucion: |
+    Desenrollar a través de un marco de C era comportamiento indefinido. Ahora es un aborto seguro. Si quieres propagar el pánico, existe la ABI `"C-unwind"`; si quieres capturarlo, `std::panic::catch_unwind`.
+  etiquetas: ["pánico", "FFI", "C-unwind"]
+
+- id: m22-proceso
+  titulo: "Lanzar otro programa"
+  mundo: 22-sistemas-y-ffi
+  tema: procesos
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué hace `Command::new(\"git\").args([\"status\", \"--short\"]).output()?`?"
+  opciones:
+    - "Ejecuta `git status --short`, espera a que termine y devuelve su código de salida y lo que escribió en stdout y stderr"
+    - "Abre una terminal"
+    - "Ejecuta el programa en un hilo de Rust"
+    - "Solo comprueba que `git` existe"
+  correcta: 0
+  solucion: |
+    `output()` captura las salidas; `status()` solo espera y devuelve el código; `spawn()` lo lanza sin esperar. Los argumentos van separados, sin pasar por un shell, así que no hay que preocuparse por las comillas.
+  etiquetas: ["Command", "procesos"]
+
+- id: m22-leer-archivo
+  titulo: "Leer un archivo entero"
+  mundo: 22-sistemas-y-ffi
+  tema: archivos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué devuelve `std::fs::read_to_string(\"notas.txt\")`?"
+  opciones:
+    - "`io::Result<String>`: `Err` si no existe, no hay permiso o no es UTF-8 válido"
+    - "`String`, o vacío si no existe"
+    - "`Option<String>`"
+    - "Un `File` abierto"
+  correcta: 0
+  solucion: |
+    Toda operación con el sistema puede fallar, y la biblioteca lo refleja en el tipo. Para bytes cualesquiera, `fs::read` devuelve `io::Result<Vec<u8>>`.
+  etiquetas: ["fs", "io::Result"]
+
+- id: m22-cerrar-archivo
+  titulo: "¿Quién cierra el archivo?"
+  mundo: 22-sistemas-y-ffi
+  tema: archivos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Abres un archivo con `let f = File::open(\"datos.bin\")?;`. ¿Cuándo se cierra?"
+  opciones:
+    - "Cuando `f` sale de ámbito: el `drop` de `File` cierra el descriptor del sistema (RAII)"
+    - "Hay que llamar a `f.close()`"
+    - "Al terminar el programa"
+    - "Nunca"
+  correcta: 0
+  solucion: |
+    `File` no tiene `close`: se cierra en su `drop`. Si necesitas saber si los datos llegaron al disco antes de cerrar, llama a `f.sync_all()?`, que sí devuelve un error.
+  etiquetas: ["RAII", "File", "Drop"]
+
+- id: m22-tcp
+  titulo: "Un servidor TCP"
+  mundo: 22-sistemas-y-ffi
+  tema: red
+  dificultad: media
+  tipo: opcion
+  enunciado: "En un servidor con `for conexion in listener.incoming()`, ¿por qué conviene atender cada conexión en un hilo (o en una tarea async)?"
+  opciones:
+    - "Porque si no, mientras atiendes a un cliente lento, el resto espera: el bucle no acepta otra conexión hasta terminar con la actual"
+    - "Porque `TcpStream` no funciona en el hilo principal"
+    - "Porque `incoming` solo devuelve una conexión"
+    - "No conviene"
+  correcta: 0
+  solucion: |
+    `TcpStream` es `Send`, así que se puede mover a un hilo con `thread::spawn(move || atender(conexion))`. Para miles de conexiones, async (mundo 18) escala mejor que un hilo por conexión.
+  etiquetas: ["TcpListener", "hilos"]
+
+- id: m22-global-alloc
+  titulo: "Contar reservas"
+  mundo: 22-sistemas-y-ffi
+  tema: memoria
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué implementar `GlobalAlloc` es `unsafe`?"
+  opciones:
+    - "Porque el asignador debe cumplir un contrato que el compilador no puede comprobar (alineación, no devolver bloques solapados…); si falla, todo `Vec` y `Box` del programa tendría UB"
+    - "Porque usa hilos"
+    - "Porque solo funciona en nightly"
+    - "No es `unsafe`"
+  correcta: 0
+  solucion: |
+    Es un `unsafe trait`: quien lo implementa promete cumplir sus reglas. El ejemplo `m22/contador-reservas` delega en `System` y solo cuenta.
+  etiquetas: ["GlobalAlloc", "unsafe trait"]
+
+- id: m22-alinear
+  titulo: "Redondear a la alineación"
+  mundo: 22-sistemas-y-ffi
+  tema: memoria
+  dificultad: dificil
+  tipo: respuesta
+  enunciado: "¿Cuánto vale `alinear_arriba(13, 8)`, es decir, el primer múltiplo de 8 mayor o igual que 13? (Solo el número.)"
+  respuestas: ["16"]
+  solucion: |
+    Con alineación potencia de 2: `(dir + align - 1) & !(align - 1)` = `(13 + 7) & !7` = `20 & !7` = 16. En Rust estable también existe `13usize.next_multiple_of(8)`.
+  etiquetas: ["alineación"]
+
+- id: m22-no-std-capas
+  titulo: "core, alloc y std"
+  mundo: 22-sistemas-y-ffi
+  tema: no_std
+  dificultad: media
+  tipo: opcion
+  enunciado: "En un crate `#![no_std]` con `extern crate alloc;`, ¿cuál de estos NO puedes usar?"
+  opciones:
+    - "`std::fs::File`"
+    - "`alloc::vec::Vec`"
+    - "`core::option::Option`"
+    - "`alloc::string::String`"
+  correcta: 0
+  solucion: |
+    Los archivos necesitan un sistema operativo, así que solo están en `std`. `Vec` y `String` están en `alloc` (si hay un asignador) y `Option` en `core`.
+  etiquetas: ["no_std", "alloc", "core"]
+
+- id: m22-windows-rs
+  titulo: "La API de Windows"
+  mundo: 22-sistemas-y-ffi
+  tema: ffi
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál es la forma habitual de llamar a la API de Windows desde Rust?"
+  opciones:
+    - "Los crates oficiales de Microsoft `windows` o `windows-sys`, que generan las declaraciones a partir de los metadatos de la API"
+    - "Escribir a mano cada `extern` de la API"
+    - "No se puede"
+    - "Solo con WSL"
+  correcta: 0
+  solucion: |
+    `windows-sys` da las declaraciones crudas (todo `unsafe`); `windows` añade envoltorios más cómodos (COM, `Result`). La ficha [`#[link]`](/ref/lenguaje/atributos/link/) muestra cómo se haría a mano con una sola función.
+  etiquetas: ["Windows", "windows-rs"]

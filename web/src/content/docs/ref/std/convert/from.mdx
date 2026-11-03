@@ -1,0 +1,58 @@
+---
+title: "From e Into"
+description: "Conversiones que no pueden fallar: T::from(x) y x.into()."
+sidebar:
+  order: 1
+insignias: ["Desde 1.24", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::convert::From, std::convert::Into` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub trait From<T>: Sized {
+    // Required method
+    fn from(value: T) -> Self;
+}
+
+pub trait Into<T>: Sized {
+    // Required method
+    fn into(self) -> T;
+}
+```
+
+## Qué hace
+
+`From<T> for U` dice cómo crear un `U` a partir de un `T`, siempre con éxito y sin pérdida. Se usa como `U::from(t)` o, si el compilador sabe el tipo de destino, `t.into()`. La biblioteca estándar trae muchas: `String::from(&str)`, `i64::from(u8)`, `Vec::from([1, 2])`, `Box::from(x)`…
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/convert-from" />
+
+**Salida:**
+
+```text
+Fahrenheit(212.0) Fahrenheit(32.0) 180
+hola 7 [97, 98, 99]
+Ok(Porcentaje(42))
+7%
+Err("130 no es un porcentaje")
+Err(TryFromIntError(PosOverflow))
+Ok(200)
+```
+
+## Desde
+
+Rust 1.24 (estable).
+
+## Ver también
+
+- [TryFrom](/ref/std/convert/tryfrom/)
+- [Error y ?](/ref/std/error/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)
+- [Mundo 10 · Errores](/curso/10-errores/)

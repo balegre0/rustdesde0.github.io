@@ -1,0 +1,93 @@
+---
+title: "Visibilidad"
+description: "Todo es privado salvo que lo marques con pub. Los campos de un struct son privados aunque el struct sea público, y pub(crate) limita la visibilidad al crate."
+sidebar:
+  order: 2
+duracion: 12
+desde: "1.0"
+requiere: ["12-modulos-crates-y-cargo/01-modulos"]
+tarjetas:
+  - p: "¿Quién puede ver un elemento privado (sin `pub`)?"
+    r: "El módulo donde está definido y todos sus módulos descendientes."
+  - p: "Si un struct es `pub`, ¿sus campos también lo son?"
+    r: "No. Cada campo es privado salvo que lleve su propio `pub`. (En un enum `pub`, en cambio, todas las variantes son públicas.)"
+  - p: "¿Qué significa `pub(crate)`?"
+    r: "Visible en todo el crate actual, pero no para otros crates que lo usen."
+  - p: "¿Qué dice E0603?"
+    r: "Que intentas usar un elemento privado desde fuera de su módulo (*… is private*)."
+  - p: "¿Para qué sirven los campos privados?"
+    r: "Para proteger invariantes: solo los métodos del módulo pueden cambiarlos, así que nadie puede dejar el valor en un estado inválido."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+La visibilidad es la herramienta que te deja cambiar el interior de tu código sin romper a quien lo usa. En Rust la regla por defecto es la más prudente: **todo es privado**.
+
+## Predice
+
+<NoCompila ej="m12/modulo-privado" explicacion={"`cocina::preparar` es pública y funciona. Pero `main` intenta llamar directamente a `cocina::horno::hornear`. Fíjate en qué le falta a `mod horno`."} />
+
+## La idea
+
+Un elemento **privado** (sin `pub`) solo es visible para su propio módulo y para los módulos que tiene **dentro**. Para que se vea desde fuera, hay que marcarlo con `pub`, y **todo el camino** tiene que ser visible: de nada sirve una función `pub` dentro de un módulo privado.
+
+Hay grados intermedios:
+
+| Escribes | Visible para |
+|---|---|
+| (nada) | el módulo actual y sus descendientes |
+| `pub(super)` | además, el módulo padre |
+| `pub(crate)` | todo el crate, pero no otros crates |
+| `pub` | todo el mundo, también otros crates |
+
+**Los campos de un struct van aparte.** Un `pub struct` tiene campos privados salvo que les pongas `pub` uno a uno. Es la forma de proteger un **invariante**: si `saldo` es privado, solo los métodos de `banco` pueden cambiarlo, y nadie puede poner un saldo imposible desde fuera.
+
+<NoCompila ej="m12/campo-privado-mal" explicacion="`saldo` es privado: solo el módulo `banco` puede tocarlo. Desde `main`, el único camino es un método público, como `ingresar`." />
+
+(En un `pub enum`, en cambio, todas las variantes son públicas: un enum con variantes ocultas no se podría usar en un `match`.)
+
+## Pruébalo
+
+<Ejecutar ej="m12/campos-privados" />
+
+<Ejecutar ej="m12/visibilidad-crate" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La privacidad es por módulo, no por tipo.** No hay nada como «privado para todos menos este struct»: cualquier código del mismo módulo (o de sus descendientes) ve todo. Por eso, en Rust, el **módulo** es la frontera de encapsulación.
+
+**Constructores obligatorios.** Si un struct tiene algún campo privado, desde fuera **no** se puede crear con `Cuenta { … }`, porque harían falta todos los campos. Hay que pasar por una función del módulo, como `Cuenta::nueva`. Esa es la forma idiomática de garantizar que todos los valores se crean válidos.
+
+**`#[non_exhaustive]`.** En bibliotecas, este atributo en un struct o enum público impide que otros crates lo construyan o hagan `match` sin un brazo `_`. Así puedes añadir campos o variantes en el futuro sin romper a nadie (lección 12).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Hacerlo todo pub para que compile">
+
+❌ Poner `pub` en todos los campos y funciones a la primera queja del compilador. Funciona, pero cualquier código podrá cambiar cualquier cosa, y los invariantes desaparecen.
+
+✅ Empieza con todo privado y abre solo lo que **otros** necesitan usar. Para cambiar un campo desde fuera, ofrece un método que compruebe que el cambio es válido.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`pub struct P { x: i32, pub y: i32 }` en el módulo `m`. Desde `main`, ¿qué puedes hacer?"
+  opciones={["Crear `m::P { x: 1, y: 2 }`", "Leer `p.y`", "Leer `p.x`", "Nada: el struct es privado"]}
+  correcta={1}
+  explicacion="`y` es público y `x` no. Leer `y` se puede; leer `x` o construir el struct directamente (haría falta `x`) no."
+  porque={["Construirlo exige dar todos los campos, y `x` es privado.", "", "`x` es privado: E0616.", "El struct es `pub`."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál es la visibilidad por defecto en Rust?"
+  opciones={["Pública", "Privada: el módulo y sus descendientes", "Visible para todo el crate", "Depende del tipo de elemento"]}
+  correcta={1}
+  explicacion="Todo empieza privado. Las únicas excepciones son las variantes de un enum público y los elementos de un trait público."
+  porque={["Hay que pedirlo con `pub`.", "", "Eso es `pub(crate)`.", "Es la misma regla para funciones, tipos, constantes y módulos."]}
+/>

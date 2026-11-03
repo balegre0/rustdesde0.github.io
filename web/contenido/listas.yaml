@@ -1,0 +1,48 @@
+# Listas de práctica (CONTENIDO.md §7.3). Generadas a partir de los bancos de preguntas y de problemas/.
+- id: rust-50
+  titulo: "Rust 50"
+  descripcion: "Cincuenta preguntas que recorren todo el curso, dos por mundo, y un problema de cada mundo con ejercicios."
+  preguntas: [m00-link-exe, m00-git-bash-link, m01-cpu-juguete, m01-contador-programa, m02-parentesis-sin-cerrar, m02-en-que-se-convierte, err-e0606-1, m03-mut-no-cambia-tipo, err-e0015-1, m04-sombra-en-bloque, m05-nombre-repetido, m05-parametro-inmutable, err-e0040-1, err-e0184-1, err-e0502-2, err-e0503-1, err-e0106-1, err-e0515-1, err-e0005-1, err-e0029-1, m10-overflow-perfiles, m10-debug-display, m11-capacidad-crece, m11-concatenar, err-e0616-1, m12-ruta-relativa, err-e0053-1, err-e0117-1, err-e0283-1, err-e0373-1, err-e0072-1, m15-option-box-nicho, m16-debug-assert-perfiles, m16-should-panic-expected, m17-spawn-prestamo, m17-rc-en-hilo, err-e0728-1, m18-self-poll, m19-precedencia, m19-follow-set-expr, err-e0133-1, m20-add-fuera, m21-cadena-sin-cerrar, m21-interrogacion, m22-path-pathbuf, m22-main-result, m23-sin-heap, m23-volatile, m24-option-bool, m24-isomorfos]
+  problemas: [m03-bytes-y-letras, m04-es-primo, m05-factorial, m06-cambiazo, m07-contar-palabras, m08-campos-csv, m09-area-de-formas, m10-parsear-hora, m11-agrupar-anagramas, m12-config-por-perfil, m13-dinero-operadores, m14-aplicar-n-veces, m15-boletin-weak, m16-en-rango, m17-cache-rwlock, m18-block-on, m19-al-reves, m20-invertir-crudo, m21-interprete-mir, m22-cadena-c, m23-asignador-bloques, m24-cardinalidad]
+
+- id: ownership-25
+  titulo: "Ownership, préstamos y lifetimes 25"
+  descripcion: "El núcleo de Rust en 25 preguntas: mover, prestar y cuánto vive cada referencia."
+  preguntas: [err-e0040-1, err-e0184-1, err-e0204-1, err-e0382-1, err-e0382-2, err-e0505-1, err-e0507-1, err-e0508-1, err-e0509-1, m06-usar-tras-mover, m06-mover-a-funcion, m06-mover-en-bucle, m06-mover-vec, m06-sacar-de-vec, m06-for-consume, m06-copy-y-drop, m06-mover-en-if, m06-reasignar-tras-mover, m06-copia-entero, m06-clone-independiente, m06-orden-drop, m06-sombra-no-libera, m06-asignar-libera, m06-guion-bajo, m06-drop-temprano]
+  problemas: [m06-cambiazo, m06-exclamar, m06-repartir, m06-sacar-el-mas-largo, m06-unir-nombres, m07-contar-palabras, m07-doblar-y-sumar, m07-invertir-en-sitio, m07-la-mas-larga-de, m07-primera-palabra, m07-primeros-caracteres, m08-campos-csv, m08-dividir, m08-extracto, m08-lineas-con, m08-mas-larga]
+
+- id: por-que-no-compila-30
+  titulo: "¿Por qué no compila? 30"
+  descripcion: "Treinta errores reales de rustc: lee el programa, encuentra el problema y aprende qué fallo de memoria evita."
+  preguntas: [err-e0004-1, err-e0070-1, err-e0277-2, err-e0407-1, err-e0505-1, err-e0597-1, err-e0618-1, m02-sin-main, m02-llave-sola, m03-asignar-dos-veces, m03-string-sin-mut, m04-if-asignacion, m04-bloque-break-sin-etiqueta, m05-tipo-argumento, m05-imprimir-unidad, m06-tupla-no-copy, m07-escribir-por-compartida, m08-colgante-bloque, m08-box-dyn, m09-metodo-mut, m09-let-refutable, m11-match-string, m13-solapamiento, m14-move-vec, m14-collect-sin-tipo, m15-pin-unpin, m17-scope-conflicto, m19-no-rules-expected, m19-compile-error, m20-extern-2024]
+  problemas: []
+
+- id: primeros-pasos-30
+  titulo: "Primeros pasos 30"
+  descripcion: "Del taller a las funciones: las bases para empezar con buen pie."
+  preguntas: [m00-ruta-relativa, m00-absoluta, m00-partes-ruta, m00-onedrive, m00-cd, m00-rustc-no-reconocido, m00-herramientas, m00-check-vs-build, m00-release, m00-target, m00-sin-cargo-toml, m00-printn, m00-edition, m00-cargo-add, m00-rust-analyzer, m00-git-orden, m00-gitignore, m00-ia, m01-ciclo-cpu, m01-cpu-pasos, m01-registro, m01-codigo-maquina, m01-usize-navegador, m01-casilla-byte, m01-distancia-array, m01-size-u32, m01-valores-byte, m01-binario-5, m01-binario-42, m01-sin-ceros]
+  problemas: [m03-bytes-y-letras, m03-intercambiar, m03-media-de-notas, m03-subir-volumen, m03-suma-segura, m04-es-primo]
+
+- id: concurrencia-y-async-25
+  titulo: "Concurrencia y async 25"
+  descripcion: "Hilos, Send y Sync, mutex, atómicos, canales, futuros y ejecutores."
+  preguntas: [m17-sin-move, m17-usar-tras-move, m17-spawn-prestamo, m17-rc-en-hilo, m17-cell-compartida, m17-contador-mut, m17-scope-conflicto, m17-guard-no-send, m17-rx-clone, m17-mutex-guard, m17-rwlock, m17-canal-cierre, m17-canal-acotado, m17-atomico-orden, m17-acquire-release, m17-carrera-intercalaciones, m17-send-sync-def, m17-interbloqueo, m17-envenenado, m17-arc-mutex, m17-wasm-hilos, m17-lazylock, m17-condvar, m17-rayon, m17-false-sharing]
+  problemas: [m17-cache-rwlock, m17-taquilla-atomica, m17-transferencia-sin-bloqueo, m17-tuberia-canales, m18-block-on, m18-despues, m18-el-primero, m18-join-todos, m18-maquina-a-mano]
+
+- id: bajo-nivel-30
+  titulo: "Bajo nivel 30"
+  descripcion: "Unsafe, comportamiento indefinido, el compilador por dentro, FFI y tu propio núcleo."
+  preguntas: [err-e0133-1, m20-add-fuera, m20-packed-e0793, m20-packed-tamano, m20-nicho-nonzero, m20-producir-valor, m20-sound-definicion, m20-assert-sound, m20-invariantes, m20-frontera-privacidad, m20-stacked-pila, m20-tree-borrows, m20-rustc-no-ve, m20-miri-limite, m20-precondicion-debug, m20-memoria-sin-init, m20-zeroed-ref, m20-cast-mut, m20-provenance, m20-map-addr, m20-varianza-cell, m20-invarianza-mut, m20-phantom-send, m20-orden-drop, m20-dropck, m20-may-dangle, m20-safe-fn, m20-repr-c, m20-cstring-temporal, m20-panico-ffi]
+  problemas: [m20-invertir-crudo, m20-leer-u32-le, m20-mi-cell, m20-partir-mut, m20-texto-ascii, m21-interprete-mir, m21-layout-repr-c, m21-lexer]
+
+- id: tipos-y-traits-25
+  titulo: "Tipos y traits 25"
+  descripcion: "Structs, enums, traits, genéricos y la teoría que hay debajo."
+  preguntas: [err-e0005-1, err-e0029-1, err-e0408-1, m09-tamano-reordenado, m09-metodo-self, m09-azucar-metodo, m09-map-none, m09-map-unwrap-or, m09-nicho-referencia, m09-option-option-bool, m09-un-solo-nicho, m09-raw-sin-nicho, m09-variante-grande, m09-lista-infinita, m09-match-u8, m09-variable-patron, m09-guardas-predice, m09-arroba, m09-slice-resto, m09-binding-ref, m09-movido-en-match, m09-comparar-enum, m09-let-else-diverge, m09-let-refutable, m09-irrefutables]
+  problemas: [m09-area-de-formas, m09-ascensor, m09-calculadora-segura, m09-interpretar-comandos, m09-tipo-de-triangulo, m13-dinero-operadores, m13-forma-area, m13-maximo-generico]
+
+- id: entrevista-40
+  titulo: "Preparar una entrevista 40"
+  descripcion: "Cuarenta preguntas difíciles de todo el temario, las que separan a quien usa Rust de quien lo entiende."
+  preguntas: [err-e0038-1, err-e0521-1, err-e0716-1, m02-overflow-mir, m03-as-con-signo, m03-tamano-string, m05-capturar-variable, m05-marco-hex, m05-tres-bugs, m06-asignar-libera, m06-movimiento-parcial-mal, m07-two-phase, m07-get-o-insertar, m07-incompleto, m08-anotacion-restrictiva, m08-closure-elision, m08-impl-lifetime, m08-ref-a-vs-t-a, m09-option-option-bool, m09-binding-ref, m10-variante-funcion, m10-from-atributo, m11-vecdeque-slice, m12-variante-nueva, m13-assoc-vs-generico, m14-closure-copy, m14-orden-perezoso, m14-captura-2024, m15-weak-cuentas, m15-refcell-tamano, m15-pin-unpin, m16-edicion-2024-doctests, m16-cobertura, m17-atomico-orden, m17-false-sharing, m18-guard-await, m18-cancel-safety, m18-jefe-reloj, m19-literal-negativo, m19-higiene-ident-pasado]
+  problemas: [m23-ring-buffer, m23-traducir-direccion, m24-cardinalidad, m24-email-validado, m24-lista-no-vacia, m24-maquina-de-estados]

@@ -1,0 +1,1 @@
+{ "nota": "Este ejemplo se ejecuta en el navegador a propósito: verás el pánico real que produce thread::spawn en wasm32-wasip1." }

@@ -1,0 +1,147 @@
+---
+title: "Los bloques son expresiones"
+description: "Descubre que un bloque { } produce un valor, y por qué un simple punto y coma puede cambiar ese valor."
+sidebar:
+  order: 1
+duracion: 9
+desde: "1.0"
+requiere: ["03-valores-y-tipos"]
+tarjetas:
+  - p: "¿Qué valor tiene un bloque { }?"
+    r: "El de su última expresión, la que NO lleva punto y coma. Si termina en `;`, el bloque vale `()`."
+  - p: "¿Qué es `()`?"
+    r: "La tupla vacía, también llamada «unidad» (*unit*). Es el valor de algo que no produce nada interesante."
+  - p: "¿Diferencia entre expresión y sentencia?"
+    r: "Una expresión produce un valor (`3 + 4`, `{ x * 2 }`). Una sentencia hace algo y no produce valor útil (`let x = 5;`, `x + 1;`)."
+  - p: "¿Qué pasa con las variables declaradas dentro de un bloque al salir de él?"
+    r: "Dejan de existir: su ámbito termina en la llave de cierre."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+En esta lección vas a ver que unas llaves `{ }` no solo agrupan instrucciones: **producen un valor**. Es la pieza que hace que `if`, `match` y `loop` funcionen como funcionan.
+
+## Predice
+
+<Predice
+  ej="m04/bloque-valor"
+  opciones={[
+    "`área = 12` y luego `nada = 2`",
+    "`área = 12`, la línea de dentro del bloque y `nada = ()`",
+    "No compila: no se puede guardar un bloque en una variable",
+    "`área = 12` y luego `nada = 1`"
+  ]}
+  correcta={1}
+  explicacion="El primer bloque termina en `ancho * alto` sin `;`, así que vale 12. El segundo termina en una sentencia con `;` (el `println!`), así que no produce nada: vale `()`."
+  porque={[
+    "El segundo bloque no termina en `x + 1`, termina en un `println!(...);`. Y aunque terminara en `x + 1;`, el `;` tiraría el valor.",
+    "",
+    "Sí se puede: un bloque es una expresión como `3 + 4`, y toda expresión se puede guardar.",
+    "`x` vale 1, pero el bloque no termina en `x`: termina en una sentencia con `;`."
+  ]}
+/>
+
+## La idea
+
+Una **expresión** (*expression*) es un trozo de código que **produce un valor**: `3 + 4` produce `7`; `"hola"` produce un texto; `ancho * alto` produce un número. Una **sentencia** (*statement*) es una orden que **hace algo** pero no produce un valor útil: `let x = 5;` crea una variable y ya.
+
+Un **bloque** es lo que va entre llaves `{ }`. Puede contener sentencias, y puede terminar con una expresión **sin punto y coma**. Esa última expresión es **el valor del bloque**. Por eso puedes escribir `let area = { ... };`: Rust ejecuta las líneas de dentro y se queda con lo que valga la última.
+
+¿Y si el bloque termina en `;`? Entonces no hay expresión final, y el bloque vale `()`, que se lee «unidad» (*unit*): una tupla vacía que significa «aquí no hay nada interesante». El `;` funciona como un **tragavalores**: convierte una expresión en sentencia y descarta su valor.
+
+## Pruébalo
+
+<Ejecutar ej="m04/bloque-valor" />
+
+Fíjate en tres cosas:
+
+1. `ancho` y `alto` solo existen **dentro** de su bloque. Al cerrar la llave, desaparecen. Es una forma limpia de usar variables auxiliares sin «ensuciar» el resto del programa.
+2. El primer bloque vale `12` porque su última línea, `ancho * alto`, no lleva `;`.
+3. El segundo bloque vale `()`. Para imprimir `()` hace falta `{nada:?}` (el formato de depuración, *Debug*), porque `()` no tiene una forma «bonita» de escribirse.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El tipo del bloque es el tipo de su última expresión.** El compilador no solo calcula el valor: calcula su **tipo** antes de ejecutar nada. El primer bloque es de tipo `i32` (porque `ancho * alto` es `i32`); el segundo es de tipo `()`.
+
+**`()` es un tipo de verdad y ocupa 0 bytes.** Solo tiene un valor posible (también escrito `()`), así que no hace falta guardar nada en memoria para saber cuál es. El compilador lo borra por completo del programa final: no cuesta nada.
+
+**Ámbito (*scope*).** Cada bloque abre un ámbito nuevo. Las variables que nacen dentro viven en la **pila** (*stack*, la zona de memoria que viste en el mundo 01) mientras dure el bloque. Al cerrar `}`, su sitio queda libre. Esta idea, «al cerrar la llave se acaba la vida de lo de dentro», será la base del mundo 06 (propiedad).
+
+**Casi todo es expresión.** En Rust son expresiones los literales, las operaciones, las llamadas, los bloques, `if`, `match`, `loop`... Las sentencias son pocas: `let`, las declaraciones (`fn`, etc.) y «expresión + `;`». Por eso se dice que Rust es un lenguaje **orientado a expresiones**.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Pones un `;` de más al final del bloque y el valor desaparece:
+
+<NoCompila
+  ej="m04/bloque-punto-y-coma"
+  explicacion="Le dijiste a Rust que `area` es un `i32`, pero el bloque termina en `ancho * alto;` con punto y coma, así que vale `()`. Fíjate en la pista del compilador: «remove this semicolon to return this value» (quita este punto y coma para devolver este valor)."
+/>
+
+Lee el error de abajo arriba: `expected i32, found ()` significa «esperaba un `i32` y encontré `()`». Cada vez que veas `found ()` donde esperabas un valor, busca un `;` sobrante.
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena las líneas para que `total` valga 30 (precio por cantidad) y `precio` y `cantidad` solo existan dentro del bloque."
+  lineas={[
+    "let total = {",
+    "    let precio = 6;",
+    "    let cantidad = 5;",
+    "    precio * cantidad",
+    "};",
+    "println!(\"total = {total}\");"
+  ]}
+  distractores={["    precio * cantidad;"]}
+  explicacion="La última línea del bloque va SIN punto y coma: es la expresión que da valor al bloque. Con `;` el bloque valdría `()`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuánto vale `r` en `let r = { let a = 2; let b = a + 1; b * b };`?"
+  opciones={["`9`", "`4`", "`()`", "No compila: `b` no existe fuera"]}
+  correcta={0}
+  explicacion="`a = 2`, `b = 3` y la expresión final `b * b` (sin `;`) da 9."
+  porque={[
+    "",
+    "`4` sería `a * a`, pero la última expresión es `b * b` y `b` vale 3.",
+    "Solo valdría `()` si la última línea terminara en `;`.",
+    "`b` no se usa fuera: se usa dentro del bloque, donde existe. Lo que sale es su valor."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `let x: i32 = { 5; };` no compila?"
+  opciones={[
+    "Porque un bloque no puede contener un número suelto",
+    "Porque el `;` convierte `5` en sentencia: el bloque vale `()` y no `i32`",
+    "Porque falta `return`",
+    "Porque `x` debería ser `mut`"
+  ]}
+  correcta={1}
+  explicacion="El punto y coma descarta el valor. El bloque queda sin expresión final y vale `()`, que no es un `i32`."
+  porque={[
+    "Sí puede: `{ 5 }` es un bloque válido que vale 5.",
+    "",
+    "`return` sirve para salir de una función; aquí basta con quitar el `;`.",
+    "`mut` solo hace falta si vas a cambiar `x` después; no tiene nada que ver con su valor inicial."
+  ]}
+/>
+
+<Pregunta
+  pregunta={"¿Qué tipo tiene el bloque `{ println!(\"hola\"); }`?"}
+  opciones={["`&str`", "`()`", "No tiene tipo", "`String`"]}
+  correcta={1}
+  explicacion="Termina en una sentencia (con `;`), así que es de tipo unidad `()`. Todo bloque tiene un tipo; cuando no produce nada interesante, ese tipo es `()`."
+  porque={[
+    "El texto `\"hola\"` es el argumento de `println!`, no el valor del bloque.",
+    "",
+    "En Rust todo bloque tiene tipo; «nada» se representa con `()`.",
+    "`println!` imprime, no crea un `String` que el bloque devuelva."
+  ]}
+/>

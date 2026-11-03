@@ -1,0 +1,42 @@
+---
+title: "Jefe: la terminal de tu núcleo"
+description: "Escribe la lógica de la terminal de texto de un núcleo: salto de línea, ajuste al final de la línea y desplazamiento de la pantalla."
+sidebar:
+  order: 13
+duracion: 20
+requiere: ["23-embebido-y-tu-so/12-rust-en-linux"]
+tarjetas:
+  - p: "Los tres casos de un escritor de texto en pantalla:"
+    r: "Salto de línea (`\\n`), línea llena (saltar antes de escribir) y última fila (desplazar todo hacia arriba y vaciar la última)."
+---
+
+import { Reto, Pregunta } from '~/components';
+
+Tu núcleo arranca y quiere contarlo. Escribe la terminal de texto: la misma lógica que el escritor VGA de blog_os, en una pantalla de 3 × 8 para que se vea bien.
+
+## El reto
+
+<Reto
+  ej="m23/jefe"
+  enunciado="Completa `escribir_byte` y `salto`. Reglas: (1) `\\n` llama a `salto`; (2) si la columna ya llegó a `COLUMNAS`, salta **antes** de escribir; (3) `salto` pone la columna a 0 y baja una fila, pero si ya estás en la última, copia cada fila a la de arriba y deja la última en blanco (`[b' '; COLUMNAS]`)."
+/>
+
+## Repaso relámpago
+
+<Pregunta
+  pregunta="¿Por qué el núcleo real escribe la pantalla con `write_volatile` y la simulación no?"
+  opciones={["Por estilo", "Porque en el núcleo real la memoria es la de vídeo y nadie la vuelve a leer: sin volatile, el optimizador podría eliminar las escrituras", "Porque la simulación es más lenta", "No hay diferencia"]}
+  correcta={1}
+  explicacion="En la simulación, el array se lee después (en `pintar`), así que las escrituras tienen efecto visible para el compilador. En la memoria de vídeo, el efecto lo ve la pantalla, no el programa."
+  porque={["Cambia el comportamiento del programa optimizado.", "", "No tiene que ver con la velocidad.", "La hay, y es la lección 2."]}
+/>
+
+## Lo que te llevas del mundo 23
+
+- `#![no_std]`: todo el lenguaje con solo `core` (y `alloc`).
+- Los periféricos se controlan con registros en memoria y accesos `volatile`.
+- PAC, HAL y `embedded-hal`: capas que hacen el hardware seguro y portable, con ownership y typestate.
+- Interrupciones como concurrencia: atómicos, secciones críticas, RTIC y Embassy.
+- Un núcleo: punto de entrada propio, VGA, IDT, paginación y un asignador.
+
+En el último mundo verás las ideas teóricas que hacen posible todo lo que has aprendido.

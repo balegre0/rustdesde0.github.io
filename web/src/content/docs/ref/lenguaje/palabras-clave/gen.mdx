@@ -1,0 +1,48 @@
+---
+title: "gen"
+description: "Palabra clave reservada: no se usa en Rust estable, pero no puede ser un nombre."
+sidebar:
+  order: 55
+desde: "2024"
+categoria: "reservada"
+---
+
+import { NoCompila } from '~/components';
+
+`gen` es una palabra clave **reservada**: hoy no hace nada en Rust estable, pero está apartada para el futuro, así que no puedes usarla como nombre de variable, función, tipo, campo, módulo…
+
+## Sinopsis
+
+```text
+gen          // sin significado en Rust estable 1.99
+r#gen        // identificador crudo: «gen» usado como nombre normal
+```
+
+## Qué hace
+
+Reservada **desde la edición 2024** (en ediciones anteriores es un identificador normal). Está pensada para los **bloques generadores**: `gen { yield 1; yield 2; }` crearía un iterador escribiendo un cuerpo con `yield`.
+
+Existe un experimento **inestable** que la usa, la *feature* `gen_blocks`, disponible solo en el compilador *nightly*. En Rust estable 1.99 no se puede usar.
+
+Reservar palabras de antemano permite añadir sintaxis nueva **sin romper** programas existentes: como nadie ha podido llamar `gen` a nada, el día que la palabra tenga significado ningún programa dejará de compilar.
+
+Si necesitas ese nombre (por ejemplo, para hablar con otro sistema que usa un campo llamado así), escribe el **identificador crudo** `r#gen`: para el compilador es el nombre `gen` sin más.
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-gen" />
+
+`error: expected identifier, found reserved keyword gen`, con la ayuda `escape gen to use it as an identifier`. El arreglo usa `r#gen`.
+
+## Desde
+
+Edición 2024 (Rust 1.85).
+
+## Ver también
+
+- [Palabras clave](/ref/lenguaje/palabras-clave/): las tres categorías y los identificadores crudos.
+- [Ediciones](/ref/ediciones/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)

@@ -1,0 +1,120 @@
+---
+title: "Jefe: el detective de bytes"
+description: "Junta todo lo del mundo para descifrar un volcado de memoria sin etiquetas: enteros, flotantes, orden de los bytes y UTF-8."
+sidebar:
+  order: 13
+duracion: 15
+desde: "1.0"
+requiere: ["01-la-maquina/12-quien-libera-el-heap"]
+tarjetas:
+  - p: "¿Qué tres preguntas hay que hacerse para leer bytes desconocidos?"
+    r: "¿Cuántos bytes forman cada dato? ¿En qué orden están (little o big-endian)? ¿De qué tipo son (entero, flotante, texto)?"
+  - p: "¿Qué hace `std::str::from_utf8(&bytes)`?"
+    r: "Intenta leer los bytes como texto. Devuelve `Ok` con el texto si son UTF-8 válido, o un `Err` si no lo son (por ejemplo, si cortas una «ñ» por la mitad)."
+  - p: "Los bytes `2c 01 00 00` leídos como `u32` little-endian, ¿qué número son?"
+    r: "300: `0x0000012c`."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Último reto del mundo. Alguien te pasa doce bytes de memoria sin ninguna etiqueta. Tu trabajo: averiguar qué son.
+
+## Predice
+
+<Pregunta
+  pregunta="Ves los bytes `2c 01 00 00`, guardados por un PC x86-64. Son un `u32`. ¿Qué número es?"
+  opciones={["300", "738263040", "44", "2010"]}
+  correcta={0}
+  explicacion="x86-64 es little-endian: el primer byte es el menos significativo. El número es `0x0000012c` = 1 × 256 + 44 = 300."
+  porque={["Correcto.", "Esa es la lectura big-endian (`0x2c010000`): orden equivocado para un PC x86-64.", "44 (`0x2c`) es solo el primer byte.", "Los bytes no se pegan como cifras decimales."]}
+/>
+
+## La idea
+
+Un volcado de memoria (*memory dump*) son bytes sin más. Recuerda la idea central del mundo: **los bytes no significan nada; el tipo les da significado**. Para descifrarlos, un buen detective se hace tres preguntas:
+
+1. **¿Cuántos bytes forman cada dato?** Un `u32` o un `f32` son 4; un `u16`, 2; un texto, los que haga falta.
+2. **¿En qué orden están?** Si los guardó un PC o WebAssembly, en little-endian.
+3. **¿De qué tipo son?** Mismos 4 bytes, cuatro lecturas distintas: `u32`, `i32`, `f32` o texto.
+
+Hay pistas que ayudan. Un flotante «normal» suele tener un byte alto como `3f`, `40` o `c0` (signo y exponente) en su extremo más significativo. Un texto en español tiene muchos bytes entre `61` y `7a` (las minúsculas), y una `c3` delante de una vocal con tilde o de una ñ.
+
+## Pruébalo
+
+<Ejecutar ej="m01/jefe-volcado" />
+
+Salida real:
+
+```text
+ 0: 2c = 00101100
+ 1: 01 = 00000001
+ 2: 00 = 00000000
+ 3: 00 = 00000000
+ 4: 00 = 00000000
+ 5: 00 = 00000000
+ 6: 48 = 01001000
+ 7: 40 = 01000000
+ 8: 61 = 01100001
+ 9: c3 = 11000011
+10: b1 = 10110001
+11: 6f = 01101111
+u32 le: 300
+u32 be: 738263040
+i32 le: 300
+f32 le: 4.2e-43
+bytes 4-7 como f32 le: 3.125
+bytes 8-11 como texto: Ok("año")
+```
+
+Los cuatro primeros bytes dan 300 como `u32` y como `i32` (el bit de signo está apagado, así que las dos lecturas coinciden). Como `f32` dan un número absurdo, 4,2 × 10⁻⁴³: pista de que **no** era un flotante. Los bytes 4–7 terminan en `40`, con pinta de flotante, y salen 3,125. Los 8–11 tienen una `c3`: texto con ñ.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+¿Por qué `2c 01 00 00` como `f32` da un número tan diminuto? Leídos en little-endian, sus 32 bits son `0x0000012c`. El bit de signo es 0 y los 8 bits de exponente son **todos 0**. Es un **subnormal** (lección 8): no hay 1 implícito y la potencia es la más pequeña posible. El resultado es 300 × 2⁻¹⁴⁹, que da ese 4,2 × 10⁻⁴³. Cuando una lectura como flotante da algo así de raro, casi seguro que esos bytes eran otra cosa.
+
+Y `3.125`: `0x40480000` tiene signo 0, exponente `10000000` (128, o sea 2¹) y mantisa `1001` seguida de ceros, es decir 1,1001₂ = 1,5625. Total: 1,5625 × 2 = 3,125.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Cortar un carácter por la mitad">
+
+❌ Leer el texto con los bytes 8, 9 y 10 (`&memoria[8..11]`), pensando «año tiene 3 letras».
+
+✅ «año» ocupa **4** bytes: la ñ son dos (`c3 b1`). Con `8..11` cortarías la `o` y te quedarías con `61 c3 b1`, o peor, si cortas entre `c3` y `b1` el texto deja de ser UTF-8 válido y `from_utf8` devuelve un error. En Rust, `a..b` significa «desde `a` hasta **antes de** `b`»: para los bytes 8 a 11 hay que escribir `8..12`.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m01/jefe-detective"
+  enunciado="Una ficha de jugador de 12 bytes, guardada por un PC little-endian: bytes 0–3 los puntos (`u32`), 4–7 la altura (`f32`) y 8–11 el nombre (texto UTF-8). El programa la lee mal en tres sitios. Arréglalo para que imprima exactamente `puntos: 300 | altura: 1.75 | nombre: año`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Cuatro bytes leídos como `f32` dan `4.2e-43`. ¿Qué es lo más probable?"
+  opciones={["Que no eran un flotante, sino otra cosa (un entero pequeño, por ejemplo)", "Que el número guardado era 4,2 × 10⁻⁴³", "Que el orden de los bytes es el correcto", "Que la máquina tiene un fallo"]}
+  correcta={0}
+  porque={["Correcto: un exponente todo a 0 con bits solo en la parte baja es la huella típica de un entero pequeño.", "Es posible en teoría, pero es rarísimo que un programa guarde algo así; mejor probar otras lecturas.", "El orden no se deduce de este resultado; de hecho aquí el orden era correcto y lo que fallaba era el tipo.", "La máquina hace exactamente lo que le pides: leer esos bits como `f32`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué rango de bytes ocupa un texto que empieza en el byte 8 y mide 4 bytes?"
+  opciones={["`8..12`", "`8..11`", "`8..4`", "`9..12`"]}
+  correcta={0}
+  porque={["Correcto: del 8 hasta antes del 12, o sea 8, 9, 10 y 11.", "`8..11` solo toma 3 bytes: el final no se incluye.", "El segundo número es dónde termina, no cuántos bytes hay.", "Empezaría un byte tarde y se comería la primera letra."]}
+/>
+
+<Pregunta
+  pregunta="Los bytes `00 00 80 3f` vienen de un PC little-endian y son un `f32`. ¿Qué número es?"
+  opciones={["1", "0", "−1", "128"]}
+  correcta={0}
+  explicacion="En little-endian el último byte es el más significativo: los bits son `0x3f800000`, que (lección 8) es 1.0."
+  porque={["Correcto.", "Que haya muchos ceros no lo hace 0: el `3f` lleva el exponente 127.", "El bit de signo está a 0 (`3f` empieza por `0011`).", "No es un entero: es un `f32`."]}
+/>

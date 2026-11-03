@@ -1,0 +1,68 @@
+---
+title: "Registros y volatile"
+description: "Los periféricos se controlan leyendo y escribiendo en direcciones de memoria fijas (MMIO). read_volatile y write_volatile garantizan que cada acceso ocurra de verdad."
+sidebar:
+  order: 2
+duracion: 12
+requiere: ["23-embebido-y-tu-so/01-sin-sistema-operativo"]
+tarjetas:
+  - p: "¿Qué es la E/S mapeada en memoria (MMIO)?"
+    r: "Una forma de controlar periféricos: sus registros aparecen como direcciones de memoria. Escribir en una dirección enciende un LED; leer de otra da el estado de un botón."
+  - p: "¿Por qué hay que usar `read_volatile`/`write_volatile` con los registros?"
+    r: "Porque el optimizador puede eliminar, juntar o reordenar accesos normales a memoria. Con volatile, cada lectura y escritura se hace exactamente como está escrita."
+  - p: "¿`volatile` sirve para compartir datos entre hilos?"
+    r: "No. No da atomicidad ni orden entre núcleos. Para eso están los atómicos."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+En tu PC, el sistema operativo habla con el hardware por ti. En un microcontrolador lo haces tú, y la forma es sorprendentemente simple: **escribiendo en la memoria**.
+
+## La idea
+
+Cada periférico (los pines, el temporizador, el puerto serie) tiene **registros**: palabras de 32 bits en direcciones **fijas** que da el fabricante en el manual. Por ejemplo, en el microcontrolador de la micro:bit v2, el registro `OUT` del puerto de pines está en una dirección concreta: escribir un 1 en su bit 13 pone el pin 13 a nivel alto (y enciende un LED, si hay uno conectado). A esto se le llama **E/S mapeada en memoria** (*memory-mapped I/O*, MMIO).
+
+En Rust, una dirección fija se convierte en un puntero crudo (`0x5000_0504 as *mut u32`), y para acceder a ella se usan dos funciones **`unsafe`**:
+
+```rust
+ptr.read_volatile()        // lee AHORA, de verdad
+ptr.write_volatile(valor)  // escribe AHORA, de verdad
+```
+
+**Volatile** significa: «este acceso tiene efectos que el compilador no ve». Sin él, el optimizador podría pensar «escribe dos veces seguidas en la misma dirección: me quedo solo con la última», o «lee esto en un bucle y nadie lo cambia: lo leo una vez». Con memoria normal estaría bien; con un registro, rompería el programa.
+
+## Pruébalo
+
+Simulamos el periférico con un struct `#[repr(C)]` que tiene la misma forma que los registros:
+
+<Ejecutar ej="m23/registros" />
+
+Las operaciones **leer–modificar–escribir** (`dir | (1 << pin)`) cambian solo el bit que nos interesa sin tocar los demás pines.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué es `unsafe`.** El compilador no puede saber si la dirección es la de un registro de verdad, si está alineada o si otro código la está usando a la vez. Lo garantizas tú (o la biblioteca de la siguiente lección, que lo hace una vez por todas).
+
+**`addr_of_mut!`.** En el ejemplo se usa `ptr::addr_of_mut!((*gpio).direccion)` para obtener un puntero al campo **sin crear una referencia** intermedia. Crear un `&mut` a un registro sería incorrecto: las referencias prometen que nadie más cambia el valor, y el hardware sí lo cambia. Desde Rust 1.82 también se puede escribir `&raw mut (*gpio).direccion`.
+
+</BajoElCapo>
+
+<Trampa titulo="Usar volatile para sincronizar">
+
+❌ Pensar que `volatile` sirve para compartir una variable entre el programa principal y una interrupción, o entre dos núcleos. No da atomicidad ni orden con respecto a otros accesos.
+
+✅ Para compartir datos usa atómicos (`AtomicBool`, `AtomicU32`) o secciones críticas (lección 4). `volatile` es solo para hablar con el hardware.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="El código escribe 1 y luego 0 en el registro de un pin para generar un pulso. Sin `volatile`, ¿qué podría hacer el optimizador?"
+  opciones={["Nada: siempre respeta las escrituras", "Quitar la primera escritura, porque la segunda la sobrescribe, y el pulso no existiría", "Cambiar el 1 por un 0", "Duplicar las escrituras"]}
+  correcta={1}
+  explicacion="Para memoria normal, una escritura que se sobrescribe enseguida no tiene efecto visible, así que se puede eliminar. En un registro, esa escritura era justo el pulso."
+  porque={["Solo los accesos volatile están garantizados.", "", "No cambia valores.", "No añade accesos."]}
+/>

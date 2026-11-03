@@ -1,0 +1,135 @@
+---
+title: "Enteros sin signo"
+description: "Entiende por qué un u8 va de 0 a 255, cuánto cabe en cada tamaño de entero y qué ocurre cuando un resultado no cabe."
+sidebar:
+  order: 6
+duracion: 10
+desde: "1.0"
+requiere: ["01-la-maquina/05-hexadecimal-el-atajo"]
+tarjetas:
+  - p: "¿Cuál es el rango de un entero sin signo de N bits?"
+    r: "De 0 a 2ᴺ − 1. Por ejemplo, un `u8` va de 0 a 255 y un `u16` de 0 a 65 535."
+  - p: "¿Cómo son los bits del valor máximo de un entero sin signo?"
+    r: "Todos a 1. `u8::MAX` es `11111111` y `u16::MAX` es `0xffff`."
+  - p: "¿Qué significan la `u` y el número de `u32`?"
+    r: "`u` es *unsigned* (sin signo: solo 0 y positivos) y 32 es el número de bits."
+  - p: "¿Qué devuelve `255u8.checked_add(1)`?"
+    r: "`None`: el resultado (256) no cabe en un `u8`."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa, Bits } from '~/components';
+
+Vas a ponerle nombre a lo que ya sabes contar: los enteros sin signo de Rust, y su límite.
+
+## Predice
+
+`u8::MAX` es el número más grande que cabe en un `u8`. ¿Cuál es?
+
+<Predice
+  ej="m01/u8-max"
+  opciones={["`255`", "`256`", "`128`", "`8`"]}
+  correcta={0}
+  explicacion="Un `u8` tiene 8 bits. Con todos encendidos: 128 + 64 + 32 + 16 + 8 + 4 + 2 + 1 = 255."
+  porque={["Correcto.", "Hay 256 valores distintos, pero uno de ellos es el 0: el más alto es 255.", "128 es lo que vale **solo** el bit de la izquierda.", "8 son los bits, no el valor máximo."]}
+/>
+
+## La idea
+
+Un **entero sin signo** (*unsigned integer*) es exactamente el binario de la lección 4: N bits, cada posición vale el doble que la anterior, y no hay negativos. Rust los llama con una `u` y el número de bits: `u8`, `u16`, `u32`, `u64` y `u128`. Hay uno más, `usize`, que mide lo que una dirección (4 bytes en el navegador, 8 en un PC de 64 bits).
+
+Con N bits caben los números del **0 al 2ᴺ − 1**. El mínimo tiene todos los bits a 0; el máximo, todos a 1.
+
+| Tipo | Bits | Máximo |
+|---|---|---|
+| `u8` | 8 | 255 |
+| `u16` | 16 | 65 535 |
+| `u32` | 32 | 4 294 967 295 |
+| `u64` | 64 | 18 446 744 073 709 551 615 |
+
+<Bits objetivo={255} />
+
+Enciende el máximo de un `u8`.
+
+## Pruébalo
+
+<Ejecutar ej="m01/sin-signo" />
+
+Salida real:
+
+```text
+u8:  de 0 a 255
+u16: de 0 a 65535
+u32: de 0 a 4294967295
+u64: de 0 a 18446744073709551615
+10000001 = 128 + 1 = 129
+u8::MAX en binario: 11111111
+u16::MAX en hex:    0xffff
+```
+
+¿Y si una suma no cabe? Este adelanto usa dos formas explícitas de sumar. `checked_add` («suma comprobada») responde `None` si no cabe. `wrapping_add` («suma con vuelta») tira el bit que sobra:
+
+<Ejecutar ej="m01/no-cabe" />
+
+Salida real:
+
+```text
+255 + 1 comprobado:  None
+255 + 1 con vuelta:  0
+en bits: 11111111 + 1 = 100000000
+```
+
+255 + 1 = 256 necesita **9 bits** (`1` y ocho `0`). En un `u8` solo hay sitio para 8, así que el 1 de delante se pierde y queda 0. A esto se le llama **desbordamiento** (*overflow*). Lo que hace Rust con un `+` normal cuando pasa esto lo verás en el Mundo 3.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Para la CPU, «sin signo» no es una propiedad de los bits: es una forma de **leerlos**. Un registro de 32 bits guarda 32 ceros y unos, y es la instrucción la que decide si los trata como sin signo o con signo. Rust lleva la cuenta por ti: como sabe el tipo de cada valor, elige las instrucciones correctas al compilar.
+
+¿Por qué hay tantos tamaños? Porque cada uno ocupa lo que ocupa. Un `u8` gasta 1 byte; un `u64`, 8. Si guardas un millón de edades (que nunca pasan de 255), un `u8` gasta un millón de bytes y un `u64` ocho millones. Elegir el tipo es elegir cuánto espacio y qué rango necesitas.
+
+`usize` es el tipo de los **índices** y de las **longitudes**: como mide lo que una dirección, siempre puede contar todos los bytes que la máquina puede numerar.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«256 cabe en un byte»">
+
+❌ «Un byte tiene 256 valores, así que el 256 cabe.»
+
+✅ Los 256 valores son **del 0 al 255**. El 256 ya necesita 9 bits: no cabe en un `u8`. Es el mismo error que creer que con dos cifras decimales puedes escribir el 100.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m01/sin-signo-reto"
+  enunciado="Cambia SOLO el tipo para que el programa imprima el máximo de un entero sin signo de 32 bits: `4294967295`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál es el máximo de un `u16`?"
+  opciones={["65535", "65536", "32767", "16"]}
+  correcta={0}
+  explicacion="2¹⁶ − 1 = 65 535, o sea, `0xffff`: 16 bits a 1."
+  porque={["Correcto.", "65 536 es la **cantidad** de valores; el máximo es uno menos, porque se empieza en 0.", "32 767 es el máximo de un `i16`, que tiene signo (lección 7).", "16 es el número de bits."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué devuelve `200u8.checked_add(100)`?"
+  opciones={["`None`", "`Some(300)`", "`Some(44)`", "`255`"]}
+  correcta={0}
+  explicacion="300 no cabe en un `u8` (máximo 255), y `checked_add` lo dice con `None`."
+  porque={["Correcto.", "300 no cabe en 8 bits: `checked_add` nunca devuelve un valor fuera de rango.", "44 es lo que daría `wrapping_add` (300 − 256), no `checked_add`.", "`checked_add` no se queda en el máximo; eso lo hace otra función (`saturating_add`), que verás en el Mundo 3."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué tipo usarías para guardar la longitud de una lista?"
+  opciones={["`usize`", "`u8`", "`u128`", "Cualquiera: da igual"]}
+  correcta={0}
+  porque={["Correcto: `usize` mide lo que una dirección, así que puede contar todo lo que cabe en memoria. Es lo que devuelve `len()`.", "Una lista puede tener más de 255 elementos.", "Funcionaría, pero Rust usa `usize` para longitudes e índices, y `u128` gasta 16 bytes.", "Rust es estricto con los tipos: las longitudes e índices son `usize`."]}
+/>

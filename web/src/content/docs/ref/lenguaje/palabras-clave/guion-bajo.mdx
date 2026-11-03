@@ -1,0 +1,76 @@
+---
+title: "_"
+description: "Palabra clave estricta: el comodín. «Aquí va algo, pero no le pongo nombre»."
+sidebar:
+  order: 1
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+El guion bajo `_` es el **comodín**: ocupa el sitio de un nombre, de un patrón o de un tipo cuando no te interesa darle nombre.
+
+## Sinopsis
+
+```text
+let _ = expresión;          // patrón comodín: no enlaza nada
+match x { _ => … }          // «cualquier otro valor»
+_ = expresión;              // descartar en una asignación
+let v: Vec<_> = …;          // tipo a deducir
+f::<_>(…)  /  [0; _]        // argumento genérico o constante a deducir
+```
+
+## Qué hace
+
+### Uso 1 · Patrón comodín
+
+En un patrón, `_` encaja con **cualquier** valor y **no lo enlaza** a ninguna variable. Por eso `let _ = valor;` no mueve ni presta nada: el valor (si es temporal) se destruye en ese mismo momento. En un `match`, `_` es la rama «todo lo demás».
+
+No confundas `_` con un nombre que empieza por guion bajo, como `_x`: `_x` **sí** es una variable (el compilador solo deja de avisar de que no la usas) y sí se queda con el valor.
+
+### Uso 2 · Expresión de descarte
+
+A la izquierda de una asignación, `_ = f();` descarta el resultado. También vale dentro de una asignación con desestructuración: `(a, _) = (1, 2);`.
+
+### Uso 3 · Tipo o constante a deducir
+
+En posición de tipo, `_` le pide al compilador que deduzca ese trozo: `Vec<_>`, `collect::<Vec<_>>()`. Desde Rust 1.89 también se acepta como argumento constante: `[0u8; _]` cuando la longitud se deduce del contexto.
+
+### Uso 4 · No es palabra clave en números
+
+Dentro de un literal numérico, `_` solo separa cifras para leerlas mejor: `1_000_000`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-guion-bajo" />
+
+Salida:
+
+```text
+a = 1
+otro
+[1, 2, 3]
+1000000
+```
+
+## Errores
+
+`_` no es una variable, así que no se puede leer:
+
+<NoCompila ej="ref-lenguaje/kw-guion-bajo-error" />
+
+El compilador responde: `in expressions, _ can only be used on the left-hand side of an assignment`.
+
+## Desde
+
+Rust 1.0 como patrón. Como expresión de descarte en asignaciones, desde 1.59. Como argumento constante deducido, desde 1.89.
+
+## Ver también
+
+- [Patrones](/ref/lenguaje/patrones/) · [`let`](/ref/lenguaje/palabras-clave/let/) · [`match`](/ref/lenguaje/palabras-clave/match/)
+- [Destructores y orden de drop](/ref/lenguaje/destructores-y-orden-de-drop/): por qué `let _ = x` y `let _x = x` destruyen en momentos distintos.
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

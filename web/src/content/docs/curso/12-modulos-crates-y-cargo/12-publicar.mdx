@@ -1,0 +1,95 @@
+---
+title: "Publicar en crates.io"
+description: "Qué necesita un crate para publicarse, cómo elegir la siguiente versión sin romper a nadie, y por qué una versión publicada no se puede borrar."
+sidebar:
+  order: 12
+duracion: 10
+desde: "1.0"
+requiere: ["12-modulos-crates-y-cargo/11-documentar"]
+tarjetas:
+  - p: "¿Qué campos de `Cargo.toml` hacen falta para publicar?"
+    r: "Además de `name` y `version`: `description` y `license` (o `license-file`). Muy recomendables: `repository`, `readme`, `keywords`, `categories` y `rust-version`."
+  - p: "¿Se puede borrar una versión publicada en crates.io?"
+    r: "No. Solo se puede retirar (`cargo yank`): los proyectos nuevos no la eligen, pero los que ya la usan en su `Cargo.lock` siguen funcionando."
+  - p: "¿Qué cambios obligan a subir la versión MAYOR?"
+    r: "Cualquiera que pueda romper código que compila: quitar o renombrar algo público, cambiar una firma, añadir un campo público a un struct sin `#[non_exhaustive]`, subir la versión mínima de Rust en algunos casos…"
+  - p: "¿Qué hace `cargo publish --dry-run`?"
+    r: "Empaqueta y comprueba el crate como si fuera a publicarlo, pero sin subirlo."
+---
+
+import { Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Publicar un crate es compartir tu código con todos. Es fácil de hacer, pero tiene una consecuencia seria: otros programas empezarán a depender de ti. Esta lección es sobre las reglas que lo hacen funcionar.
+
+## La idea
+
+Un crate publicado necesita, en su `Cargo.toml`:
+
+```toml
+[package]
+name = "conversor-unidades"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Convierte entre unidades de longitud, masa y temperatura."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tu-usuario/conversor-unidades"
+readme = "README.md"
+keywords = ["unidades", "conversion"]
+categories = ["science"]
+```
+
+`MIT OR Apache-2.0` es la doble licencia que usan el propio Rust y la mayoría de crates. Luego:
+
+```powershell
+cargo publish --dry-run   # comprueba todo sin subir nada
+cargo login               # una vez, con un token de crates.io
+cargo publish             # sube la versión
+```
+
+**Una versión publicada es para siempre.** No se puede borrar ni sustituir: así se garantiza que cualquier `Cargo.lock` del mundo siga funcionando. Si publicas una versión con un fallo grave, la **retiras** con `cargo yank --version 0.1.1`: nadie nuevo la elegirá, pero quien ya la tenía no se rompe.
+
+## Elegir la siguiente versión
+
+El versionado semántico (lección 6) es una **promesa** a quien te usa. Antes de publicar, pregúntate si el cambio puede romper código que hoy compila:
+
+| Cambio | Versión |
+|---|---|
+| arreglar un fallo interno | PARCHE |
+| añadir una función o un tipo públicos | MENOR |
+| añadir una variante a un `pub enum` sin `#[non_exhaustive]` | **MAYOR** (rompe los `match` exhaustivos) |
+| añadir un campo público a un struct sin `#[non_exhaustive]` | **MAYOR** (rompe a quien lo construye) |
+| quitar, renombrar o cambiar la firma de algo público | **MAYOR** |
+| implementar un trait nuevo para un tipo tuyo | normalmente MENOR |
+
+La herramienta `cargo-semver-checks` compara tu crate con la última versión publicada y detecta muchos de estos cambios automáticamente.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Qué se sube.** `cargo publish` empaqueta el código en un archivo `.crate` (un `.tar.gz`) con `Cargo.toml` normalizado, y crates.io lo guarda junto con una entrada en su **índice**: la lista de versiones, dependencias y features de cada crate, que es lo que Cargo consulta para resolver versiones. Desde 1.70, Cargo descarga solo las partes del índice que necesita (protocolo *sparse*).
+
+**Las dependencias de un crate publicado** solo pueden venir de crates.io (no por ruta ni de Git), para que cualquiera pueda compilarlo.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Publicar secretos o archivos enormes">
+
+❌ Publicar sin mirar qué entra en el paquete: archivos de prueba gigantes, configuraciones locales o, peor, un archivo con claves.
+
+✅ Antes de publicar, `cargo package --list` muestra exactamente qué archivos se subirán. Excluye lo que sobre con `exclude = […]` o `include = […]` en `[package]`. Y recuerda: lo publicado no se puede borrar.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tu crate está en la versión 1.3.0. Añades una variante a un `pub enum` que no tiene `#[non_exhaustive]`. ¿Qué versión publicas?"
+  opciones={["1.3.1", "1.4.0", "2.0.0", "1.3.0 otra vez"]}
+  correcta={2}
+  explicacion="Quien hacía `match` sobre ese enum cubriendo todas las variantes dejará de compilar (E0004). Es un cambio incompatible: versión mayor."
+  porque={["Un parche no puede romper nada.", "Una versión menor solo puede añadir sin romper, y esto rompe los `match`.", "", "Una versión publicada no se puede sustituir."]}
+/>

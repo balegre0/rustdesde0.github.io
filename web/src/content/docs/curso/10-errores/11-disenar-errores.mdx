@@ -1,0 +1,96 @@
+---
+title: "Diseñar errores"
+description: "Decide entre pánico y Result con criterio, documenta cómo falla cada función y prepara tus errores para crecer."
+sidebar:
+  order: 11
+duracion: 12
+desde: "1.40"
+requiere: ["10-errores/10-thiserror-y-anyhow"]
+tarjetas:
+  - p: "Regla para elegir entre pánico y `Result`:"
+    r: "Pánico si el fallo indica un error del programador (una precondición rota que quien llama podía evitar). `Result` si el fallo puede ocurrir en un programa correcto (entrada del usuario, archivos, red)."
+  - p: "¿Qué hace `#[must_use]` sobre tu función o tipo?"
+    r: "Hace que el compilador avise si alguien ignora el valor devuelto. Admite un mensaje: `#[must_use = \"…\"]`."
+  - p: "¿Para qué sirve `#[non_exhaustive]` en un enum de error público?"
+    r: "Obliga a los usuarios de OTROS crates a poner un brazo `_` en sus `match`, para que puedas añadir variantes más adelante sin romper su código."
+  - p: "¿Qué secciones de documentación espera la comunidad en una función que falla?"
+    r: "`# Errors` (cuándo devuelve cada `Err`) y `# Panics` (cuándo entra en pánico)."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a juntar todo el mundo en criterios de diseño: cómo deciden los expertos qué es un pánico, qué es un error y cómo exponerlo.
+
+## Predice
+
+<Pregunta
+  pregunta="`fn obtener(v: &[i32], i: usize) -> i32` documenta que `i` debe ser menor que `v.len()`. Si alguien la llama con `i` fuera de rango, ¿qué es más razonable?"
+  opciones={["Un pánico: quien llama rompió una precondición documentada", "Devolver 0", "Devolver -1", "Devolver un valor cualquiera de memoria"]}
+  correcta={0}
+  porque={["Correcto: es lo que hace `v[i]`. Si el fallo es normal, ofreces además una versión con `Option` (como `v.get(i)`).", "Un 0 inventado esconde el fallo y lo convierte en un dato falso.", "Un «valor mágico» es indistinguible de un dato real.", "Eso sería comportamiento indefinido: Rust seguro nunca lo hace."]}
+/>
+
+## La idea
+
+Tres preguntas guían el diseño:
+
+1. **¿Puede pasar en un programa correcto?** Si sí (el usuario escribe mal, el archivo no existe, la red se cae), es un `Result`. Si no (alguien pasó un índice imposible, una regla interna se rompió), es un **pánico**, y conviene documentarlo. La biblioteca estándar suele ofrecer **las dos versiones**: `v[i]` (pánico) y `v.get(i)` (`Option`); `a + b` (pánico en debug) y `a.checked_add(b)` (`Option`).
+2. **¿Quién va a leer el error?** Si es código que debe **reaccionar** (reintentar, pedir otra cosa), dale un enum concreto con datos. Si es una **persona** al final del programa, un mensaje con contexto basta.
+3. **¿Puede crecer?** Si añades una variante a un enum de error público, todos los `match` de tus usuarios dejan de compilar (E0004). Con **`#[non_exhaustive]`** (estable desde Rust 1.40) les obligas a poner un brazo `_` desde el principio, y puedes añadir variantes sin romper a nadie.
+
+Y documenta: la costumbre es una sección `# Errors` y otra `# Panics` en el comentario de cada función pública (mundo 12).
+
+## Pruébalo
+
+<Ejecutar ej="m10/disenar" />
+
+El ejemplo combina todo: el `assert!` del pánico documentado, el enum con datos (`libres`) que permite ofrecer una alternativa, y la guarda `if libres > 0` en el `match` de quien llama.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`#[must_use]`** es la forma de decirle al compilador «ignorar este valor casi seguro es un fallo». `Result` lo lleva de serie; tú puedes ponerlo en tus funciones y tipos, incluso con un mensaje:
+
+<Ejecutar ej="m10/must-use" titulo="Avisos de #[must_use]" />
+
+**`#[non_exhaustive]`** solo tiene efecto **fuera del crate** que define el enum: dentro de tu propio crate puedes seguir haciendo `match` exhaustivos. Así que no se puede demostrar en un único archivo; lo verás funcionar con varios crates en el mundo 12. Lo que sí puedes ver aquí es el problema que resuelve:
+
+<NoCompila ej="m10/variante-nueva" explicacion="Añadiste `Rechazado` al enum y el `match` de `mensaje` dejó de ser exhaustivo (E0004). Dentro de tu crate esto es una ayuda; en el código de tus usuarios sería un cambio que rompe su compilación. `#[non_exhaustive]` les obliga a tener un `_` preparado." />
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Errores que pierden información">
+
+❌ `Err(format!("falló: {e}"))`: convierte el error original en texto. Quien llama ya no puede preguntar el tipo, ni recorrer `source()`, ni traducir el mensaje.
+
+❌ `Err(())` o `Option` cuando hay varias causas posibles: quien llama no sabe qué arreglar.
+
+✅ Guarda el error original dentro de tu variante (como `Numero { causa: ParseIntError }`) y devuélvelo en `source()`. Y no repitas la causa en tu `Display`: quien recorra la cadena la vería dos veces.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m10/elegir"
+  enunciado="Completa `dividir_en_grupos(personas, por_grupo) -> Result<u32, u32>`: si `por_grupo` es 0, pánico con `assert!` y el mensaje `por_grupo debe ser > 0`; si sobran personas, `Err(sobran)`; si no, `Ok(grupos)`. Debe imprimir `Ok(3)` y `Err(2)`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estos fallos debería ser un pánico en una biblioteca de fechas?"
+  opciones={["`Fecha::new_unchecked(2026, 13, 1)` cuando la documentación exige un mes válido y existe `Fecha::new` que devuelve `Result`", "El usuario escribe «31/02/2026»", "Un archivo de calendario tiene una línea corrupta", "El servidor de hora no responde"]}
+  correcta={0}
+  porque={["Correcto: quien llama eligió la versión que no comprueba y rompió su contrato.", "Una entrada mala del usuario es normal: `Result`.", "Los archivos se corrompen: `Result`.", "La red falla: `Result`."]}
+/>
+
+<Pregunta
+  pregunta="Publicas un enum de error y crees que en el futuro añadirás variantes. ¿Qué haces?"
+  opciones={["Marcarlo con `#[non_exhaustive]`", "Añadir una variante `Otro(String)` y no tocarlo nunca más", "Usar `Box<dyn Error>` para no tener que decidir", "Nada: añadir variantes nunca rompe a nadie"]}
+  correcta={0}
+  porque={["Correcto.", "Ayuda, pero quien haga `match` exhaustivo se romperá igual en cuanto añadas otra variante.", "Pierdes la posibilidad de que los usuarios distingan casos.", "Rompe cualquier `match` exhaustivo de tus usuarios (E0004)."]}
+/>

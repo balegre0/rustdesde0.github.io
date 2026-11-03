@@ -1,0 +1,40 @@
+---
+title: "format_args!"
+description: "Prepara un texto formateado sin reservar memoria. Es la pieza sobre la que están construidas println!, format! y write!."
+sidebar:
+  order: 18
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::format_args`
+
+## Sinopsis
+
+```rust
+format_args!("formato {}", args) // -> std::fmt::Arguments<'_>
+```
+
+## Qué hace
+
+Comprueba el formato al compilar y crea un `fmt::Arguments`: una descripción del texto (los trozos fijos y los argumentos), **sin escribirlo en ningún sitio y sin reservar memoria**. Quien lo recibe decide dónde escribirlo: `println!` lo manda a la salida estándar, `format!` a un `String` nuevo y `write!` a cualquier destino.
+
+Es útil para escribir tus propias funciones de registro sin forzar una reserva en cada mensaje, y en `no_std`, donde no hay `String`.
+
+`Arguments::as_str()` devuelve `Some(&str)` si el texto no tiene ningún argumento.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-format-args" />
+
+## Errores típicos
+
+- Guardar el resultado en una variable para usarlo después: `fmt::Arguments` toma prestados los argumentos y no puede vivir más que la sentencia donde se crea (los argumentos suelen ser temporales). Úsalo directamente como argumento de una función.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[`format!`](/ref/std/macros/format/) · [`write!`](/ref/std/macros/write/) · [Sintaxis de formato](/ref/std/fmt/sintaxis/)

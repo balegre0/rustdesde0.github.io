@@ -1,0 +1,109 @@
+---
+title: "Box<T>"
+description: "Pone un valor en el montón: tipos recursivos, objetos de trait y valores grandes."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "alloc"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::boxed::Box` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub struct Box<T, A = Global>(/* private fields */)
+where
+    A: Allocator,
+    T: ?Sized;
+```
+
+## Qué hace
+
+`Box::new(valor)` reserva memoria en el montón, mueve el valor allí y devuelve la caja. Gracias a `Deref`, usas la caja casi como el valor (`*b`, métodos del valor). Al salir de ámbito, `Drop` destruye el valor y libera la memoria. `Box<dyn Trait>` guarda cualquier tipo que implemente el trait junto con un puntero a su **vtable** (la tabla de sus métodos).
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`new`](#new) | Reserva memoria en el montón y mueve el valor allí. | 1.0 |
+| [`pin`](#pin) | Crea una caja fijada (`Pin<Box<T>>`): el valor ya no se podrá mover. | 1.33 |
+| [`leak`](#leak) | Consume la caja sin liberar la memoria y devuelve un `&'static mut T`. | 1.26 |
+| [`into_raw`](#into_raw) | Convierte la caja en un puntero crudo; liberar la memoria pasa a ser responsabilidad tuya (con `from_raw`). | 1.4 |
+| [`from_raw`](#from_raw) | Recupera la caja a partir de un puntero de `into_raw`. | 1.4 |
+
+### `new`
+
+```rust
+pub fn new(x: T) -> Box<T>
+```
+
+Reserva memoria en el montón y mueve el valor allí.
+
+### `pin`
+
+```rust
+pub fn pin(x: T) -> Pin<Box<T>>
+```
+
+Crea una caja fijada (`Pin<Box<T>>`): el valor ya no se podrá mover.
+
+### `leak`
+
+```rust
+pub fn leak<'a>(b: Box<T, A>) -> &'a mut T
+where
+    A: 'a,
+```
+
+Consume la caja sin liberar la memoria y devuelve un `&'static mut T`. La memoria no se recupera nunca.
+
+### `into_raw`
+
+```rust
+pub fn into_raw(b: Box<T>) -> *mut T
+```
+
+Convierte la caja en un puntero crudo; liberar la memoria pasa a ser responsabilidad tuya (con `from_raw`).
+
+### `from_raw`
+
+```rust
+pub unsafe fn from_raw(raw: *mut T) -> Box<T>
+```
+
+Recupera la caja a partir de un puntero de `into_raw`. Es `unsafe`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/boxed-basico" />
+
+**Salida:**
+
+```text
+42
+Nodo(1, Nodo(2, Fin)) suma 3
+4
+3.14
+4 bytes
+```
+
+> En el navegador (wasm32) un puntero mide 4 bytes; en un PC de 64 bits mide 8.
+
+## Seguridad
+
+`Box::from_raw` es `unsafe`: el puntero debe venir de `Box::into_raw` (o tener la misma disposición y origen) y no puede usarse dos veces; si no, hay doble liberación o uso tras liberar.
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `pin` (1.33), `leak` (1.26), `into_raw` (1.4), `from_raw` (1.4).
+
+## Ver también
+
+- [E0072: tipo recursivo infinito](/errores/e0072/)
+- [E0746: devolver dyn Trait](/errores/e0746/)
+- [std::rc](/ref/std/rc/)
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

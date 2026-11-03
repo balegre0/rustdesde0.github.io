@@ -1,0 +1,46 @@
+---
+title: "final"
+description: "Palabra clave reservada: no se usa en Rust estable, pero no puede ser un nombre."
+sidebar:
+  order: 54
+desde: "1.0"
+categoria: "reservada"
+---
+
+import { NoCompila } from '~/components';
+
+`final` es una palabra clave **reservada**: hoy no hace nada en Rust estable, pero está apartada para el futuro, así que no puedes usarla como nombre de variable, función, tipo, campo, módulo…
+
+## Sinopsis
+
+```text
+final          // sin significado en Rust estable 1.99
+r#final        // identificador crudo: «final» usado como nombre normal
+```
+
+## Qué hace
+
+Reservada desde Rust 1.0. No tiene uso en el lenguaje actual.
+
+Reservar palabras de antemano permite añadir sintaxis nueva **sin romper** programas existentes: como nadie ha podido llamar `final` a nada, el día que la palabra tenga significado ningún programa dejará de compilar.
+
+Si necesitas ese nombre (por ejemplo, para hablar con otro sistema que usa un campo llamado así), escribe el **identificador crudo** `r#final`: para el compilador es el nombre `final` sin más.
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-final" />
+
+`error: expected identifier, found reserved keyword final`, con la ayuda `escape final to use it as an identifier`. El arreglo usa `r#final`.
+
+## Desde
+
+Reservada desde Rust 1.0, en todas las ediciones.
+
+## Ver también
+
+- [Palabras clave](/ref/lenguaje/palabras-clave/): las tres categorías y los identificadores crudos.
+- [Ediciones](/ref/ediciones/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)

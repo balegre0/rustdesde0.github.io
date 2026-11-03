@@ -1,0 +1,48 @@
+---
+title: "unreachable!"
+description: "Marca código que nunca debería ejecutarse; si se ejecuta, entra en pánico."
+sidebar:
+  order: 8
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::unreachable`
+
+## Sinopsis
+
+```rust
+macro_rules! unreachable {
+    ($($arg:tt)*) => { ... };
+}
+```
+
+## Qué hace
+
+Úsalo en ramas que sabes imposibles pero que el compilador no puede descartar (por ejemplo, el `_` de un `match` sobre `x % 2`). Si tu razonamiento falla, el programa entra en pánico con un mensaje claro en lugar de seguir con datos imposibles. No confundir con `std::hint::unreachable_unchecked`, que es `unsafe` y, si se alcanza, es comportamiento indefinido.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-unreachable" />
+
+**Salida:**
+
+```text
+-5: negativo
+0: cero
+8: positivo
+impar
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [todo!](/ref/std/macros/todo/)
+- [E0004 (match exhaustivo)](/errores/e0004/)
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

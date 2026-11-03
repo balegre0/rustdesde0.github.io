@@ -1,0 +1,113 @@
+---
+title: "E0408: variable no ligada en todas las alternativas"
+description: "En un patrón con | (o), una variable aparece en una alternativa pero no en las otras."
+sidebar:
+  order: 33
+insignias: ["Patrones"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` variable `n` is not bound in all patterns ``
+
+## Qué significa
+
+Con `A(t) | B(n) => ...`, el brazo se ejecuta para las dos alternativas. Si es `A`, existe `t` pero no `n`; si es `B`, al revés. El código del brazo no sabría qué variables existen. Por eso cada alternativa debe ligar **las mismas variables, con el mismo tipo**.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0408" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0408]: variable `n` is not bound in all patterns
+ --> E0408.rs:9:9
+  |
+9 |         Mensaje::Texto(t) | Mensaje::Numero(n) => println!("algo"),
+  |         ^^^^^^^^^^^^^^^^^                   - variable not in all patterns
+  |         |
+  |         pattern doesn't bind `n`
+  |
+help: you might have meant to use the similarly named previously used binding `t`
+  |
+9 -         Mensaje::Texto(t) | Mensaje::Numero(n) => println!("algo"),
+9 +         Mensaje::Texto(t) | Mensaje::Numero(t) => println!("algo"),
+  |
+
+error[E0408]: variable `t` is not bound in all patterns
+ --> E0408.rs:9:29
+  |
+9 |         Mensaje::Texto(t) | Mensaje::Numero(n) => println!("algo"),
+  |                        -    ^^^^^^^^^^^^^^^^^^ pattern doesn't bind `t`
+  |                        |
+  |                        variable not in all patterns
+  |
+help: you might have meant to use the similarly named previously used binding `n`
+  |
+9 -         Mensaje::Texto(t) | Mensaje::Numero(n) => println!("algo"),
+9 +         Mensaje::Texto(n) | Mensaje::Numero(n) => println!("algo"),
+  |
+
+warning: unused variable: `t`
+ --> E0408.rs:9:24
+  |
+9 |         Mensaje::Texto(t) | Mensaje::Numero(n) => println!("algo"),
+  |                        ^ help: if this is intentional, prefix it with an underscore: `_t`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `n`
+ --> E0408.rs:9:45
+  |
+9 |         Mensaje::Texto(t) | Mensaje::Numero(n) => println!("algo"),
+  |                                             ^ help: if this is intentional, prefix it with an underscore: `_n`
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Juntar con `|` variantes con datos distintos.
+- Erratas en el nombre de la variable entre alternativas.
+
+## Cómo arreglarlo
+
+Separa los casos en brazos distintos, o usa el mismo nombre en todas las alternativas si los tipos coinciden, o ignora los datos con `_`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+enum Mensaje {
+    Texto(String),
+    Numero(i32),
+}
+
+fn main() {
+    for m in [Mensaje::Numero(4), Mensaje::Texto(String::from("hola"))] {
+        match m {
+            Mensaje::Texto(t) => println!("texto: {t}"),
+            Mensaje::Numero(n) => println!("número: {n}"),
+        }
+    }
+}
+```
+
+**Salida:**
+
+```text
+número: 4
+texto: hola
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0408` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0023](/errores/e0023/): número de campos incorrecto en un patrón
+- [E0004](/errores/e0004/): patrones no exhaustivos
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

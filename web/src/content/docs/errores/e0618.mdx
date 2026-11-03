@@ -1,0 +1,75 @@
+---
+title: "E0618: se esperaba una función"
+description: "Usas ( ) para llamar a algo que no es una función ni una closure."
+sidebar:
+  order: 64
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` expected function, found `{integer}` ``
+
+## Qué significa
+
+`precio(2)` intenta **llamar** a `precio`, pero `precio` es un número. Solo se pueden llamar funciones, closures y tipos que implementan los traits `Fn*`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0618" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0618]: expected function, found `{integer}`
+ --> E0618.rs:3:17
+  |
+2 |     let precio = 10;
+  |         ------ `precio` has type `{integer}`
+3 |     let total = precio(2);
+  |                 ^^^^^^---
+  |                 |
+  |                 call expression requires function
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Una variable con el mismo nombre que una función la tapa (*shadowing*).
+- Paréntesis donde querías multiplicar (`precio(2)` en vez de `precio * 2`).
+
+## Cómo arreglarlo
+
+Si querías multiplicar, escribe `precio * 2`. Si es una función, comprueba que ninguna variable con el mismo nombre la tape.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn precio(unidades: u32) -> u32 {
+    unidades * 10
+}
+
+fn main() {
+    let total = precio(2);
+    println!("{total}");
+}
+```
+
+**Salida:**
+
+```text
+20
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0618` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0425](/errores/e0425/): nombre no encontrado
+- [E0599](/errores/e0599/): no existe ese método para el tipo
+
+## Aprende esto en
+
+- [Mundo 05 · Funciones y la pila](/curso/05-funciones-y-la-pila/)

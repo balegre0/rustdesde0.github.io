@@ -1,0 +1,177 @@
+---
+title: "Desbordamiento: cuando un entero no cabe"
+description: "Mira qué pasa cuando un entero se sale de su rango: pánico en debug, vuelta en release, y error de compilación si el compilador lo ve venir."
+sidebar:
+  order: 5
+duracion: 15
+desde: "1.0"
+requiere: ["03-valores-y-tipos/04-enteros"]
+tarjetas:
+  - p: "¿Qué pasa en Rust si un `u8` que vale 255 recibe `+= 1` en modo debug?"
+    r: "Pánico: «attempt to add with overflow». El programa se detiene."
+  - p: "¿Y el mismo código compilado en release (por defecto)?"
+    r: "Da la vuelta (módulo 2⁸): 255 + 1 = 0. Está definido, no es comportamiento indefinido."
+  - p: "¿Qué opción del compilador decide si se comprueba el desbordamiento?"
+    r: "`-C overflow-checks` (en Cargo, `overflow-checks` en el perfil). Debug la activa; release no."
+  - p: "¿Qué hace el compilador con `let x: u8 = 255 + 1;`?"
+    r: "No compila: «this arithmetic operation will overflow» (lint `arithmetic_overflow`, error por defecto)."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Un `u8` llega hasta 255. ¿Qué pasa si le sumas 1? Hoy vas a ver que la respuesta de Rust depende de cómo compiles, y que **nunca** es «cualquier cosa».
+
+## Predice
+
+<Pregunta
+  pregunta="Un `u8` vale 255 y el programa hace `+= 1`. Compilado en modo **debug** (el de `cargo run`), ¿qué ocurre?"
+  opciones={["Vale 256", "Vale 0", "El programa se detiene con un pánico", "Rust lo convierte en `u16` automáticamente"]}
+  correcta={2}
+  explicacion="En debug, cada suma comprueba si el resultado cabe. 256 no cabe en un `u8`, así que el programa se detiene con un pánico y un mensaje claro."
+  porque={["256 no cabe en 8 bits: el máximo es 255.", "Eso pasaría en release, no en debug.", "", "Rust nunca cambia el tipo de una variable por su cuenta."]}
+/>
+
+## La idea
+
+Cuando el resultado de una operación no cabe en el tipo, hay **desbordamiento** (*overflow*). Rust tiene dos comportamientos, según el **perfil** (*profile*) con el que compiles:
+
+- **Debug** (`cargo run`, `cargo build`): el compilador añade una comprobación a cada `+`, `-`, `*`. Si hay desbordamiento, **pánico**: el programa se detiene con el mensaje `attempt to add with overflow`.
+- **Release** (`cargo run --release`): sin comprobaciones, para ir más rápido. El valor **da la vuelta** (*wraps*): se queda con los bits de abajo, como un cuentakilómetros. 255 + 1 = 0.
+
+Lo importante: las dos cosas están **definidas**. El desbordamiento de enteros en Rust no es comportamiento indefinido: o te avisa, o da la vuelta, y tú sabes cuál. Y si el compilador puede calcular el desbordamiento al compilar (con valores fijos), ni siquiera te deja compilar.
+
+## Pruébalo
+
+Este ejemplo se ejecuta con **los dos perfiles**. El botón ▶ te muestra ambas salidas:
+
+<Ejecutar ej="m03/overflow" />
+
+Salida real en **debug**:
+
+```text
+nivel = 253
+nivel = 254
+nivel = 255
+
+thread 'main' (1) panicked at ejemplos/m03/overflow.rs:7:9:
+attempt to add with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+```
+
+Salida real en **release**:
+
+```text
+nivel = 253
+nivel = 254
+nivel = 255
+nivel = 0
+fin: 1
+```
+
+El mensaje del pánico te dice el hilo (`main`), el archivo, la **línea 7, columna 9** (justo el `nivel += 1`) y qué pasó. En release, en cambio, el programa sigue como si nada: 255 → 0 → 1.
+
+La resta es aún más traicionera con los enteros sin signo. Aquí quedan 2 unidades y se venden 3:
+
+<Ejecutar ej="m03/overflow-resta" />
+
+En debug: `attempt to subtract with overflow`. En release (salida real): `quedan 4294967295`. Un stock de cuatro mil millones de unidades por un descuido.
+
+## Bajo el capó
+
+<BajoElCapo titulo="La comprobación, en ensamblador">
+¿Cuánto cuesta la comprobación? Compilamos esta función para x86-64 con las comprobaciones activadas y desactivadas (`rustc --emit=asm -C opt-level=3 -C overflow-checks=on/off`):
+
+```rust
+pub fn suma(a: i32, b: i32) -> i32 { a + b }
+```
+
+Con `overflow-checks=on` (lo que hace debug), salida real, resumida:
+
+```text
+suma:
+	sub	rsp, 40
+	add	ecx, edx
+	jo	.LBB0_2
+	mov	eax, ecx
+	add	rsp, 40
+	ret
+.LBB0_2:
+	...
+	call	_RNvNtNtCs7uUmbfRqPp3_4core9panicking11panic_const24panic_const_add_overflow
+```
+
+`add` suma; `jo` (*jump if overflow*) salta si la CPU marcó desbordamiento, y allí se llama a `panic_const_add_overflow`. Con `overflow-checks=off`:
+
+```text
+suma:
+	lea	eax, [rcx + rdx]
+	ret
+```
+
+Una sola instrucción: suma y ya. La CPU **siempre** da la vuelta al sumar; lo que añade debug es mirar el indicador de desbordamiento y reaccionar.
+
+Esto se controla por perfil en `Cargo.toml`. Si quieres las comprobaciones también en release (por ejemplo, en un programa donde un número equivocado es peor que un poco de lentitud):
+
+```toml
+[profile.release]
+overflow-checks = true
+```
+
+Y si el desbordamiento ocurre con constantes, lo detecta el compilador. Error real al compilar `let x: u8 = 255 + 1;`:
+
+```text
+error: this arithmetic operation will overflow
+ --> ejemplos/m03/overflow-constante.rs:2:17
+  |
+2 |     let x: u8 = 255 + 1;
+  |                 ^^^^^^^ attempt to compute `u8::MAX + 1_u8`, which would overflow
+  |
+  = note: `#[deny(arithmetic_overflow)]` on by default
+```
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«En release no hay pánico, así que mi programa está bien»">
+❌ Probar solo en release, ver que no se rompe y darlo por bueno. El valor que ha dado la vuelta es **incorrecto**: el programa sigue, pero con un número falso (como los 4294967295 de stock).
+
+✅ Prueba en debug, que te avisa del fallo en la línea exacta. Y cuando un desbordamiento sea posible de verdad, no lo dejes al perfil: **dilo en el código** con `checked_`, `wrapping_` o `saturating_` (la siguiente lección).
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["let mut x: u8 = 255;", "x += 1;  // debug: pánico «attempt to add with overflow»", "// release: x vale 0 (da la vuelta)", "// las dos cosas están definidas: no es comportamiento indefinido"]}
+  distractores={["// release: x vale 256", "// debug: x pasa a ser u16"]}
+  explicacion="Un `u8` nunca puede valer 256 ni cambiar de tipo. En debug hay pánico; en release se queda con los 8 bits de abajo de 256, que son 0."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`let a: u32 = 2; let b: u32 = 3;` (valores que el compilador no puede prever) y luego `a - b` en **release**. ¿Qué da?"
+  opciones={["-1", "0", "4294967295", "Un pánico"]}
+  correcta={2}
+  explicacion="En release la resta da la vuelta: 2 − 3 = −1, que en 32 bits sin signo son todos los bits a 1, es decir, `u32::MAX` = 4294967295."
+  porque={["Un `u32` no puede ser negativo.", "No se satura: eso lo hace `saturating_sub`.", "", "El pánico es en debug; release no comprueba (salvo que actives `overflow-checks`)."]}
+/>
+
+<Pregunta
+  pregunta="¿Es comportamiento indefinido (UB) desbordar un entero en Rust?"
+  opciones={["Sí, siempre", "Solo con enteros con signo", "No: o hay pánico o da la vuelta, según el perfil", "Solo en release"]}
+  correcta={2}
+  explicacion="Rust define los dos resultados posibles. Con `overflow-checks` activo hay pánico; sin él, aritmética en complemento a dos que da la vuelta."
+  porque={["En Rust seguro no hay UB por aritmética.", "Con o sin signo, el comportamiento está definido.", "", "En release da la vuelta, de forma definida."]}
+/>
+
+<Pregunta
+  pregunta="En el mensaje `panicked at ejemplos/m03/overflow.rs:7:9`, ¿qué es el `7`?"
+  opciones={["El número de pánicos", "La línea del código donde ocurrió", "El valor de la variable", "El código de error"]}
+  correcta={1}
+  explicacion="Es `archivo:línea:columna`: línea 7, columna 9, donde está `nivel += 1`."
+  porque={["Un pánico detiene el hilo: solo hay uno.", "", "El valor no aparece en el mensaje.", "Los pánicos no tienen códigos E0xxx: esos son de los errores de compilación."]}
+/>
+
+<Historia titulo="Los números gigantes que no fueron">
+Graydon Hoare, el creador de Rust, contó en 2023 qué habría hecho distinto si hubiera mandado él solo. Una de sus ideas: que los enteros, al desbordarse, se convirtieran automáticamente en números de precisión arbitraria (*bignums*) en lugar de dar la vuelta o detener el programa. No se hizo: habría costado rendimiento y complejidad en el compilador. El resultado fue este compromiso, comprobar en debug y dar la vuelta en release, con funciones explícitas para quien quiera decidir.
+</Historia>

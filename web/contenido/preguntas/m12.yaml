@@ -1,0 +1,369 @@
+# Banco de preguntas del mundo 12 — Módulos, crates y Cargo (CONTENIDO.md §7.1).
+# Código citado: ejemplos/m12/*.rs, compilado con rustc 1.99.1, edición 2024.
+
+- id: m12-super
+  titulo: "super:: sube un nivel"
+  mundo: 12-modulos-crates-y-cargo
+  tema: modulos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m12/super-y-self
+  opciones: ["`12.10 €`", "`10.00 €`", "No compila: `IVA` es privado", "No compila: `super` no existe"]
+  correcta: 0
+  solucion: |
+    `super::IVA` es la constante de `tienda`, el padre de `caja`. Lo privado es visible para el propio módulo **y sus descendientes**.
+  etiquetas: ["super", "privacidad"]
+
+- id: m12-ruta-relativa
+  titulo: "Rutas desde dentro"
+  mundo: 12-modulos-crates-y-cargo
+  tema: modulos
+  dificultad: media
+  tipo: opcion
+  enunciado: "Dentro de `mod cocina`, ¿cómo llamas a `hornear`, definida en `cocina::horno`?"
+  opciones: ["`horno::hornear()`", "`cocina::horno::hornear()`", "`super::horno::hornear()`", "`hornear()`"]
+  correcta: 0
+  solucion: |
+    Las rutas relativas empiezan en el módulo actual. `cocina::horno` buscaría un `cocina` dentro de `cocina`. También valdría la absoluta `crate::cocina::horno::hornear()`.
+  etiquetas: ["rutas"]
+
+- id: m12-privado-por-defecto
+  titulo: "Un módulo privado"
+  mundo: 12-modulos-crates-y-cargo
+  tema: visibilidad
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué hay que cambiar para que `main` pueda llamar a `cocina::horno::hornear`?"
+  ej: m12/modulo-privado
+  opciones:
+    - "Hacer público el módulo: `pub mod horno` (todo el camino tiene que ser visible). E0603"
+    - "Nada más que `pub fn hornear`, que ya lo es"
+    - "Poner `use cocina::horno` en `main`"
+    - "Mover `hornear` a `main.rs`"
+  correcta: 0
+  solucion: |
+    De nada sirve una función `pub` dentro de un módulo privado: `main` no puede atravesar `horno`.
+  etiquetas: ["E0603", "pub"]
+
+- id: m12-campo-privado
+  titulo: "Campos privados"
+  mundo: 12-modulos-crates-y-cargo
+  tema: visibilidad
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede escribir `c.saldo = 1_000_000` desde `main`?"
+  ej: m12/campo-privado-mal
+  opciones:
+    - "Porque `saldo` es privado (E0616): solo el módulo `banco` puede tocarlo, y así protege que el saldo sea siempre válido"
+    - "Porque `c` no es `mut`"
+    - "Porque `u64` no admite números tan grandes"
+    - "Porque `Cuenta` no es `pub`"
+  correcta: 0
+  solucion: |
+    Un `pub struct` tiene campos privados salvo que cada uno lleve `pub`. Para cambiar el saldo, `banco` ofrece métodos que comprueban lo necesario.
+  etiquetas: ["E0616", "encapsulación"]
+
+- id: m12-pub-crate
+  titulo: "Grados de visibilidad"
+  mundo: 12-modulos-crates-y-cargo
+  tema: visibilidad
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Quién puede usar una función marcada `pub(crate)`?"
+  opciones:
+    - "Cualquier módulo del crate actual, pero no otros crates"
+    - "Solo el módulo donde está"
+    - "Solo el módulo padre"
+    - "Todo el mundo"
+  correcta: 0
+  solucion: |
+    `pub(super)` es «el padre»; `pub(in ruta)`, un antepasado concreto; `pub`, todos.
+  etiquetas: ["pub(crate)"]
+
+- id: m12-enum-variantes
+  titulo: "Las variantes de un pub enum"
+  mundo: 12-modulos-crates-y-cargo
+  tema: visibilidad
+  dificultad: media
+  tipo: opcion
+  enunciado: "En un `pub enum Color { Rojo, Verde }`, ¿son públicas las variantes?"
+  opciones:
+    - "Sí: en un enum público, todas las variantes lo son (si no, no se podría hacer `match`)"
+    - "No: hay que poner `pub` en cada una"
+    - "Solo la primera"
+    - "Solo dentro del crate"
+  correcta: 0
+  solucion: |
+    Es la diferencia con los structs, cuyos campos son privados por defecto.
+  etiquetas: ["enum", "pub"]
+
+- id: m12-use-mal
+  titulo: "Un use que no lleva a nada"
+  mundo: 12-modulos-crates-y-cargo
+  tema: use
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da `use geometria::superficie;` si el módulo solo tiene `area`?"
+  ej: m12/use-mal
+  opciones: ["E0432: importación sin resolver", "E0425: valor no encontrado", "E0603: elemento privado", "Ninguno: `use` no se comprueba"]
+  correcta: 0
+  solucion: |
+    El compilador comprueba cada ruta de un `use`. Si el nombre es parecido a uno que existe, lo sugiere.
+  etiquetas: ["E0432", "use"]
+
+- id: m12-trait-en-ambito
+  titulo: "Un método que no aparece"
+  mundo: 12-modulos-crates-y-cargo
+  tema: use
+  dificultad: media
+  tipo: opcion
+  enunciado: "`io::stdout().flush()` dice que el método `flush` no existe. ¿Qué falta?"
+  opciones: ["`use std::io::Write;`", "`use std::io::stdout;`", "`pub use`", "`mut`"]
+  correcta: 0
+  solucion: |
+    `flush` es un método del trait `Write`. Los métodos de un trait solo se pueden llamar si el trait está en el ámbito.
+  etiquetas: ["traits", "use"]
+
+- id: m12-pub-use
+  titulo: "Re-exportar"
+  mundo: 12-modulos-crates-y-cargo
+  tema: use
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m12/reexportar
+  opciones: ["`brum`", "No compila: `piezas` es privado", "No compila: `Bujia` no es `pub`", "Nada"]
+  correcta: 0
+  solucion: |
+    `pub use piezas::{encender, Bujia};` hace visibles esos nombres como `motor::encender` y `motor::Bujia`, aunque `piezas` sea privado.
+  etiquetas: ["pub use"]
+
+- id: m12-preludio
+  titulo: "Lo que no hay que importar"
+  mundo: 12-modulos-crates-y-cargo
+  tema: use
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué puedes usar `Vec`, `Option` o `String` sin ningún `use`?"
+  opciones:
+    - "Porque están en el preludio, una lista de `use` que el compilador añade a cada módulo"
+    - "Porque son palabras clave"
+    - "Porque están en `main.rs`"
+    - "Porque Cargo los importa"
+  correcta: 0
+  solucion: |
+    Cada edición tiene su preludio (`std::prelude::rust_2024`). El de 2024 añadió `Future` e `IntoFuture`.
+  etiquetas: ["preludio"]
+
+- id: m12-mod-archivo
+  titulo: "¿Dónde está el módulo?"
+  mundo: 12-modulos-crates-y-cargo
+  tema: archivos
+  dificultad: media
+  tipo: opcion
+  enunciado: "En `src/main.rs` hay `mod red;` y en `src/red.rs` hay `mod tcp;`. ¿Dónde está el código de `tcp`?"
+  opciones: ["`src/red/tcp.rs` (o `src/red/tcp/mod.rs`)", "`src/tcp.rs`", "Dentro de `src/red.rs`", "`src/main/tcp.rs`"]
+  correcta: 0
+  solucion: |
+    Los hijos de un módulo van en una carpeta con su nombre. Un archivo que nadie declara con `mod` no se compila.
+  etiquetas: ["mod", "archivos"]
+
+- id: m12-lib-desde-main
+  titulo: "Usar lib.rs desde main.rs"
+  mundo: 12-modulos-crates-y-cargo
+  tema: crates
+  dificultad: media
+  tipo: opcion
+  enunciado: "En el paquete `mi-app`, con `src/lib.rs` y `src/main.rs`, ¿cómo importa `main.rs` la función pública `iniciar` de la biblioteca?"
+  opciones: ["`use mi_app::iniciar;`", "`use crate::iniciar;`", "`mod lib;`", "No se puede"]
+  correcta: 0
+  solucion: |
+    La biblioteca es otro crate, que se nombra como el paquete con `_` en lugar de `-`. `crate` es el binario.
+  etiquetas: ["lib.rs", "crates"]
+
+- id: m12-semver
+  titulo: "¿Qué versiones acepta?"
+  mundo: 12-modulos-crates-y-cargo
+  tema: dependencias
+  dificultad: media
+  tipo: opcion
+  enunciado: "`regex = \"1.10\"` en `Cargo.toml`. ¿Cuál de estas versiones podría elegir Cargo?"
+  opciones: ["1.11.2", "1.9.5", "2.0.0", "Solo la 1.10.0"]
+  correcta: 0
+  solucion: |
+    El requisito por defecto es «compatible»: de 1.10.0 en adelante, sin llegar a 2.0.0.
+  etiquetas: ["semver"]
+
+- id: m12-semver-cero
+  titulo: "Versiones 0.x"
+  mundo: 12-modulos-crates-y-cargo
+  tema: dependencias
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "`rand = \"0.9\"`. ¿Aceptaría Cargo la versión 0.10.0?"
+  opciones:
+    - "No: con versión mayor 0, el número menor hace de «mayor», y 0.9 → 0.10 se considera incompatible"
+    - "Sí: 0.10 es mayor que 0.9"
+    - "Sí, si está en `Cargo.lock`"
+    - "Solo con `cargo update`"
+  correcta: 0
+  solucion: |
+    Antes de la 1.0, cualquier versión menor puede romper la interfaz. `"0.9"` equivale a `>=0.9.0, <0.10.0`.
+  etiquetas: ["semver"]
+
+- id: m12-features-off-on
+  titulo: "Una feature"
+  mundo: 12-modulos-crates-y-cargo
+  tema: features
+  dificultad: media
+  tipo: predice
+  enunciado: "Este programa se compiló como si Cargo hubiera activado la feature `colores`. ¿Qué imprime?"
+  ej: m12/feature-on
+  opciones:
+    - "`con colores (la feature está activa)` y `esta función solo existe con la feature`"
+    - "`sin colores`"
+    - "Solo `con colores (la feature está activa)`"
+    - "No compila: `solo_con_colores` no existe"
+  correcta: 0
+  solucion: |
+    Cargo activa una feature pasando `--cfg feature="colores"` a rustc. Con ella, `cfg!(feature = "colores")` vale `true` y el código con `#[cfg(feature = "colores")]` existe.
+  etiquetas: ["features", "cfg"]
+
+- id: m12-features-aditivas
+  titulo: "Features aditivas"
+  mundo: 12-modulos-crates-y-cargo
+  tema: features
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Dos crates de tu árbol usan `serde`: uno con la feature `derive` y otro sin ella. ¿Cuántas veces se compila `serde`?"
+  opciones:
+    - "Una, con la unión de las features (aquí, con `derive`). Por eso las features deben añadir, nunca quitar"
+    - "Dos, una por cada configuración"
+    - "Ninguna"
+    - "Da un error de conflicto"
+  correcta: 0
+  solucion: |
+    Es la unificación de features. Una feature que desactivara algo rompería al crate que lo necesita.
+  etiquetas: ["features", "unificación"]
+
+- id: m12-cfg-target
+  titulo: "¿Para qué se compiló?"
+  mundo: 12-modulos-crates-y-cargo
+  tema: perfiles
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime en el navegador?"
+  ej: m12/cfg-plataforma
+  opciones:
+    - "`procesador: wasm32`, `compilado para WASI…`, `¿familia wasm? true`, `bits de un puntero: 32`"
+    - "`procesador: x86_64`, `compilado para Windows`, …, `bits de un puntero: 64`"
+    - "`procesador: wasm32`, `compilado para Windows`…"
+    - "Nada: `cfg!` no funciona en wasm"
+  correcta: 0
+  solucion: |
+    `cfg!` pregunta por el target para el que se **compiló**. Los ejemplos de este curso se compilan para `wasm32-wasip1`.
+  etiquetas: ["cfg", "target"]
+
+- id: m12-perfil-overflow
+  titulo: "Desbordar en release"
+  mundo: 12-modulos-crates-y-cargo
+  tema: perfiles
+  dificultad: media
+  tipo: opcion
+  enunciado: "Con el perfil `release` por defecto, un `u8` que vale 255 recibe `+ 1` (con un valor que no se conoce al compilar). ¿Qué pasa?"
+  opciones: ["Da la vuelta: vale 0", "Pánico", "No compila", "Vale 256"]
+  correcta: 0
+  solucion: |
+    `overflow-checks` está desactivado en release. Si quieres el mismo comportamiento en los dos perfiles, usa `wrapping_add`, `checked_add` o `saturating_add`.
+  etiquetas: ["perfiles", "overflow"]
+
+- id: m12-workspace-lock
+  titulo: "Un workspace"
+  mundo: 12-modulos-crates-y-cargo
+  tema: workspaces
+  dificultad: facil
+  tipo: opcion
+  enunciado: "En un workspace con tres paquetes, ¿cuántos `Cargo.lock` y carpetas `target` hay?"
+  opciones: ["Uno de cada, en la raíz", "Tres de cada", "Ninguno", "Un `Cargo.lock` por paquete y un `target` común"]
+  correcta: 0
+  solucion: |
+    Todos los miembros comparten versiones y resultados de compilación.
+  etiquetas: ["workspace"]
+
+- id: m12-build-rs
+  titulo: "build.rs"
+  mundo: 12-modulos-crates-y-cargo
+  tema: build
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuándo se ejecuta `build.rs`?"
+  opciones:
+    - "Antes de compilar el crate: Cargo lo compila, lo ejecuta y lee las instrucciones `cargo::…` que imprime"
+    - "Al ejecutar el programa"
+    - "Solo con `cargo test`"
+    - "Nunca: es documentación"
+  correcta: 0
+  solucion: |
+    Sirve para generar código, compilar bibliotecas de otros lenguajes o detectar el entorno. Escribe en `OUT_DIR`, nunca en `src`.
+  etiquetas: ["build.rs"]
+
+- id: m12-doc-comentarios
+  titulo: "/// y //!"
+  mundo: 12-modulos-crates-y-cargo
+  tema: docs
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Al principio de `lib.rs` quieres documentar el crate entero. ¿Qué comentario usas?"
+  opciones: ["`//!`", "`///`", "`//`", "`/* */`"]
+  correcta: 0
+  solucion: |
+    `//!` documenta lo que contiene el comentario; `///`, lo que viene después.
+  etiquetas: ["rustdoc"]
+
+- id: m12-doctest
+  titulo: "Doctests"
+  mundo: 12-modulos-crates-y-cargo
+  tema: docs
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué hace `cargo test` con un bloque de código dentro de un comentario `///` de una biblioteca?"
+  opciones:
+    - "Lo compila y lo ejecuta como una prueba: si falla, el test falla"
+    - "Lo ignora"
+    - "Solo comprueba que es Rust válido"
+    - "Lo copia a la documentación sin comprobarlo"
+  correcta: 0
+  solucion: |
+    Así la documentación no se queda desactualizada. Opciones: `no_run`, `should_panic`, `compile_fail`, `ignore`.
+  etiquetas: ["doctests"]
+
+- id: m12-yank
+  titulo: "Retirar una versión"
+  mundo: 12-modulos-crates-y-cargo
+  tema: publicar
+  dificultad: media
+  tipo: opcion
+  enunciado: "Publicaste una versión con un fallo grave. ¿Qué puedes hacer?"
+  opciones:
+    - "Retirarla con `cargo yank`: los proyectos nuevos no la eligen, pero los que ya la tienen en `Cargo.lock` siguen funcionando"
+    - "Borrarla de crates.io"
+    - "Sustituirla por otra con el mismo número"
+    - "Nada"
+  correcta: 0
+  solucion: |
+    Una versión publicada es para siempre: así ningún `Cargo.lock` del mundo se rompe. Después, publica una versión de parche.
+  etiquetas: ["cargo yank", "crates.io"]
+
+- id: m12-variante-nueva
+  titulo: "¿Qué versión toca?"
+  mundo: 12-modulos-crates-y-cargo
+  tema: publicar
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Tu crate está en la 1.3.0 y añades una variante a un `pub enum` sin `#[non_exhaustive]`. ¿Qué versión publicas?"
+  opciones: ["2.0.0", "1.4.0", "1.3.1", "1.3.0"]
+  correcta: 0
+  solucion: |
+    Los `match` exhaustivos de quien te usa dejarían de compilar (E0004): es un cambio incompatible. Con `#[non_exhaustive]` desde el principio, sería una versión menor.
+  etiquetas: ["semver", "non_exhaustive"]

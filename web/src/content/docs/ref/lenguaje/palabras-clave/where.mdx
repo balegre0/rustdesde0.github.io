@@ -1,0 +1,58 @@
+---
+title: "where"
+description: "Palabra clave estricta: cláusula que agrupa los límites de traits y tiempos de vida de un genérico."
+sidebar:
+  order: 38
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`where` introduce una lista de **requisitos** (límites, *bounds*) que deben cumplir los tipos y tiempos de vida genéricos.
+
+## Sinopsis
+
+```text
+fn f<T, U>(…) where T: Trait1 + Trait2, U: 'a, Vec<T>: Debug { … }
+struct S<T> where T: Clone { … }
+impl<T> Trait for S<T> where T: Debug { … }
+trait T { fn m(&self) where Self: Sized; }
+type Gat<'a> where Self: 'a;
+```
+
+## Qué hace
+
+- Hace lo mismo que escribir los límites junto al parámetro (`<T: Debug>`), pero **más legible** cuando hay muchos.
+- Permite límites que no caben en la lista de parámetros: sobre tipos compuestos (`Vec<T>: Debug`), sobre tipos asociados (`T::Item: Clone`) o de orden superior (`F: for<'a> Fn(&'a str)`).
+- `where Self: Sized` en un método de trait lo excluye de los objetos `dyn`, para que el resto del trait siga siendo compatible con `dyn`.
+- Los límites se comprueban en **cada uso**: si el tipo concreto no los cumple, el error aparece donde se llama, señalando el límite incumplido.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-where" />
+
+Salida:
+
+```text
+3 < 5
+['a', 'b']
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-where-error" />
+
+`error[E0277]: Secreto doesn't implement std::fmt::Display`, con la nota `required by this bound in mostrar` apuntando a la línea `T: Display`.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+- [`trait`](/ref/lenguaje/palabras-clave/trait/) · [`impl`](/ref/lenguaje/palabras-clave/impl/) · [`for`](/ref/lenguaje/palabras-clave/for/) (límites `for<'a>`) · [Subtipos y varianza](/ref/lenguaje/subtipos-y-varianza/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

@@ -1,0 +1,70 @@
+---
+title: "Jefe: el registro de lecturas"
+description: "Escribe dos funciones que trabajan con préstamos: una modifica un Vec a través de &mut y otra lee una slice. Sin clone y sin mover nada."
+sidebar:
+  order: 12
+duracion: 20
+desde: "1.0"
+requiere: ["07-prestamos/11-limites-del-comprobador"]
+tarjetas:
+  - p: "Firma para una función que modifica un vector sin devolverlo:"
+    r: "`fn f(v: &mut Vec<T>)`. Se llama con `f(&mut v)`."
+  - p: "Firma para una función que solo lee varios elementos seguidos:"
+    r: "`fn f(xs: &[T])`. Acepta `&v`, `&v[a..b]` y arrays."
+  - p: "¿Qué pregunta te haces ante cualquier error de préstamos?"
+    r: "¿Qué podría mudarse, liberarse o cambiar mientras otra referencia lo mira? Y después: ¿dónde está el último uso que mantiene vivo el préstamo?"
+---
+
+import { Reto, Pregunta, Ordena } from '~/components';
+
+Un sensor manda lecturas y a veces repite la misma varias veces seguidas. Tienes que limpiar el registro y sacar el mínimo y el máximo. Todo con préstamos: **sin `clone`** y sin mover el vector a ninguna función.
+
+## El reto
+
+<Reto
+  ej="m07/jefe"
+  enunciado="Completa las dos funciones. `compactar` recibe un préstamo exclusivo y quita los repetidos **seguidos** (`[3, 3, 7, 7, 7, 1, 1, 9, 3]` → `[3, 7, 1, 9, 3]`). `extremos` recibe una slice no vacía y devuelve `(mínimo, máximo)`. Pista para `compactar`: recorre con un índice `i` desde 1 y compara `v[i]` con `v[i - 1]`; si son iguales, `v.remove(i)` (y no avances `i`)."
+/>
+
+Fíjate en lo que hace `main`: presta el vector en exclusiva para `compactar`, luego lo presta en compartido para `extremos` (entero y en trozo), y nunca pierde la propiedad.
+
+## Repaso relámpago
+
+<Ordena
+  enunciado="Ordena las líneas para que el programa compile: imprime el primero y después añade un elemento."
+  lineas={[
+    "let mut v = vec![5, 6];",
+    "let p = &v[0];",
+    "println!(\"{p}\");",
+    "v.push(7);",
+    "println!(\"{}\", v.len());"
+  ]}
+  distractores={["let q = &mut v; println!(\"{p}\");"]}
+  explicacion="El préstamo `p` tiene que terminar antes del `push` (préstamo exclusivo). El distractor crea un exclusivo con `p` todavía vivo: E0502."
+/>
+
+<Pregunta
+  pregunta="¿Por qué `compactar` no puede escribirse con `for x in &v { … v.remove(…) … }`?"
+  opciones={["Porque `remove` no existe en `Vec`", "Porque el bucle mantiene un préstamo compartido de `v` y `remove` necesita uno exclusivo", "Porque `remove` mueve el vector", "Sí puede"]}
+  correcta={1}
+  explicacion="Es la invalidación de iteradores de la lección 8: modificar una colección mientras la recorres. Con un índice `i` no hay ningún préstamo largo: cada `v[i]` es un préstamo cortito."
+  porque={["Existe: quita el elemento `i` y desplaza los siguientes.", "", "`remove` toma `&mut self`: presta, no mueve.", "El compilador lo rechaza con E0502."]}
+/>
+
+<Pregunta
+  pregunta="Si `extremos` recibiera `xs: Vec<i32>` en vez de `&[i32]`, ¿qué pasaría en `main`?"
+  opciones={["Nada, funciona igual", "La primera llamada movería `lecturas` y la tercera línea daría E0382", "Sería más rápido", "No se podría llamar con `&lecturas[..2]`, pero el resto funcionaría"]}
+  correcta={1}
+  explicacion="Pasar un `Vec` por valor lo mueve. Después de la primera llamada, `lecturas` ya no podría usarse. Además, `&lecturas[..2]` no es un `Vec`, así que tampoco encajaría."
+  porque={["Cambia la propiedad: mueve.", "", "Mover 12 o 24 bytes no es más rápido que pasar una referencia ancha.", "También fallaría la llamada siguiente, por E0382."]}
+/>
+
+## Lo que te llevas del mundo 07
+
+- `&x` presta para leer; `&mut x` presta en exclusiva para modificar.
+- **Muchos lectores o un escritor**. Evita el uso tras liberar por reubicación, la invalidación de iteradores y (en el mundo 17) las carreras de datos.
+- Un préstamo vive **hasta su último uso**.
+- `&T` se copia; `&mut T` se mueve y se represta.
+- Para leer, las firmas buenas son `&str` y `&[T]`.
+
+En el mundo 08 le pondrás nombre a la vida de un préstamo, `'a`, y verás cómo el compilador comprueba que **ninguna referencia vive más que su dueña**.

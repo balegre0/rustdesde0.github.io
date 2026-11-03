@@ -1,0 +1,141 @@
+---
+title: "Jefe: el árbol de carpetas"
+description: "Construyes un árbol de carpetas con Rc, Weak y RefCell que calcula tamaños, sube hasta la raíz y se libera entero sin fugas."
+sidebar:
+  order: 12
+duracion: 15
+desde: "1.4"
+requiere: ["15-punteros-inteligentes/06-weak-y-ciclos", "15-punteros-inteligentes/09-rc-refcell"]
+tarjetas:
+  - p: "En un árbol con `Rc` hacia los hijos y `Weak` hacia la madre, ¿quién mantiene vivo a un nodo?"
+    r: "Su madre (por el `Vec<Rc<_>>` de hijas) y cualquier variable que tenga un `Rc` suyo. Su hija no lo mantiene vivo: solo tiene un `Weak`."
+  - p: "¿Por qué hace falta `RefCell` en `madre: RefCell<Weak<Carpeta>>`?"
+    r: "Porque las carpetas están dentro de `Rc` (solo lectura) y hay que poder cambiar su madre después de crearlas."
+  - p: "¿En qué orden se liberan raíz → hija → nieta cuando se suelta la raíz?"
+    r: "Raíz, luego hija, luego nieta: el `Drop` de cada carpeta imprime y después se destruyen sus campos, entre ellos el Vec de hijas."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa, Ordena } from '~/components';
+
+El jefe del mundo: un sistema de carpetas en memoria. Cada carpeta conoce a sus hijas y a su madre, calcula su tamaño total y, al soltarlo todo, se libera **sin fugas**. Usarás casi todo lo del mundo: `Rc`, `Weak`, `RefCell`, `Drop` y `Deref`.
+
+## Predice
+
+Primero, el diseño equivocado. Aquí la hija guarda a su madre con un `Rc` **fuerte**.
+
+<Predice
+  ej="m15/jefe-ciclo"
+  pregunta="Cada carpeta imprime «borrada …» al destruirse. Soltamos `fotos` y luego `raiz`. ¿Qué se imprime?"
+  opciones={["borrada fotos, borrada inicio y fin (fotos)", "borrada inicio, borrada fotos y fin (fotos)", "Solo fin (fotos)", "No compila: hay un ciclo de tipos"]}
+  correcta={2}
+  explicacion="`inicio` tiene a `fotos` en su Vec de hijas (Rc fuerte) y `fotos` tiene a `inicio` como madre (Rc fuerte). Al soltar las variables, cada contador baja a 1 y se queda ahí: ninguna carpeta se libera. Es un ciclo y una fuga."
+  porque={["Para eso algún contador tendría que llegar a 0.", "Tampoco: el ciclo mantiene vivas a las dos.", "Correcto.", "Los tipos compilan bien; el ciclo es entre valores, en ejecución."]}
+/>
+
+## La idea
+
+El diseño correcto sigue la regla de la lección 6: los dueños apuntan **hacia abajo** y los recuerdos **hacia arriba**.
+
+- `hijas: RefCell<Vec<Rc<Carpeta>>>`: la madre es dueña de sus hijas (`Rc`). El `RefCell` deja añadir hijas aunque la carpeta esté dentro de un `Rc`.
+- `madre: RefCell<Weak<Carpeta>>`: la hija solo recuerda a su madre (`Weak`). Al subir por el árbol, `upgrade()` dice si la madre sigue viva.
+
+Así, el único camino de propiedad empieza en la raíz y baja. Soltar la raíz suelta a sus hijas, que sueltan a las suyas, y todo se libera en cascada.
+
+<Ordena
+  lineas={["let (raiz, fotos) = (nueva(\"inicio\", 10), nueva(\"fotos\", 300));", "meter(&raiz, &fotos);", "println!(\"{}\", ruta(&fotos));", "drop(raiz);"]}
+  distractores={["*fotos.madre.borrow_mut() = Some(Rc::clone(&raiz));"]}
+  explicacion="Primero se crean las dos carpetas, luego se enganchan (`meter` pone el Rc hacia abajo y el Weak hacia arriba), se usa la ruta mientras las dos viven y al final se suelta la raíz. El distractor crea un Rc fuerte hacia la madre: el ciclo de la predicción."
+/>
+
+## Pruébalo
+
+El programa completo lo escribirás en «Tu turno». Esta es la salida real de la solución, para que sepas adónde vas. Fíjate en los contadores de `fotos`: 2 fuertes (la variable y el Vec de su madre) y 1 débil (la madre de `viaje`).
+
+```text
+inicio/fotos/viaje
+total = 2310 bytes
+fotos: fuertes = 2, débiles = 1
+soltando la raíz...
+borrada inicio
+borrada fotos
+borrada viaje
+fin
+```
+
+Mientras tanto, prueba el diseño de la lección 9 con índices, que resuelve un problema parecido sin contadores:
+
+<Ejecutar ej="m15/arena" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Estado de la memoria justo antes de los `drop` (cada caja es un bloque `Rc` en el heap):
+
+```text
+ variables: raiz ─┐      fotos ─┐            viaje ─┐
+                  ▼             ▼                   ▼
+          ┌────────────┐  ┌────────────┐     ┌────────────┐
+          │ inicio     │  │ fotos      │     │ viaje      │
+          │ strong = 1 │  │ strong = 2 │     │ strong = 2 │
+          │ weak   = 1 │  │ weak   = 1 │     │ weak   = 0 │
+          │ hijas ─────┼─►│ hijas ─────┼────►│ hijas: []  │
+          │            │◄┄┼┄ madre     │◄┄┄┄┄┼┄ madre     │
+          └────────────┘  └────────────┘     └────────────┘
+          ──► Rc (dueño)    ┄┄► Weak (solo recuerda)
+```
+
+Tras `drop(viaje)` y `drop(fotos)`, las cuentas de `viaje` y `fotos` bajan a 1: solo las mantiene vivas el `Vec` de su madre. `drop(raiz)` lleva la de `inicio` a 0: se ejecuta su `Drop` (imprime «borrada inicio») y luego se destruyen sus campos, entre ellos el Vec de hijas. Eso suelta el último `Rc` de `fotos`, que hace lo mismo con `viaje`. De ahí el orden de la salida: **de arriba abajo**.
+
+La recursión de `total` y `ruta` es segura porque cada `borrow()` es corto: termina antes de llamar a nada que pueda pedir un `borrow_mut()` del mismo `RefCell`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Pedir borrow_mut mientras recorres">
+
+❌ Recorrer las hijas con un préstamo activo y, dentro del bucle, añadir una hija a la misma carpeta:
+
+```rust
+for h in c.hijas.borrow().iter() {
+    meter(c, &nueva("copia", 0)); // borrow_mut() dentro: pánico «RefCell already borrowed»
+}
+```
+
+✅ Primero recoge lo que necesitas (por ejemplo, un `Vec` con los nombres) y suelta el préstamo; después modifica.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m15/jefe-carpetas"
+  enunciado="Completa las dos funciones marcadas con `todo!()`. `meter` debe añadir un `Rc::clone(hija)` a las hijas de `madre` y poner en la hija un `Rc::downgrade(madre)` como madre. `total` debe sumar los bytes propios más el total de cada hija (pista: `c.hijas.borrow().iter().map(|h| total(h)).sum::<u64>()`). La salida debe coincidir con la del programa de arriba, incluido el orden de las líneas «borrada»."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Si cambias `madre` a `RefCell<Option<Rc<Carpeta>>>`, ¿qué pasa al final del programa?"
+  opciones={["Lo mismo que ahora", "No se borra ninguna carpeta: hay ciclos madre ↔ hija", "No compila", "Pánico al hacer `drop(raiz)`"]}
+  correcta={1}
+  explicacion="Cada par madre-hija se mantiene vivo mutuamente con dos Rc fuertes. Es exactamente el programa de la predicción."
+  porque={["El Weak es lo que permite que la cuenta llegue a 0.", "Correcto.", "Compila: las fugas no son errores de compilación.", "No hay ningún pánico: simplemente nada se libera."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué devolvería `ruta(&viaje)` si llamaras a la función después de `drop(raiz)`, suponiendo que aún tuvieras un `Rc` de `viaje`?"
+  opciones={["\"inicio/fotos/viaje\"", "\"viaje\" (o la parte del camino que siga viva)", "Pánico por uso tras liberar", "Basura de memoria"]}
+  correcta={1}
+  explicacion="Si alguna madre ya no existe, su `upgrade()` da `None` y el bucle se detiene. Nunca se accede a memoria liberada."
+  porque={["Las madres liberadas ya no aparecen.", "Correcto.", "`upgrade()` devuelve `None`, no hay pánico.", "En Rust seguro no puedes leer memoria liberada."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué alternativa evitaría `Rc`, `Weak` y `RefCell` en este problema?"
+  opciones={["Usar `Arc` en lugar de `Rc`", "Una arena: un `Vec<Carpeta>` con índices `usize` para madre e hijas", "Poner todo en `Box`", "Usar `mem::forget` al final"]}
+  correcta={1}
+  explicacion="Con una arena, el `Vec` es el único dueño y las relaciones son números: sin contadores ni comprobaciones en ejecución (lección 9)."
+  porque={["`Arc` es lo mismo con contador atómico: no simplifica nada.", "Correcto.", "Una `Box` tiene un solo dueño: no puede haber punteros hacia arriba.", "Eso provocaría una fuga a propósito."]}
+/>

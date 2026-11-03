@@ -1,0 +1,87 @@
+---
+title: "E0046: faltan elementos del trait"
+description: "Un impl de un trait no define todos los métodos (o tipos asociados) obligatorios."
+sidebar:
+  order: 8
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` not all trait items implemented, missing: `nombre` ``
+
+## Qué significa
+
+Implementar un trait es una promesa: «mi tipo sabe hacer **todo** lo que pide el trait». Cada método sin cuerpo por defecto debe aparecer en el `impl`. Aquí falta `nombre`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0046" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0046]: not all trait items implemented, missing: `nombre`
+ --> E0046.rs:8:1
+  |
+3 |     fn nombre(&self) -> String;
+  |     --------------------------- `nombre` from trait
+...
+8 | impl Figura for Cuadrado {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ missing `nombre` in implementation
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Olvidar un método.
+- Escribir mal el nombre del método (eso da, además, E0407).
+- Olvidar un tipo asociado (`type Output = ...;`, `type Item = ...;`).
+
+## Cómo arreglarlo
+
+Añade los elementos que faltan. Tu editor puede rellenarlos por ti (acción «implementar miembros que faltan»). Si un método puede tener comportamiento por defecto, dale cuerpo en el propio trait.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+trait Figura {
+    fn area(&self) -> f64;
+    fn nombre(&self) -> String;
+}
+
+struct Cuadrado(f64);
+
+impl Figura for Cuadrado {
+    fn area(&self) -> f64 {
+        self.0 * self.0
+    }
+    fn nombre(&self) -> String {
+        String::from("cuadrado")
+    }
+}
+
+fn main() {
+    let c = Cuadrado(2.0);
+    println!("{} {}", c.nombre(), c.area());
+}
+```
+
+**Salida:**
+
+```text
+cuadrado 4
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0046` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0407](/errores/e0407/): el método no pertenece al trait
+- [E0053](/errores/e0053/): firma incompatible con la del trait
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

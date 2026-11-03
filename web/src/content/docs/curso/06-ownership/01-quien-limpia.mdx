@@ -1,0 +1,177 @@
+---
+title: "¿Quién limpia?"
+description: "Descubre los tres fallos de memoria que Rust quiere hacer imposibles y las tres reglas de la propiedad que los evitan."
+sidebar:
+  order: 1
+duracion: 10
+desde: "1.0"
+requiere: ["05-funciones-y-la-pila/07-donde-vive-cada-valor"]
+tarjetas:
+  - p: "¿Cuáles son las tres reglas de la propiedad?"
+    r: "1) Cada valor tiene un dueño. 2) Solo hay un dueño a la vez. 3) Cuando el dueño sale de su ámbito, el valor se libera."
+  - p: "¿Qué es una doble liberación (double free)?"
+    r: "Devolver al asignador dos veces el mismo trozo de heap. Corrompe su contabilidad y es comportamiento indefinido."
+  - p: "¿Qué es un uso tras liberar (use after free)?"
+    r: "Leer o escribir memoria que ya se devolvió al asignador. Puede leer basura o datos de otro: comportamiento indefinido."
+  - p: "¿Qué significan R, W y O en una tabla de permisos?"
+    r: "R: leer. W: escribir (modificar). O: propiedad (mover o liberar)."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Vas a ver el problema que Rust resuelve con la propiedad y las **tres reglas** que lo hacen. Todo lo demás de este mundo sale de aquí.
+
+## Predice
+
+<Pregunta
+  pregunta="Un programa pide un trozo del heap para guardar un texto. Al terminar de usarlo, lo devuelve **dos veces**. ¿Qué pasa?"
+  opciones={[
+    "Nada: la segunda vez no hace nada",
+    "El asignador queda corrupto; a partir de ahí el programa puede hacer cualquier cosa",
+    "El programa siempre se detiene con un mensaje claro",
+    "La memoria se libera el doble de rápido"
+  ]}
+  correcta={1}
+  explicacion="Devolver dos veces el mismo trozo es una **doble liberación**. El asignador apunta ese hueco dos veces como libre y puede dárselo a dos dueños distintos a la vez. Es **comportamiento indefinido** (UB): no hay garantía de nada, ni siquiera de un error."
+  porque={[
+    "El asignador no lleva la cuenta de quién devolvió qué; se fía de que cada trozo se devuelva una sola vez.",
+    "",
+    "A veces se detiene y a veces sigue con datos corruptos. Ese «a veces» es lo peligroso.",
+    "Liberar no tiene velocidades: el trozo está libre o no."
+  ]}
+/>
+
+## La idea
+
+En el mundo 05 viste que los bytes de un `String` viven en el **heap**, y que alguien tiene que devolverlos al asignador cuando ya no se usan. Hay tres formas de hacerlo mal:
+
+| Fallo | Qué pasa | Consecuencia |
+|---|---|---|
+| **Fuga** (*leak*) | Nadie devuelve el trozo | La memoria se agota poco a poco. Molesta, pero no corrompe nada. |
+| **Doble liberación** (*double free*) | Dos partes del programa devuelven el mismo trozo | El asignador se corrompe: **UB**. |
+| **Uso tras liberar** (*use after free*) | Alguien sigue leyendo un trozo ya devuelto | Lee basura o datos de otro: **UB**. |
+
+Rust evita los dos últimos **al compilar**, con tres reglas que llamamos **propiedad** (*ownership*):
+
+1. **Cada valor tiene un dueño** (*owner*): una variable que es responsable de él.
+2. **Solo hay un dueño a la vez.**
+3. **Cuando el dueño sale de su ámbito, el valor se libera.** El ámbito (*scope*) es la zona del programa donde existe la variable: desde su `let` hasta la llave `}` que cierra su bloque.
+
+Con un solo dueño, solo hay **una** persona que libera: adiós a la doble liberación. Y como el dueño libera al **final** de su ámbito, mientras puedas nombrar la variable, el valor sigue vivo: adiós al uso tras liberar. No hace falta acordarse de liberar: lo hace el compilador por ti, en el sitio exacto.
+
+## Pruébalo
+
+<Ejecutar ej="m06/ambito" />
+
+Esta es la tabla de permisos del programa. Cada fila dice qué puede hacer cada variable **después** de esa línea (R = leer, W = escribir, O = propiedad; `-` = no está):
+
+<Prestamos lineas={[
+  { codigo: "let a = String::from(\"pan\");", permisos: { a: "R-O" }, nota: "a es dueña. No es mut: puede leer, no modificar." },
+  { codigo: "let b = String::from(\"queso\");", permisos: { a: "R-O", b: "R-O" } },
+  { codigo: "println!(\"dentro: {a} y {b}\");", permisos: { a: "R-O", b: "R-O" }, nota: "Leer solo necesita R." },
+  { codigo: "}", permisos: { a: "R-O", b: "---" }, nota: "Fin del ámbito de b: se libera \"queso\". b deja de existir." },
+  { codigo: "println!(\"fuera: {a}\");", permisos: { a: "R-O" } },
+  { codigo: "}", permisos: { a: "---" }, nota: "Fin del ámbito de a: se libera \"pan\"." }
+]} />
+
+Fíjate en que **no hay ninguna línea que diga «libera»**. Las dos liberaciones las pone el compilador en las llaves de cierre.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Lo que escribe el compilador por ti.** Antes de generar código máquina, `rustc` traduce tu programa a un lenguaje intermedio llamado **MIR** (lo estudiarás en el mundo 21). En el MIR de este programa (versión reducida, compilada con `--emit=mir`), las variables se llaman `_1` (`a`) y `_2` (`b`), y aparecen dos instrucciones que tú no escribiste:
+
+```text
+    bb3: {
+        drop(_2) -> [return: bb4, unwind: bb8];
+    ...
+    bb5: {
+        drop(_1) -> [return: bb6, unwind continue];
+```
+
+`drop(_2)` libera `b` al cerrar el bloque interior; `drop(_1)` libera `a` al final de `main`. El orden es el inverso al de creación.
+
+**¿Y si el programa entra en pánico?** Las ramas `unwind` son el camino de emergencia: si algo provoca un pánico entre medias, el programa recorre esas ramas y **también** libera lo que posee. Por eso la regla 3 se cumple incluso cuando las cosas van mal.
+
+**Coste cero.** No hay nada vigilando mientras el programa se ejecuta: el compilador decide en qué punto exacto va cada liberación, y el programa final solo contiene esas llamadas.
+
+</BajoElCapo>
+
+## Trampa típica
+
+¿Y si intentas usar `b` después de su llave de cierre? Ahí ya no existe: su texto se ha liberado. Rust ni siquiera te deja **nombrarla**:
+
+<NoCompila ej="m06/ambito-fuera" explicacion="Fuera del bloque, `b` no existe (E0425). Si el lenguaje te dejara nombrarla, estarías leyendo un texto ya liberado: un uso tras liberar. El arreglo es declarar `b` en un ámbito que llegue hasta donde la necesitas." />
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena lo que pasa al ejecutar el programa de «Pruébalo»."
+  lineas={[
+    "Se reserva \"pan\" en el heap; `a` es su dueña",
+    "Se reserva \"queso\" en el heap; `b` es su dueña",
+    "Se imprime «dentro: pan y queso»",
+    "Se libera \"queso\" (cierra el bloque de `b`)",
+    "Se imprime «fuera: pan»",
+    "Se libera \"pan\" (cierra `main`)"
+  ]}
+  distractores={["Se libera \"pan\" al cerrar el bloque interior"]}
+  explicacion="Cada valor se libera cuando **su** dueño sale de **su** ámbito. `a` vive en el ámbito de `main`, no en el del bloque interior."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué fallo evita la regla «solo hay un dueño a la vez»?"
+  opciones={[
+    "La fuga de memoria",
+    "La doble liberación",
+    "El desbordamiento de enteros",
+    "Que el programa sea lento"
+  ]}
+  correcta={1}
+  explicacion="Si solo hay un dueño, solo hay una variable que libera el valor al salir de su ámbito. No puede haber dos liberaciones."
+  porque={[
+    "Rust no promete evitar las fugas: son seguras (no corrompen nada) y se pueden crear a propósito. Lo que impide son la doble liberación y el uso tras liberar.",
+    "",
+    "El desbordamiento se trata con pánicos o con `checked_add` (mundo 03); no tiene que ver con la propiedad.",
+    "La propiedad se comprueba al compilar: no añade coste al ejecutar."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Quién escribe la orden de liberar el texto de un `String`?"
+  opciones={[
+    "Tú, con una función `liberar(s)` al final",
+    "Un proceso que revisa la memoria de vez en cuando mientras el programa se ejecuta",
+    "El compilador, que la coloca donde el dueño sale de su ámbito",
+    "Nadie: el texto se queda en el heap hasta que se apaga el programa"
+  ]}
+  correcta={2}
+  explicacion="El compilador inserta un `drop` en el punto exacto donde termina el ámbito del dueño (lo viste en el MIR). No hay nada vigilando al ejecutar."
+  porque={[
+    "Puedes liberar antes con `drop(s)` (lección 3), pero no hace falta: si no lo haces, lo hace el compilador.",
+    "En Rust no hay nada revisando la memoria mientras el programa se ejecuta: todo se decide al compilar.",
+    "",
+    "Eso sería una fuga en cada `String`. Rust libera al final del ámbito."
+  ]}
+/>
+
+<Pregunta
+  pregunta="En una tabla de permisos, una variable tiene `R-O`. ¿Qué significa?"
+  opciones={[
+    "Que puede leer y es dueña, pero no puede modificar el valor (no es `mut`)",
+    "Que ha perdido la propiedad",
+    "Que puede modificar pero no leer",
+    "Que el valor ya está liberado"
+  ]}
+  correcta={0}
+  explicacion="R = leer, O = propiedad; el `-` del medio dice que falta W (escribir), porque la variable se declaró sin `mut`."
+  porque={[
+    "",
+    "Sin propiedad, la O sería un `-`.",
+    "Es al revés: tiene R y le falta W.",
+    "Un valor liberado deja la variable en `---`."
+  ]}
+/>

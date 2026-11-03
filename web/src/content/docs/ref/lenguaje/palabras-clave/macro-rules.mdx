@@ -1,0 +1,65 @@
+---
+title: "macro_rules"
+description: "Palabra clave débil: define una macro por ejemplo con reglas patrón => plantilla."
+sidebar:
+  order: 71
+desde: "1.0"
+categoria: "debil"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`macro_rules!` define una **macro por ejemplo** (*macro by example*): una lista de reglas que dicen «si la llamada tiene esta forma, escribe este código».
+
+## Sinopsis
+
+```text
+macro_rules! nombre {
+    (patrón) => { plantilla };
+    (otro patrón) => { otra plantilla };
+}
+nombre!(…)   nombre![…]   nombre!{…}
+```
+
+## Qué hace
+
+- Al compilar, cada llamada `nombre!(…)` se compara con las reglas **en orden**; la primera que encaja se sustituye por su plantilla. Esto pasa **antes** de comprobar tipos.
+- Los patrones capturan trozos de código con **metavariables** `$nombre:fragmento`: `$x:expr` (una expresión), `$t:ty` (un tipo), `$i:ident` (un nombre), `$b:block`, `$p:pat`, `$tt:tt` (un token cualquiera)…
+- Las **repeticiones** `$( … ),*` (cero o más), `$( … ),+` (una o más) y `$( … )?` (cero o una) permiten número variable de argumentos.
+- Una `$x:expr` se inserta como una expresión **completa**: `cuadrado!(1 + 2)` da `9`, no `5`.
+- Higiene: las variables que crea la macro no chocan con las de quien la llama.
+- La macro existe desde la línea donde se define hacia abajo. `#[macro_export]` la exporta desde la raíz del crate.
+
+`macro_rules` es palabra clave débil: fuera de `macro_rules!` es un identificador normal.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-macro-rules" />
+
+Salida:
+
+```text
+49
+9
+0
+6
+solo un nombre
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-macro-rules-error" />
+
+`error: no rules expected ,`, con la nota de que intentaba encajar `$x:expr`. Ninguna regla admite dos argumentos.
+
+## Desde
+
+Rust 1.0. Repetición `$( … )?`: edición 2018. Fragmento `pat_param`: 1.53. En la edición 2024, `expr` también acepta `const { … }` y `_`.
+
+## Ver también
+
+- [Macros](/ref/lenguaje/macros/): gramática completa, fragmentos y reglas de seguimiento. · [`macro`](/ref/lenguaje/palabras-clave/macro/) (reservada)
+
+## Aprende esto en
+
+- [Mundo 19 · Macros](/curso/19-macros/)

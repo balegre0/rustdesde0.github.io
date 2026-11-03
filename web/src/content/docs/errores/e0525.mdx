@@ -1,0 +1,90 @@
+---
+title: "E0525: se esperaba una closure Fn y es FnOnce"
+description: "Pasas una closure que consume lo que captura a algo que necesita poder llamarla varias veces."
+sidebar:
+  order: 49
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` expected a closure that implements the `Fn` trait, but this closure only implements `FnOnce` ``
+
+## Qué significa
+
+Una closure que **mueve** fuera de sí un valor capturado (`let dueno = nombre;`) solo puede llamarse **una vez**: después ya no tiene ese valor. Por eso solo implementa `FnOnce`. `llamar_dos_veces` pide `F: Fn()`, es decir, una closure que se pueda llamar muchas veces sin gastarse.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0525" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0525]: expected a closure that implements the `Fn` trait, but this closure only implements `FnOnce`
+  --> E0525.rs:8:20
+   |
+ 8 |     let despedir = move || {
+   |                    ^^^^^^^ this closure implements `FnOnce`, not `Fn`
+ 9 |         let dueno = nombre;
+   |                     ------ closure is `FnOnce` because it moves the variable `nombre` out of its environment
+...
+12 |     llamar_dos_veces(despedir);
+   |     ---------------- -------- the requirement to implement `Fn` derives from here
+   |     |
+   |     required by a bound introduced by this call
+   |
+note: required by a bound in `llamar_dos_veces`
+  --> E0525.rs:1:24
+   |
+ 1 | fn llamar_dos_veces<F: Fn()>(f: F) {
+   |                        ^^^^ required by this bound in `llamar_dos_veces`
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Mover o devolver dentro de la closure una variable capturada que no es `Copy`.
+- Llamar dentro de la closure a una función que recibe el valor capturado por valor.
+
+## Cómo arreglarlo
+
+Haz que la closure solo **mire** lo capturado (`&nombre`) o que lo clone por dentro (`nombre.clone()`). Si de verdad solo se llama una vez, cambia el límite a `F: FnOnce()`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn llamar_dos_veces<F: Fn()>(f: F) {
+    f();
+    f();
+}
+
+fn main() {
+    let nombre = String::from("Ana");
+    let despedir = move || {
+        let prestado = &nombre; // solo lo mira: la closure es Fn
+        println!("adiós, {prestado}");
+    };
+    llamar_dos_veces(despedir);
+}
+```
+
+**Salida:**
+
+```text
+adiós, Ana
+adiós, Ana
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0525` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0507](/errores/e0507/): mover desde detrás de una referencia
+- [E0373](/errores/e0373/): la closure puede vivir más que lo que toma prestado
+
+## Aprende esto en
+
+- [Mundo 14 · Closures e iteradores](/curso/14-closures-e-iteradores/)

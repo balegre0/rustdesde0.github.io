@@ -1,0 +1,89 @@
+---
+title: "E0521: un dato prestado escapa de la función"
+description: "Una referencia recibida como parámetro acaba dentro de algo que debe vivir para siempre ('static)."
+sidebar:
+  order: 48
+insignias: ["Tiempos de vida"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` borrowed data escapes outside of function ``
+
+## Qué significa
+
+`guardar_para_luego` exige que la closure sea `'static`: que no dependa de nada que pueda desaparecer. Pero la closure lleva dentro `nombre`, un `&str` que solo es válido mientras dura la llamada a `preparar`. El préstamo «se escaparía» de la función.
+
+## Qué error evita
+
+La closure podría ejecutarse cuando el texto original ya no existe: **referencia colgante**.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0521" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0521]: borrowed data escapes outside of function
+ --> E0521.rs:6:5
+  |
+5 | fn preparar(nombre: &str) -> Box<dyn Fn()> {
+  |             ------  - let's call the lifetime of this reference `'1`
+  |             |
+  |             `nombre` is a reference that is only valid in the function body
+6 |     guardar_para_luego(move || println!("hola, {nombre}"))
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |     |
+  |     `nombre` escapes the function body here
+  |     argument requires that `'1` must outlive `'static`
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Pasar a `thread::spawn` una closure que usa un parámetro `&T`.
+- Guardar en una `Box<dyn Trait>` (que por defecto es `'static`) algo que contiene referencias de un parámetro.
+
+## Cómo arreglarlo
+
+Haz que la closure tenga datos propios: convierte la referencia en un valor con propiedad (`to_string()`, `to_vec()`, `clone()`) antes del `move`. Si de verdad debe guardar una referencia, el tipo de destino tiene que admitir un tiempo de vida (`Box<dyn Fn() + 'a>`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn guardar_para_luego<F: Fn() + 'static>(f: F) -> Box<dyn Fn()> {
+    Box::new(f)
+}
+
+fn preparar(nombre: &str) -> Box<dyn Fn()> {
+    let propio = nombre.to_string(); // un String propio: no depende de nadie
+    guardar_para_luego(move || println!("hola, {propio}"))
+}
+
+fn main() {
+    let saludo = preparar("Ana");
+    saludo();
+}
+```
+
+**Salida:**
+
+```text
+hola, Ana
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0521` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0373](/errores/e0373/): la closure puede vivir más que lo que toma prestado
+- [E0597](/errores/e0597/): un valor no vive lo suficiente
+- [E0621](/errores/e0621/): se necesita un tiempo de vida explícito
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/)
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

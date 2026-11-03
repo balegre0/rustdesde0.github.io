@@ -1,0 +1,19 @@
+---
+// Página índice de una sección (recetas, errores, explicaciones) con el diseño de Starlight.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { getCollection } from 'astro:content';
+interface Props { seccion: string; titulo: string; descripcion: string; vacio: string }
+const { seccion, titulo, descripcion, vacio } = Astro.props;
+const docs = (await getCollection('docs', (e) => e.id.startsWith(seccion + '/') && !e.data.draft))
+  .sort((a, b) => (a.data.sidebar?.order ?? 1e9) - (b.data.sidebar?.order ?? 1e9) || a.data.title.localeCompare(b.data.title, 'es'));
+---
+<StarlightPage frontmatter={{ title: titulo, description: descripcion, tableOfContents: false }}>
+  <p>{descripcion}</p>
+  {docs.length === 0 ? <p>{vacio}</p> : (
+    <ul class="rdc-indice-seccion not-content">
+      {docs.map((d) => (
+        <li><a href={`/${d.id}/`}><span class="rdc-is-titulo">{d.data.title}</span>{d.data.description && <span class="rdc-is-desc">{d.data.description}</span>}</a></li>
+      ))}
+    </ul>
+  )}
+</StarlightPage>

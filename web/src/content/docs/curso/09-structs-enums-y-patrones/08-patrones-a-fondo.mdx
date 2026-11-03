@@ -1,0 +1,113 @@
+---
+title: "Patrones a fondo"
+description: "Desmonta cualquier dato con guardas, enlaces @, rangos, alternativas, patrones anidados y de slices."
+sidebar:
+  order: 8
+duracion: 14
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones/07-match-exhaustivo"]
+tarjetas:
+  - p: "¿Qué es una guarda en un `match`?"
+    r: "Una condición extra tras el patrón: `(x, y) if x == y => …`. El brazo solo se elige si el patrón encaja Y la condición es verdadera."
+  - p: "¿Para qué sirve `n @ 1..=9` en un patrón?"
+    r: "Comprueba que el valor está en el rango y, a la vez, lo guarda en la variable `n`."
+  - p: "¿Qué hace un nombre suelto como `objetivo` dentro de un patrón?"
+    r: "Declara una variable NUEVA que encaja con cualquier valor; no compara con una variable que ya existía. Para comparar, usa una guarda: `t if t == objetivo`."
+  - p: "¿Qué significa `..` en un patrón?"
+    r: "«El resto, ignorado»: en structs, los campos que no nombras; en tuplas y slices, los elementos del medio. `resto @ ..` en un slice guarda esos elementos."
+  - p: "¿Dónde se pueden usar patrones, además de en `match`?"
+    r: "En `let`, en parámetros de funciones y closures, en `for`, `if let`, `while let` y `let else`."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer el lenguaje completo de los patrones: con él puedes preguntar «¿tiene esta forma?» y sacar las piezas en una sola línea.
+
+## Predice
+
+<Predice
+  ej="m09/patrones-predice"
+  opciones={["`origen`, `en el eje X, x=3`, `en el eje Y, y=-2`, `en la diagonal (5)`, `en (2, 7)`", "`origen`, `en (3, 0)`, `en (0, -2)`, `en (5, 5)`, `en (2, 7)`", "`origen`, `en el eje X, x=3`, `en el eje Y, y=-2`, `en (5, 5)`, `en (2, 7)`", "No compila: `x` aparece en varios brazos"]}
+  correcta={0}
+  explicacion="`(x, 0)` encaja si la segunda parte es 0 y guarda la primera en `x`. `(x, y) if x == y` exige además que sean iguales. Cada brazo tiene sus propias variables."
+  porque={["Correcto.", "Los brazos con un 0 fijo van antes que el general y encajan primero.", "(5, 5) pasa la guarda `x == y`.", "Cada brazo declara sus propias variables; no chocan entre sí."]}
+/>
+
+## La idea
+
+Un patrón es una **plantilla con huecos**. Las partes fijas se comparan (`0`, `'ñ'`, `Forma::Punto`); los nombres son huecos que se rellenan con lo que haya en esa posición. Las piezas que puedes combinar:
+
+| Pieza | Ejemplo | Encaja con… |
+|---|---|---|
+| literal | `0`, `'a'`, `true` | ese valor exacto |
+| nombre | `x` | cualquier cosa, y la guarda en `x` |
+| comodín | `_` | cualquier cosa, sin guardarla |
+| rango | `1..=9`, `'a'..='z'`, `65..` | valores dentro del rango |
+| alternativa | `'ñ' \| 'Ñ'` | cualquiera de las opciones |
+| enlace | `n @ 1..=9` | lo de la derecha, y lo guarda en `n` |
+| tupla, struct, variante | `(a, 0)`, `Punto { x, .. }`, `Some(v)` | esa forma, desmontada |
+| slice | `[primero, .., ultimo]`, `[c, resto @ ..]` | listas con esa forma |
+| guarda | `p if p > 10` | el patrón, si además se cumple la condición |
+
+Lo potente es que **se anidan**: `Evento::Clic { pos: Punto { x: 0, y: 0 }, .. }` encaja con «un clic cuya posición es exactamente el origen, sea cual sea el resto». Todo se comprueba en una sola línea y el compilador sigue verificando que el `match` sea exhaustivo.
+
+## Pruébalo
+
+<Ejecutar ej="m09/patrones" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Cuando desmontas algo **prestado** (`match e` con `e: &Evento`), los nombres del patrón no se llevan los datos: se convierten en **préstamos** de cada campo. Por eso, en el ejemplo, `boton` es un `&u8` y en la guarda escribimos `*boton == 2`. Esto se llama **modo de enlace por defecto** (*default binding mode*, apodado *match ergonomics*): al atravesar una referencia, el patrón pasa a enlazar con `ref` automáticamente.
+
+Si en cambio desmontas **por valor** (`match e` con `e: Evento`), los campos que no son `Copy` se **mueven** a las variables del patrón, y el valor original queda movido (total o parcialmente). Las reglas de propiedad no tienen excepciones dentro de un patrón.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Un nombre en un patrón no compara: declara">
+
+❌ Querías comparar con la variable `objetivo`… pero `objetivo` dentro del patrón es una **variable nueva** que encaja con todo. Sale «¡acertaste! (2)» aunque la tirada no era 5:
+
+<Ejecutar ej="m09/variable-atrapa-todo" titulo="Mal: compila con avisos y acierta siempre" />
+
+rustc te avisa (brazo inalcanzable y variable sin usar), y su nota lo explica: comparar con el valor de un nombre solo funciona con **constantes**, no con variables `let`.
+
+✅ Para comparar con una variable, usa una guarda:
+
+<Ejecutar ej="m09/variable-atrapa-todo-arreglado" titulo="Bien: guarda" />
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m09/clasificar"
+  enunciado="Completa `clasificar(edad, socio)` con un único `match` sobre la tupla `(edad, socio)`: `0..=11` → `infantil`; 65 o más → `senior`; si es socio → `socio`; si no, `general`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Con qué encaja `Some(n @ 10..=20)`?"
+  opciones={["Con un `Some` cuyo valor está entre 10 y 20, y lo guarda en `n`", "Con cualquier `Some`, y guarda en `n` un número entre 10 y 20", "Con `Some(10)` y `Some(20)` solamente", "No es un patrón válido"]}
+  correcta={0}
+  porque={["Correcto.", "Si el valor no está en el rango, el patrón no encaja.", "`10..=20` incluye todos los valores intermedios.", "Es válido: un enlace `@` dentro de una variante."]}
+/>
+
+<Pregunta
+  pregunta="`let datos = [1, 2, 3, 4, 5];` ¿Qué guarda `resto` en `if let [_, resto @ ..] = &datos[..]`?"
+  opciones={["Un slice con `[2, 3, 4, 5]`", "El número 5", "Un slice con `[1, 2, 3, 4]`", "El número 2"]}
+  correcta={0}
+  porque={["Correcto: todo menos el primero.", "`resto @ ..` recoge varios elementos, no el último.", "El `_` se salta el primero, no el último.", "`..` es «el resto», no un solo elemento."]}
+/>
+
+<Pregunta
+  pregunta="Haces `match &evento { Evento::Tecla(c) => … }`. ¿De qué tipo es `c` si la variante es `Tecla(char)`?"
+  opciones={["`&char`", "`char`", "`&&char`", "`Option<char>`"]}
+  correcta={0}
+  explicacion="Al desmontar a través de una referencia, los nombres enlazan por referencia (modo de enlace por defecto)."
+  porque={["Correcto.", "Sería `char` si hicieras `match evento` por valor.", "Solo hay una referencia que atravesar.", "Un patrón no envuelve nada en `Option`."]}
+/>

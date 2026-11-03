@@ -1,0 +1,69 @@
+---
+title: "E0614: no se puede desreferenciar ese tipo"
+description: "Usas * sobre un valor que no es una referencia ni un puntero."
+sidebar:
+  order: 62
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` type `u32` cannot be dereferenced ``
+
+## Qué significa
+
+`*x` significa «el valor al que apunta `x`». Solo tiene sentido si `x` es una referencia, un puntero o un tipo que implementa `Deref` (`Box`, `Rc`, `String`…). `n` ya es un `u32`: no apunta a nada.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0614" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0614]: type `u32` cannot be dereferenced
+ --> E0614.rs:3:13
+  |
+3 |     let m = *n + 1;
+  |             ^^ can't be dereferenced
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Poner `*` «por si acaso» sobre un valor normal.
+- Pensar que un parámetro es una referencia cuando se recibió por valor.
+
+## Cómo arreglarlo
+
+Quita el `*`, o crea primero una referencia si de verdad la necesitas.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let n: u32 = 5;
+    let r = &n;
+    let m = *r + 1; // `*` solo se aplica a referencias y punteros
+    println!("{m}");
+}
+```
+
+**Salida:**
+
+```text
+6
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0614` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0606](/errores/e0606/): conversión con as inválida
+- [E0308](/errores/e0308/): tipos que no coinciden
+
+## Aprende esto en
+
+- [Mundo 07 · Préstamos](/curso/07-prestamos/)

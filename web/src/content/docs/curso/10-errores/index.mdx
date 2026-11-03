@@ -1,0 +1,31 @@
+---
+title: "Mundo 10 · Errores"
+description: "Aprende a distinguir los fallos del programa de los problemas esperables, y a tratar estos últimos con Result, el operador ? y tus propios tipos de error."
+sidebar:
+  order: 0
+---
+
+Todo programa real se encuentra con cosas que salen mal: un texto que no es un número, un archivo que no existe, una red que no responde. En este mundo aprendes la forma de Rust de tratarlas, que tiene una idea central:
+
+> **Hay dos clases de fallos.** Los que indican un **error del programador** (un índice imposible, una regla interna rota) terminan el programa con un **pánico**. Los que son **parte normal de la vida** (el usuario escribe «hola» donde iba un número) se devuelven como un **valor**: `Result`.
+
+Como `Result` es un tipo normal, el compilador te obliga a mirarlo; y como es un valor, puedes pasarlo, transformarlo y combinarlo. Al final del mundo sabrás diseñar los errores de una biblioteca entera.
+
+## Lo que vas a conseguir
+
+| # | Lección | Al terminar sabrás… |
+|---|---|---|
+| 1 | `panic!` y el desenrollado | qué es un pánico, quién los provoca y qué pasa con la memoria |
+| 2 | `Result`: errores que son valores | tratar fallos esperables con `Ok` y `Err` |
+| 3 | `unwrap` y `expect` | cuándo está bien entrar en pánico y cuándo no |
+| 4 | El operador `?` | propagar errores en una línea, y qué hace por dentro |
+| 5 | Combinadores | `map`, `map_err`, `and_then`, `ok_or` y `collect` sobre `Result` |
+| 6 | Tus propios errores | un enum de error con `Display` y `Error` |
+| 7 | `From` y la conversión con `?` | juntar errores de distintos tipos en uno solo |
+| 8 | `Box<dyn Error>` | mezclar cualquier error, y recorrer su cadena de causas |
+| 9 | `main` que devuelve `Result` | qué imprime Rust y qué código de salida da |
+| 10 | Los patrones thiserror y anyhow | qué escriben por ti esas dos bibliotecas famosas |
+| 11 | Diseñar errores | pánico o `Result`, `#[must_use]`, `#[non_exhaustive]` |
+| 12 | Jefe: el lector de configuración | un analizador completo con errores bien diseñados |
+
+Requisitos: el mundo 9 (enums, `match`, `Option`, `if let`, `let else`). `Result` es un enum como los que ya sabes escribir.

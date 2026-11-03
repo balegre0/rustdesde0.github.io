@@ -1,0 +1,32 @@
+---
+title: "Mundo 2 · Tu primer programa"
+description: "Escribe, entiende y depura tus primeros programas en Rust: fn main, println!, el formato de texto, los comentarios, los errores del compilador y de dónde viene todo esto."
+sidebar:
+  order: 0
+---
+
+Tienes el taller montado y sabes cómo guarda la máquina números y texto. Ahora toca **escribir**. Cada programa de este mundo cabe en una pantalla, pero ninguna línea queda sin explicar: por qué `println!` lleva una exclamación, qué hace `rustc` con tu texto antes de que exista un programa y cómo leer lo que te dice cuando algo no le cuadra.
+
+Tres ideas recorren todo el mundo:
+
+- **El compilador trabaja antes que tú ejecutes.** Huecos, tipos y nombres se comprueban al compilar; lo que falla ahí nunca llega a ejecutarse.
+- **Un error es un mensaje, no un castigo.** Vas a provocar errores a propósito para aprender a leerlos de arriba abajo.
+- **El texto se coloca al carácter.** Con ancho, alineación y decimales, `println!` construye tablas exactas.
+
+## Lo que vas a conseguir
+
+| # | Lección | Al terminar sabrás… |
+|---|---|---|
+| 1 | `fn main`: donde empieza todo | qué es el punto de entrada y en qué orden corren las líneas (E0601) |
+| 2 | `println!` y qué es una macro | por qué el `!`, y por qué un hueco de más se detecta al compilar |
+| 3 | Cadenas de formato | usar `{}`, `{:?}`, `{0}`, `{nombre}` y `{x}`; Display frente a Debug |
+| 4 | Formato avanzado | ancho, alineación, relleno, decimales, bases, escapes y stderr |
+| 5 | Comentarios y documentación | `//`, `/* */`, `///`, `//!` y generar la web con `cargo doc` |
+| 6 | El viaje de tu código por `rustc` | las fases del compilador y por qué `cargo check` no necesita enlazador |
+| 7 | Leer los errores del compilador | código, ubicación, marcas, `help:`, `note:` y `rustc --explain` |
+| 8 | Los avisos no son errores | lints, `_nombre`, `#[allow]` y `#![deny]` con criterio |
+| 9 | Ediciones | qué es la edición 2024, `r#gen` y `cargo fix --edition` |
+| 10 | De un ascensor roto a Rust 1.0 | la historia de Rust y el problema que nació para resolver |
+| 11 | Jefe: tu tarjeta | imprimir una tarjeta con bordes y columnas exactas |
+
+Requisitos: el mundo 0 (tener Cargo funcionando, o al menos `cargo check`) y el mundo 1 (bits, hexadecimal y UTF-8). Todos los ejemplos se ejecutan también en el navegador con el botón ▶, compilados a WebAssembly; para los programas de este mundo la salida es la misma que en tu PC.

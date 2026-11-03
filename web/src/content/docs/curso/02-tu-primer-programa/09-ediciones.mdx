@@ -1,0 +1,121 @@
+---
+title: "Ediciones: 2015, 2018, 2021 y 2024"
+description: "Entiende qué es una edición de Rust, en qué se diferencia de una versión y por qué este curso usa la edición 2024."
+sidebar:
+  order: 9
+duracion: 10
+desde: "2024"
+requiere: ["00-el-taller/08-cargo-toml", "02-tu-primer-programa/07-leer-errores-del-compilador"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre una versión de Rust (1.99.1) y una edición (2024)?"
+    r: "La versión es el compilador que tienes instalado (sale una cada 6 semanas). La edición es un «modo de idioma» que eliges por proyecto en Cargo.toml."
+  - p: "¿Qué ediciones de Rust existen?"
+    r: "2015, 2018, 2021 y 2024."
+  - p: "¿Por qué `let gen = 7;` compila en la edición 2021 y no en la 2024?"
+    r: "Porque la edición 2024 reservó `gen` como palabra clave. Se puede seguir usando como nombre con el identificador crudo `r#gen`."
+  - p: "¿Qué edición usa `rustc` si no le indicas ninguna?"
+    r: "La 2015. Cargo, en cambio, escribe `edition = \"2024\"` en los proyectos nuevos."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+En el `Cargo.toml` de tu proyecto hay una línea que quizá te ha intrigado: `edition = "2024"`. Hoy descubres qué es una edición, por qué existen y qué pasa si cambias ese número.
+
+## Predice
+
+Este programa usa `gen` como nombre de variable, abreviatura de «generación». Compila sin problemas con la edición 2021. Con la 2024, no:
+
+<NoCompila ej="m02/gen-reservada" />
+
+<Pregunta
+  pregunta="¿Por qué el mismo código compila con una edición y no con otra?"
+  opciones={["Porque la edición 2024 tiene un compilador con un fallo", "Porque la edición 2024 reservó `gen` como palabra clave para usos futuros", "Porque en 2024 las variables no pueden tener nombres cortos", "Porque `gen` es una macro"]}
+  correcta={1}
+  explicacion="El primer error real lo dice: «expected identifier, found reserved keyword `gen`» (se esperaba un nombre y se encontró la palabra reservada `gen`). La edición 2024 reservó esa palabra para poder darle un significado en el futuro. El segundo error, E0425, es una consecuencia del primero: como la variable no se pudo declarar, no existe cuando `println!` la busca."
+  porque={["No es un fallo: es un cambio deliberado del lenguaje, solo para quien elige esa edición.", "", "Los nombres cortos están permitidos en todas las ediciones.", "`gen` no es una macro: no lleva `!`."]}
+/>
+
+## La idea
+
+Rust saca una **versión** nueva del compilador cada 6 semanas: 1.97, 1.98, 1.99… Cada versión añade cosas, pero tiene una promesa: **el código que compilaba sigue compilando**. ¿Cómo se arregla entonces un error de diseño, o se reserva una palabra nueva, sin romper el código de nadie?
+
+Con las **ediciones** (*editions*). Una edición es un «modo de idioma» que eliges **por proyecto**: el mismo compilador sabe leer Rust 2015, 2018, 2021 y 2024, y en cada proyecto lee el que pone en `Cargo.toml`. Los cambios incompatibles, como reservar una palabra, solo se aplican a quien elige la edición nueva. Tu código antiguo sigue en su edición y sigue compilando con los compiladores nuevos.
+
+Hasta hoy hay cuatro: **2015** (la de Rust 1.0), **2018** (llegó con Rust 1.31), **2021** (con Rust 1.56) y **2024** (con Rust 1.85, el 20 de febrero de 2025). Este curso usa **Rust 1.99.1 con la edición 2024**, la que pone `cargo new` en todo proyecto nuevo. No hay ninguna edición posterior anunciada: `rustc --edition 2027` responde que la edición debe ser una de `2015|2018|2021|2024|future` (`future` es para probar cambios aún no estabilizados).
+
+## Pruébalo
+
+Cuando necesitas usar una palabra reservada como nombre, existe el **identificador crudo** (*raw identifier*): `r#` delante del nombre.
+
+<Ejecutar ej="m02/gen-reservada-arreglado" titulo="Arreglo: r#gen" />
+
+Salida real:
+
+```text
+Generación 7
+```
+
+Un caso parecido y más antiguo: `async`. Comprobado con el `rustc` 1.99.1 de este curso, `let async = 1;` compila con la edición 2015 y falla con la 2018, la 2021 y la 2024 («expected identifier, found keyword `async`»): la edición 2018 la convirtió en palabra clave para la programación asíncrona, que verás en el mundo 18.
+
+Para pasar un proyecto a una edición nueva, Cargo trae una herramienta: `cargo fix --edition`. Probado con un proyecto en 2021 que contenía `let gen = 7;`, la salida real fue:
+
+```text
+   Migrating Cargo.toml from 2021 edition to 2024
+    Checking ed2021 v0.1.0 (…)
+   Migrating src\main.rs from 2021 edition to 2024
+       Fixed src\main.rs (1 fix)
+```
+
+Reescribió `let gen = 7;` como `let r#gen = 7;`. Ojo a un detalle comprobado: después de ese comando, `Cargo.toml` seguía diciendo `edition = "2021"`. El código queda **preparado** para la edición nueva, y el último paso, cambiar el número en `Cargo.toml`, lo das tú.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Qué cambia una edición, y qué no">
+Una edición cambia sobre todo cómo se **lee** el código: qué palabras son clave, algunas reglas de sintaxis, algunos detalles de cómo se resuelven nombres o cuánto viven ciertos valores temporales. Lo que no cambia es el resultado: un crate en edición 2015 y otro en edición 2024 se compilan con el mismo `rustc` y se pueden usar el uno al otro sin problemas. Por eso las ediciones no dividen el ecosistema: tu proyecto 2024 puede depender de bibliotecas escritas en 2018.
+
+La edición se le pasa a `rustc` con `--edition`. Si no le pasas ninguna, usa la **2015**, la original, para no romper nada antiguo. Cargo, en cambio, siempre se la pasa, leyendo tu `Cargo.toml`. Por eso este curso compila todos sus ejemplos con `rustc --edition 2024`.
+
+Algunos cambios de la edición 2024, que irás viendo en su momento: la palabra `gen` reservada, los bloques `extern` que deben marcarse `unsafe`, nuevas reglas sobre cuánto viven los temporales de la última expresión de un bloque y de `if let`, y la prohibición de tomar referencias a un `static mut`.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Confundir la edición con la versión">
+❌ «Uso Rust 2024, así que tengo un compilador de 2024». La edición no dice qué compilador tienes.
+
+✅ Son dos números independientes. `rustc --version` te dice la **versión** (aquí, `rustc 1.99.1`, de octubre de 2026). `Cargo.toml` te dice la **edición** de cada proyecto. Un compilador nuevo entiende todas las ediciones anteriores; uno antiguo no entiende las ediciones que salieron después de él.
+</Trampa>
+
+## Tu turno
+
+<Respuesta
+  pregunta="¿Cómo escribes una variable llamada `gen` en la edición 2024?"
+  respuestas={["r#gen", "let r#gen"]}
+  explicacion="Con el identificador crudo: `r#gen`. El `r#` le dice al compilador «esto es un nombre, aunque coincida con una palabra reservada»."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tu proyecto está en la edición 2024 y quieres usar una biblioteca escrita en la edición 2018. ¿Qué pasa?"
+  opciones={["No se puede: hay que convertir la biblioteca a 2024", "Funciona: los crates de ediciones distintas se usan entre sí sin problemas", "Funciona solo con un compilador antiguo", "Hay que instalar dos compiladores"]}
+  correcta={1}
+  explicacion="Cada crate se lee con su propia edición, pero todos se compilan con el mismo `rustc` y encajan entre sí. Esa es la gracia de las ediciones."
+  porque={["Cada crate elige su edición; nadie obliga a migrar a los demás.", "", "El compilador nuevo entiende todas las ediciones anteriores.", "Un solo compilador lee todas las ediciones."]}
+/>
+
+<Pregunta
+  pregunta="Ejecutas `rustc programa.rs` sin indicar edición. ¿Cuál usa?"
+  opciones={["La 2024, la más reciente", "La 2015", "La que diga `Cargo.toml`", "Ninguna: da un error"]}
+  correcta={1}
+  explicacion="`rustc` solo usa por defecto la edición 2015. La edición 2024 la pone Cargo en los proyectos nuevos, y se la pasa a `rustc` con `--edition`."
+  porque={["Por compatibilidad, el valor por defecto de `rustc` nunca cambia.", "", "`rustc` a solas no lee `Cargo.toml`; eso lo hace Cargo.", "Funciona sin error, con la edición 2015."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace `cargo fix --edition`?"
+  opciones={["Instala la edición nueva del compilador", "Reescribe tu código para que sea válido en la siguiente edición", "Cambia `edition` en Cargo.toml y nada más", "Borra el código incompatible"]}
+  correcta={1}
+  explicacion="Aplica arreglos automáticos (como `gen` → `r#gen`) para que el código funcione en la edición siguiente. Después, tú cambias el número en `Cargo.toml`."
+  porque={["Las ediciones no se instalan: ya vienen todas en el compilador.", "", "En la prueba del curso, `Cargo.toml` seguía con la edición antigua después del comando.", "No borra nada: transforma el código manteniendo lo que hace."]}
+/>

@@ -1,0 +1,30 @@
+---
+import Practica from '../../components/paginas/Practica.astro';
+import { itemsCompila, itemsPredice } from '../../lib/practica';
+const juegos = [
+  { id: 'compila', titulo: '¿Compila? · 60 s', desc: 'Programas cortos: ¿los acepta el compilador o no? Entrena el ojo para el borrow checker y los tipos.', n: itemsCompila().length },
+  { id: 'predice', titulo: 'Predice la salida · 60 s', desc: 'Lee el programa y elige qué imprime antes de que se acabe el tiempo.', n: itemsPredice().length },
+];
+---
+<Practica titulo="Juegos" descripcion="Minijuegos de Rust de 60 segundos: ¿compila o no?, predice la salida. Con mejor marca personal.">
+  <p class="rdc-lead">Un minuto cada uno. Sirven para calentar o para repasar en un rato muerto. Tus marcas se guardan en este navegador.</p>
+  <ul class="rdc-tarjetas" role="list">
+    {juegos.map((j) => (
+      <li data-juego-tarjeta={j.id}>
+        <a href={`/juegos/${j.id}/`} class="rdc-tarjeta-enlace">
+          <span class="rdc-tarjeta-titulo">{j.titulo}</span>
+          <span class="rdc-tarjeta-desc">{j.desc}</span>
+          <span class="rdc-tarjeta-meta">{j.n} programas · <span data-mejor>sin marca</span></span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</Practica>
+<script>
+  import { leer } from '../../runtime/progreso';
+  const p = leer();
+  for (const li of document.querySelectorAll<HTMLElement>('[data-juego-tarjeta]')) {
+    const m = p.marcas[`juego:${li.dataset.juegoTarjeta}`];
+    if (m) li.querySelector('[data-mejor]')!.textContent = `mejor marca ${m.mejor}`;
+  }
+</script>

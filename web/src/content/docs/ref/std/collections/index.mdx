@@ -1,0 +1,48 @@
+---
+title: "std::collections"
+description: "Las colecciones de la biblioteca estándar: HashMap, HashSet, BTreeMap, BTreeSet, VecDeque, BinaryHeap y LinkedList."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "alloc (y std para HashMap/HashSet)"]
+---
+**Ruta:** `std::collections`
+
+## Para qué sirve
+
+Además de `Vec`, la biblioteca estándar trae varias colecciones. Ninguna está en el preludio: impórtalas con `use std::collections::HashMap;` (o la que necesites). Cómo elegir:
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`HashMap`](/ref/std/collections/hashmap/) | Diccionario clave → valor, sin orden. Lo normal para buscar por clave. | 1.0 |
+| [`HashSet`](/ref/std/collections/hashset/) | Conjunto sin repetidos, sin orden. | 1.0 |
+| [`BTreeMap`](/ref/std/collections/btreemap/) | Diccionario **ordenado** por clave. | 1.0 |
+| `BTreeSet` | Conjunto ordenado. | 1.0 |
+| [`VecDeque`](/ref/std/collections/vecdeque/) | Cola de doble extremo: meter y sacar por los dos lados. | 1.0 |
+| [`BinaryHeap`](/ref/std/collections/binaryheap/) | Cola de prioridad: siempre sale el mayor. | 1.0 |
+| `LinkedList` | Lista doblemente enlazada. Casi nunca es la mejor opción. | 1.0 |
+
+## Conceptos clave
+
+| Necesitas… | Usa | Coste típico |
+|---|---|---|
+| una lista en orden de llegada | `Vec` | acceso por índice O(1) |
+| buscar por clave, el orden da igual | `HashMap` | O(1) de media |
+| buscar por clave y recorrer en orden | `BTreeMap` | O(log n) |
+| saber si algo ya apareció | `HashSet` | O(1) de media |
+| una cola (FIFO) | `VecDeque` | O(1) por los dos extremos |
+| sacar siempre el mayor (o el menor) | `BinaryHeap` | O(log n) |
+
+- **Claves**: `HashMap` y `HashSet` piden que la clave implemente `Hash` y `Eq`; `BTreeMap` y `BTreeSet`, que implemente `Ord`. Con `#[derive(Hash, PartialEq, Eq)]` (o `PartialOrd, Ord`) tus tipos sirven de clave.
+- **El orden de un HashMap no está definido** y cambia entre ejecuciones: no dependas de él.
+
+## Ver también
+
+- [Vec](/ref/std/vec/vec/)
+- [std::hash](/ref/std/hash/)
+- [std::cmp](/ref/std/cmp/)
+
+## Aprende esto en
+
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

@@ -1,0 +1,91 @@
+---
+title: "Jefe: un runtime con reloj"
+description: "Juntar todo el mundo: tareas, wakers, cola de listas y temporizadores en un runtime propio que sirve un desayuno."
+sidebar:
+  order: 11
+duracion: 15
+desde: "1.85"
+requiere: ["18-async/08-ejecutores-y-tokio", "18-async/09-join-select-cancelacion"]
+tarjetas:
+  - p: "¿Qué hace el ejecutor del jefe cuando no queda ninguna tarea lista?"
+    r: "Adelanta el reloj virtual hasta la alarma más próxima y despierta (wake) a las tareas cuya alarma ha vencido."
+  - p: "¿Qué guarda un temporizador cuando devuelve Pending?"
+    r: "Su hora de vencimiento y un clon del waker de la tarea, para que el ejecutor la despierte a esa hora."
+  - p: "¿Cuándo termina el runtime?"
+    r: "Cuando no hay tareas listas ni alarmas pendientes."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Último combate del mundo: vas a montar un **runtime completo** en miniatura, con tareas, wakers, una cola y **temporizadores**, y lo vas a hacer funcionar en el navegador.
+
+## Predice
+
+<Pregunta
+  pregunta="Tres tareas empiezan a la vez en t=0: tostadas (duermen 3 tics), café (1 tic) seguido de leche (1 tic) y huevos (2 tics). ¿En qué tic está servido el desayuno?"
+  opciones={["t=7", "t=3", "t=4", "t=2"]}
+  correcta={1}
+  explicacion="Todo se solapa: café acaba en t=1, leche en t=2, huevos en t=2 y tostadas en t=3. El total es el máximo, no la suma (lección 1)."
+  porque={["Esa sería la suma: lo secuencial.", "Correcto.", "Café + leche suman 2, no 3.", "Las tostadas tardan 3."]}
+/>
+
+## La idea
+
+Un runtime de verdad tiene dos mitades (lección 8): un **ejecutor** que sondea tareas listas y un **reactor** que despierta tareas cuando el mundo exterior tiene novedades. Aquí, el «mundo exterior» es un **reloj virtual**:
+
+1. `dormir(t)` devuelve un future `Dormir { hasta }`. Su `poll` mira la hora: si ya ha llegado, `Ready`; si no, apunta una **alarma** `(hasta, waker)` y devuelve `Pending`.
+2. El ejecutor sondea todo lo que haya en la cola de listas.
+3. Cuando la cola se vacía, hace de reactor: busca la alarma más próxima, **salta** el reloj hasta esa hora (no hace falta esperar de verdad: es virtual) y llama a `wake` de cada alarma vencida. Esos wakers vuelven a meter sus tareas en la cola.
+4. Si no hay ni tareas listas ni alarmas, termina.
+
+Todas las piezas son tuyas: el `Wake` con cola de la lección 8, los `Pin<Box<dyn Future>>` de la lección 7, la cesión de turno, los bloques async de la lección 6.
+
+## Pruébalo
+
+<Ejecutar ej="m18/jefe" />
+
+El desayuno sale en t=3, como predijiste, y el orden es determinista: cuando dos alarmas vencen a la vez (huevos y leche en t=2), se despiertan en el orden en que se apuntaron.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Es la arquitectura de los runtimes reales, en pequeño.** Los temporizadores de Tokio también guardan `(hora, waker)` (en una estructura llamada *rueda de temporizadores*, más eficiente que buscar el mínimo en un `Vec`), y su reactor duerme el hilo exactamente hasta la próxima alarma o hasta que el sistema operativo avise de E/S. Nuestro reloj virtual hace ese salto sin dormir: por eso los tests de muchos runtimes usan un «tiempo pausado» parecido, para que los temporizadores no hagan lentos los tests.
+
+**`thread_local!` en lugar de un objeto runtime.** `dormir` necesita encontrar el reloj y la lista de alarmas sin que se los pasen como argumento. Usamos variables locales del hilo (`thread_local!` con `Cell` y `RefCell`), que es justo lo que hace Tokio para que `tokio::time::sleep` encuentre «el runtime actual». Por eso llamar a `tokio::time::sleep` fuera de un runtime de Tokio provoca un pánico: no hay runtime en ese hilo.
+
+**Qué falta para ser un runtime de producción**: E/S real (sockets) a través del sistema operativo, varios hilos con robo de trabajo, `spawn` desde dentro de las tareas, `JoinHandle` para esperar resultados, y cancelación de tareas lanzadas.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Un temporizador que no apunta su alarma">
+
+❌ Un `Dormir::poll` que devuelve `Pending` sin guardar el waker en `ALARMAS`: el ejecutor ve la cola vacía y ninguna alarma, cree que todo ha terminado y **sale**, dejando la tarea a medias, en silencio.
+
+✅ Cada `Pending` va acompañado de un waker guardado donde alguien lo vaya a usar. Es el contrato de `poll` (lección 2), y en un runtime de verdad su incumplimiento se ve como una tarea que «se cuelga» sin error.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m18/jefe" enunciado="El runtime está completo salvo una pieza: el `poll` del temporizador `Dormir`. Si ya es la hora (`ahora() >= self.hasta`), devuelve `Ready(())`. Si no, apunta `(self.hasta, cx.waker().clone())` en `ALARMAS` y devuelve `Pending`. La salida debe coincidir con la del ejemplo." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="En el runtime del jefe, ¿qué pasaría si `dormir(0)` se llamara en t=5?"
+  opciones={["Se quedaría colgado", "Su primer `poll` vería `ahora() >= hasta` y devolvería `Ready` enseguida", "Entraría en pánico", "Esperaría hasta t=6"]}
+  correcta={1}
+  explicacion="`hasta = ahora() + 0 = 5`, y la comparación `>=` se cumple en el primer sondeo: no hace falta alarma."
+  porque={["Solo se cuelga si devuelve Pending sin alarma.", "Correcto.", "No hay ninguna rama de pánico ahí.", "La espera es de 0 tics."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué el ejecutor puede **saltar** el reloj en lugar de esperar tic a tic?"
+  opciones={["Porque es más rápido de compilar", "Porque si ninguna tarea está lista, nada puede cambiar hasta la próxima alarma: los tics intermedios no tienen nada que hacer", "Porque Rust no tiene bucles lentos", "No puede: es un error del ejemplo"]}
+  correcta={1}
+  explicacion="Es la misma lógica que dormir el hilo hasta el próximo temporizador en un runtime real, pero sin tiempo de verdad de por medio."
+  porque={["No tiene que ver con compilar.", "Correcto.", "La razón es lógica, no del lenguaje.", "Es intencionado y correcto."]}
+/>

@@ -1,0 +1,80 @@
+---
+title: "E0506: asignar a un valor prestado"
+description: "Cambias un valor con = mientras existe un préstamo compartido suyo que todavía se usa."
+sidebar:
+  order: 43
+insignias: ["Préstamos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot assign to `nivel` because it is borrowed ``
+
+## Qué significa
+
+Mientras `r = &nivel` siga vivo, `nivel` no se puede cambiar. Asignar `nivel = 2` en medio rompería lo que `r` cree estar viendo.
+
+## Qué error evita
+
+Si el valor fuera un `String` o un `Vec`, asignarle uno nuevo **libera** el antiguo: `r` quedaría apuntando a memoria liberada. Con un entero no habría ese peligro, pero la regla es la misma para todos los tipos, así es sencilla y no tiene excepciones.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0506" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0506]: cannot assign to `nivel` because it is borrowed
+ --> E0506.rs:4:5
+  |
+3 |     let r = &nivel;
+  |             ------ `nivel` is borrowed here
+4 |     nivel = 2;
+  |     ^^^^^^^^^ `nivel` is assigned to here but it was already borrowed
+5 |     println!("{r} {nivel}");
+  |                - borrow later used here
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Actualizar una variable mientras una referencia a ella sigue en uso.
+- Reasignar el elemento de un `Vec` mientras se recorre por referencia.
+
+## Cómo arreglarlo
+
+Termina de usar la referencia antes de asignar, o lee el valor en una copia (`let antes = nivel;`). Si necesitas modificar a través de una referencia, usa un préstamo exclusivo `&mut`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let mut nivel = 1;
+    let r = &nivel;
+    println!("{r}"); // último uso del préstamo
+    nivel = 2;
+    println!("{nivel}");
+}
+```
+
+**Salida:**
+
+```text
+1
+2
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0506` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0502](/errores/e0502/): préstamo exclusivo mientras hay uno compartido
+- [E0499](/errores/e0499/): dos préstamos exclusivos a la vez
+- [E0384](/errores/e0384/): asignar dos veces a una variable inmutable
+
+## Aprende esto en
+
+- [Mundo 07 · Préstamos](/curso/07-prestamos/)

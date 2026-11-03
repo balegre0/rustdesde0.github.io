@@ -1,0 +1,63 @@
+---
+title: "std::any"
+description: "Tipos en tiempo de ejecución: el trait Any, downcast_ref, TypeId y type_name."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::any`
+
+## Para qué sirve
+
+`Any` permite guardar valores de **cualquier tipo** (`'static`) detrás de `&dyn Any` o `Box<dyn Any>` y preguntar después de qué tipo eran (`is`, `downcast_ref`). Es la forma de Rust de hacer comprobaciones de tipo al ejecutar; úsala poco: normalmente un enum o un trait propio expresan mejor la idea.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| `Any` | Tipos que se pueden identificar al ejecutar. | 1.0 |
+| `TypeId` | Identificador único de un tipo. | 1.0 |
+| `type_name, type_name_of_val` | El nombre de un tipo como texto (solo para depurar). | None |
+
+**Ficha detallada:** [Any, TypeId y type_name](/ref/std/any/any-y-typeid/)
+
+## Conceptos clave
+
+- **Solo tipos `'static`**: un tipo con referencias prestadas no puede ser `Any`.
+- **`type_name` no es estable**: el texto puede cambiar entre versiones del compilador; úsalo solo para mensajes de depuración.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/any-basico" />
+
+**Salida:**
+
+```text
+un i32: 5
+un String: hola
+otra cosa
+true
+alloc::vec::Vec<core::option::Option<char>>
+f32
+1
+```
+
+## Sinopsis
+
+```rust
+pub trait Any: 'static {
+    // Required method
+    fn type_id(&self) -> TypeId;
+}
+```
+
+## Ver también
+
+- [`Box<dyn Trait>`](/ref/std/boxed/box/)
+- [E0038 (traits compatibles con dyn)](/errores/e0038/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

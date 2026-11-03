@@ -1,0 +1,42 @@
+---
+// <Predice ej opciones correcta explicacion? porque? pregunta? /> — CONTENIDO.md §4
+// Elegir qué imprime (o qué error da) ANTES de ejecutar. Si el ejemplo tiene "debe_fallar", tras responder
+// se muestra el error real de rustc (y «Ver arreglo» si existe).
+import { Code } from '@astrojs/starlight/components';
+import Ejecutable from './interno/Ejecutable.astro';
+import Diagnostico from './interno/Diagnostico.astro';
+import PreguntaIsla from './islas/Pregunta';
+import { ejemplo, nombreArchivo } from '../lib/ejemplos';
+interface Props { ej: string; opciones: string[]; correcta: number; explicacion?: string; porque?: string[]; pregunta?: string; titulo?: string; idPregunta?: string }
+const { ej, opciones, correcta, explicacion, porque, pregunta, titulo, idPregunta } = Astro.props;
+if (!Array.isArray(opciones) || correcta < 0 || correcta >= opciones.length) throw new Error(`<Predice ej="${ej}">: "correcta" (${correcta}) debe ser un índice válido de "opciones".`);
+const e = ejemplo(ej, 'Predice');
+---
+{e.debeFallar ? (
+  <div class="rdc-predice" data-predice-error>
+    <Code code={e.codigo.replace(/\n$/, '')} lang="rust" title={titulo ?? nombreArchivo(e)} />
+    <PreguntaIsla client:visible modo="predice" pregunta={pregunta ?? '¿Qué crees que pasa al compilarlo? Elige antes de ver el resultado.'} opciones={opciones} correcta={correcta} explicacion={explicacion} porque={porque} idPregunta={idPregunta} />
+    <div data-revelar-error hidden>
+      <p class="rdc-nocompila-estado">No compila: esto es lo que dice rustc.</p>
+      <Diagnostico diagnosticos={e.diagnosticos ?? []} />
+      {e.arreglo && (
+        <details class="rdc-arreglo">
+          <summary>Ver arreglo</summary>
+          <Ejecutable ej={ej} arreglo componente="Predice" titulo={`${nombreArchivo(e).replace(/\.rs$/, '')}.arreglo.rs`} />
+        </details>
+      )}
+    </div>
+  </div>
+) : (
+  <div class="rdc-predice">
+    <Ejecutable ej={ej} titulo={titulo} componente="Predice" bloqueado>
+      <PreguntaIsla client:visible slot="entre" modo="predice" pregunta={pregunta ?? '¿Qué crees que imprime? Elige antes de ejecutarlo.'} opciones={opciones} correcta={correcta} explicacion={explicacion} porque={porque} idPregunta={idPregunta} />
+    </Ejecutable>
+  </div>
+)}
+
+<script>
+  for (const el of document.querySelectorAll<HTMLElement>('[data-predice-error]')) {
+    el.addEventListener('rdc-respondida', () => { el.querySelector<HTMLElement>('[data-revelar-error]')!.hidden = false; });
+  }
+</script>

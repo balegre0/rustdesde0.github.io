@@ -1,0 +1,64 @@
+---
+title: "type"
+description: "Palabra clave estricta: alias de tipo y tipos asociados en traits."
+sidebar:
+  order: 35
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`type` da un **nombre** a un tipo: un alias, o un tipo asociado dentro de un trait.
+
+## Sinopsis
+
+```text
+type Alias<genéricos> = TipoExistente;      // alias
+trait T { type Asociado: Límites; }         // declaración en un trait
+impl T for X { type Asociado = Concreto; }  // elección en la implementación
+```
+
+## Qué hace
+
+### Uso 1 · Alias de tipo
+
+`type Agenda = HashMap<String, Vec<u32>>;` es solo **otro nombre**: `Agenda` y el tipo original son **exactamente el mismo tipo** y se mezclan sin conversión. Sirve para acortar tipos largos y para fijar parámetros, como `std::io::Result<T>` = `Result<T, io::Error>`.
+
+Si lo que quieres es un tipo **distinto** que el compilador no deje confundir (metros frente a segundos), usa un *newtype*: `struct Metros(f64);`.
+
+Los límites escritos en un alias (`type A<T: Clone> = …`) no se comprueban; el compilador avisa de ello.
+
+### Uso 2 · Tipos asociados
+
+En un trait, `type Elem;` declara un tipo que cada implementación elige. Se nombra con `Self::Elem` o `<X as Contenedor>::Elem`. Con `type Item<'a> where Self: 'a;` el tipo asociado es genérico (*GAT*).
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-type" />
+
+Salida:
+
+```text
+Some([600, 700])
+Ok(3) Err("división entre cero")
+Some('x')
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-type-error" />
+
+`error[E0308]: mismatched types` con `expected f64, found integer`: `Metros` **es** `f64`, así que exige un literal como `10.0`.
+
+## Desde
+
+Rust 1.0. Tipos asociados genéricos: 1.65.
+
+## Ver también
+
+- [`trait`](/ref/lenguaje/palabras-clave/trait/) · [`struct`](/ref/lenguaje/palabras-clave/struct/) · [Tipos](/ref/lenguaje/tipos/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

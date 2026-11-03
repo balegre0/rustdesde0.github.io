@@ -1,0 +1,107 @@
+---
+title: "UnsafeCell: la puerta de la mutabilidad interior"
+description: "Construyes tu propia Cell y entiendes por qué toda mutación a través de &T pasa por UnsafeCell."
+sidebar:
+  order: 8
+duracion: 12
+desde: "1.0"
+requiere: ["20-unsafe-y-ub/05-aliasing-y-tree-borrows", "15-punteros-inteligentes/01-box"]
+tarjetas:
+  - p: "¿Se puede mutar algo a través de un `&T` convirtiéndolo en `*mut T`?"
+    r: "No: es UB (el lint invalid_reference_casting lo rechaza cuando lo ve). Solo es legal si el dato está dentro de un UnsafeCell."
+  - p: "¿Qué tipos de std usan UnsafeCell por dentro?"
+    r: "Cell, RefCell, OnceCell, Mutex, RwLock, OnceLock y todos los atómicos."
+  - p: "¿Por qué Cell no es Sync?"
+    r: "Porque UnsafeCell no es Sync: dos hilos podrían mutar a la vez sin sincronizar (carrera de datos). Para hilos hacen falta Mutex o atómicos."
+  - p: "¿Qué devuelve `UnsafeCell::get`?"
+    r: "Un `*mut T` hacia el interior, a partir de `&self`. Crearlo es seguro; usarlo exige que nadie más acceda a la vez."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a construir tu propia `Cell` con `UnsafeCell` y a entender por qué es la **única** forma legal de mutar algo a través de un préstamo compartido.
+
+## Predice
+
+Esta función recibe un préstamo compartido y, con un par de conversiones, intenta escribir a través de él. ¿Por qué no compila?
+
+<NoCompila ej="m20/cast-mut-ub" explicacion="Un `&i32` promete que el valor no cambia mientras vive. Convertirlo en `*mut i32` no quita esa promesa: escribir es UB. rustc lo reconoce y lo rechaza con el lint `invalid_reference_casting`, que es un error por defecto, y te sugiere `UnsafeCell`." />
+
+## La idea
+
+El compilador trata los datos detrás de un `&T` como **congelados**: puede leerlos una vez y reutilizar el valor, o suponer que una llamada a función no los cambia. Si alguien los muta «por detrás», esas suposiciones fallan. Por eso mutar a través de `&T` es UB… salvo en un caso: si los datos están dentro de un `UnsafeCell<T>`.
+
+`UnsafeCell<T>` es la **marca** que le dice al compilador: «esto puede cambiar aunque solo tengas un `&`». Su método `get(&self) -> *mut T` te da un puntero al interior. La mutación sigue siendo responsabilidad tuya: debes garantizar que nadie más lee ni escribe a la vez.
+
+Todo lo que has usado de mutabilidad interior está hecho con esa pieza: `Cell`, `RefCell`, `Mutex`, `RwLock`, `OnceLock` y los atómicos. Cada uno añade **una regla** que hace segura la mutación: `Cell` nunca presta el interior (solo copia), `RefCell` cuenta préstamos en tiempo de ejecución, `Mutex` bloquea.
+
+## Pruébalo
+
+<Ejecutar ej="m20/mi-cell" />
+
+Dos préstamos compartidos `a` y `b` mutan el mismo valor, y es correcto: `MiCell` nunca entrega referencias al interior, solo copias (`T: Copy`). Y mide 4 bytes, igual que el `i32`: `UnsafeCell` no ocupa nada extra.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Lo que cambia `UnsafeCell` en el compilador:** para un `&T` sin `UnsafeCell` dentro, Rust le indica a LLVM (con la marca `noalias`) que nadie modifica esa memoria mientras dure el préstamo. Con `UnsafeCell` dentro, no pone esa marca. No hay instrucciones especiales: cambia lo que el optimizador puede suponer.
+
+**Por qué `MiCell` es sound:**
+
+| Riesgo | Por qué no ocurre |
+|---|---|
+| Dos hilos mutando a la vez | `UnsafeCell` no es `Sync`, así que `MiCell` tampoco (el auto trait se propaga): no se puede compartir entre hilos |
+| Una referencia al interior que vea un cambio | `get` devuelve una **copia**; nunca existe un `&T` al interior |
+| Mutar durante otra lectura | cada acceso dura una sola expresión; no hay reentrada |
+
+El compilador lo confirma: intentar exigir `Sync` de una `Cell` da E0277.
+
+<NoCompila ej="m20/cell-no-sync" explicacion="`Cell` (y cualquier tipo con un `UnsafeCell` sin protección) no es `Sync`. La ayuda del compilador apunta a `RwLock` para el caso con varios hilos." />
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Es mi dato; si lo convierto a *mut puedo escribir»">
+
+❌ `let p = r as *const T as *mut T; unsafe { *p = v }` con `r: &T`. Aunque el lint no lo detecte (por ejemplo, si la conversión ocurre en otra función), sigue siendo UB: el puntero hereda los permisos de solo lectura del `&T`.
+
+✅ Si necesitas mutar con `&self`, mete el campo en `Cell`, `RefCell`, `Mutex` o un atómico. Solo si construyes uno de esos tipos tú mismo, usa `UnsafeCell` directamente.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m20/contador-cell" enunciado="Implementa `visitar(&self)` para que sume 1 a `visitas` usando `Cell::get` y `Cell::set` (sin unsafe: Cell ya encapsula el UnsafeCell). Debe imprimir `inicio: 3 visitas`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estos tipos **no** usa `UnsafeCell` por dentro?"
+  opciones={["`Cell<T>`", "`Mutex<T>`", "`Box<T>`", "`AtomicU32`"]}
+  correcta={2}
+  explicacion="`Box<T>` no tiene mutabilidad interior: para mutar su contenido necesitas un `&mut Box<T>`. Los otros tres permiten mutar con `&`, así que necesitan `UnsafeCell`."
+  porque={["Cell es el caso más simple de UnsafeCell.", "Mutex guarda el dato en un UnsafeCell y lo protege con un bloqueo.", "Correcto.", "Los atómicos también: permiten `store` con `&self`."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `MiCell<T>` exige `T: Copy`?"
+  opciones={["Por rendimiento", "Para que `get` pueda devolver una copia sin prestar nunca el interior", "Porque UnsafeCell solo admite tipos Copy", "No hace falta"]}
+  correcta={1}
+  explicacion="Si `get` devolviera `&T`, un `set` posterior mutaría algo que esa referencia cree congelado: UB. Copiar evita que exista cualquier referencia al interior."
+  porque={["No es por velocidad: es por solidez.", "Correcto.", "`UnsafeCell<T>` admite cualquier `T`.", "Sin esa restricción habría que diseñar otra regla (como hace RefCell)."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace `UnsafeCell::get(&self)`?"
+  opciones={["Devuelve una copia del valor", "Devuelve un `*mut T` hacia el interior (seguro de llamar)", "Bloquea el dato", "Es una `unsafe fn`"]}
+  correcta={1}
+  explicacion="Obtener el puntero es seguro; desreferenciarlo para leer o escribir es lo que requiere `unsafe` y tu garantía de exclusividad."
+  porque={["Eso lo hace Cell::get, no UnsafeCell::get.", "Correcto.", "No sincroniza nada.", "Es una función segura; el peligro está en usar el puntero."]}
+/>
+
+## Para saber más
+
+- Documentación de `std::cell::UnsafeCell`.
+- En este curso: [mundo 15, mutabilidad interior](../../15-punteros-inteligentes/).

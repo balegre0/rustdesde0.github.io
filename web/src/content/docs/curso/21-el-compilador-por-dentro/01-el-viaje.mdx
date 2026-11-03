@@ -1,0 +1,200 @@
+---
+title: "El viaje de tu programa"
+description: "Recorre las etapas de rustc y aprende qué pregunta responde cada una, con salidas reales del compilador."
+sidebar:
+  order: 1
+duracion: 12
+desde: "1.0"
+requiere: ["20-unsafe-y-ub"]
+tarjetas:
+  - p: "¿Cuáles son las grandes etapas de rustc, en orden?"
+    r: "Lexer (tokens) → parser (AST) → expansión de macros y resolución de nombres → HIR → comprobación de tipos → THIR → MIR (borrow checker, optimizaciones) → monomorfización → codegen (LLVM IR) → enlazado."
+  - p: "¿Qué es el *lowering*?"
+    r: "Traducir una representación del programa a otra más simple, quitando azúcar sintáctico (por ejemplo, AST → HIR, donde `for` desaparece)."
+  - p: "¿Por qué el borrow checker no trabaja sobre el texto del programa?"
+    r: "Porque necesita ver todos los caminos posibles de ejecución: trabaja sobre MIR, que es un grafo de flujo de control."
+  - p: "¿Qué opción de rustc muestra el HIR y por qué hace falta nightly?"
+    r: "`-Zunpretty=hir`. Las opciones `-Z` son internas e inestables; solo las acepta la toolchain nightly."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Ordena, BajoElCapo, Trampa, Historia } from '~/components';
+
+`rustc` no lee tu programa una vez y escupe un ejecutable. Lo transforma **muchas veces**, y cada forma intermedia existe para responder una pregunta concreta. En esta lección recorres el viaje entero con un programa de seis líneas.
+
+## Predice
+
+<Pregunta
+  pregunta="El programa de abajo olvida cerrar la comilla de la línea 3. ¿Por qué rustc señala la línea **4**, columna 23, y no la 3?"
+  opciones={[
+    "Porque rustc cuenta las líneas empezando en 0",
+    "Porque el lexer se tragó el principio de la línea 4 como parte de la cadena, y la comilla siguiente abrió otra cadena que ya nunca se cierra",
+    "Porque el error lo detecta el borrow checker, que va una línea por detrás",
+    "Porque el punto y coma de la línea 3 cierra la cadena"
+  ]}
+  correcta={1}
+  explicacion="El **lexer** solo ve caracteres. Desde la comilla de `hola;` todo es cadena hasta la siguiente comilla, que está en la línea 4. Ahí la cadena se cierra… y la comilla de la columna 23 abre otra que no termina nunca. El error aparece donde el lexer se perdió, no donde tú te equivocaste."
+  porque={[
+    "rustc numera líneas y columnas desde 1.",
+    "",
+    "El borrow checker trabaja muchísimo después, sobre MIR; un programa con una cadena sin cerrar ni siquiera llega a tener árbol.",
+    "Dentro de una cadena, `;` es un carácter más."
+  ]}
+/>
+
+<NoCompila ej="m21/cadena-sin-cerrar" explicacion="Error E0765 del lexer: una cadena que empieza y nunca termina." />
+
+## La idea
+
+El compilador es una **cadena de traducciones**. Cada etapa recibe una representación del programa y produce otra más fácil de analizar:
+
+1. **Lexer**: texto → *tokens* (palabras sueltas: `let`, `v`, `=`, `[`, `10`…). Pregunta: ¿son válidos estos caracteres?
+2. **Parser**: tokens → **AST** (*abstract syntax tree*, árbol de sintaxis abstracta). Pregunta: ¿tiene forma de Rust?
+3. **Expansión de macros y resolución de nombres**: las macros (`println!`, `vec!`, `#[derive]`) se sustituyen por código, y cada nombre se une a lo que significa. Pregunta: ¿existe cada cosa que nombras?
+4. **HIR** (*high-level IR*, representación intermedia de alto nivel): el AST sin azúcar. `for`, `?` y `while let` ya no existen.
+5. **Comprobación de tipos** (*typeck*) y **THIR** (*typed HIR*): cada expresión recibe su tipo, cada método se resuelve, cada conversión implícita se escribe. Pregunta: ¿cuadran los tipos? ¿se cumplen los traits?
+6. **MIR** (*mid-level IR*): un **grafo** de bloques básicos. Aquí trabajan el borrow checker, la evaluación de `const` y muchas optimizaciones. Pregunta: ¿es seguro cada camino de ejecución?
+7. **Monomorfización y codegen**: se crean las copias concretas de tus genéricos y se traducen a **LLVM IR**, que LLVM convierte en código máquina.
+8. **Enlazado** (*linking*): los trozos de código máquina (tuyos y de `std`) se unen en un ejecutable.
+
+Fíjate en el patrón: **cada error que conoces pertenece a una etapa**. E0765 (cadena sin cerrar) es del lexer; E0425 (nombre que no existe) es de la resolución de nombres; E0308 (tipos que no cuadran) es de typeck; E0499 y E0502 (préstamos) son del borrow checker sobre MIR. Saber en qué etapa está un error te dice qué clase de cosa está mal.
+
+## Pruébalo
+
+Este es el programa que seguiremos durante el mundo. Ejecútalo y luego mira, en «Bajo el capó», en qué se convierte por dentro.
+
+<Ejecutar ej="m21/viaje" />
+
+Para verlo en tu ordenador necesitas la toolchain nightly (solo para mirar):
+
+```bash
+rustup toolchain install nightly
+rustc +nightly --edition 2024 -Zunpretty=expanded viaje.rs   # tras expandir macros
+rustc +nightly --edition 2024 -Zunpretty=hir viaje.rs        # el HIR
+rustc --edition 2024 --emit=mir viaje.rs                     # el MIR (¡funciona con stable!)
+```
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Salida real de `rustc +nightly --edition 2024 -Zunpretty=expanded` (nightly 1.101.0, noviembre de 2026). La macro `println!` ya es una llamada a `::std::io::_print` con `format_args!`:
+
+```text
+fn main() {
+    let v = [10, 20, 30];
+    for x in v { { ::std::io::_print(format_args!("{0}\n", x)); }; }
+}
+```
+
+Y la salida real de `-Zunpretty=hir`, donde el `for` **ya no existe**:
+
+```text
+fn main() {
+    let v = [10, 20, 30];
+    {
+        let _t =
+            match into_iter(v) {
+                mut iter =>
+                    loop {
+                        match next(&mut iter) {
+                            None {} => break,
+                            Some {  0: x } => {
+                                {
+                                    ::std::io::_print({
+                                            super let args = (&x,);
+                                            super let args = [format_argument::new_display(args.0)];
+                                            unsafe { format_arguments::new(b"\xc0\x01\n\x00", &args) }
+                                        });
+                                };
+                            }
+                        }
+                    },
+            };
+        _t
+    }
+}
+```
+
+Tres cosas que leer aquí:
+
+- `into_iter` y `next` son `IntoIterator::into_iter` e `Iterator::next`. Por eso **cualquier** tipo que implemente `IntoIterator` sirve en un `for`.
+- `super let` es una construcción interna que usan las macros de `std` para alargar la vida de un temporal. No la puedes escribir en código estable.
+- `b"\xc0\x01\n\x00"` es la plantilla de formato codificada en bytes. Este detalle **cambia entre versiones**: no lo memorices, aprende a generarlo.
+
+El código del compilador está organizado por etapas en crates con nombre propio: `rustc_lexer` y `rustc_parse` (lexer y parser), `rustc_expand` y `rustc_resolve` (macros y nombres), `rustc_ast_lowering` (AST → HIR), `rustc_hir_typeck` (tipos dentro de las funciones), `rustc_mir_build` (THIR → MIR), `rustc_borrowck`, `rustc_mir_transform` (optimizaciones de MIR), `rustc_monomorphize` y `rustc_codegen_llvm`. La guía oficial para contribuir, la *rustc-dev-guide*, sigue este mismo orden.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Creer que el fallo está exactamente en la línea del error">
+
+❌ «El compilador dice línea 4, así que el fallo está en la línea 4.»
+
+✅ El error aparece donde **la etapa que lo detecta** se dio cuenta. El lexer se pierde después de la comilla que falta; el borrow checker señala el uso que choca, y en otra etiqueta el préstamo que lo causa. Lee todas las marcas del mensaje (`-`, `^`, `note:`, `help:`), no solo la primera línea.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={[
+    "Lexer: texto → tokens",
+    "Parser: tokens → AST",
+    "Expansión de macros y resolución de nombres",
+    "Lowering: AST → HIR",
+    "Comprobación de tipos y THIR",
+    "Construcción de MIR y borrow checker",
+    "Monomorfización y codegen a LLVM IR",
+    "Enlazado del ejecutable"
+  ]}
+  distractores={["Ejecución del recolector de basura", "Borrow checker sobre el texto fuente"]}
+  explicacion="Cada etapa necesita el resultado de la anterior: no puedes comprobar tipos sin saber a qué se refiere cada nombre, ni comprobar préstamos sin el grafo de MIR. Rust no tiene recolector de basura: la memoria se libera con `drop`, que el compilador inserta en MIR."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿En qué etapa se detecta `error[E0425]: cannot find value`?"
+  opciones={["Lexer", "Resolución de nombres", "Borrow checker", "Enlazado"]}
+  correcta={1}
+  explicacion="Unir cada nombre con su definición es el trabajo de la resolución de nombres (`rustc_resolve`), que ocurre junto con la expansión de macros."
+  porque={["El lexer no sabe qué nombres existen; solo que `totl` es un identificador válido.", "", "El borrow checker ni siquiera llega a ejecutarse si un nombre no existe.", "El enlazador une símbolos de código máquina; los nombres de variables locales no llegan hasta ahí."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `for x in v` funciona con cualquier tipo que implemente `IntoIterator`?"
+  opciones={[
+    "Porque `for` es una función de la biblioteca estándar",
+    "Porque el lowering convierte el `for` en `IntoIterator::into_iter` + `loop` + `Iterator::next` + `match`",
+    "Porque el compilador tiene una lista de tipos permitidos en `for`",
+    "Porque `for` solo funciona con arrays y vectores"
+  ]}
+  correcta={1}
+  explicacion="Tras el lowering a HIR no queda ningún `for`: queda una llamada al trait. Cualquier tipo con esa implementación encaja."
+  porque={["`for` es una palabra clave; lo que hace es desazucararse en llamadas a traits.", "", "No hay lista: lo decide el solver de traits al buscar `IntoIterator`.", "Funciona con rangos, `HashMap`, iteradores propios… todo lo que implemente el trait."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué afirmación sobre la salida de `-Zunpretty=hir` es correcta?"
+  opciones={[
+    "Es un formato estable que puedes usar en scripts",
+    "Es interna: puede cambiar entre versiones y solo la acepta nightly",
+    "Es el código que ejecuta la CPU",
+    "Es el mismo texto que escribiste, formateado"
+  ]}
+  correcta={1}
+  explicacion="Las opciones `-Z` y sus salidas son herramientas de diagnóstico internas. Sirven para entender, no para depender de ellas."
+  porque={["Ningún formato `-Z` es estable.", "", "La CPU ejecuta código máquina; el HIR es una representación intermedia de alto nivel.", "El HIR ya no tiene `for`, `?` ni macros: es tu programa sin azúcar."]}
+/>
+
+<Historia titulo="Un compilador escrito en sí mismo">
+
+`rustc` está escrito en Rust y se compila a sí mismo por fases (*stages*): una versión anterior ya publicada compila la nueva (stage 1), y esa nueva se recompila a sí misma (stage 2). Lo verás en la última lección del mundo, cuando compiles rustc tú mismo.
+
+</Historia>
+
+## Para saber más
+
+- La lección [Leer MIR](/curso/21-el-compilador-por-dentro/04-leer-mir/) de este mundo.
+- *rustc-dev-guide*, capítulo «Overview of the compiler»: https://rustc-dev-guide.rust-lang.org/overview.html

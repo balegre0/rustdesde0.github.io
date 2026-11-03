@@ -1,0 +1,104 @@
+---
+title: "Tipos y constantes asociados"
+description: "Decide cuándo un trait lleva un tipo dentro (`type Item`) y cuándo un parámetro genérico (`Trait<T>`), y usa constantes por tipo."
+sidebar:
+  order: 6
+duracion: 12
+desde: "1.0"
+requiere: ["13-traits-y-genericos/02-genericos-y-bounds"]
+tarjetas:
+  - p: "¿Qué es un tipo asociado?"
+    r: "Un tipo que cada implementación del trait elige: `type Item;` en el trait y `type Item = u32;` en el `impl`. Se usa como `Self::Item` o `G::Item`."
+  - p: "¿Tipo asociado o parámetro genérico en el trait?"
+    r: "Asociado si cada tipo implementa el trait una sola vez (un `Iterator` tiene un solo `Item`). Genérico (`Trait<T>`) si un tipo puede implementarlo varias veces, una por `T`."
+  - p: "¿Qué es una constante asociada?"
+    r: "Un valor que cada `impl` fija: `const SIMBOLO: &'static str;` en el trait y `const SIMBOLO: &'static str = \"€\";` en el `impl`. Se usa como `Euro::SIMBOLO`."
+  - p: "¿Qué error sale si un tipo implementa `ConvertirA<f64>` y `ConvertirA<String>` y llamas `let x = t.convertir();`?"
+    r: "E0283, «type annotations needed»: hay dos impl posibles y nada dice cuál. Se arregla anotando `let x: f64`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a aprender la diferencia entre «este trait produce un tipo» y «este trait funciona con un tipo», que es la clave para leer firmas como `Iterator<Item = u32>`.
+
+## Predice
+
+<Predice
+  ej="m13/assoc-predice"
+  opciones={["`Some(\"llave\") 3`", "`llave 3`", "`Some(\"llave\") 2`", "No compila: `Caja::CAPACIDAD` necesita un valor `Caja`"]}
+  correcta={0}
+  explicacion={"`primero` devuelve `Option<&String>`, que con `{:?}` se ve como `Some(\"llave\")`. `CAPACIDAD` es una constante del **tipo** `Caja`, no del valor: vale 3 aunque la caja tenga 2 cosas."}
+  porque={["Correcto.", "`{:?}` muestra el `Option` entero, con su `Some`.", "`CAPACIDAD` es la constante que fija el `impl` (3), no `cosas.len()`.", "Las constantes asociadas se usan con el tipo: `Caja::CAPACIDAD`."]}
+/>
+
+## La idea
+
+Un trait puede declarar «huecos» que cada implementación rellena:
+
+- Un **tipo asociado** (*associated type*): `type Item;`. Cada `impl` dice qué tipo es: `type Item = String;`. Dentro del trait se escribe `Self::Item`, y desde fuera `G::Item` o `Iterator<Item = u32>`.
+- Una **constante asociada** (*associated const*): `const CAPACIDAD: usize;`. Cada `impl` fija su valor, y se usa con el tipo: `Caja::CAPACIDAD`.
+
+Pero también existe otra forma de poner un tipo en un trait: un **parámetro genérico**, `trait ConvertirA<T>`. ¿Cuándo usar cada uno? La pregunta es: **¿un mismo tipo puede implementar el trait varias veces?** `Celsius` puede convertirse a `f64` **y** a `String`: son dos implementaciones distintas, `ConvertirA<f64>` y `ConvertirA<String>`. En cambio, un contador produce **un** tipo de elemento; no tiene sentido que produzca a la vez `u32` y `String`. Para eso, tipo asociado.
+
+La ventaja práctica del tipo asociado: quien lo usa **no necesita otro parámetro**. Una función que recibe un generador escribe `fn tres<G: Generador>(g: &mut G) -> [G::Item; 3]`, sin tener que añadir un segundo genérico para el tipo de elemento.
+
+## Pruébalo
+
+<Ejecutar ej="m13/assoc-vs-generico" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Para el compilador, la diferencia es de **identidad**. `ConvertirA<f64>` y `ConvertirA<String>` son **dos traits distintos**: por eso caben dos `impl` para `Celsius`. En cambio `Generador` es un solo trait, y `Item` es un dato de cada implementación. Formalmente: un tipo asociado está **determinado** por el tipo que implementa (`Contador` → `u32`), mientras que un parámetro genérico es una entrada más que hay que elegir.
+
+Eso explica el error de la trampa: con dos implementaciones posibles, `t.convertir()` no sabe cuál usar. Con un tipo asociado ese error es imposible, porque solo hay una.
+
+`Iterator` es el ejemplo más famoso. Su definición empieza por `trait Iterator { type Item; fn next(&mut self) -> Option<Self::Item>; … }`. Y `Add<Rhs = Self>` combina los dos mundos: `Rhs` es un parámetro genérico (puedes sumar un `V2` con otro `V2` o con un `f64`), y `Output` es un tipo asociado (fijado el `Rhs`, el resultado es uno). Lo verás en la lección 10.
+
+Las constantes asociadas se calculan al compilar y se insertan donde se usan, como cualquier `const`: no ocupan sitio en los valores.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m13/ambiguo"
+  explicacion="`Celsius` implementa `ConvertirA<f64>` **y** `ConvertirA<String>`, y en `let x = t.convertir();` nada dice cuál quieres (E0283). La nota del error enseña las dos `impl` candidatas. Arreglo: `let x: f64 = t.convertir();`."
+/>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Diseñas un trait `Analizador` que convierte texto en un valor. Cada analizador produce **un** tipo de resultado (el de fechas da `Fecha`, el de números da `i64`). ¿Qué usas?"
+  opciones={["Un tipo asociado: `type Salida;`", "Un parámetro genérico: `trait Analizador<T>`", "Una constante asociada", "Dos traits distintos"]}
+  correcta={0}
+  explicacion="Cada analizador implementa el trait una vez y fija su salida: tipo asociado. Así una función escribe `A::Salida` sin un genérico extra."
+  porque={["Correcto.", "Un genérico permitiría que un mismo analizador diera varios tipos, que no es lo que quieres, y obligaría a anotar en cada llamada.", "Una constante es un **valor**, no un tipo.", "Un solo trait con tipo asociado lo resuelve."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `Iterator` usa `type Item` en vez de `Iterator<T>`?"
+  opciones={["Porque un iterador produce un solo tipo de elemento; así no hay que anotar `T` en cada uso", "Porque los genéricos no se permiten en traits", "Porque `type Item` es más rápido al ejecutar", "Por compatibilidad con versiones antiguas"]}
+  correcta={0}
+  explicacion="El tipo de elemento lo determina el iterador. Con un genérico, `v.iter().next()` podría ser ambiguo."
+  porque={["Correcto.", "Los traits genéricos existen (`Add<Rhs>`, `From<T>`).", "Los dos se resuelven al compilar: velocidad idéntica.", "Es una decisión de diseño, no histórica."]}
+/>
+
+<Pregunta
+  pregunta="Un trait tiene `const LIMITE: u32;`. ¿Cómo lees el valor para el tipo `Disco`?"
+  opciones={["`Disco::LIMITE`", "`disco.LIMITE`", "`LIMITE::Disco`", "`Disco.LIMITE()`"]}
+  correcta={0}
+  explicacion="Las constantes asociadas pertenecen al tipo y se usan con la ruta `Tipo::CONSTANTE`."
+  porque={["Correcto.", "No es un campo del valor.", "El orden es `Tipo::CONSTANTE`.", "No es un método."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuántas veces puede `Celsius` implementar `trait Generador { type Item; … }`?"
+  opciones={["Una", "Una por cada `Item` posible", "Ilimitadas", "Ninguna: los tipos asociados son solo para la biblioteca estándar"]}
+  correcta={0}
+  explicacion="Un trait sin parámetros genéricos solo se puede implementar una vez por tipo; una segunda daría E0119."
+  porque={["Correcto.", "Eso pasa con un parámetro genérico, no con un tipo asociado.", "Coherencia: una implementación por par (trait, tipo).", "Cualquiera puede declararlos."]}
+/>

@@ -1,0 +1,883 @@
+# Banco de preguntas — Mundo 04 · Expresiones y control
+# Todo código y todo error citados están verificados con rustc 1.99.1 (edición 2024).
+
+- id: m04-bloque-punto-y-coma
+  titulo: "El punto y coma que se come el valor"
+  mundo: 04-expresiones-y-control
+  tema: expresiones
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m04/bloque-punto-y-coma
+  opciones:
+    - "Porque `ancho` y `alto` no existen fuera del bloque"
+    - "Porque el bloque termina en `ancho * alto;`: el `;` descarta el valor y el bloque vale `()`, no `i32`"
+    - "Porque un bloque no se puede asignar a una variable"
+    - "Porque falta `mut` en `area`"
+  correcta: 1
+  solucion: |
+    El error es **E0308** («mismatched types»): `expected i32, found ()`. La pista del compilador lo dice todo: «remove this semicolon to return this value».
+
+    Un bloque vale su **última expresión sin `;`**. Con el `;`, `ancho * alto` se convierte en sentencia, su valor se tira y el bloque vale `()`.
+
+    - *Fuera del bloque*: `ancho` y `alto` solo se usan dentro, donde existen.
+    - *Asignar un bloque*: es totalmente válido, es justo lo que hace `let area = { ... };`.
+    - *`mut`*: `area` no cambia después; no lo necesita.
+  etiquetas: ["E0308", "bloques", ";"]
+
+- id: m04-bloque-ultima-expresion
+  titulo: "Bloques dentro de bloques"
+  mundo: 04-expresiones-y-control
+  tema: expresiones
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m04/p-bloque-ultima
+  opciones: ["`22`", "`20`", "`2`", "`()`"]
+  correcta: 0
+  solucion: |
+    El bloque interior `{ b * 10 }` vale 20 y se guarda en `c`. La última expresión del bloque exterior es `c + b` = 20 + 2 = **22**.
+
+    - `20` es solo `c`; falta sumar `b`.
+    - `2` es solo `b`.
+    - `()` sería el valor si la última línea terminara en `;`.
+  etiquetas: ["bloques"]
+
+- id: m04-unidad
+  titulo: "¿Cuánto vale la nada?"
+  mundo: 04-expresiones-y-control
+  tema: expresiones
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué tipo tiene el bloque `{ let x = 3; println!(\"{x}\"); }`?"
+  opciones: ["`i32`", "`()`", "`&str`", "No tiene tipo"]
+  correcta: 1
+  solucion: |
+    Termina en una sentencia (`println!(...);` con `;`), así que no tiene expresión final y vale `()`, la **unidad**: una tupla vacía que ocupa 0 bytes.
+
+    - `i32`: `x` es `i32`, pero el bloque no termina en `x`.
+    - `&str`: el texto es el formato de `println!`, no el valor del bloque.
+    - *Sin tipo*: en Rust todo bloque tiene tipo; «nada» se escribe `()`.
+  etiquetas: ["()", "bloques"]
+
+- id: m04-variable-fuera-bloque
+  titulo: "El secreto que no sale del bloque"
+  mundo: 04-expresiones-y-control
+  tema: expresiones
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-variable-fuera-bloque
+  opciones:
+    - "Porque `secreto` debería ser `mut`"
+    - "Porque `secreto` solo existe dentro del bloque donde se declaró"
+    - "Porque `println!` no acepta números"
+    - "Porque hay dos `println!`"
+  correcta: 1
+  solucion: |
+    Error **E0425**: «cannot find value `secreto` in this scope». El ámbito (*scope*) de una variable termina en la llave `}` del bloque donde nace. El compilador incluso avisa: «the binding `secreto` is available in a different scope in the same function».
+
+    - `mut` permite cambiar una variable, no alargar su vida.
+    - `println!` imprime números sin problema.
+    - El número de `println!` no importa.
+  etiquetas: ["E0425", "ámbito"]
+
+- id: m04-sombra-en-bloque
+  titulo: "Sombra dentro del bloque"
+  mundo: 04-expresiones-y-control
+  tema: expresiones
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m04/p-shadow-bloque
+  opciones:
+    - "`dentro: 11` y `fuera: 11`"
+    - "`dentro: 11` y `fuera: 1`"
+    - "`dentro: 1` y `fuera: 1`"
+    - "No compila: `x` ya existe"
+  correcta: 1
+  solucion: |
+    Dentro del bloque, `let x = x + 10;` crea una variable **nueva** que *sombrea* (*shadows*) a la de fuera mientras dura el bloque. Al cerrar `}`, esa `x` desaparece y vuelve a verse la original, que nunca cambió: **1**.
+
+    - Pensar que `fuera` vale 11 es confundir sombreado con modificación: la `x` de fuera no es `mut` y nadie la toca.
+    - `dentro: 1` olvida que la nueva `x` vale `1 + 10`.
+    - Sombrear con `let` está permitido (lo viste en el mundo 03).
+  etiquetas: ["shadowing", "ámbito"]
+
+- id: m04-if-tipos
+  titulo: "Número o texto"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/if-tipos-distintos
+  opciones:
+    - "Porque `lleno` no es un `bool`"
+    - "Porque las ramas del `if` producen tipos distintos (entero y `&str`)"
+    - "Porque falta `else`"
+    - "Porque `100` es demasiado grande"
+  correcta: 1
+  solucion: |
+    Error **E0308**: «`if` and `else` have incompatible types», con `expected integer, found &str`. Una variable tiene **un solo tipo**, fijado al compilar; `mensaje` no puede ser «a veces número, a veces texto».
+
+    - `lleno` es `true`, un `bool` perfecto.
+    - El `else` está.
+    - 100 cabe de sobra en un `i32`.
+  etiquetas: ["E0308", "if"]
+
+- id: m04-if-sin-else
+  titulo: "¿Y si no?"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/if-sin-else
+  opciones:
+    - "Porque `puntos` vale 7 y la condición siempre es verdadera"
+    - "Porque un `if` sin `else` vale `()` cuando la condición es falsa, y `premio` necesita un número"
+    - "Porque `if` no puede usarse como valor"
+    - "Porque `10` necesita un tipo explícito"
+  correcta: 1
+  solucion: |
+    Error **E0317**: «`if` may be missing an `else` clause». La nota lo explica: «`if` expressions without `else` evaluate to `()`».
+
+    - El compilador no mira el valor de `puntos`: comprueba tipos en **todos** los caminos, también el que no ocurrirá.
+    - `if` sí es una expresión, pero necesita `else` para tener valor en todos los casos.
+    - El tipo de `10` se deduce sin problemas.
+  etiquetas: ["E0317", "if"]
+
+- id: m04-else-if-sin-else
+  titulo: "La cadena incompleta"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila, si con `t = 15` se cumple la segunda condición?"
+  ej: m04/p-else-if-sin-else
+  opciones:
+    - "Porque `t = 15` no cumple `t > 10`"
+    - "Porque la cadena no tiene `else` final: si `t` valiera 5, ninguna rama daría valor"
+    - "Porque `else if` no existe en Rust"
+    - "Porque las dos ramas devuelven `&str`"
+  correcta: 1
+  solucion: |
+    Error **E0317** con `expected &str, found ()`. El compilador no ejecuta el programa para ver que `t` es 15: comprueba que **todos** los caminos den un `&str`. Con `t = 5` no se cumpliría ninguna condición y el `if` valdría `()`.
+
+    - 15 > 10 es verdadero, pero eso no importa al compilar.
+    - `else if` existe y se usa así.
+    - Que ambas ramas den `&str` está bien; lo que falta es la tercera.
+  etiquetas: ["E0317", "else if"]
+
+- id: m04-if-entero
+  titulo: "¿Tres es verdad?"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/if-no-bool
+  opciones:
+    - "Porque la condición de un `if` debe ser `bool` y `mensajes` es un entero"
+    - "Porque falta `else`"
+    - "Porque `mensajes` no es `mut`"
+    - "Porque `println!` no puede ir dentro de un `if`"
+  correcta: 0
+  solucion: |
+    Error **E0308**: `expected bool, found integer`. Rust nunca convierte números en verdadero/falso: escribe la pregunta completa, `mensajes > 0`.
+
+    - Un `if` usado como decisión (sin valor) no necesita `else`.
+    - Leer `mensajes` no requiere `mut`.
+    - `println!` puede ir en cualquier bloque.
+  etiquetas: ["E0308", "bool"]
+
+- id: m04-if-asignacion
+  titulo: "Un igual de menos"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-if-asignacion
+  opciones:
+    - "Porque `x = 5` es una asignación (vale `()`), no una comparación (`x == 5`)"
+    - "Porque `x` no es `mut`, y eso es todo"
+    - "Porque 5 no es un `bool`"
+    - "Porque falta `else`"
+  correcta: 0
+  solucion: |
+    Error **E0308**: `expected bool, found ()`, con la pista «you might have meant to compare for equality»: `if x == 5`.
+
+    `=` asigna y `==` compara. Una asignación es una expresión que vale `()`, y la condición necesita un `bool`. Así Rust convierte un despiste clásico en un error de compilación.
+
+    - Es cierto que `x` no es `mut`, pero el error que da el compilador es el de tipos: aunque fuera `mut`, `()` seguiría sin ser un `bool`.
+    - El problema no es el 5, sino que la expresión entera vale `()`.
+    - Sin valor, un `if` no necesita `else`.
+  etiquetas: ["E0308", "==", "="]
+
+- id: m04-if-sin-llaves
+  titulo: "Llaves obligatorias"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-if-sin-llaves
+  opciones:
+    - "Porque en Rust el cuerpo de un `if` siempre va entre llaves `{ }`"
+    - "Porque la condición necesita paréntesis"
+    - "Porque `println!` va con mayúscula"
+    - "Porque `x` no está inicializada"
+  correcta: 0
+  solucion: |
+    Error de sintaxis: «expected `{`, found `println`». En Rust las llaves del `if` son **obligatorias**, incluso para una sola línea; los paréntesis de la condición, en cambio, no hacen falta (y el compilador avisa si los pones).
+
+    - Paréntesis: opcionales y desaconsejados.
+    - `println!` se escribe en minúsculas, como está.
+    - `x` vale 4.
+  etiquetas: ["sintaxis", "if"]
+
+- id: m04-else-if-orden
+  titulo: "Gana la primera"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Con `let t = 25;`, ¿qué vale `if t > 10 { \"A\" } else if t > 20 { \"B\" } else { \"C\" }`?"
+  opciones: ["`\"A\"`", "`\"B\"`", "`\"C\"`", "`\"A\"` y `\"B\"`"]
+  correcta: 0
+  solucion: |
+    Las condiciones se comprueban de arriba abajo y gana **la primera** verdadera: `25 > 10` ya lo es, así que vale `"A"`. La segunda nunca se evalúa.
+
+    - `"B"` sería la respuesta si el orden fuera el contrario: por eso las condiciones más estrictas van primero.
+    - `"C"` solo si todas fueran falsas.
+    - Un `if` elige una única rama.
+  etiquetas: ["else if"]
+
+- id: m04-if-tipo-numerico
+  titulo: "Entero y decimal"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Compila `let x = if c { 1 } else { 2.5 };`?"
+  opciones:
+    - "Sí, `x` es `f64`"
+    - "No: una rama es entera y la otra `f64`, y Rust no convierte números implícitamente (E0308)"
+    - "Sí, si `c` es `true`"
+    - "No: falta `mut`"
+  correcta: 1
+  solucion: |
+    Rust **nunca** convierte entre tipos numéricos por su cuenta. `1` es un entero y `2.5` un `f64`: tipos distintos, error E0308. Arreglo: `1.0`.
+
+    - No hay «promoción» automática a `f64`.
+    - El valor de `c` no importa: se comprueban las dos ramas.
+    - `mut` no tiene relación con los tipos.
+  etiquetas: ["E0308", "tipos numéricos"]
+
+- id: m04-loop-dos-tipos
+  titulo: "Dos breaks, dos tipos"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-loop-dos-tipos
+  opciones:
+    - "Porque un `loop` solo puede tener un `break`"
+    - "Porque los dos `break` entregan valores de tipos distintos"
+    - "Porque `loop` no puede entregar valores"
+    - "Porque el segundo `break` es inalcanzable"
+  correcta: 1
+  solucion: |
+    Error **E0308**: el primer `break 1` fija el tipo («expected because of this `break`») y `break "dos"` da un `&str`: `expected integer, found &str`. Todos los caminos de salida de un `loop` deben dar el mismo tipo, igual que las ramas de un `if`.
+
+    - Puede haber todos los `break` que quieras.
+    - `loop` sí entrega valores con `break valor`.
+    - Es alcanzable cuando `lleno` es falso.
+  etiquetas: ["E0308", "loop", "break"]
+
+- id: m04-loop-sin-valor
+  titulo: "El break vacío"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-loop-sin-valor
+  opciones:
+    - "Porque `i` no llega nunca a 3"
+    - "Porque `break;` sin valor hace que el `loop` valga `()`, y `x` debe ser `i32`"
+    - "Porque no se puede anotar el tipo de una variable que recibe un `loop`"
+    - "Porque falta `continue`"
+  correcta: 1
+  solucion: |
+    Error **E0308**: «this loop is expected to be of type `i32`», `expected i32, found ()`. La pista: «give the `break` a value of the expected type».
+
+    - `i` sí llega a 3 (vale 1, 2, 3).
+    - Anotar el tipo es correcto; lo que falla es que el `break` no da valor.
+    - `continue` no aporta valores.
+  etiquetas: ["E0308", "loop"]
+
+- id: m04-loop-cuenta
+  titulo: "Dividir hasta caer"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m04/p-loop-cuenta
+  opciones: ["`3`", "`11`", "`1`", "`0`"]
+  correcta: 0
+  solucion: |
+    `n` empieza en 100. Vueltas: 100 no es < 10 → `n = 33`; 33 → `n = 11`; 11 → `n = 3` (división entera: 11 / 3 = 3); 3 < 10 → `break 3`.
+
+    - `11` es el valor anterior; aún no es menor que 10.
+    - `1` sería si se dividiera una vez más.
+    - `0` exigiría seguir dividiendo, pero el bucle sale en cuanto `n < 10`.
+  etiquetas: ["loop", "break valor", "división entera"]
+
+- id: m04-break-fuera
+  titulo: "Un break sin bucle"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-break-fuera
+  opciones:
+    - "Porque `break` solo tiene sentido dentro de un bucle o de un bloque etiquetado"
+    - "Porque `if` no admite `break` nunca"
+    - "Porque `n` debería ser `mut`"
+    - "Porque falta `return`"
+  correcta: 0
+  solucion: |
+    Error **E0268**: «`break` outside of a loop or labeled block». `break` significa «sal del bucle»; aquí no hay bucle del que salir.
+
+    - Un `break` dentro de un `if` está bien **si** ese `if` está dentro de un bucle.
+    - `n` no cambia.
+    - `return` saldría de `main`, que es otra cosa; quizá era lo que querías, pero el error es por el `break`.
+  etiquetas: ["E0268", "break"]
+
+- id: m04-continue-suma
+  titulo: "Saltarse los pares"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m04/p-continue-suma
+  opciones: ["`25`", "`30`", "`55`", "`20`"]
+  correcta: 0
+  solucion: |
+    `continue` salta los pares, así que se suman 1 + 3 + 5 + 7 + 9 = **25**.
+
+    - `30` es la suma de los pares (2 + 4 + 6 + 8 + 10).
+    - `55` es la suma de todos del 1 al 10.
+    - `20` se obtiene olvidando el 9 (como si el rango fuera `1..10`... que tampoco incluiría el 10, pero sí el 9).
+  etiquetas: ["continue", "for"]
+
+- id: m04-while-break-valor
+  titulo: "El while que quería devolver"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/while-break-valor
+  opciones:
+    - "Porque `while` no admite `break`"
+    - "Porque un `while` puede terminar por su condición sin dar valor, así que no admite `break` con valor"
+    - "Porque `n % 7` no es un `bool`"
+    - "Porque `primero` no es `mut`"
+  correcta: 1
+  solucion: |
+    Error **E0571**: «`break` with value from a `while` loop», con la explicación «can only break with a value inside `loop` or breakable block». Si `n` llegara a 100 sin encontrar múltiplo de 7, el `while` acabaría por la condición, sin valor.
+
+    - `break` sin valor sí se admite en `while`.
+    - `n % 7 == 0` es un `bool` correcto.
+    - `primero` se asigna una vez.
+  etiquetas: ["E0571", "while"]
+
+- id: m04-while-entero
+  titulo: "Mientras tres"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-while-entero
+  opciones:
+    - "Porque la condición de `while` debe ser un `bool`, y `n` es un entero"
+    - "Porque `n -= 1` no está permitido"
+    - "Porque `while` necesita un contador"
+    - "Porque falta un `break`"
+  correcta: 0
+  solucion: |
+    Error **E0308**: `expected bool, found integer`. Igual que en `if`: escribe `while n > 0`.
+
+    - `n -= 1` es válido porque `n` es `mut`.
+    - `while` solo necesita una condición `bool`.
+    - El bucle acabaría por su condición; el `break` es opcional.
+  etiquetas: ["E0308", "while"]
+
+- id: m04-while-cero-vueltas
+  titulo: "El while perezoso"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuántas veces se ejecuta el cuerpo de `let mut i = 10; while i < 5 { i += 1; }`?"
+  opciones: ["0", "5", "1", "Infinitas"]
+  correcta: 0
+  solucion: |
+    `while` comprueba la condición **antes** de cada vuelta, también la primera. `10 < 5` es falso desde el principio: cero vueltas.
+
+    - `5` sería con `i` empezando en 0.
+    - `while` no garantiza «al menos una vez».
+    - No entra, así que no puede repetir sin fin.
+  etiquetas: ["while"]
+
+- id: m04-while-pasos
+  titulo: "Triplicar hasta cien"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m04/p-while-pasos
+  opciones: ["`243 5`", "`81 4`", "`100 5`", "`729 6`"]
+  correcta: 0
+  solucion: |
+    `n` pasa por 3, 9, 27, 81, 243. Tras la cuarta vuelta `n` = 81 < 100, así que se da una quinta: 243. Ahora `243 < 100` es falso y sale. Resultado: **243 5**.
+
+    - `81 4` olvida que 81 aún cumple la condición.
+    - `100` no es potencia de 3: `n` nunca vale 100.
+    - `729 6` daría una vuelta de más.
+  etiquetas: ["while"]
+
+- id: m04-rangos-vueltas
+  titulo: "Contar vueltas"
+  mundo: 04-expresiones-y-control
+  tema: rangos
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuántas vueltas da `for i in 2..=7 { }`? Escribe solo el número."
+  respuestas: ["6"]
+  solucion: |
+    `2..=7` incluye los dos extremos: 2, 3, 4, 5, 6, 7 → **6** vueltas. Con `2..7` (sin `=`) serían 5. En general, `a..b` da `b − a` vueltas y `a..=b` da `b − a + 1`.
+  etiquetas: ["rangos"]
+
+- id: m04-rango-inverso
+  titulo: "El rango al revés"
+  mundo: 04-expresiones-y-control
+  tema: rangos
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m04/p-rango-inverso
+  opciones:
+    - "`vueltas = 4` y `4 3 2 1`"
+    - "`vueltas = 0` y `4 3 2 1`"
+    - "`vueltas = 0` y `5 4 3 2 1`"
+    - "`vueltas = 4` y `5 4 3 2`"
+  correcta: 1
+  solucion: |
+    `5..1` empieza en 5 y termina **antes** de 1: está **vacío**, no cuenta hacia atrás. Para ir al revés se usa `.rev()`: `(1..5).rev()` recorre 4, 3, 2, 1 (el 5 sigue excluido).
+
+    - Un rango con inicio mayor que el final no da vueltas.
+    - `(1..5)` no incluye el 5, ni siquiera al revés.
+  etiquetas: ["rangos", "rev"]
+
+- id: m04-for-numero
+  titulo: "Recorrer un número"
+  mundo: 04-expresiones-y-control
+  tema: rangos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-for-numero
+  opciones:
+    - "Porque `for` necesita algo que se pueda recorrer, y un número suelto no lo es"
+    - "Porque `i` no se usa"
+    - "Porque 10 es demasiado grande"
+    - "Porque falta `mut i`"
+  correcta: 0
+  solucion: |
+    Error **E0277**: «`{integer}` is not an iterator». `for` recorre **iteradores**: rangos, arrays, textos con `.chars()`... La nota sugiere lo que querías: un rango, `0..10` o `0..=10`.
+
+    - `i` sí se usa (se imprime).
+    - El tamaño no importa.
+    - La variable del `for` no necesita `mut`.
+  etiquetas: ["E0277", "for", "iterador"]
+
+- id: m04-suma-sin-mut
+  titulo: "La suma que no cambia"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-suma-sin-mut
+  opciones:
+    - "Porque `suma` no es `mut` y el bucle intenta cambiarla"
+    - "Porque `1..=3` está mal escrito"
+    - "Porque `i` no es `mut`"
+    - "Porque no se puede sumar dentro de un `for`"
+  correcta: 0
+  solucion: |
+    Error **E0384**: «cannot assign twice to immutable variable `suma`», con la pista «consider making this binding mutable»: `let mut suma = 0;`.
+
+    - `1..=3` es correcto.
+    - `i` no se modifica, solo se lee.
+    - Sumar en un bucle es lo más normal; solo hace falta `mut`.
+  etiquetas: ["E0384", "mut"]
+
+- id: m04-indice-fuera
+  titulo: "Una vuelta de más"
+  mundo: 04-expresiones-y-control
+  tema: rangos
+  dificultad: media
+  tipo: opcion
+  enunciado: "Recorres `let notas = [7, 9, 4, 10];` con `for i in 0..=notas.len() { println!(\"{}\", notas[i]); }`. ¿Qué pasa?"
+  opciones:
+    - "Imprime las 4 notas"
+    - "Imprime las 4 notas y luego entra en pánico: «index out of bounds: the len is 4 but the index is 4»"
+    - "No compila"
+    - "Imprime las 4 notas y un 0"
+  correcta: 1
+  solucion: |
+    `0..=4` incluye el 4, pero las posiciones válidas son 0 a 3. En la quinta vuelta, Rust comprueba el índice y **entra en pánico** en lugar de leer memoria ajena (que sería comportamiento indefinido).
+
+    - Imprime las 4, pero el programa no acaba bien.
+    - El índice depende de un valor de ejecución, así que el compilador no lo rechaza.
+    - Rust nunca se inventa un 0 detrás del array.
+
+    Arreglo: `0..notas.len()` o, mejor, `for nota in notas`.
+  etiquetas: ["pánico", "índices", "rangos"]
+
+- id: m04-chars
+  titulo: "Recorrer la ñ"
+  mundo: 04-expresiones-y-control
+  tema: rangos
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuántas vueltas da `for c in \"año\".chars() { }`?"
+  opciones: ["3", "4", "2", "No compila"]
+  correcta: 0
+  solucion: |
+    `.chars()` recorre **caracteres**: `a`, `ñ`, `o` → 3. El texto ocupa 4 **bytes** (la `ñ` ocupa 2 en UTF-8), así que `.bytes()` daría 4 vueltas y `"año".len()` vale 4.
+  etiquetas: ["chars", "UTF-8"]
+
+- id: m04-etiqueta-continue
+  titulo: "Continuar fuera"
+  mundo: 04-expresiones-y-control
+  tema: etiquetas
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m04/p-etiqueta-continue
+  opciones: ["`8`", "`16`", "`4`", "`12`"]
+  correcta: 0
+  solucion: |
+    Para cada `i` (4 valores), el bucle interior cuenta `j = 0` y `j = 1`; al llegar a `j = 2`, `continue 'a` abandona el bucle interior y pasa al siguiente `i`. 4 × 2 = **8**.
+
+    - `16` sería sin el `continue` (4 × 4).
+    - `4` contaría una sola vez por `i`.
+    - `12` sería con un `continue` sin etiqueta (que solo salta `j = 2`): 4 × 3.
+  etiquetas: ["etiquetas", "continue"]
+
+- id: m04-etiqueta-sin-apostrofo
+  titulo: "La etiqueta sin apóstrofo"
+  mundo: 04-expresiones-y-control
+  tema: etiquetas
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-etiqueta-sin-apostrofo
+  opciones:
+    - "Porque falta el apóstrofo: `break fuera` busca una variable `fuera` y además intenta salir con un valor de un `for`"
+    - "Porque no se puede salir de dos bucles"
+    - "Porque la etiqueta debería ir dentro del bucle"
+    - "Porque `a + b` no puede valer 3"
+  correcta: 0
+  solucion: |
+    Sin apóstrofo, Rust lee `break fuera;` como «sal con el **valor** de la variable `fuera`». Dos errores: **E0425** («cannot find value `fuera` in this scope», con la pista «use the similarly named label: `'fuera`») y **E0571** («`break` with value from a `for` loop»).
+
+    - Con `break 'fuera;` sí se sale de los dos bucles.
+    - La etiqueta va antes del bucle, como está.
+    - `a + b` llega a 3 (por ejemplo 1 + 2).
+  etiquetas: ["E0425", "E0571", "etiquetas"]
+
+- id: m04-etiqueta-mal-escrita
+  titulo: "Afuera o fuera"
+  mundo: 04-expresiones-y-control
+  tema: etiquetas
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/etiqueta-inexistente
+  opciones:
+    - "Porque el `break` usa `'afuera` y la etiqueta se llama `'fuera`"
+    - "Porque las etiquetas solo valen en `loop`"
+    - "Porque no hay `println!`"
+    - "Porque `a * b` no puede valer 4"
+  correcta: 0
+  solucion: |
+    Error **E0426**: «use of undeclared label `'afuera`», con la pista «try using similarly named label: `'fuera`». Además avisa de que `'fuera` no se usa.
+
+    - Las etiquetas valen en `loop`, `while`, `for` y bloques.
+    - Un programa no necesita imprimir nada.
+    - 2 × 2 = 4.
+  etiquetas: ["E0426", "etiquetas"]
+
+- id: m04-bloque-break-sin-etiqueta
+  titulo: "Bloque con nombre, break sin él"
+  mundo: 04-expresiones-y-control
+  tema: etiquetas
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-bloque-break-sin-etiqueta
+  opciones:
+    - "Porque dentro de un bloque etiquetado, un `break` que sale de él debe llevar la etiqueta: `break 'b 5`"
+    - "Porque un bloque no puede devolver valor"
+    - "Porque `0` y `5` son de tipos distintos"
+    - "Porque falta un `loop`"
+  correcta: 0
+  solucion: |
+    Error **E0695**: «unlabeled `break` inside of a labeled block», con la explicación «`break` statements that would diverge to or through a labeled block need to bear a label». Para salir de un bloque etiquetado hay que **nombrarlo**; así nunca hay duda de a dónde salta el `break`.
+
+    - Los bloques etiquetados sí devuelven valor (desde Rust 1.65).
+    - `0` y `5` son ambos enteros.
+    - No hace falta `loop`: basta `break 'b 5;`.
+  etiquetas: ["E0695", "bloque etiquetado"]
+
+- id: m04-match-exhaustivo
+  titulo: "El dado de 256 caras"
+  mundo: 04-expresiones-y-control
+  tema: match
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/match-no-exhaustivo
+  opciones:
+    - "Porque `dado` es `u8` (0 a 255) y faltan el 0 y del 7 al 255"
+    - "Porque `2..=5` no es un patrón válido"
+    - "Porque los brazos deben ir ordenados de mayor a menor"
+    - "Porque `match` no puede devolver `&str`"
+  correcta: 0
+  solucion: |
+    Error **E0004**: «non-exhaustive patterns: `0_u8` and `7_u8..=u8::MAX` not covered». Un `match` debe cubrir **todos** los valores del tipo, no solo los que esperas. Arreglo habitual: un brazo `_ => ...` al final.
+
+    - `2..=5` es un patrón de rango correcto.
+    - El orden de los brazos no tiene que ser numérico.
+    - `match` puede devolver cualquier tipo, si todos los brazos coinciden.
+  etiquetas: ["E0004", "match"]
+
+- id: m04-match-bool
+  titulo: "Medio booleano"
+  mundo: 04-expresiones-y-control
+  tema: match
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-match-bool
+  opciones:
+    - "Porque falta el caso `false`"
+    - "Porque no se puede hacer `match` sobre un `bool`"
+    - "Porque `activo` es `true` y el compilador lo sabe"
+    - "Porque `1` no es un `bool`"
+  correcta: 0
+  solucion: |
+    Error **E0004**: «non-exhaustive patterns: `false` not covered». Un `bool` tiene dos valores y hay que cubrir los dos (o usar `_`).
+
+    - `match` sobre `bool` es válido.
+    - El compilador comprueba todos los valores posibles del **tipo**, no el valor actual.
+    - Los brazos devuelven enteros; eso está bien.
+  etiquetas: ["E0004", "match", "bool"]
+
+- id: m04-match-u8-hueco
+  titulo: "Las notas altísimas"
+  mundo: 04-expresiones-y-control
+  tema: match
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-match-u8-hueco
+  opciones:
+    - "Porque faltan los valores de 200 a 255"
+    - "Porque `nota` vale 150 y no está cubierto"
+    - "Porque los rangos `0..=100` y `101..=199` se solapan"
+    - "Porque falta un caso para 100"
+  correcta: 0
+  solucion: |
+    Error **E0004**: «non-exhaustive patterns: `200_u8..=u8::MAX` not covered». El compilador calcula exactamente qué hueco queda: 200..=255.
+
+    - 150 sí está cubierto por `101..=199`.
+    - Los rangos no se solapan: uno acaba en 100 y el otro empieza en 101.
+    - 100 está en `0..=100`.
+  etiquetas: ["E0004", "match", "rangos"]
+
+- id: m04-match-char
+  titulo: "Letras y todo lo demás"
+  mundo: 04-expresiones-y-control
+  tema: match
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-match-char-incompleto
+  opciones:
+    - "Porque un `char` puede ser cualquier carácter Unicode (cifras, signos, `ñ`...) y solo se cubren las letras ASCII"
+    - "Porque los rangos de `char` no existen"
+    - "Porque `'x'` es minúscula y el compilador lo ve"
+    - "Porque hay que poner primero las mayúsculas"
+  correcta: 0
+  solucion: |
+    Error **E0004**: el compilador enumera los huecos (desde el carácter 0 hasta `'@'`, entre `'['` y la comilla invertida, desde `'{'` en adelante... «and 1 more not covered»). Un `char` admite más de un millón de valores Unicode; solo has cubierto 52.
+
+    - Los rangos de `char` como `'a'..='z'` sí existen.
+    - El valor concreto de `c` no cuenta.
+    - El orden no cambia la exhaustividad.
+
+    Fíjate en que la `ñ` tampoco está en `'a'..='z'`: si quieres incluirla, añade un brazo para ella.
+  etiquetas: ["E0004", "match", "char"]
+
+- id: m04-match-brazos
+  titulo: "Brazos de tipos distintos"
+  mundo: 04-expresiones-y-control
+  tema: match
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m04/p-match-brazos-tipos
+  opciones:
+    - "Porque un brazo da `&str` y el otro un entero"
+    - "Porque falta un brazo para el 3"
+    - "Porque `_` debe ir primero"
+    - "Porque `match` no admite números"
+  correcta: 0
+  solucion: |
+    Error **E0308**: «`match` arms have incompatible types» (`expected &str, found integer`). Como en `if`, todos los brazos deben producir el mismo tipo.
+
+    - El 3 lo cubre `_`.
+    - `_` debe ir **al final**; primero haría inalcanzables los demás.
+    - `match` sobre números es lo más normal.
+  etiquetas: ["E0308", "match"]
+
+- id: m04-match-guardas
+  titulo: "Guardas en orden"
+  mundo: 04-expresiones-y-control
+  tema: match
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m04/p-match-orden-guardas
+  opciones:
+    - "`otro par par `"
+    - "`otro par grande `"
+    - "`otro grande grande `"
+    - "`par par par `"
+  correcta: 0
+  solucion: |
+    Los brazos se prueban **en orden**: 3 no es par ni > 5 → `otro`; 6 es par → `par` (el brazo «grande» ni se mira); 10 es par → `par`.
+
+    - `grande` solo saldría para impares mayores que 5.
+    - 3 no es par.
+  etiquetas: ["match", "guardas"]
+
+- id: m04-match-guarda-exhaustiva
+  titulo: "La guarda no cuenta"
+  mundo: 04-expresiones-y-control
+  tema: match
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Por qué `match n { x if x >= 0 => 1, x if x < 0 => -1 }` (con `n: i32`) NO compila, si las dos guardas cubren todos los números?"
+  opciones:
+    - "Porque el compilador no usa las guardas para comprobar la exhaustividad: para él, ambos brazos podrían fallar"
+    - "Porque `x` se declara dos veces"
+    - "Porque `-1` no es un `i32`"
+    - "Sí compila"
+  correcta: 0
+  solucion: |
+    Las guardas son condiciones que se evalúan **al ejecutar**; el compilador no las analiza para demostrar exhaustividad. Da **E0004** («`i32::MIN..=i32::MAX` not covered»). Arreglo: cambiar el último brazo a `_ => -1` (o `x => -1`).
+
+    - Cada brazo tiene su propia `x`: no hay conflicto.
+    - `-1` es un `i32` válido.
+  etiquetas: ["E0004", "guardas"]
+
+- id: m04-elige-bucle
+  titulo: "Elige tu bucle"
+  mundo: 04-expresiones-y-control
+  tema: control
+  dificultad: media
+  tipo: opcion
+  enunciado: "Quieres repetir una pregunta hasta que la respuesta sea válida y quedarte con esa respuesta. ¿Qué construcción encaja mejor?"
+  opciones:
+    - "`loop` con `break respuesta`"
+    - "`for i in 0..10`"
+    - "`while` con `break respuesta`"
+    - "Un `match`"
+  correcta: 0
+  solucion: |
+    No sabes cuántas vueltas harán falta y quieres que el bucle **entregue** un valor: `loop` + `break valor`.
+
+    - `for` con rango fijo da un número fijo de vueltas.
+    - `while` no admite `break` con valor (E0571).
+    - `match` elige entre casos, no repite.
+  etiquetas: ["loop", "diseño"]
+
+- id: m04-division-negativa
+  titulo: "Dividir negativos"
+  mundo: 04-expresiones-y-control
+  tema: operadores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprimen las tres últimas líneas?"
+  ej: m04/operadores-predice
+  opciones: ["`-3`, `-1` y `-4`", "`-4`, `2` y `4`", "`-3`, `2` y `-4`", "`-4`, `-1` y `4`"]
+  correcta: 0
+  solucion: |
+    La división entera trunca hacia cero (−3,5 → −3); el resto tiene el signo del dividendo (−7 = 2·(−3) − 1); y en `-2i32.pow(2)` el método va antes que el signo menos: −(2²) = −4. Para el resto siempre positivo, `rem_euclid`.
+  etiquetas: ["operadores", "precedencia"]
+
+- id: m04-cortocircuito
+  titulo: "La derecha que no se evalúa"
+  mundo: 04-expresiones-y-control
+  tema: operadores
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿En cuál de estas expresiones NO se llama a `es_par(4)`?"
+  opciones: ["`false && es_par(4)`", "`true && es_par(4)`", "`false || es_par(4)`", "`es_par(4) || true`"]
+  correcta: 0
+  solucion: |
+    Con `&&`, si la izquierda es `false` el resultado ya es `false` y la derecha no se evalúa (cortocircuito). En las otras, la llamada sí ocurre.
+  etiquetas: ["cortocircuito", "&&"]
+
+- id: m04-comparar-encadenado
+  titulo: "Entre 12 y 18"
+  mundo: 04-expresiones-y-control
+  tema: operadores
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Cómo se arregla?"
+  ej: m04/comparar-encadenado
+  opciones: ["`12 < edad && edad < 18`", "`12 < (edad < 18)`", "`(12 < edad) < 18`", "No tiene arreglo"]
+  correcta: 0
+  solucion: |
+    En Rust las comparaciones no se encadenan («comparison operators cannot be chained»). También vale `(13..18).contains(&edad)`.
+  etiquetas: ["comparación"]
+
+- id: m04-maximo-inicial
+  titulo: "¿Con qué empieza el máximo?"
+  mundo: 04-expresiones-y-control
+  tema: bucles
+  dificultad: media
+  tipo: opcion
+  enunciado: "Buscas la temperatura más alta de `[-5, -2, -8]` con un bucle. ¿Con qué valor inicializas `maxima`?"
+  opciones: ["Con el primer elemento, `-5` (o `i32::MIN`)", "Con `0`", "Con `-1`", "Da igual"]
+  correcta: 0
+  solucion: |
+    Si empiezas en 0, el resultado sería 0, que ni siquiera está en la lista. Empieza con el primer elemento o con el menor valor posible.
+  etiquetas: ["bucles", "patrones"]

@@ -1,0 +1,165 @@
+---
+title: "Documentar con rustdoc"
+description: "Convierte tus comentarios en una web de documentación con buscador, enlaces y ejemplos que funcionan."
+sidebar:
+  order: 6
+duracion: 11
+desde: "1.0"
+requiere: ["16-pruebas-y-herramientas/05-doctests"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre `///` y `//!`?"
+    r: "`///` documenta el elemento que viene **después** (una función, un struct…). `//!` documenta el elemento que lo **contiene**: al principio de `lib.rs`, el crate entero; al principio de un módulo, ese módulo."
+  - p: "¿Qué secciones de costumbre lleva la documentación de una función en Rust?"
+    r: "`# Ejemplos` (*Examples*), `# Errores` (*Errors*, si devuelve `Result`), `# Pánicos` (*Panics*, si puede entrar en pánico) y `# Safety` (si es `unsafe fn`: qué debe garantizar quien la llama)."
+  - p: "¿Cómo enlazas a otra función desde la documentación?"
+    r: "Con su nombre entre corchetes y acentos graves: [`a_celsius`]. rustdoc resuelve el nombre como lo haría el compilador y avisa si no existe (`broken_intra_doc_links`)."
+  - p: "¿Qué hace `#![warn(missing_docs)]`?"
+    r: "Activa un aviso por cada elemento **público** sin documentación. Así no se te olvida documentar nada de tu API."
+---
+
+import { Ejecutar, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Has visto que los ejemplos de la documentación son pruebas. Ahora vas a escribir documentación completa y a generar con un comando una web como la de la biblioteca estándar.
+
+## Predice
+
+<Pregunta
+  pregunta="Escribes `//! Utilidades para notas.` en la primera línea de `src/lib.rs`. ¿Qué documenta?"
+  opciones={["La primera función del archivo", "El crate entero: aparece en la portada de su documentación", "Nada: `//!` es un comentario normal", "El archivo `main.rs`"]}
+  correcta={1}
+  explicacion="`//!` documenta el elemento que **contiene** al comentario. En la raíz de `lib.rs`, ese elemento es el crate. `///` documentaría lo que viene a continuación."
+  porque={["Eso lo haría `///` encima de la función.", "Correcto.", "Es un comentario de documentación interno, no uno normal.", "Cada archivo raíz documenta su propio crate."]}
+/>
+
+## La idea
+
+rustdoc lee tus comentarios de documentación y genera **HTML**: una página por elemento público, con buscador, enlaces entre tipos y el código fuente. Lo lanzas con `cargo doc` (y `cargo doc --open` para abrirla en el navegador). La documentación de la biblioteca estándar, la de cualquier crate en docs.rs y la tuya salen de la misma herramienta.
+
+Hay dos tipos de comentario. `///` documenta lo que viene **detrás**. `//!` documenta lo que lo **contiene** (el crate o el módulo). Dentro escribes Markdown, y la comunidad sigue unas **secciones de costumbre** que cualquiera que use Rust sabe leer:
+
+| Sección | Cuándo |
+|---|---|
+| `# Ejemplos` | casi siempre: un doctest con el uso típico |
+| `# Errores` | si devuelve `Result`: qué casos dan `Err` |
+| `# Pánicos` | si puede entrar en pánico: en qué casos |
+| `# Safety` | si es `unsafe fn`: lo que debe garantizar quien la llama (mundo 20) |
+
+La primera frase es la más importante: rustdoc la usa como **resumen** en las listas. Que sea corta y diga qué hace.
+
+## Pruébalo
+
+Un pequeño conversor documentado como una biblioteca de verdad. El `main` ejecuta a mano lo que prometen sus ejemplos y su sección de errores:
+
+<Ejecutar ej="m16/documentado" />
+
+Mira el comentario de `a_celsius`: ``[`a_fahrenheit`]`` es un **enlace interno** (*intra-doc link*). rustdoc busca ese nombre igual que lo haría el compilador y lo convierte en un enlace a su página.
+
+Así responde `cargo doc` cuando algo va mal. Este es un proyecto con `#![warn(missing_docs)]`, una función sin documentar y un enlace a una función que no existe (salida real, con la ruta acortada):
+
+```text title="cargo doc --no-deps (salida real)"
+ Documenting docs1 v0.1.0 (…)
+warning: missing documentation for a function
+ --> src\lib.rs:9:1
+  |
+9 | pub fn a_celsius(f: f64) -> f64 {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+note: the lint level is defined here
+ --> src\lib.rs:1:9
+  |
+1 | #![warn(missing_docs)]
+  |         ^^^^^^^^^^^^
+
+warning: unresolved link to `a_kelvin`
+ --> src\lib.rs:4:70
+  |
+4 | /// Pasa grados Celsius a Fahrenheit. Mira también [`a_celsius`] y [`a_kelvin`].
+  |                                                                      ^^^^^^^^ no item named `a_kelvin` in scope
+  |
+  = help: to escape `[` and `]` characters, add '\' before them like `\[` or `\]`
+  = note: `#[warn(rustdoc::broken_intra_doc_links)]` on by default
+
+warning: `docs1` (lib doc) generated 2 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.48s
+   Generated …\target\doc\docs1\index.html
+```
+
+El primer aviso lo da el compilador (`missing_docs`): solo se queja de lo **público**, que es lo que verán los demás. El segundo, rustdoc: el enlace a `a_kelvin` no lleva a ninguna parte. `cargo doc` no necesita el enlazador, así que funciona aunque no tengas las Build Tools.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un comentario de documentación es **azúcar sintáctico** de un atributo: `/// Hola` equivale a `#[doc = " Hola"]` (fíjate en el espacio inicial, que se conserva), y `//! Hola` a `#![doc = " Hola"]`. Lo puedes comprobar: este archivo, con `#![warn(missing_docs)]`, solo avisa por `b`, porque `a_f` está documentada con el atributo escrito a mano:
+
+```rust
+#![warn(missing_docs)]
+#![doc = " Conversión."]
+
+#[doc = " Pasa grados."]
+pub fn a_f(c: f64) -> f64 { c }
+pub fn b(c: f64) -> f64 { c }
+```
+
+Por eso la documentación viaja con el código: forma parte del árbol que lee el compilador, igual que `#[derive]` o `#[test]`. rustdoc usa la misma parte inicial del compilador (lectura, expansión de macros, resolución de nombres y tipos), pero en vez de generar código máquina escribe HTML.
+
+Lo que deja en `target/doc/` (real, del proyecto anterior): una carpeta por crate (`docs1/` con `index.html`, `fn.a_fahrenheit.html`, `fn.a_celsius.html`, `all.html`), un índice de búsqueda (`search.index`) que el buscador consulta en tu navegador sin servidor, y una copia del código fuente (`src/`) para el botón «Source». Cada página de función se llama `fn.<nombre>.html`; las de structs, `struct.<nombre>.html`.
+
+Opciones útiles: `cargo doc --no-deps` documenta solo tu crate (sin tus dependencias), y `cargo doc --document-private-items` incluye también lo privado, útil para el equipo que mantiene el código.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Documentar el cómo en vez del qué">
+
+❌ Repite el código con palabras. Quien usa tu función no necesita saber cómo está hecha por dentro:
+
+```rust
+/// Recorre la lista con un iterador, suma todo con sum()
+/// y divide entre len() convertido a f64.
+pub fn media(notas: &[f64]) -> Option<f64> { /* … */ }
+```
+
+✅ Dice **qué** hace, **cuándo falla** y **cómo se usa**:
+
+````rust
+/// Calcula la media de una lista de notas.
+///
+/// Devuelve `None` si la lista está vacía.
+///
+/// # Ejemplos
+///
+/// ```
+/// assert_eq!(notas::media(&[6.0, 8.0]), Some(7.0));
+/// ```
+pub fn media(notas: &[f64]) -> Option<f64> { /* … */ }
+````
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["//! Herramientas para trabajar con fechas.", "/// Dice si `año` es bisiesto.", "///", "/// # Ejemplos", "///", "/// ```", "/// assert!(fechas::es_bisiesto(2024));", "/// ```", "pub fn es_bisiesto(año: u32) -> bool {"]}
+  distractores={["/// Herramientas para trabajar con fechas.", "/// # Safety"]}
+  explicacion="La descripción del crate va con `//!` al principio del archivo. La de la función, con `///` justo encima: resumen de una frase, sección `# Ejemplos` y un doctest. `# Safety` solo se usa en funciones `unsafe`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tu función devuelve `Result<u8, String>` y puede entrar en pánico si recibe un slice vacío. ¿Qué secciones debería tener su documentación?"
+  opciones={["Solo `# Ejemplos`", "`# Ejemplos`, `# Errores` y `# Pánicos`", "`# Safety`", "Ninguna: el tipo `Result` ya lo explica todo"]}
+  correcta={1}
+  explicacion="`# Errores` explica qué casos dan `Err`; `# Pánicos`, cuándo entra en pánico. Las dos cosas son parte del contrato de la función y el tipo no las cuenta."
+  porque={["Faltaría explicar los fallos.", "Correcto.", "`# Safety` es para funciones `unsafe`.", "El tipo dice que puede fallar, no cuándo ni por qué."]}
+/>
+
+<Pregunta
+  pregunta="¿Sobre qué elementos avisa `#![warn(missing_docs)]`?"
+  opciones={["Sobre todas las funciones, también las privadas", "Sobre los elementos públicos sin documentación", "Sobre las funciones sin doctests", "Sobre los comentarios `//` normales"]}
+  correcta={1}
+  explicacion="La documentación es para quien **usa** tu crate, así que el aviso se limita a lo que ese usuario puede ver: lo público."
+  porque={["Lo privado no se avisa.", "Correcto.", "No exige ejemplos, solo documentación.", "Los comentarios normales no cuentan como documentación."]}
+/>

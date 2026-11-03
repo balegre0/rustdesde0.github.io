@@ -1,0 +1,140 @@
+---
+title: "Rc<T>"
+description: "Varios dueños de un mismo valor en un hilo: clonar el Rc suma 1 al contador."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "alloc"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::rc::Rc`
+
+## Sinopsis
+
+```rust
+pub struct Rc<T, A = Global>
+where
+    A: Allocator,
+    T: ?Sized,
+{ /* private fields */ }
+```
+
+## Qué hace
+
+`Rc::new(valor)` pone el valor en el montón junto a dos contadores (fuertes y débiles). `Rc::clone(&a)` **no copia el valor**: crea otro puntero al mismo sitio y suma 1. Cada `Rc` que se destruye resta 1; al llegar a 0, el valor se destruye. Escribe `Rc::clone(&a)` en vez de `a.clone()` para que se vea que es barato.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`new`](#new) | Crea el primer `Rc` de un valor. | 1.0 |
+| [`clone`](#clone) | Otro dueño del mismo valor (suma 1). | 1.0 |
+| [`strong_count`](#strong_count) | Cuántos `Rc` (dueños) hay. | 1.15 |
+| [`weak_count`](#weak_count) | Cuántos `Weak` hay. | 1.15 |
+| [`downgrade`](#downgrade) | Crea un `Weak` que apunta al mismo valor. | 1.4 |
+| [`ptr_eq`](#ptr_eq) | ¿Apuntan los dos `Rc` al mismo valor?. | 1.17 |
+| [`try_unwrap`](#try_unwrap) | Si es el único dueño, devuelve el valor; si no, devuelve el `Rc` como error. | 1.4 |
+| [`get_mut`](#get_mut) | Si es el único dueño, da `&mut T`; si no, `None`. | 1.4 |
+| [`make_mut`](#make_mut) | Da `&mut T`; si hay más dueños, primero clona el valor (copia al escribir). | 1.4 |
+
+### `new`
+
+```rust
+pub fn new(value: T) -> Rc<T>
+```
+
+Crea el primer `Rc` de un valor.
+
+### `clone`
+
+```rust
+fn clone(&self) -> Rc<T, A>
+```
+
+Otro dueño del mismo valor (suma 1).
+
+### `strong_count`
+
+```rust
+pub fn strong_count(this: &Rc<T, A>) -> usize
+```
+
+Cuántos `Rc` (dueños) hay.
+
+### `weak_count`
+
+```rust
+pub fn weak_count(this: &Rc<T, A>) -> usize
+```
+
+Cuántos `Weak` hay.
+
+### `downgrade`
+
+```rust
+pub fn downgrade(this: &Rc<T, A>) -> Weak<T, A>
+where
+    A: AllocatorClone,
+```
+
+Crea un `Weak` que apunta al mismo valor.
+
+### `ptr_eq`
+
+```rust
+pub fn ptr_eq(this: &Rc<T, A>, other: &Rc<T, A>) -> bool
+```
+
+¿Apuntan los dos `Rc` al mismo valor?
+
+### `try_unwrap`
+
+```rust
+pub fn try_unwrap(this: Rc<T, A>) -> Result<T, Rc<T, A>>
+```
+
+Si es el único dueño, devuelve el valor; si no, devuelve el `Rc` como error.
+
+### `get_mut`
+
+```rust
+pub fn get_mut(this: &mut Rc<T, A>) -> Option<&mut T>
+```
+
+Si es el único dueño, da `&mut T`; si no, `None`.
+
+### `make_mut`
+
+```rust
+pub fn make_mut(this: &mut Rc<T, A>) -> &mut T
+```
+
+Da `&mut T`; si hay más dueños, primero clona el valor (copia al escribir).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/rc-basico" />
+
+**Salida:**
+
+```text
+dueños: 1
+dueños: 3 (compartido)
+dueños: 2
+true
+compartido
+```
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `strong_count` (1.15), `weak_count` (1.15), `downgrade` (1.4), `ptr_eq` (1.17), `try_unwrap` (1.4), `get_mut` (1.4), `make_mut` (1.4).
+
+## Ver también
+
+- [Weak](/ref/std/rc/weak/)
+- [Arc](/ref/std/sync/arc/)
+- [RefCell](/ref/std/cell/refcell/)
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

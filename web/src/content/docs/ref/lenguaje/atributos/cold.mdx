@@ -1,0 +1,49 @@
+---
+title: "#[cold]"
+description: "Marca una función que casi nunca se llama, para que el optimizador la aparte del camino caliente y optimice mejor el caso habitual."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "Generación de código"]
+---
+import { Ejecutar } from '~/components';
+
+`#[cold]` le dice al compilador: «esta función se llama muy pocas veces».
+
+## Sinopsis
+
+```text
+#[cold]
+fn manejar_error_raro(…) { … }
+```
+
+## Qué hace
+
+El optimizador usa la pista para:
+
+- suponer que las ramas que llevan a la función **casi nunca** se toman, y colocar el código del caso normal seguido, sin saltos;
+- no expandir la función en línea (no merece la pena para código frío);
+- optimizarla más por tamaño que por velocidad.
+
+Es la forma estable de marcar la «rama improbable» de un `if`: pon el trabajo raro (errores, casos límite) en una función `#[cold]`. La biblioteca estándar lo hace en sus funciones de pánico y en los caminos de error de `Vec` y `HashMap`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-cold" />
+
+`error_raro` es `#[cold]`, `#[inline(never)]` y devuelve `!`: el optimizador sabe que el `if b == 0` es improbable y deja el camino de la división limpio.
+
+## Bajo el capó
+
+Se traduce al atributo `cold` de LLVM. Las llamadas a funciones `cold` hacen que el bloque que las contiene se considere de baja probabilidad, lo que afecta a cómo se ordenan los bloques del código generado. Las funciones que devuelven `!` (como `panic!`) ya reciben un trato parecido.
+
+## Errores típicos
+
+- Marcar como `#[cold]` algo que en realidad se llama a menudo: el optimizador tomará malas decisiones para el caso habitual.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[`#[inline]`](/ref/lenguaje/atributos/inline/) · [`!` (never)](/ref/lenguaje/tipos/)

@@ -1,0 +1,53 @@
+---
+title: "panic!"
+description: "Detiene el hilo actual con un mensaje: para errores que indican un fallo del programa, no del entorno."
+sidebar:
+  order: 5
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::panic`
+
+## Sinopsis
+
+```rust
+macro_rules! panic {
+    ($($arg:tt)*) => { ... };
+}
+```
+
+## Qué hace
+
+`panic!` **entra en pánico**: muestra el mensaje y la ubicación, deshace la pila del hilo ejecutando los destructores (*unwinding*) y termina el hilo. Si es el hilo principal, termina el programa con un código de error. Úsalo para situaciones que **no deberían pasar nunca** si el programa es correcto; para errores esperables (un archivo que no existe), devuelve `Result`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-panic" />
+
+**Salida:**
+
+```text
+5
+```
+
+**Salida de error** (*stderr*):
+
+```text
+thread 'main' (1) panicked at macros-panic.rs:3:9:
+división por cero: 1 / 0
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [Result](/ref/std/result/result/)
+- [todo! y unreachable!](/ref/std/macros/todo/)
+- [process::exit](/ref/std/process/exit/)
+
+## Aprende esto en
+
+- [Mundo 10 · Errores](/curso/10-errores/)

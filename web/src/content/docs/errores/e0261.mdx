@@ -1,0 +1,75 @@
+---
+title: "E0261: tiempo de vida no declarado"
+description: "Usas un nombre de tiempo de vida como 'a sin declararlo antes."
+sidebar:
+  order: 21
+insignias: ["Tiempos de vida"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` use of undeclared lifetime name `'a` ``
+
+## Qué significa
+
+Los tiempos de vida con nombre son **parámetros genéricos**, igual que `T`: hay que declararlos antes de usarlos, en `struct Vista<'a>`, `fn f<'a>(...)` o `impl<'a> ...`. Usar `'a` sin declararlo es como usar una variable que no existe.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0261" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0261]: use of undeclared lifetime name `'a`
+ --> E0261.rs:2:13
+  |
+2 |     texto: &'a str,
+  |             ^^ undeclared lifetime
+  |
+help: consider introducing lifetime `'a` here
+  |
+1 | struct Vista<'a> {
+  |             ++++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Copiar un campo `&'a str` a un struct sin añadir `<'a>` tras el nombre.
+- Escribir `impl Vista<'a>` en lugar de `impl<'a> Vista<'a>`.
+
+## Cómo arreglarlo
+
+Declara el tiempo de vida: `struct Vista<'a> { texto: &'a str }`. En los `impl`, decláralo tras `impl`: `impl<'a> Vista<'a> { ... }`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+struct Vista<'a> {
+    texto: &'a str,
+}
+
+fn main() {
+    let v = Vista { texto: "hola" };
+    println!("{}", v.texto);
+}
+```
+
+**Salida:**
+
+```text
+hola
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0261` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0106](/errores/e0106/): falta un especificador de tiempo de vida
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/)

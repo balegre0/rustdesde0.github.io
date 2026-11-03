@@ -1,0 +1,1 @@
+{ "plataforma": "playground", "nota": "Ejecútalo en el Playground con Tools → Miri: Miri lo señala como UB. Sin Miri, el programa puede parecer correcto." }

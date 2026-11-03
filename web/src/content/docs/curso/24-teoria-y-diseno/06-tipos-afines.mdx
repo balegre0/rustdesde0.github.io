@@ -1,0 +1,70 @@
+---
+title: "Tipos afines: el ownership como lógica"
+description: "El ownership de Rust es un sistema de tipos afín: cada valor se usa como mucho una vez. Viene de la lógica lineal de Girard y explica por qué mem::forget es seguro."
+sidebar:
+  order: 6
+duracion: 12
+requiere: ["24-teoria-y-diseno/05-clases-de-tipos"]
+tarjetas:
+  - p: "¿Qué es un sistema de tipos lineal? ¿Y uno afín?"
+    r: "Lineal: cada valor se usa exactamente una vez. Afín: como mucho una vez (se puede descartar sin usar). Rust es afín."
+  - p: "¿Qué papel tiene `Copy` en esta teoría?"
+    r: "Marca los tipos «sin restricciones»: se pueden usar tantas veces como quieras, porque copiarlos no duplica ningún recurso."
+  - p: "¿Por qué `std::mem::forget` es una función segura?"
+    r: "Porque Rust es afín, no lineal: no garantiza que los destructores se ejecuten. Olvidar un valor puede perder memoria, pero no crear un uso tras liberar."
+  - p: "¿De dónde viene la lógica lineal?"
+    r: "De Jean-Yves Girard (1987): una lógica en la que las hipótesis son recursos que se consumen al usarse."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Historia } from '~/components';
+
+En el mundo 06 aprendiste las reglas del ownership como reglas de memoria. Aquí vas a ver que son, además, una **lógica**: una forma precisa de razonar sobre recursos.
+
+## La idea
+
+En la lógica clásica, una hipótesis se puede usar tantas veces como quieras. En 1987, Jean-Yves Girard propuso la **lógica lineal**, donde las hipótesis son **recursos**: usar una la **consume**. «Si tengo un euro, puedo comprar un café» no te deja comprar dos cafés con el mismo euro.
+
+Llevada a los tipos, da lugar a los **sistemas subestructurales**:
+
+| Sistema | Cada valor se usa… | En Rust |
+|---|---|---|
+| sin restricciones | cualquier número de veces | tipos `Copy` |
+| **afín** | **como mucho** una vez | los demás tipos (mover consume) |
+| lineal | **exactamente** una vez | no existe en Rust |
+| relevante | al menos una vez | parecido: `#[must_use]` (solo un aviso) |
+
+Rust es **afín**: mover un `String` lo consume (no se puede usar otra vez: E0382), pero puedes dejarlo sin usar y el compilador inserta su `drop`.
+
+## Pruébalo
+
+<Ejecutar ej="m24/afin" />
+
+`b2` se descarta sin usar y `b3` se **olvida**: no se ejecuta su destructor y nadie protesta. Eso sería imposible en un sistema lineal.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué Rust no es lineal: la «leakpocalypse» de 2015.** Antes de Rust 1.0, había una API (`thread::scoped`) cuya seguridad dependía de que un destructor se ejecutara **siempre**. Se descubrió que, combinando `Rc` y ciclos de referencias, se podía evitar el destructor en Rust seguro, y la API resultó insegura. El equipo decidió que **no ejecutar un destructor es seguro**, convirtió `mem::forget` en una función segura y rediseñó la API (hoy es `thread::scope`, mundo 17). Consecuencia: el código `unsafe` nunca puede depender de que un `drop` se ejecute para mantener la seguridad.
+
+**Tipos lineales de verdad, ¿algún día?** Hay propuestas para añadir tipos que **deben** consumirse (por ejemplo, para garantizar que una transacción se confirma o se cancela), a veces llamadas `!Leak` o *must-move types*. Son difíciles de encajar con lo que ya existe (`panic!`, `mem::forget`, `Rc`), y siguen en discusión.
+
+**`Copy` como estructura.** En lógica lineal, el operador «!» (*bang*, «de esto puedes tener cuantos quieras») marca las hipótesis que no se gastan. `Copy` es su equivalente en Rust, y por eso un tipo con `Drop` no puede ser `Copy`: un recurso que hay que liberar no puede duplicarse gratis.
+
+</BajoElCapo>
+
+<Historia titulo="Antepasados del ownership">
+
+Antes de Rust hubo muchos intentos de llevar estas ideas a lenguajes prácticos: los *uniqueness types* de Clean (1993), los tipos de propiedad para objetos (Clarke, Potter y Noble, 1998), Cyclone (2002), Vault, Singularity y Mezzo. Rust no inventó la teoría: su aportación fue combinarla de forma usable, con préstamos que vuelven, inferencia de lifetimes y un compilador industrial.
+
+</Historia>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué se dice que Rust es afín y no lineal?"
+  opciones={["Porque los valores se pueden copiar siempre", "Porque un valor puede usarse como mucho una vez, pero también puede descartarse sin usarlo", "Porque los valores deben usarse exactamente una vez", "Porque no tiene destructores"]}
+  correcta={1}
+  explicacion="Lineal exigiría usar cada valor exactamente una vez. Rust permite no usarlo (el compilador lo libera, o lo olvidas con `mem::forget`)."
+  porque={["Solo los tipos `Copy`.", "", "Eso sería lineal.", "Sí los tiene: `Drop`."]}
+/>

@@ -1,0 +1,162 @@
+---
+title: "Hilos y join"
+description: "Lanzar trabajo en otro hilo con thread::spawn, recoger su resultado con join y entender qué pasa si main termina antes."
+sidebar:
+  order: 1
+duracion: 11
+desde: "1.0"
+requiere: ["14-closures-e-iteradores/01-closures"]
+tarjetas:
+  - p: "¿Qué devuelve thread::spawn?"
+    r: "Un JoinHandle<T>: una manija para esperar al hilo con join() y recoger el valor T que devuelve su closure."
+  - p: "¿Qué pasa con los demás hilos cuando main termina?"
+    r: "El proceso entero acaba y los hilos que sigan vivos se cortan, hayan terminado o no."
+  - p: "¿Qué devuelve join() si el hilo entró en pánico?"
+    r: "Err(...) con el mensaje del pánico. El pánico de un hilo no tumba a main por sí solo."
+  - p: "¿Por qué el orden de los println! de varios hilos cambia entre ejecuciones?"
+    r: "Porque el sistema operativo decide cuándo corre cada hilo (planificación); sin sincronización no hay orden garantizado."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a lanzar tu primer hilo, esperar a que termine y recoger lo que calcula.
+
+## Predice
+
+Este ejemplo se ejecuta **en tu navegador** (no en el Playground). Antes de pulsar ▶, piensa qué pasará.
+
+<Predice
+  ej="m17/hilo-en-wasm"
+  opciones={[
+    "Imprime las tres líneas en orden",
+    "Imprime «Antes de crear el hilo» y después entra en pánico porque no se puede crear el hilo",
+    "No compila: falta move",
+    "Se queda colgado para siempre"
+  ]}
+  correcta={1}
+  explicacion="El navegador ejecuta WebAssembly sin hilos del sistema operativo. `thread::spawn` intenta pedir un hilo, el sistema responde «no soportado» (`kind: Unsupported`) y spawn entra en pánico con «failed to spawn thread». Por eso, en este mundo, los ejemplos con hilos se ejecutan en el Rust Playground."
+  porque={[
+    "Eso es lo que pasaría en tu ordenador o en el Playground, no en el navegador.",
+    "Correcto: lo primero se imprime, y spawn falla después.",
+    "El closure no usa ninguna variable de fuera, así que no necesita move.",
+    "No llega a esperar nada: el pánico ocurre al intentar crear el hilo."
+  ]}
+/>
+
+## La idea
+
+Un **hilo** (*thread*) es una línea de ejecución independiente dentro de tu programa. Todo programa empieza con uno, el hilo principal, que ejecuta `main`. Con `std::thread::spawn` le pides al sistema operativo **otro** hilo y le das un closure: ese closure es lo que el nuevo hilo ejecutará. Los dos hilos corren a la vez, en núcleos distintos si los hay.
+
+`spawn` te devuelve una **manija** (`JoinHandle<T>`). Con ella puedes **esperar** al hilo: `h.join()` bloquea el hilo actual hasta que el otro termina y te entrega lo que devolvió su closure. La `T` de `JoinHandle<T>` es precisamente el tipo de ese valor.
+
+Lo que no puedes saber es **en qué orden** avanzan los hilos. Lo decide el planificador del sistema operativo, que reparte el tiempo de CPU como quiere. Dos ejecuciones del mismo programa pueden intercalar los `println!` de forma distinta. Lo único seguro es lo que tú ordenas con `join` (o con las herramientas de las próximas lecciones).
+
+## Pruébalo
+
+<Ejecutar ej="m17/hola-hilos" />
+
+1. El bucle lanza tres hilos y guarda sus manijas en un `Vec`.
+2. Cada hilo imprime una línea y **devuelve** `id * 100`.
+3. `join()` espera a cada uno; `unwrap()` saca el valor del `Ok`. Por eso `total = 600` sale siempre al final, aunque las líneas «trabajando» cambien de orden entre ejecuciones.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Un hilo del sistema operativo.** `thread::spawn` llama al sistema (en Windows, `CreateThread`; en Linux, `pthread_create` a través de la biblioteca del sistema). El hilo nuevo recibe su **propia pila**: sus variables locales no se mezclan con las de `main`. El heap, en cambio, es **uno solo para todo el proceso**: si dos hilos tienen un puntero al mismo dato del heap, están mirando los mismos bytes. De ahí vienen todos los peligros de la concurrencia, y todas las reglas de este mundo.
+
+**El tamaño de la pila.** La documentación de `std::thread` indica que los hilos creados con `spawn` tienen 2 MiB de pila por defecto (configurable con `thread::Builder::new().stack_size(...)` o la variable de entorno `RUST_MIN_STACK`). El hilo principal lo crea el sistema operativo con su propio tamaño.
+
+**La firma.** Así está escrita `spawn` en la biblioteca estándar de Rust 1.99.1:
+
+```rust
+pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+where
+    F: FnOnce() -> T,
+    F: Send + 'static,
+    T: Send + 'static,
+{
+    Builder::new().spawn(f).expect("failed to spawn thread")
+}
+```
+
+Ese `expect` es el origen del mensaje que viste en el navegador: «failed to spawn thread». Si necesitas reaccionar al error en vez de entrar en pánico, usa `thread::Builder::new().spawn(f)`, que devuelve un `io::Result`.
+
+- `FnOnce() -> T`: el closure se ejecuta una vez y devuelve un `T`.
+- `Send`: el closure (y lo que lleva dentro) puede **moverse** a otro hilo. Lo verás en la lección 4.
+- `'static`: el closure no puede llevar préstamos de variables locales, porque el hilo podría vivir más que ellas. Lo verás en la lección 2.
+
+**Pánicos.** Si el closure entra en pánico, el pánico desenrolla **solo ese hilo**. `join()` devuelve entonces `Err` con el contenido del pánico (un `Box<dyn Any + Send>`), y tú decides qué hacer:
+
+<Ejecutar ej="m17/join-panico" />
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Olvidar join: main no espera a nadie">
+
+❌ Lanzar un hilo y dejar que `main` termine. Cuando `main` acaba, **el proceso entero termina** y los demás hilos se cortan donde estén:
+
+<Ejecutar ej="m17/sin-join" />
+
+En el Playground casi nunca verás los cinco pasos: `main` imprime «termino» y se acabó.
+
+✅ Guarda la manija y llama a `join()` antes de salir. Si el valor de retorno no te interesa, `h.join().unwrap();` igualmente garantiza que el hilo terminó.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m17/reto-cuadrados" enunciado="Lanza un hilo por cada número de `numeros` que DEVUELVA su cuadrado. Después recorre los números y las manijas a la vez (con `zip`) e imprime `3² = 9`, `5² = 25` y `7² = 49`, en ese orden. Como las líneas se imprimen desde main tras cada join, el orden es siempre el mismo." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Lanzas 3 hilos que hacen `println!` y luego llamas a `join()` sobre los tres, en orden. ¿Qué puedes asegurar sobre el orden de las líneas impresas por los hilos?"
+  opciones={[
+    "Salen en el orden en que se lanzaron los hilos",
+    "Salen en el orden de los join",
+    "Nada: el orden lo decide el planificador del sistema operativo",
+    "Salen en orden inverso"
+  ]}
+  correcta={2}
+  explicacion="`join` solo asegura que, cuando vuelve, ese hilo ha terminado. No ordena lo que los hilos hacen mientras corren."
+  porque={[
+    "Lanzar primero no significa ejecutar primero.",
+    "Cuando llamas al primer join, los otros hilos pueden haber terminado ya.",
+    "Correcto.",
+    "No hay ninguna regla así."
+  ]}
+/>
+
+<Pregunta
+  pregunta="El closure de un hilo devuelve un `String`. ¿Qué tipo tiene su manija?"
+  opciones={["`JoinHandle<()>`", "`JoinHandle<String>`", "`String`", "`Result<String, ()>`"]}
+  correcta={1}
+  explicacion="La `T` de `JoinHandle<T>` es el tipo que devuelve el closure. `join()` te dará un `Result<String, _>`: `Ok` si el hilo terminó bien, `Err` si entró en pánico."
+  porque={[
+    "Solo sería `()` si el closure no devolviera nada.",
+    "Correcto.",
+    "spawn devuelve la manija, no el valor (todavía no existe: el hilo acaba de empezar).",
+    "Ese es el tipo que devuelve `join()`, y su error es `Box<dyn Any + Send>`, no `()`."
+  ]}
+/>
+
+<Pregunta
+  pregunta="Un hilo entra en pánico. ¿Qué le pasa a main?"
+  opciones={[
+    "Entra en pánico en ese mismo instante",
+    "Nada por sí solo; si hace join() sobre ese hilo, recibe un Err",
+    "El programa se cuelga",
+    "El pánico se ignora y join devuelve Ok"
+  ]}
+  correcta={1}
+  explicacion="El pánico desenrolla solo el hilo que lo sufre. `main` se entera a través de `join()`. Si haces `join().unwrap()`, entonces sí: el `unwrap` sobre el `Err` hace entrar en pánico a main."
+  porque={[
+    "Los pánicos no saltan de un hilo a otro.",
+    "Correcto.",
+    "No hay ningún bloqueo: el hilo terminó (mal).",
+    "join informa del pánico con Err."
+  ]}
+/>

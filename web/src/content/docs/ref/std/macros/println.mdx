@@ -1,0 +1,75 @@
+---
+title: "println!, print!, eprintln! y eprint!"
+description: "Escribir texto formateado en la consola: en la salida normal (print) o en la de errores (eprint), con o sin salto de línea."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::println y familia`
+
+## Sinopsis
+
+```rust
+macro_rules! println {
+    () => { ... };
+    ($($arg:tt)*) => { ... };
+}
+
+macro_rules! print {
+    ($($arg:tt)*) => { ... };
+}
+
+macro_rules! eprintln {
+    () => { ... };
+    ($($arg:tt)*) => { ... };
+}
+
+macro_rules! eprint {
+    ($($arg:tt)*) => { ... };
+}
+```
+
+## Qué hace
+
+`println!` escribe en la salida estándar con un salto de línea al final; `print!`, sin él. `eprintln!` y `eprint!` hacen lo mismo en la salida de errores. Todas usan la [sintaxis de formato](/ref/std/fmt/sintaxis/). Son macros (no funciones) porque reciben un número variable de argumentos y comprueban el texto de formato **al compilar**.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-println" />
+
+**Salida:**
+
+```text
+
+hola
+Ana tiene 9.5 puntos
+Ana tiene 10 puntos
+sin salto
+```
+
+**Salida de error** (*stderr*):
+
+```text
+esto va a stderr
+y esto también
+```
+
+## Pánicos
+
+Entran en pánico si no pueden escribir en la consola (por ejemplo, si se cerró la salida). Para controlar ese error, usa `writeln!` sobre `io::stdout()`.
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [format!](/ref/std/macros/format/)
+- [Sintaxis de formato](/ref/std/fmt/sintaxis/)
+- [stdout](/ref/std/io/stdout/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)

@@ -1,0 +1,110 @@
+---
+title: "let: dar nombre a un valor"
+description: "Crea tus primeras variables con let, con y sin anotación de tipo, y descubre que Rust no te deja usar una variable sin valor."
+sidebar:
+  order: 1
+duracion: 10
+desde: "1.0"
+requiere: ["02-tu-primer-programa/03-cadenas-de-formato"]
+tarjetas:
+  - p: "¿Qué palabra clave crea una variable en Rust?"
+    r: "`let`, por ejemplo `let edad = 30;`."
+  - p: "¿Cómo se escribe a mano el tipo de una variable?"
+    r: "Con dos puntos después del nombre: `let altura: f64 = 1.75;` (anotación de tipo)."
+  - p: "Si no escribes el tipo, ¿quién lo decide?"
+    r: "El compilador, por inferencia de tipos, a partir del valor y de cómo se usa."
+  - p: "¿Qué error da usar una variable declarada sin valor?"
+    r: "E0381: «used binding isn't initialized». Rust no deja leer memoria sin inicializar."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Hoy vas a guardar valores con nombre para poder usarlos después. Es lo más básico de cualquier programa, y en Rust tiene una regla de seguridad escondida que vas a ver al final.
+
+## Predice
+
+Este programa crea una variable `edad` y después otra a partir de ella. ¿Qué imprime la tercera línea?
+
+<Predice
+  ej="m03/variables"
+  opciones={["`el doble de 30 es 60`", "`el doble de edad es el_doble`", "`el doble de 30 es 302`", "No compila: falta escribir el tipo"]}
+  correcta={0}
+  explicacion="Dentro de las llaves de `println!`, `{edad}` y `{el_doble}` se sustituyen por el **valor** de cada variable: 30 y 30 × 2 = 60."
+  porque={["", "Las llaves `{}` no imprimen el nombre, sino el valor.", "`*` es una multiplicación de números, no pega textos.", "El tipo es opcional: el compilador lo deduce."]}
+/>
+
+## La idea
+
+Una **variable** (*variable*) es un nombre pegado a un valor. Se crea con `let`:
+
+```rust
+let edad = 30;
+```
+
+Se lee «sea `edad` igual a 30». Desde esa línea, cada vez que escribas `edad` Rust usará el valor 30. El `;` cierra la instrucción.
+
+Todo valor tiene un **tipo** (*type*): número entero, decimal, texto… Normalmente no hace falta escribirlo, porque el compilador lo **infiere** (*type inference*): ve el `30` y deduce que es un entero (en concreto, un `i32`, como verás en la lección de enteros). Si quieres decirlo tú, añades una **anotación de tipo** con dos puntos: `let altura: f64 = 1.75;`.
+
+Puedes declarar una variable sin valor y dárselo después, **una sola vez**: `let saludo; saludo = "hola";`. Lo que no puedes es **leerla** antes de darle valor.
+
+## Pruébalo
+
+<Ejecutar ej="m03/variables" />
+
+Salida real:
+
+```text
+edad = 30
+altura = 1.75
+el doble de 30 es 60
+hola
+```
+
+Fíjate en el paso 3: el valor de una variable puede salir de una expresión (`edad * 2`). El cálculo se hace una vez, al crear `el_doble`, y lo que queda guardado es el resultado, 60.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Una variable es un trozo de la pila con nombre">
+Cuando el programa llega a `let edad = 30;`, reserva en la **pila** (*stack*, la viste en el Mundo 1) un hueco del tamaño del tipo: un `i32` ocupa 4 bytes. Ahí escribe los bytes del 30 (`1e 00 00 00` en little-endian). El nombre `edad` **no existe** en el programa compilado: es solo una etiqueta para ti y para el compilador, que la traduce a «el hueco que está en tal posición de la pila».
+
+Por eso importa tanto que una variable tenga valor antes de leerla. Si `let x: i32;` reserva el hueco pero no escribe nada, esos 4 bytes contienen lo que hubiera ahí antes: basura. Leerla sería leer **memoria sin inicializar**, que en lenguajes sin estas comprobaciones es una fuente clásica de fallos. Rust lo comprueba **al compilar**: sigue todos los caminos posibles del programa y, si alguno llega a una lectura sin escritura previa, se niega a compilar.
+</BajoElCapo>
+
+## Trampa típica
+
+Aquí `x` se declara con su tipo, pero nunca recibe un valor:
+
+<NoCompila ej="m03/sin-valor" explicacion="E0381: la variable se usa sin haberse inicializado. El compilador incluso te propone un arreglo: darle un valor en el `let`." />
+
+El error dice, en el idioma del compilador, «la variable `x` se usa aquí pero no está inicializada», y señala dos sitios: donde la declaraste sin valor y donde la lees. No es una manía: te está protegiendo de leer basura.
+
+## Tu turno
+
+<Reto
+  ej="m03/precio"
+  enunciado="Crea `precio` con el valor 12 y `cantidad` con el valor 3. Calcula `total` multiplicándolas e imprime exactamente `total = 36`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace `let x = 5;`?"
+  opciones={["Compara `x` con 5", "Crea una variable `x` con el valor 5", "Imprime 5", "Crea una constante global"]}
+  correcta={1}
+  explicacion="`let` introduce una variable nueva y le da un valor. Comparar se hace con `==`."
+  porque={["Comparar se escribe `x == 5`; un solo `=` en un `let` da valor.", "", "Para imprimir hace falta `println!`.", "Las constantes se declaran con `const`; lo verás en la lección 13."]}
+/>
+
+<Pregunta
+  pregunta={'`let total;` en una línea y `println!("{total}");` en la siguiente. ¿Qué pasa?'}
+  opciones={["Imprime 0", "Imprime basura de la memoria", "No compila: `total` se usa sin valor", "Imprime una línea vacía"]}
+  correcta={2}
+  explicacion="Rust no tiene valores por defecto escondidos ni deja leer memoria sin inicializar: el compilador lo detecta y da un error (E0381)."
+  porque={["Rust no rellena las variables con 0 por su cuenta.", "Eso es justo lo que Rust impide al compilar.", "", "No llega a ejecutarse: el error es de compilación."]}
+/>
+
+<Respuesta
+  pregunta="Escribe la línea que crea una variable `pi` de tipo `f64` con el valor 3.14 (con anotación de tipo)."
+  respuestas={["let pi: f64 = 3.14;", "let pi:f64 = 3.14;", "let pi: f64 = 3.14"]}
+  explicacion="Nombre, dos puntos, tipo, igual y valor: `let pi: f64 = 3.14;`."
+/>

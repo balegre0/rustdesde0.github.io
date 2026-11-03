@@ -1,0 +1,47 @@
+---
+import Practica from '../../components/paginas/Practica.astro';
+import { listas, preguntaPorId, problemaPorSlug, DIFICULTAD, TIPO, nombreTema } from '../../lib/practica';
+
+export function getStaticPaths() { return listas.map((l) => ({ params: { id: l.id } })); }
+const l = listas.find((x) => x.id === Astro.params.id)!;
+const items = [
+  ...l.preguntas.map((id) => { const p = preguntaPorId.get(id)!; return { tipo: 'pregunta', id, href: `/preguntas/${id}/`, titulo: p.titulo, tema: p.tema, dif: p.dificultad, clase: TIPO[p.tipo] }; }),
+  ...l.problemas.map((s) => { const p = problemaPorSlug.get(s)!; return { tipo: 'problema', id: s, href: `/problemas/${s}/`, titulo: p.titulo, tema: p.tema ?? '', dif: p.dificultad, clase: 'Problema de código' }; }),
+];
+---
+<Practica titulo={l.titulo} descripcion={l.descripcion || `Lista de práctica de Rust: ${l.titulo}`}>
+  <nav class="rdc-migas" aria-label="Migas de pan"><a href="/listas/">Listas</a></nav>
+  {l.descripcion && <p class="rdc-lead">{l.descripcion}</p>}
+  <p class="rdc-tabla-cuenta"><span data-hechos>0</span> de {items.length} hechos</p>
+  <div class="rdc-tabla-scroll">
+    <table class="rdc-tabla">
+      <thead><tr><th scope="col">#</th><th scope="col">Título</th><th scope="col">Tipo</th><th scope="col">Tema</th><th scope="col">Dificultad</th><th scope="col">Estado</th></tr></thead>
+      <tbody>
+        {items.map((it, i) => (
+          <tr data-item={it.tipo} data-id={it.id}>
+            <td class="rdc-num">{i + 1}</td>
+            <td class="rdc-col-titulo"><a href={it.href}>{it.titulo}</a></td>
+            <td>{it.clase}</td>
+            <td>{nombreTema(it.tema)}</td>
+            <td><span class="rdc-dif" data-dif={it.dif}>{DIFICULTAD[it.dif]}</span></td>
+            <td class="rdc-col-estado"><span class="rdc-estado" data-estado="nueva"><span aria-hidden="true">—</span><span class="rdc-sr">Sin hacer</span></span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</Practica>
+<script>
+  import { leer } from '../../runtime/progreso';
+  const p = leer();
+  let n = 0;
+  for (const tr of document.querySelectorAll<HTMLElement>('[data-item]')) {
+    const r = tr.dataset.item === 'pregunta' ? p.preguntas[tr.dataset.id!] : p.problemas[tr.dataset.id!];
+    const est = r ? (r.ok ? 'ok' : 'mal') : 'nueva';
+    if (r?.ok) n++;
+    const s = tr.querySelector<HTMLElement>('.rdc-estado')!;
+    s.dataset.estado = est;
+    s.innerHTML = est === 'ok' ? '<span aria-hidden="true">✓</span><span class="rdc-sr">Hecho</span>' : est === 'mal' ? '<span aria-hidden="true">✗</span><span class="rdc-sr">Intentado, sin acertar</span>' : '<span aria-hidden="true">—</span><span class="rdc-sr">Sin hacer</span>';
+  }
+  document.querySelector('[data-hechos]')!.textContent = String(n);
+</script>

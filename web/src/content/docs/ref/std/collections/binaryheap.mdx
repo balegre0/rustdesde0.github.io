@@ -1,0 +1,104 @@
+---
+title: "BinaryHeap<T>"
+description: "Cola de prioridad: push y pop sacando siempre el elemento mayor (o el menor con Reverse)."
+sidebar:
+  order: 5
+insignias: ["Desde 1.0", "alloc"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::collections::BinaryHeap`
+
+## Sinopsis
+
+```rust
+pub struct BinaryHeap<T, A = Global>
+where
+    A: Allocator,
+{ /* private fields */ }
+```
+
+## Qué hace
+
+Un `BinaryHeap` es un **montículo binario** guardado en un `Vec`: el elemento mayor (según `Ord`) siempre está arriba. Para que salga primero el menor, envuelve los valores en `std::cmp::Reverse`.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`push`](#push) | Añade un elemento. | 1.0 |
+| [`pop`](#pop) | Saca el mayor. | 1.0 |
+| [`peek`](#peek) | Mira el mayor sin sacarlo. | 1.0 |
+| [`len`](#len) | Número de elementos. | 1.0 |
+| [`into_sorted_vec`](#into_sorted_vec) | Consume el montículo y devuelve un `Vec` ordenado de menor a mayor. | 1.5 |
+
+### `push`
+
+```rust
+pub fn push(&mut self, item: T)
+```
+
+Añade un elemento.
+
+### `pop`
+
+```rust
+pub fn pop(&mut self) -> Option<T>
+```
+
+Saca el mayor.
+
+### `peek`
+
+```rust
+pub fn peek(&self) -> Option<&T>
+```
+
+Mira el mayor sin sacarlo.
+
+### `len`
+
+```rust
+pub fn len(&self) -> usize
+```
+
+Número de elementos.
+
+### `into_sorted_vec`
+
+```rust
+pub fn into_sorted_vec(self) -> Vec<T, A>
+```
+
+Consume el montículo y devuelve un `Vec` ordenado de menor a mayor.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/collections-binaryheap" />
+
+**Salida:**
+
+```text
+Some(9)
+[9, 8, 5, 3, 2, 1]
+1: comer
+2: barrer
+3: dormir
+```
+
+## Rendimiento
+
+`push` y `pop`: O(log n). `peek`: O(1).
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `into_sorted_vec` (1.5).
+
+## Ver también
+
+- [std::cmp::Reverse](/ref/std/cmp/ord/)
+- [VecDeque](/ref/std/collections/vecdeque/)
+
+## Aprende esto en
+
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

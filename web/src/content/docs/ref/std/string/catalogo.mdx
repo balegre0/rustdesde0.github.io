@@ -1,0 +1,94 @@
+---
+title: "String y str: todos los métodos"
+description: "Catálogo de los métodos estables de String (crear, añadir, quitar, capacidad) y de str (buscar, partir, recortar, comparar, convertir), con sus trampas de UTF-8."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "alloc / core"]
+---
+import { Ejecutar } from '~/components';
+
+Todos estos métodos existen en Rust estable 1.99 (comprobado compilando cada uno). Los de `str` también se pueden llamar sobre un `String`, porque `String` se convierte en `&str` automáticamente.
+
+**Recuerda:** todas las posiciones son **bytes** de UTF-8. Un método que recibe un índice o un rango (`insert`, `remove`, `split_off`, `replace_range`, `drain`, `&s[a..b]`) **entra en pánico** si cae en mitad de un carácter. `get(a..b)` y `is_char_boundary(i)` permiten comprobarlo antes.
+
+## String: crear y construir
+
+| Método | Qué hace |
+|---|---|
+| `String::new()`, `String::with_capacity(n)` | vacío (con sitio para `n` bytes) |
+| `String::from(s)`, `s.to_string()`, `s.to_owned()` | copia un `&str` |
+| `String::from_utf8(bytes)` | de `Vec<u8>`; `Err` si no es UTF-8 |
+| `String::from_utf8_lossy(&bytes)` | igual, sustituyendo lo inválido por `�` |
+| `push(c)`, `push_str(s)` | añadir al final |
+| `insert(i, c)`, `insert_str(i, s)` | insertar en la posición `i` (bytes) |
+| `"ab".repeat(n)` | repetir (método de `str`) |
+| `format!(…)`, `+`, `+=` | ver [construir texto](/curso/11-colecciones-y-texto/07-construir-texto/) |
+
+## String: quitar y modificar
+
+| Método | Qué hace |
+|---|---|
+| `pop()` | quita y devuelve el último carácter (`Option<char>`) |
+| `remove(i)` | quita y devuelve el carácter en el byte `i` |
+| `truncate(n)`, `clear()` | dejar `n` bytes / vaciar |
+| `retain(p)` | dejar solo los caracteres que cumplen `p` |
+| `drain(rango)` | quitar un rango y recorrer lo quitado |
+| `split_off(i)` | partir en dos: devuelve la parte desde `i` |
+| `replace_range(rango, s)` | sustituir un rango por otro texto |
+
+## String: capacidad y conversión
+
+| Método | Qué hace |
+|---|---|
+| `len()`, `is_empty()`, `capacity()` | bytes usados / ¿vacío? / bytes reservados |
+| `reserve(n)`, `shrink_to_fit()` | reservar / devolver memoria sobrante |
+| `as_str()`, `into_bytes()`, `as_bytes()` | ver como `&str` / convertir en bytes |
+
+## str: recorrer
+
+| Método | Da |
+|---|---|
+| `chars()`, `char_indices()` | caracteres / pares `(byte, carácter)` |
+| `bytes()` | bytes `u8` |
+| `lines()` | líneas (sin `\n` ni `\r\n`) |
+| `split_whitespace()` | palabras |
+
+## str: partir
+
+| Método | Qué hace |
+|---|---|
+| `split(sep)`, `rsplit(sep)` | por cada separador (texto, `char` o closure) |
+| `splitn(n, sep)` | como mucho `n` trozos |
+| `split_once(sep)`, `rsplit_once(sep)` | en dos, por el primero / último separador (1.52) |
+| `split_terminator(sep)` | como `split`, sin trozo vacío al final |
+| `split_at(i)` | en dos, en el byte `i` |
+
+## str: buscar y comparar
+
+| Método | Qué hace |
+|---|---|
+| `contains(p)`, `starts_with(p)`, `ends_with(p)` | `bool` |
+| `find(p)`, `rfind(p)` | posición (byte) de la primera / última aparición |
+| `matches(p)` | todas las apariciones |
+| `eq_ignore_ascii_case(otro)` | comparar sin distinguir mayúsculas ASCII |
+| `is_char_boundary(i)`, `get(rango)`, `is_ascii()` | comprobaciones sin pánico |
+
+## str: recortar y transformar (devuelven texto nuevo o vistas)
+
+| Método | Qué hace |
+|---|---|
+| `trim()`, `trim_start()`, `trim_end()`, `trim_matches(p)` | quitar espacios (o un patrón) de los extremos |
+| `strip_prefix(p)`, `strip_suffix(p)` | quitar un prefijo/sufijo **si está** (`Option`) |
+| `replace(a, b)`, `replacen(a, b, n)` | sustituir (todas / las `n` primeras) |
+| `to_lowercase()`, `to_uppercase()` | con reglas de Unicode («ñ» → «Ñ») |
+| `to_ascii_lowercase()`, `to_ascii_uppercase()` | solo ASCII |
+| `parse::<T>()` | convertir a número, `bool`, etc. (`Result`) |
+| `escape_debug()` | escapar caracteres especiales |
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/cat-string" />
+
+## Ver también
+
+[`String`](/ref/std/string/string/) · [`str`](/ref/std/str/str/) · [UTF-8](/curso/11-colecciones-y-texto/05-utf8-len-y-chars/)

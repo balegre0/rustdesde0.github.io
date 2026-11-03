@@ -1,0 +1,72 @@
+---
+title: "RustBelt y los modelos de aliasing"
+description: "Cómo se demuestra que Rust es seguro aunque la biblioteca estándar use unsafe: RustBelt, la lógica Iris, los invariantes de seguridad y validez, y los modelos Stacked Borrows y Tree Borrows."
+sidebar:
+  order: 8
+duracion: 14
+requiere: ["24-teoria-y-diseno/07-regiones-y-permisos", "20-unsafe-y-ub"]
+tarjetas:
+  - p: "¿Qué demostró RustBelt (POPL 2018)?"
+    r: "Que un núcleo de Rust es seguro y, sobre todo, que bibliotecas concretas que usan `unsafe` (Rc, Cell, RefCell, Mutex, Arc…) mantienen esa seguridad: su interfaz es segura para cualquier uso."
+  - p: "¿Qué diferencia hay entre el invariante de validez y el de seguridad de un tipo?"
+    r: "Validez: lo que tienen que cumplir los bytes en todo momento (violarlo es UB inmediato, p. ej. un `bool` que vale 3). Seguridad: lo que puede suponer el código seguro (p. ej. que un `String` contiene UTF-8 válido)."
+  - p: "¿Qué son Stacked Borrows y Tree Borrows?"
+    r: "Modelos de aliasing: reglas precisas de qué accesos a través de punteros son válidos en código `unsafe`. Miri los comprueba al ejecutar. Tree Borrows (PLDI 2025) sustituye la pila por un árbol y acepta más código real."
+  - p: "¿Qué es MiniRust?"
+    r: "Una especificación ejecutable de la semántica de Rust (de Ralf Jung): un intérprete de referencia que dice qué es UB."
+---
+
+import { Pregunta, BajoElCapo, Historia } from '~/components';
+
+Rust promete que el código seguro no tiene comportamiento indefinido. Pero `Vec`, `Rc` y `Mutex` están escritos con `unsafe`. ¿Cómo se sabe que la promesa se cumple? Con matemáticas.
+
+## La idea
+
+En 2018, Ralf Jung, Jacques-Henri Jourdan, Robbert Krebbers y Derek Dreyer publicaron **RustBelt** (POPL 2018). Su aportación clave no fue demostrar que el núcleo seguro de Rust es seguro (eso era lo esperado), sino algo más útil: dar un **método** para demostrar que una biblioteca con `unsafe` dentro es segura **para cualquier uso** desde código seguro. Lo aplicaron a `Rc`, `Cell`, `RefCell`, `Mutex`, `RwLock`, `Arc` y otras, y encontraron por el camino un fallo real en `MutexGuard` (que se corrigió).
+
+La idea central: a cada tipo le corresponde un **predicado de propiedad**, una descripción de qué significa «poseer un valor de este tipo» en términos de memoria. Para `Vec<T>`, por ejemplo: «hay un bloque de `cap` elementos, los `len` primeros son `T` válidos y lo poseo». Un `unsafe` es correcto si, al terminar, todos los predicados se cumplen otra vez.
+
+Para escribir esos predicados usaron **Iris**, una lógica de separación de alto nivel para razonar sobre programas con memoria compartida y concurrencia, y lo mecanizaron en el asistente de demostración Rocq (antes Coq).
+
+## Dos invariantes por tipo
+
+De este trabajo sale una distinción que todo autor de `unsafe` tiene que conocer:
+
+- **Invariante de validez**: lo que los bytes tienen que cumplir **siempre**, incluso en código `unsafe` a medio hacer. Un `bool` vale 0 o 1; una referencia no es nula; un `char` es un valor escalar de Unicode. Violarlo es UB **inmediato**.
+- **Invariante de seguridad**: lo que el código **seguro** puede suponer. Un `String` contiene UTF-8 válido; un `Vec` tiene `len <= cap`. Dentro de un `unsafe` puedes romperlo **temporalmente**, siempre que lo restaures antes de devolver el control al código seguro.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Modelos de aliasing.** El compilador marca los `&mut` como `noalias` (mundo 07). Para que eso sea correcto también en código `unsafe` con punteros crudos, hace falta decir **exactamente** qué accesos están permitidos. **Stacked Borrows** (Jung y otros, POPL 2020) lo hizo con una pila de permisos por posición de memoria. **Tree Borrows** (Villani, Hostert, Dreyer y Jung, PLDI 2025) la sustituyó por un **árbol** con una pequeña máquina de estados por préstamo; acepta más código `unsafe` real y conserva las optimizaciones importantes. Miri comprueba los dos al ejecutar (`-Zmiri-tree-borrows`). Ninguno es todavía la regla oficial: el equipo de semántica operacional (*t-opsem*) sigue trabajando en ello.
+
+**MiniRust.** Es una especificación **ejecutable**: un intérprete escrito para ser leído, que dice con precisión qué hace cada operación y cuándo hay UB. La idea es que un día la definición oficial de «comportamiento indefinido en Rust» sea ese código.
+
+**Los límites.** RustBelt modela un subconjunto de Rust, no el compilador real. Y el sistema de tipos del compilador tiene fallos conocidos: el más famoso, el agujero **#25860** (abierto desde 2015), permite escribir en Rust seguro un uso tras liberar combinando lifetimes implícitas de una forma muy rebuscada. Lo viste en el mundo 20. Su arreglo depende del nuevo resolutor de traits.
+
+</BajoElCapo>
+
+<Historia titulo="Una tesis que cambió el lenguaje">
+
+Ralf Jung defendió en 2020 su tesis doctoral, *Understanding and Evolving the Rust Programming Language*, con RustBelt y Stacked Borrows. Su trabajo no se quedó en el papel: Miri, las reglas de `unsafe`, `MaybeUninit`, las APIs de *strict provenance* (estables desde 1.84) y buena parte del vocabulario que usa hoy el equipo de Rust vienen de esa línea de investigación.
+
+</Historia>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Un `unsafe` deja temporalmente un `String` con bytes que no son UTF-8 y los arregla antes de devolverlo. ¿Es UB?"
+  opciones={["Sí, siempre", "No: rompió el invariante de seguridad de forma temporal, sin que el código seguro llegara a verlo", "Sí, porque viola el invariante de validez", "Depende del sistema operativo"]}
+  correcta={1}
+  explicacion="Que un `String` sea UTF-8 es un invariante de **seguridad**: el código `unsafe` puede romperlo temporalmente si lo restaura antes de que lo vea código seguro. El invariante de validez de `String` (el de sus bytes) no exige UTF-8."
+  porque={["Solo romper la validez es UB inmediato.", "", "La validez de un `String` es la de sus campos (puntero, capacidad, longitud), no la del texto.", "El UB no depende del sistema operativo."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace Miri con Tree Borrows activado?"
+  opciones={["Optimiza el programa", "Ejecuta el programa comprobando, en cada acceso, que se cumplen las reglas de aliasing del modelo", "Demuestra que el programa es correcto para todas las entradas", "Traduce el programa a otro lenguaje"]}
+  correcta={1}
+  explicacion="Miri es un intérprete que detecta UB **en la ejecución que hace**, no en todas las posibles. Para todas las entradas hacen falta herramientas de verificación (próxima lección)."
+  porque={["Miri no optimiza: ejecuta despacio a propósito.", "", "Eso sería verificación formal.", "No traduce: interpreta el MIR."]}
+/>

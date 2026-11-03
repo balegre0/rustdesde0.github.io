@@ -1,0 +1,198 @@
+---
+title: "Result<T, E>"
+description: "Ok(valor) si la operación salió bien, Err(error) si falló, y los métodos para tratar cada caso."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::result::Result` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+```
+
+## Qué hace
+
+`Result<T, E>` lleva **o** un valor de tipo `T` (`Ok`) **o** un error de tipo `E` (`Err`). Trátalo con `match`, con `if let Ok(v) = ...`, con los métodos de abajo, o propágalo con `?`.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`is_ok`](#is_ok) | Devuelve `true` si es `Ok`. | 1.0 |
+| [`is_err`](#is_err) | Devuelve `true` si es `Err`. | 1.0 |
+| [`unwrap`](#unwrap) | Saca el valor de `Ok`. | 1.0 |
+| [`expect`](#expect) | Como `unwrap`, con tu mensaje delante del error. | 1.4 |
+| [`unwrap_or`](#unwrap_or) | Saca el valor o devuelve el que le das si hubo error. | 1.0 |
+| [`unwrap_or_else`](#unwrap_or_else) | Saca el valor o calcula uno a partir del error. | 1.0 |
+| [`map`](#map) | Transforma el valor de `Ok`; un `Err` pasa tal cual. | 1.0 |
+| [`map_err`](#map_err) | Transforma el error; un `Ok` pasa tal cual. | 1.0 |
+| [`and_then`](#and_then) | Encadena otra operación que también puede fallar, solo si la anterior fue `Ok`. | 1.0 |
+| [`ok`](#ok) | Convierte en `Option`: `Ok(v)` → `Some(v)`, `Err(_)` → `None` (el error se descarta). | 1.0 |
+| [`err`](#err) | Convierte en `Option` con el error: `Err(e)` → `Some(e)`. | 1.0 |
+| [`as_ref`](#as_ref) | Pasa de `&Result<T, E>` a `Result<&T, &E>` para mirar sin mover. | 1.0 |
+
+### `is_ok`
+
+```rust
+pub const fn is_ok(&self) -> bool
+```
+
+Devuelve `true` si es `Ok`.
+
+### `is_err`
+
+```rust
+pub const fn is_err(&self) -> bool
+```
+
+Devuelve `true` si es `Err`.
+
+### `unwrap`
+
+```rust
+pub fn unwrap(self) -> T
+where
+    E: Debug,
+```
+
+Saca el valor de `Ok`. Si es `Err`, **entra en pánico** mostrando el error con `Debug`.
+
+### `expect`
+
+```rust
+pub fn expect(self, msg: &str) -> T
+where
+    E: Debug,
+```
+
+Como `unwrap`, con tu mensaje delante del error.
+
+### `unwrap_or`
+
+```rust
+pub fn unwrap_or(self, default: T) -> T
+```
+
+Saca el valor o devuelve el que le das si hubo error.
+
+### `unwrap_or_else`
+
+```rust
+pub fn unwrap_or_else<F>(self, op: F) -> T
+where
+    F: FnOnce(E) -> T,
+```
+
+Saca el valor o calcula uno a partir del error.
+
+### `map`
+
+```rust
+pub fn map<U, F>(self, op: F) -> Result<U, E>
+where
+    F: FnOnce(T) -> U,
+```
+
+Transforma el valor de `Ok`; un `Err` pasa tal cual.
+
+### `map_err`
+
+```rust
+pub fn map_err<F, O>(self, op: O) -> Result<T, F>
+where
+    O: FnOnce(E) -> F,
+```
+
+Transforma el error; un `Ok` pasa tal cual. Útil para convertir errores a tu propio tipo.
+
+### `and_then`
+
+```rust
+pub fn and_then<U, F>(self, op: F) -> Result<U, E>
+where
+    F: FnOnce(T) -> Result<U, E>,
+```
+
+Encadena otra operación que también puede fallar, solo si la anterior fue `Ok`.
+
+### `ok`
+
+```rust
+pub fn ok(self) -> Option<T>
+```
+
+Convierte en `Option`: `Ok(v)` → `Some(v)`, `Err(_)` → `None` (el error se descarta).
+
+### `err`
+
+```rust
+pub fn err(self) -> Option<E>
+```
+
+Convierte en `Option` con el error: `Err(e)` → `Some(e)`.
+
+### `as_ref`
+
+```rust
+pub const fn as_ref(&self) -> Result<&T, &E>
+```
+
+Pasa de `&Result<T, E>` a `Result<&T, &E>` para mirar sin mover.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/result-basico" />
+
+**Salida:**
+
+```text
+21 -> 42
+hola -> error: invalid digit found in string
+-1
+Ok(11)
+Err("invalid digit found in string")
+Some(8)
+true
+Ok(6)
+```
+
+## Pánicos
+
+`unwrap` y `expect` entran en pánico con un `Err`, mostrando el error:
+
+<Ejecutar ej="ref-std/result-unwrap-panico" />
+
+**Salida:**
+
+```text
+Err(ParseIntError { kind: PosOverflow })
+```
+
+**Salida de error** (*stderr*):
+
+```text
+thread 'main' (1) panicked at result-unwrap-panico.rs:4:15:
+called `Result::unwrap()` on an `Err` value: ParseIntError { kind: PosOverflow }
+```
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `expect` (1.4).
+
+## Ver también
+
+- [Option](/ref/std/option/option/)
+- [El trait Error](/ref/std/error/)
+- [std::process::exit y ExitCode](/ref/std/process/)
+
+## Aprende esto en
+
+- [Mundo 10 · Errores](/curso/10-errores/)

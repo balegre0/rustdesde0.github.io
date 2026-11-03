@@ -1,0 +1,97 @@
+---
+title: "La terminal"
+description: "Moverte por carpetas y lanzar programas escribiendo órdenes en PowerShell: pwd, ls, cd, mkdir y cómo leer lo que te responde."
+sidebar:
+  order: 2
+duracion: 10
+requiere: ["00-el-taller/01-archivos-y-rutas"]
+tarjetas:
+  - p: "¿Qué hace `cd carpeta` en la terminal?"
+    r: "Cambia la carpeta actual (*change directory*). `cd ..` sube un nivel."
+  - p: "¿Qué hacen `pwd` y `ls` en PowerShell?"
+    r: "`pwd` muestra la carpeta actual; `ls` lista lo que contiene."
+  - p: "¿Qué terminal usar para compilar Rust en Windows?"
+    r: "PowerShell (dentro de Windows Terminal o del editor). Git Bash tiene su propio `link.exe`, que confunde al compilador."
+  - p: "¿Para qué sirve la tecla Tab en la terminal?"
+    r: "Para completar nombres de carpetas, archivos y órdenes. Evita errores de escritura."
+---
+
+import { Pregunta, Ordena, Trampa } from '~/components';
+
+Las herramientas de Rust se manejan escribiendo órdenes en la **terminal**. Parece antiguo, pero es la forma más rápida y precisa de decirle al ordenador qué hacer. Con cinco órdenes tienes para empezar.
+
+## La idea
+
+La **terminal** es una ventana donde escribes órdenes de texto y el ordenador te responde con texto. El programa que interpreta esas órdenes se llama **shell**. En Windows 11 usarás **PowerShell**, dentro de la aplicación **Terminal** (búscala en el menú Inicio como «Terminal»).
+
+La terminal siempre está **en una carpeta**, la *carpeta actual*. Aparece al principio de la línea, en el *prompt*:
+
+```text
+PS C:\Users\ana>
+```
+
+Las órdenes que vas a usar ya:
+
+| Orden | Qué hace | Ejemplo |
+|---|---|---|
+| `pwd` | muestra la carpeta actual | `pwd` |
+| `ls` | lista el contenido | `ls` |
+| `cd` | cambia de carpeta | `cd C:\dev`, `cd hola`, `cd ..` |
+| `mkdir` | crea una carpeta | `mkdir C:\dev` |
+| `cls` | limpia la pantalla | `cls` |
+
+Y dos trucos que te ahorran horas:
+
+- **Tab** completa nombres: escribe `cd Doc` y pulsa Tab.
+- **Flecha arriba** recupera las órdenes anteriores.
+
+## Pruébalo
+
+Abre Terminal y escribe, una a una:
+
+```powershell
+pwd
+mkdir C:\dev
+cd C:\dev
+pwd
+ls
+```
+
+La última no muestra nada porque la carpeta está vacía. Eso también es una respuesta.
+
+Para ejecutar un programa, escribe su nombre (o su ruta). Por ejemplo, `notepad hola.txt` abre el Bloc de notas con ese archivo. Pronto escribirás `cargo run` y se ejecutará **tu** programa.
+
+## Leer las respuestas
+
+Cuando una orden falla, la terminal lo dice en rojo. **Léelo**: casi siempre explica el problema. Por ejemplo:
+
+```text
+cd: Cannot find path 'C:\dve' because it does not exist.
+```
+
+Dice exactamente qué ruta no encontró: has escrito `dve` en vez de `dev`. Esta costumbre (leer el error antes de hacer nada) es la más importante del curso, y en Rust te dará muchísimo, porque sus mensajes de error son excelentes.
+
+<Trampa titulo="Git Bash no es PowerShell">
+
+Si instalas Git (lección 9), aparecerá también **Git Bash**, otra terminal con órdenes distintas. Para compilar Rust, **usa PowerShell**: Git Bash trae un programa llamado `link.exe` que no tiene nada que ver con el enlazador de Windows, y produce un error absurdo al compilar (lo verás en la lección 4).
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena las órdenes para crear la carpeta `C:\\dev\\prueba`, entrar en ella y comprobar dónde estás."
+  lineas={["cd C:\\dev", "mkdir prueba", "cd prueba", "pwd"]}
+  distractores={["cd ..\\prueba"]}
+  explicacion="Primero vas a `C:\\dev`, creas `prueba` dentro (ruta relativa), entras y compruebas con `pwd`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Estás en `C:\\dev\\hola\\src`. ¿Qué orden te lleva a `C:\\dev\\hola`?"
+  opciones={["`cd hola`", "`cd ..`", "`cd \\`", "`cd .`"]}
+  correcta={1}
+  explicacion="`..` es la carpeta de arriba."
+  porque={["Buscaría una carpeta `hola` dentro de `src`.", "", "Te llevaría a la raíz `C:\\`.", "`.` es la carpeta actual: no te mueve."]}
+/>

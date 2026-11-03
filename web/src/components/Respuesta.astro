@@ -1,0 +1,7 @@
+---
+// <Respuesta pregunta respuestas explicacion? /> — CONTENIDO.md §4
+import RespuestaIsla from './islas/Respuesta';
+interface Props { pregunta: string; respuestas: string[]; explicacion?: string; idPregunta?: string }
+const { pregunta, respuestas, explicacion, idPregunta } = Astro.props;
+---
+<RespuestaIsla client:visible pregunta={pregunta} respuestas={respuestas} explicacion={explicacion} idPregunta={idPregunta} />

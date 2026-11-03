@@ -1,0 +1,103 @@
+---
+title: "Abstracciones seguras sobre unsafe"
+description: "Construyes una función segura con unsafe dentro y aprendes qué la hace sound: invariantes y privacidad."
+sidebar:
+  order: 4
+duracion: 14
+desde: "1.0"
+requiere: ["20-unsafe-y-ub/03-la-lista-de-ub"]
+tarjetas:
+  - p: "¿Cuándo es sound una función segura que usa unsafe por dentro?"
+    r: "Cuando NINGÚN programa que la llame solo con código seguro puede provocar UB, con cualquier argumento."
+  - p: "Invariante de validez frente a invariante de seguridad"
+    r: "Validez: lo que el compilador exige siempre (bool = 0 o 1); romperla es UB inmediato. Seguridad: lo que una biblioteca promete (String es UTF-8); romperla causa UB cuando otro código confía en ella."
+  - p: "¿Por qué el módulo, y no el bloque unsafe, es la unidad que se audita?"
+    r: "Porque código seguro del mismo módulo puede romper una invariante (por ejemplo, cambiar un campo privado) de la que depende el bloque unsafe."
+  - p: "¿Cómo hace split_at_mut lo que el borrow checker no permite?"
+    r: "Comprueba mid <= len y crea dos slices con from_raw_parts_mut sobre rangos disjuntos; la comprobación es lo que la hace sound."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir tu propia versión de `split_at_mut` y a entender la idea más importante de este mundo: **unsafe por dentro, seguro por fuera**.
+
+## Predice
+
+Quieres dos préstamos exclusivos de dos mitades de un array. Las mitades no se solapan. ¿Por qué no compila?
+
+<NoCompila ej="m20/dos-mut-slice" explicacion="Para el borrow checker, `&mut v[..2]` es un préstamo exclusivo de todo `v`: no razona sobre índices. El propio compilador sugiere `split_at_mut`, una función segura de la biblioteca estándar que está escrita con unsafe por dentro." />
+
+## La idea
+
+El borrow checker es **conservador**: rechaza algunos programas correctos porque no puede demostrar que lo sean. Dos rangos disjuntos de un slice son el ejemplo clásico. Ahí entra `unsafe`: escribes una función que **sí** sabe que los rangos no se solapan, la implementas con punteros crudos, y la ofreces con una firma **segura**.
+
+Esa función es *sound* (sólida) si **ningún** programa que la llame solo con código seguro puede provocar UB, sea cual sea el argumento. No basta con que funcione con los argumentos «normales»: si existe un argumento que lleva a UB, es *unsound*, aunque nadie lo haya usado nunca. Por eso `partir_mut` comprueba `mitad <= largo` **antes** de crear los slices: sin esa línea, `partir_mut(&mut v, 99)` crearía un slice fuera de la memoria, y todo desde código seguro.
+
+La garantía del Rust seguro («si compila sin unsafe, no tiene UB») se sostiene así: las bibliotecas con `unsafe` dentro son sound, y por tanto el código seguro que las usa también lo es.
+
+## Pruébalo
+
+<Ejecutar ej="m20/split-at-mut" />
+
+El comentario `// SAFETY:` no es adorno: es el **argumento** de por qué los dos `from_raw_parts_mut` cumplen sus requisitos (memoria válida, rangos disjuntos, tiempo de vida atado al préstamo de entrada).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Dos clases de invariantes.** Una **invariante de validez** es lo que el compilador da por supuesto *siempre*, en cualquier momento (un `bool` es 0 o 1; una referencia no es nula). Romperla es UB al instante. Una **invariante de seguridad** es lo que un tipo *promete* a quien lo usa: un `String` contiene UTF-8 válido; un `Vec` tiene `len <= capacity`. Un `String` con bytes que no son UTF-8 es *válido* como `Vec<u8>`, pero no *seguro*: el UB llega cuando algún código (por ejemplo, el que recorre los `char`) confía en la promesa.
+
+**La frontera de privacidad.** Mira este tipo (está en los ejemplos como `m20/invariante`):
+
+<Ejecutar ej="m20/invariante" />
+
+`como_str` usa `from_utf8_unchecked`, que exige UTF-8. Su `// SAFETY:` depende de que `bytes` **solo** contenga ASCII. ¿Quién lo garantiza? Que el campo es **privado**: fuera del módulo nadie puede tocarlo, y dentro solo lo crea `new`, que comprueba. Ahora imagina que añades el método comentado `bytes_mut`, que devuelve `&mut Vec<u8>`. No contiene ni una línea `unsafe`… y vuelve *unsound* a `como_str`, porque cualquiera podría meter un `0xFF` y luego pedir el `&str`.
+
+Conclusión: **la unidad que se audita es el módulo**, no el bloque `unsafe`. Un cambio en código seguro, cerca de un `unsafe`, puede romper la solidez.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Mi función es segura porque nadie la llama mal»">
+
+❌ Una función segura que hace `from_raw_parts_mut(p.add(mitad), largo - mitad)` **sin** comprobar `mitad <= largo`. «Pero yo siempre la llamo con valores correctos.» No importa: su firma promete que cualquier llamada segura está bien. Si existe una llamada segura que causa UB, la función es *unsound*.
+
+✅ O compruebas (como `partir_mut`, que entra en pánico si el índice es malo: un pánico **no** es UB), o marcas la función como `unsafe fn` y documentas en `# Safety` lo que debe garantizar quien llama.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m20/primero-resto" enunciado="Implementa `primero_y_resto` **sin unsafe**, apoyándote en `split_at_mut` (la abstracción segura ya hecha). Si el slice está vacío, devuelve `None`. Debe imprimir `[0, 3, 4]` y `true`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una función segura usa unsafe dentro. Con todos los argumentos que has probado funciona, pero con `usize::MAX` provoca UB. ¿Cómo se clasifica?"
+  opciones={["Sound, porque nadie pasa usize::MAX", "Unsound: un bug de solidez", "Sound, porque el UB solo aparece en release", "Depende del sistema operativo"]}
+  correcta={1}
+  explicacion="Basta con que exista **un** programa seguro que cause UB a través de la función. La solidez no se mide con los casos habituales."
+  porque={["La garantía cubre todos los argumentos posibles, no los probables.", "Correcto.", "El UB lo es en cualquier perfil.", "La solidez es una propiedad del código, no de la plataforma."]}
+/>
+
+<Pregunta
+  pregunta="En el tipo `Ascii` de arriba, ¿qué cambio rompería la solidez de `como_str` **sin escribir unsafe**?"
+  opciones={["Añadir `pub fn len(&self) -> usize`", "Hacer `pub` el campo `bytes`", "Añadir `#[derive(Clone)]`", "Renombrar el módulo"]}
+  correcta={1}
+  explicacion="Con el campo público, código de fuera podría escribir bytes no ASCII y luego llamar a `como_str`, que confía en la invariante: UB desde código seguro."
+  porque={["Leer la longitud no puede romper la invariante.", "Correcto.", "Clonar copia bytes ASCII: la copia también cumple la invariante.", "El nombre no afecta a quién puede tocar los campos."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué tipo de invariante es «un `String` siempre contiene UTF-8»?"
+  opciones={["De validez: romperla es UB inmediato", "De seguridad: la promete la biblioteca y el UB aparece cuando alguien confía en ella", "No es una invariante, es una convención", "De tiempo de vida"]}
+  correcta={1}
+  explicacion="Los bytes siguen siendo `u8` válidos. Lo que se rompe es la promesa del tipo, de la que dependen otras funciones (que sí causarían UB)."
+  porque={["Los bytes en sí no son inválidos como `u8`.", "Correcto.", "Es una invariante real: `from_utf8_unchecked` es unsafe justo por ella.", "No tiene relación con los tiempos de vida."]}
+/>
+
+## Para saber más
+
+- Ralf Jung, «Two Kinds of Invariants: Safety and Validity» (blog, en inglés).
+- *The Rustonomicon*, «Working with Unsafe».

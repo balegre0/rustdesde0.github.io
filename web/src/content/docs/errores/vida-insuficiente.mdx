@@ -1,0 +1,86 @@
+---
+title: "Sin código: «lifetime may not live long enough»"
+description: "Error sin código: una referencia tendría que vivir más de lo que su tiempo de vida garantiza."
+sidebar:
+  order: 71
+insignias: ["Tiempos de vida"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` lifetime may not live long enough ``
+
+## Qué significa
+
+Este error **no tiene código E**: lo da el comprobador de préstamos (*borrow checker*) cuando una referencia tendría que vivir más de lo que promete su tiempo de vida. rustc pone nombres provisionales (`'1`, `'2`) a los tiempos de vida anónimos para poder hablar de ellos. Aquí, la `Box<dyn Fn() + 'static>` debe poder vivir para siempre, pero la closure lleva dentro `x`, que solo vive `'1`.
+
+## Qué error evita
+
+Una closure guardada «para siempre» con una referencia de vida corta dentro acabaría siendo una **referencia colgante**.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/vida-insuficiente" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error: lifetime may not live long enough
+ --> vida-insuficiente.rs:2:5
+  |
+1 | fn para_siempre(x: &i32) -> Box<dyn Fn() + 'static> {
+  |                    - let's call the lifetime of this reference `'1`
+2 |     Box::new(move || println!("{x}"))
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ returning this value requires that `'1` must outlive `'static`
+  |
+help: consider changing the trait object's explicit `'static` bound to the lifetime of argument `x`
+  |
+1 - fn para_siempre(x: &i32) -> Box<dyn Fn() + 'static> {
+1 + fn para_siempre(x: &i32) -> Box<dyn Fn() + '_> {
+  |
+help: alternatively, add an explicit `'static` bound to this reference
+  |
+1 | fn para_siempre(x: &'static i32) -> Box<dyn Fn() + 'static> {
+  |                     +++++++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Devolver una referencia o una closure con un tiempo de vida mayor que el de los parámetros.
+- Métodos que devuelven `&'a T` a partir de `&self` cuando `'a` y el préstamo de `self` no son el mismo.
+
+## Cómo arreglarlo
+
+Haz que la promesa coincida con la realidad: o bien acorta la exigencia (`Box<dyn Fn() + '_>`, el tiempo de vida del argumento), o bien dale a la closure datos propios (copia o clona antes del `move`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn para_siempre(x: &i32) -> Box<dyn Fn() + 'static> {
+    let copia = *x; // la closure se lleva un i32 propio, no una referencia
+    Box::new(move || println!("{copia}"))
+}
+
+fn main() {
+    let n = 5;
+    let f = para_siempre(&n);
+    f();
+}
+```
+
+**Salida:**
+
+```text
+5
+```
+
+## Errores parecidos
+
+- [E0521](/errores/e0521/): un dato prestado escapa de la función
+- [E0621](/errores/e0621/): se necesita un tiempo de vida explícito
+- [E0106](/errores/e0106/): falta un especificador de tiempo de vida
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/)

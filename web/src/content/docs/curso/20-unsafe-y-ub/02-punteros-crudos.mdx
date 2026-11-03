@@ -1,0 +1,110 @@
+---
+title: "Punteros crudos"
+description: "Creas, comparas y recorres punteros *const T y *mut T, y sabes qué exige desreferenciarlos."
+sidebar:
+  order: 2
+duracion: 12
+desde: "1.82"
+requiere: ["20-unsafe-y-ub/01-que-es-unsafe"]
+tarjetas:
+  - p: "¿Qué cuatro cosas garantiza una referencia y NO un puntero crudo?"
+    r: "Que no es nula, que está alineada, que apunta a un valor vivo y válido, y que cumple las reglas de préstamos."
+  - p: "¿Qué hace `&raw const x` y desde qué versión existe?"
+    r: "Crea un `*const T` hacia `x` sin pasar por una referencia intermedia. Estable desde Rust 1.82."
+  - p: "¿`p.add(3)` avanza 3 bytes?"
+    r: "No: avanza 3 elementos de tipo T (3 × size_of::<T>() bytes), y el resultado debe quedar dentro de la misma asignación o justo al final."
+  - p: "¿Por qué `&s.campo` da E0793 en un struct `repr(packed)`?"
+    r: "Porque el campo puede estar desalineado y crear una referencia desalineada ya es UB. Se usa `&raw const` y `read_unaligned`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a manejar la herramienta básica del Rust inseguro: el puntero crudo (*raw pointer*). Al terminar sabrás crearlo, moverlo por un array y leer a través de él sin cometer UB.
+
+## Predice
+
+<Predice
+  ej="m20/punteros-crudos"
+  pregunta="El array empieza siendo `[1, 2, 3, 4]` y `p` apunta a su primer elemento. ¿Qué imprime la línea `tercero = …`?"
+  opciones={["tercero = 2", "tercero = 3", "tercero = 4", "No compila: no se puede sumar a un puntero"]}
+  correcta={1}
+  explicacion="`p.add(2)` avanza **dos elementos** desde el índice 0, así que llega al índice 2, que vale 3."
+  porque={["Eso sería `p.add(1)`.", "Correcto: índice 0 + 2 = índice 2.", "Eso sería `p.add(3)`; el 4 además se cambia luego a 40.", "Sí se puede, con `add` y dentro de unsafe, porque el resultado debe quedar dentro del array."]}
+/>
+
+## La idea
+
+Una referencia `&T` lleva cuatro promesas que el compilador comprueba por ti: **no es nula**, **está alineada** (su dirección es múltiplo de la alineación de `T`), **apunta a un valor vivo y válido**, y **respeta las reglas de préstamos**. Un puntero crudo `*const T` (solo lectura) o `*mut T` (lectura y escritura) es una dirección **sin ninguna de esas promesas**.
+
+Por eso crear un puntero crudo es seguro (es solo un número con tipo), pero **desreferenciarlo** es un superpoder: al escribir `*p` dentro de `unsafe`, eres tú quien afirma las cuatro promesas para ese instante.
+
+Hay dos maneras de obtenerlos: convirtiendo una referencia (`let p: *const i32 = &x;`) o, mejor, con `&raw const x` / `&raw mut x` (desde Rust 1.82), que van directos sin crear una referencia intermedia. La diferencia importa cuando una referencia sería ilegal, como verás en la trampa.
+
+## Pruébalo
+
+<Ejecutar ej="m20/punteros-crudos" />
+
+Lo que muestra cada paso: (2) un puntero puede ser nulo y se pregunta con `is_null`; (3) `add` cuenta **elementos**, no bytes; (4) `*mut` permite escribir; (5) `offset_from` mide distancias entre punteros del mismo array.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**En memoria**, un `*const i32` es exactamente una dirección: 4 bytes en el navegador (`wasm32`) y 8 en tu PC de 64 bits. No guarda longitud, ni dueño, ni tiempo de vida. Para `[1, 2, 3, 4]` de `i32` (4 bytes cada uno):
+
+| Expresión | Dirección (si el array empieza en `A`) | Valor |
+|---|---|---|
+| `p` | `A` | 1 |
+| `p.add(1)` | `A + 4` | 2 |
+| `p.add(2)` | `A + 8` | 3 |
+| `p.add(4)` | `A + 16` (justo al final: legal **calcularlo**, nunca leerlo) | — |
+| `p.add(5)` | fuera de la asignación: **UB solo por calcularlo** | — |
+
+**`add` frente a `wrapping_add`.** `add` exige que el resultado quede dentro de la misma asignación (o una posición más allá del final); salirse es UB **aunque nunca leas**. `wrapping_add` se puede calcular siempre, pero el resultado solo sirve para leer si acaba de nuevo dentro.
+
+**Lo que dice la Reference:** el UB está en el **acceso** (leer o escribir) a través de un puntero colgante o desalineado, y en crear **referencias** inválidas. `&raw const lugar` está permitido aunque el lugar esté desalineado, porque no crea ninguna referencia.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Un struct `#[repr(packed)]` elimina el relleno, así que un campo `u32` puede caer en una dirección impar. Pedirle una referencia es rechazado:
+
+<NoCompila ej="m20/packed" explicacion="Una referencia desalineada es UB aunque nunca la uses, así que rustc lo prohíbe (E0793). La propia ayuda del compilador da la salida: copiar el campo a una variable, o usar un puntero crudo con `read_unaligned`." />
+
+La versión correcta usa `&raw const c.largo` (un puntero, que sí puede estar desalineado) y lo lee con `read_unaligned`. Pulsa «Ver arreglo»: imprime `1 500` y `tamaño = 5 bytes` (1 + 4, sin relleno).
+
+## Tu turno
+
+<Reto ej="m20/suma-punteros" enunciado="Completa `suma`: recorre los `n` elementos con `p.add(i)` y súmalos, cada desreferencia dentro de `unsafe { }` con su `// SAFETY:`. Debe imprimir 24 y luego 8." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tienes `let v = [10u8, 20, 30]; let p = v.as_ptr();`. ¿Cuál de estas líneas es UB **por sí sola**, aunque no leas nada?"
+  opciones={["`let q = p.wrapping_add(7);`", "`let q = unsafe { p.add(3) };`", "`let q = unsafe { p.add(7) };`", "`let q = p as usize;`"]}
+  correcta={2}
+  explicacion="`add` exige quedarse dentro de la asignación o justo al final. `p.add(3)` es «justo al final» (legal); `p.add(7)` se sale y ya es UB al calcularlo."
+  porque={["`wrapping_add` siempre se puede calcular; solo sería UB leer a través del resultado.", "Una posición más allá del final está permitida (pero no leerla).", "Correcto.", "Convertir un puntero en número es seguro."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `let r = &c.largo;` no compila si `c` es `repr(packed)`, pero `let p = &raw const c.largo;` sí?"
+  opciones={["Porque `&raw` desactiva el borrow checker", "Porque una referencia debe estar alineada siempre, y un puntero crudo no", "Porque `repr(packed)` solo se puede usar con unsafe", "Porque `&raw` copia el valor"]}
+  correcta={1}
+  explicacion="La alineación es una de las promesas de toda referencia. Un puntero crudo no promete nada, así que puede apuntar a un campo desalineado; luego se lee con `read_unaligned`."
+  porque={["`&raw` no desactiva nada: solo crea un puntero en vez de una referencia.", "Correcto.", "Declarar y usar un struct packed es seguro; lo ilegal es la referencia desalineada.", "`&raw` no copia: produce una dirección."]}
+/>
+
+<Pregunta
+  pregunta="En el navegador, ¿cuántos bytes mide un `*const i32`?"
+  opciones={["4", "8", "16", "Depende del valor al que apunte"]}
+  correcta={0}
+  explicacion="El programa de *Pruébalo* lo imprime: en `wasm32` un puntero mide 4 bytes. En un PC de 64 bits mediría 8."
+  porque={["Correcto (lo dice la salida real).", "Eso es en un PC de 64 bits, no en el navegador.", "Un puntero crudo a un tipo con tamaño conocido es delgado: solo una dirección.", "El tamaño del puntero no depende de lo apuntado."]}
+/>
+
+## Para saber más
+
+- Documentación de `std::ptr` y del tipo primitivo `pointer` (métodos `add`, `offset_from`, `read_unaligned`).
+- En este curso: [provenance](../09-provenance/), donde verás que un puntero es algo más que una dirección.

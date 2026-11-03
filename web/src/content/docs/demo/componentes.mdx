@@ -1,0 +1,115 @@
+---
+title: "Demo: todos los componentes"
+description: "Página de prueba de la plataforma con cada componente de CONTENIDO.md §4."
+sidebar:
+  hidden: true
+duracion: 5
+desde: "1.0"
+tarjetas:
+  - p: "¿Cuánto vale `7 / 2` en Rust si los dos operandos son `i32`?"
+    r: "3: la división entera descarta los decimales."
+  - p: "¿Cuántos préstamos exclusivos (`&mut`) de un valor puede haber vivos a la vez?"
+    r: "Uno, y mientras exista no puede haber préstamos compartidos."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Esta página prueba cada componente. No forma parte del curso.
+
+## Predice
+
+<Predice
+  ej="demo/division"
+  opciones={["`3.5`", "`3`", "`4`", "No compila"]}
+  correcta={1}
+  explicacion="Con dos enteros, `/` es **división entera**: se queda con la parte entera."
+  porque={["Para obtener `3.5` harían falta `f64`.", "", "Rust no redondea: descarta los decimales.", "Dividir dos `i32` es válido."]}
+/>
+
+## Pruébalo
+
+Un programa sencillo:
+
+<Ejecutar ej="demo/hola" />
+
+Este lee de la entrada (`stdin`). Te pedirá tu nombre y tu edad:
+
+<Ejecutar ej="demo/saludo" titulo="saludo.rs" />
+
+Este se sale del rango de `u8`. En **debug** Rust lo detecta y entra en pánico; en **release** el valor da la vuelta. Cambia de perfil y ejecútalo otra vez:
+
+<Ejecutar ej="demo/overflow" playground />
+
+Este accede fuera de los límites de un array: pánico en cualquier perfil.
+
+<Ejecutar ej="demo/indice" />
+
+Este usa hilos, que el navegador no tiene:
+
+<Ejecutar ej="demo/hilos" />
+
+## No compila
+
+<NoCompila ej="demo/dos-mut" explicacion="`a` sigue vivo (se usa en la línea 5) cuando se crea `b`: dos préstamos **exclusivos** del mismo valor a la vez." />
+
+## Permisos
+
+<Prestamos
+  titulo="Un préstamo exclusivo"
+  lineas={[
+    { codigo: "let mut v = vec![1, 2];", permisos: { v: "RWO" } },
+    { codigo: "let r = &mut v;", permisos: { v: "---", r: "RO", "*r": "RW" }, nota: "Mientras `r` viva, `v` no se puede ni leer: el préstamo es **exclusivo**." },
+    { codigo: "r.push(3);", permisos: { v: "RWO" }, nota: "Último uso de `r`: el préstamo termina y `v` recupera sus permisos." },
+    { codigo: "println!(\"{v:?}\");", permisos: { v: "RWO" } },
+  ]}
+/>
+
+## Bajo el capó
+
+<BajoElCapo titulo="la división entera">
+`7 / 2` entre `i32` se compila a una única instrucción de división entera del procesador, que deja el cociente (3) en un registro y el resto (1) en otro.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="esperar decimales de dos enteros">
+❌ Mal:
+
+```rust
+let media = 7 / 2; // vale 3, y es i32
+```
+
+✅ Bien:
+
+```rust
+let media = 7.0 / 2.0; // vale 3.5, y es f64
+```
+</Trampa>
+
+<Historia titulo="por qué Rust comprueba el desbordamiento solo en debug">
+Comprobar cada suma cuesta un poco de velocidad. Rust decidió comprobarlo siempre mientras desarrollas (debug) y, en release, dejar que el valor dé la vuelta salvo que pidas otra cosa con `checked_add`, `wrapping_add` o `saturating_add`.
+</Historia>
+
+## Tu turno
+
+<Reto ej="demo/doble" enunciado="Completa `doble` para que devuelva el **doble** de `n`. Debe imprimir `42` y `-8`." />
+
+<Ordena
+  lineas={["fn main() {", "    let x = 5;", "    println!(\"{x}\");", "}"]}
+  distractores={["    print(x);"]}
+  explicacion="Primero `fn main`, dentro la variable y el `println!`, y al final la llave de cierre."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué es `7 / 2` si los dos son `i32`?"
+  opciones={["`3.5`", "`3`", "`4`"]}
+  correcta={1}
+  explicacion="La división entera descarta los decimales."
+  porque={["Haría falta `f64`.", "", "No redondea hacia arriba."]}
+/>
+
+<Respuesta pregunta="¿Cuánto vale `17 % 5`?" respuestas={["2"]} explicacion="`%` es el resto: 17 = 3 × 5 + **2**." />
+
+<Bits objetivo={200} />

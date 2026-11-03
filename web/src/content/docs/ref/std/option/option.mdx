@@ -1,0 +1,257 @@
+---
+title: "Option<T>"
+description: "Un valor que puede estar (Some) o no estar (None), y los métodos para trabajar con él."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::option::Option` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub enum Option<T> {
+    None,
+    Some(T),
+}
+```
+
+## Qué hace
+
+`Option<T>` representa un valor **opcional**. Las funciones que pueden no tener resultado lo devuelven: `v.first()`, `mapa.get(&k)`, `texto.find('a')`, `iter.next()`… Para usar el valor de dentro tienes que comprobar antes cuál de los dos casos es. Lo más habitual es `match` o `if let`; los métodos de abajo resumen los casos frecuentes en una línea.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`is_some`](#is_some) | Devuelve `true` si es `Some`. | 1.0 |
+| [`is_none`](#is_none) | Devuelve `true` si es `None`. | 1.0 |
+| [`unwrap`](#unwrap) | Saca el valor de un `Some`. | 1.0 |
+| [`expect`](#expect) | Como `unwrap`, pero el pánico muestra tu mensaje. | 1.0 |
+| [`unwrap_or`](#unwrap_or) | Saca el valor o devuelve el valor por defecto que le das. | 1.0 |
+| [`unwrap_or_else`](#unwrap_or_else) | Saca el valor o calcula uno con la closure (solo se ejecuta si es `None`). | 1.0 |
+| [`unwrap_or_default`](#unwrap_or_default) | Saca el valor o devuelve `T::default()` (0, texto vacío…). | 1.0 |
+| [`map`](#map) | Transforma el valor de dentro si existe: `Some(x)` pasa a `Some(f(x))`; `None` sigue siendo `None`. | 1.0 |
+| [`and_then`](#and_then) | Como `map`, pero la closure devuelve otro `Option`: encadena pasos que pueden no tener resultado. | 1.0 |
+| [`filter`](#filter) | Se queda con `Some(x)` solo si cumple la condición; si no, `None`. | 1.27 |
+| [`ok_or`](#ok_or) | Convierte en `Result`: `Some(x)` → `Ok(x)`, `None` → `Err(err)`. | 1.0 |
+| [`as_ref`](#as_ref) | Pasa de `&Option<T>` a `Option<&T>`: mirar dentro sin mover el valor. | 1.0 |
+| [`as_mut`](#as_mut) | Pasa de `&mut Option<T>` a `Option<&mut T>`: modificar el valor de dentro. | 1.0 |
+| [`take`](#take) | Saca el valor y deja `None` en su lugar. | 1.0 |
+| [`replace`](#replace) | Pone un `Some` nuevo y devuelve el valor anterior. | 1.31 |
+| [`insert`](#insert) | Pone un valor nuevo y devuelve un préstamo exclusivo a él. | 1.53 |
+| [`get_or_insert_with`](#get_or_insert_with) | Si es `None`, lo rellena con la closure; en todo caso devuelve `&mut T` al valor. | 1.20 |
+
+### `is_some`
+
+```rust
+pub const fn is_some(&self) -> bool
+```
+
+Devuelve `true` si es `Some`.
+
+### `is_none`
+
+```rust
+pub const fn is_none(&self) -> bool
+```
+
+Devuelve `true` si es `None`.
+
+### `unwrap`
+
+```rust
+pub const fn unwrap(self) -> T
+```
+
+Saca el valor de un `Some`. Si es `None`, **entra en pánico**. Úsalo solo cuando un `None` sea un fallo del programa.
+
+### `expect`
+
+```rust
+pub const fn expect(self, msg: &str) -> T
+```
+
+Como `unwrap`, pero el pánico muestra tu mensaje. Escribe en él por qué esperabas un valor.
+
+### `unwrap_or`
+
+```rust
+pub fn unwrap_or(self, default: T) -> T
+```
+
+Saca el valor o devuelve el valor por defecto que le das.
+
+### `unwrap_or_else`
+
+```rust
+pub fn unwrap_or_else<F>(self, f: F) -> T
+where
+    F: FnOnce() -> T,
+```
+
+Saca el valor o calcula uno con la closure (solo se ejecuta si es `None`).
+
+### `unwrap_or_default`
+
+```rust
+pub fn unwrap_or_default(self) -> T
+where
+    T: Default,
+```
+
+Saca el valor o devuelve `T::default()` (0, texto vacío…).
+
+### `map`
+
+```rust
+pub fn map<U, F>(self, f: F) -> Option<U>
+where
+    F: FnOnce(T) -> U,
+```
+
+Transforma el valor de dentro si existe: `Some(x)` pasa a `Some(f(x))`; `None` sigue siendo `None`.
+
+### `and_then`
+
+```rust
+pub fn and_then<U, F>(self, f: F) -> Option<U>
+where
+    F: FnOnce(T) -> Option<U>,
+```
+
+Como `map`, pero la closure devuelve otro `Option`: encadena pasos que pueden no tener resultado.
+
+### `filter`
+
+```rust
+pub fn filter<P>(self, predicate: P) -> Option<T>
+where
+    P: FnOnce(&T) -> bool,
+```
+
+Se queda con `Some(x)` solo si cumple la condición; si no, `None`.
+
+### `ok_or`
+
+```rust
+pub fn ok_or<E>(self, err: E) -> Result<T, E>
+```
+
+Convierte en `Result`: `Some(x)` → `Ok(x)`, `None` → `Err(err)`. Útil para usar `?` en funciones que devuelven `Result`.
+
+### `as_ref`
+
+```rust
+pub const fn as_ref(&self) -> Option<&T>
+```
+
+Pasa de `&Option<T>` a `Option<&T>`: mirar dentro sin mover el valor.
+
+### `as_mut`
+
+```rust
+pub const fn as_mut(&mut self) -> Option<&mut T>
+```
+
+Pasa de `&mut Option<T>` a `Option<&mut T>`: modificar el valor de dentro.
+
+### `take`
+
+```rust
+pub const fn take(&mut self) -> Option<T>
+```
+
+Saca el valor y deja `None` en su lugar. Sirve para mover algo fuera de un campo a través de `&mut`.
+
+### `replace`
+
+```rust
+pub const fn replace(&mut self, value: T) -> Option<T>
+```
+
+Pone un `Some` nuevo y devuelve el valor anterior.
+
+### `insert`
+
+```rust
+pub fn insert(&mut self, value: T) -> &mut T
+```
+
+Pone un valor nuevo y devuelve un préstamo exclusivo a él.
+
+### `get_or_insert_with`
+
+```rust
+pub fn get_or_insert_with<F>(&mut self, f: F) -> &mut T
+where
+    F: FnOnce() -> T,
+```
+
+Si es `None`, lo rellena con la closure; en todo caso devuelve `&mut T` al valor.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/option-basico" />
+
+**Salida:**
+
+```text
+Ana tiene 31 años
+Luis tiene 25 años
+0
+Some(32)
+None
+true
+```
+
+<Ejecutar ej="ref-std/option-take" />
+
+**Salida:**
+
+```text
+Some("Ana") None
+None Some("Luis")
+Some(4) Some("Luis")
+Err("vacío")
+```
+
+## Pánicos
+
+`unwrap` y `expect` entran en pánico si el valor es `None`. El mensaje de `expect` es el tuyo:
+
+<Ejecutar ej="ref-std/option-unwrap-panico" />
+
+**Salida:**
+
+```text
+antes
+```
+
+**Salida de error** (*stderr*):
+
+```text
+thread 'main' (1) panicked at option-unwrap-panico.rs:4:18:
+se esperaba un número
+```
+
+## Rendimiento
+
+Todos estos métodos son funciones pequeñas que el compilador integra (*inline*): usarlos cuesta lo mismo que escribir el `match` a mano.
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `filter` (1.27), `replace` (1.31), `insert` (1.53), `get_or_insert_with` (1.20).
+
+## Ver también
+
+- [Result](/ref/std/result/result/)
+- [std::mem::take y replace](/ref/std/mem/swap-replace-take/)
+- [E0005: patrón refutable en let](/errores/e0005/)
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)
+- [Mundo 10 · Errores](/curso/10-errores/)

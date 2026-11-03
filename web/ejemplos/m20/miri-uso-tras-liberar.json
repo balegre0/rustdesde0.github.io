@@ -1,0 +1,1 @@
+{ "plataforma": "playground", "nota": "UB a propósito. Tools → Miri: informa de un uso de memoria ya liberada (use-after-free) en el paso 3." }

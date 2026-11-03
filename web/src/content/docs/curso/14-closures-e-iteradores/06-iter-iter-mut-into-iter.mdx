@@ -1,0 +1,99 @@
+---
+title: "iter, iter_mut e into_iter"
+description: "Elige si recorres una colección prestando, prestando para cambiar o llevándote sus valores."
+sidebar:
+  order: 6
+duracion: 11
+desde: "2021"
+requiere: ["14-closures-e-iteradores/05-el-trait-iterator", "06-ownership", "11-colecciones-y-texto"]
+tarjetas:
+  - p: "¿Qué entrega `v.iter()` para un `Vec<T>`? ¿Y `v.iter_mut()`? ¿Y `v.into_iter()`?"
+    r: "`&T` (préstamos compartidos), `&mut T` (préstamos exclusivos) y `T` (los valores, moviéndolos fuera del vector)."
+  - p: "¿Qué es `for x in &v` por dentro?"
+    r: "`for x in v.iter()`: entrega `&T` y `v` sigue siendo tuyo después."
+  - p: "¿Por qué `for x in v { }` deja `v` inutilizable?"
+    r: "Porque llama a `v.into_iter()`, que toma `v` por valor (lo mueve). Usar `v` después da E0382."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Vas a elegir, cada vez que recorras una colección, **qué te llevas**: un préstamo de cada elemento, un préstamo para modificarlo o el elemento entero.
+
+## Predice
+
+<Predice
+  ej="m14/q-iter-mut"
+  opciones={["`[10, 20, 30]`", "`[1, 2, 3]`", "No compila: `x` es inmutable", "No compila: no se puede multiplicar una referencia"]}
+  correcta={0}
+  explicacion="`for x in &mut v` entrega `&mut i32`: con `*x` llegas al número de dentro del vector y lo cambias en su sitio."
+  porque={["Correcto.", "Los cambios se hacen en los elementos del vector, no en copias.", "`x` es un préstamo exclusivo: permite escribir a través de él.", "Por eso se escribe `*x`: se desreferencia y se modifica el `i32`."]}
+/>
+
+## La idea
+
+Una colección como `Vec<T>` ofrece tres iteradores, uno por cada forma de acceso que ya conoces:
+
+| Método | Atajo en un `for` | Entrega | Después, el vector… |
+|---|---|---|---|
+| `v.iter()` | `for x in &v` | `&T` | sigue igual y es tuyo |
+| `v.iter_mut()` | `for x in &mut v` | `&mut T` | sigue siendo tuyo, quizá cambiado |
+| `v.into_iter()` | `for x in v` | `T` | ya no existe: se ha movido |
+
+La tercera forma es la que sorprende: `for x in v` **consume** el vector. Cada `String` sale del vector y pasa a ser tuya dentro del bucle. Es útil cuando ya no necesitas la colección (te ahorras clonar), pero si luego quieres usarla, recorre con `&v`.
+
+Con tipos `Copy` (como `i32`) se nota menos, porque de un `&i32` sacas el número con `*x` o con el patrón `&x`. Con `String`, `Vec` y demás, la diferencia es la de siempre entre **prestar** y **mover**.
+
+## Pruébalo
+
+<Ejecutar ej="m14/iter-vs-into" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+El `for` siempre llama a `IntoIterator::into_iter(lo_que_le_des)`. Lo que cambia es **para qué tipo**: la biblioteca estándar implementa `IntoIterator` tres veces para los vectores:
+
+```rust
+impl<T> IntoIterator for Vec<T>        { type Item = T;      /* … */ }  // for x in v
+impl<'a, T> IntoIterator for &'a Vec<T>     { type Item = &'a T;     /* … */ }  // for x in &v
+impl<'a, T> IntoIterator for &'a mut Vec<T> { type Item = &'a mut T; /* … */ }  // for x in &mut v
+```
+
+`v.iter()` es un `std::slice::Iter<'_, T>`: un struct con dos punteros, al elemento actual y al final. Avanzar es sumar el tamaño de un `T` al primero. El tiempo de vida `'_` ata el iterador al vector: mientras el iterador exista, el vector está prestado, así que no puedes, por ejemplo, vaciarlo a mitad de recorrido. Sin esa regla, el iterador apuntaría a memoria liberada.
+
+Los arrays también: desde la edición 2021, `[1, 2, 3].into_iter()` entrega los valores (no referencias).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m14/into-iter-mueve"
+  explicacion="`for n in nombres` llama a `into_iter()`, que se queda con el vector. La nota del compilador lo explica: el `for` «is desugared into a call to `IntoIterator::into_iter`», que toma la propiedad. Arreglo: `for n in &nombres`."
+/>
+
+## Tu turno
+
+<Ordena
+  lineas={["let mut precios = vec![10, 20];", "for p in &mut precios {", "    *p += 1;", "}", 'println!("{precios:?}");']}
+  distractores={["for p in precios {", "    p += 1;"]}
+  explicacion="Para cambiar los elementos en su sitio y seguir usando el vector, recorre con `&mut precios` y modifica a través de la referencia con `*p`. Imprime `[11, 21]`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tienes `let v: Vec<String>` y quieres imprimir cada texto y después usar `v.len()`. ¿Qué escribes?"
+  opciones={["`for s in &v`", "`for s in v`", "`for s in v.into_iter()`", "`for s in v.clone().iter_mut()`"]}
+  correcta={0}
+  explicacion="Solo vas a leer: basta un préstamo compartido de cada elemento, y `v` sigue siendo tuyo."
+  porque={["Correcto.", "Movería el vector dentro del bucle (E0382 al usar `v.len()`).", "Es exactamente lo mismo que `for s in v`.", "Funciona pero clona todo el vector sin necesidad, y `iter_mut` sobra para leer."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué tipo tiene `x` en `for x in v.iter()` si `v: Vec<u8>`?"
+  opciones={["`&u8`", "`u8`", "`&mut u8`", "`Option<u8>`"]}
+  correcta={0}
+  explicacion="`iter()` presta cada elemento: `&u8`. El `Option` lo desmonta el propio `for`."
+  porque={["Correcto.", "Eso lo daría `into_iter()` (o `.iter().copied()`).", "Eso lo daría `iter_mut()`.", "El `for` ya saca el valor de dentro del `Some`."]}
+/>

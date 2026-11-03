@@ -1,0 +1,1 @@
+{"flags": "--cfg 'feature=\"colores\"' --check-cfg 'cfg(feature,values(\"colores\"))'", "nota": "Compilado con --cfg feature=\"colores\", que es lo que hace Cargo al activar la feature."}

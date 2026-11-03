@@ -1,0 +1,90 @@
+---
+title: "OnceCell<T>"
+description: "Una celda que se rellena una sola vez: inicialización perezosa con get_or_init."
+sidebar:
+  order: 3
+insignias: ["Desde 1.70", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::cell::OnceCell`
+
+## Sinopsis
+
+```rust
+pub struct OnceCell<T> { /* private fields */ }
+```
+
+## Qué hace
+
+`OnceCell<T>` empieza vacía y se puede rellenar **una vez**. Después, solo se lee, y por eso puede dar `&T` normales. `get_or_init` calcula el valor solo la primera vez que se pide. Para `static` y para varios hilos, usa `std::sync::OnceLock` (o `LazyLock`).
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`new`](#new) | Crea una celda vacía. | 1.70 |
+| [`get`](#get) | `Some(&T)` si ya tiene valor. | 1.70 |
+| [`set`](#set) | Intenta poner el valor; si ya tenía uno, devuelve `Err(valor)`. | 1.70 |
+| [`get_or_init`](#get_or_init) | Devuelve el valor, calculándolo con la closure si todavía no existe. | 1.70 |
+
+### `new`
+
+```rust
+pub const fn new() -> OnceCell<T>
+```
+
+Crea una celda vacía.
+
+### `get`
+
+```rust
+pub fn get(&self) -> Option<&T>
+```
+
+`Some(&T)` si ya tiene valor.
+
+### `set`
+
+```rust
+pub fn set(&self, value: T) -> Result<(), T>
+```
+
+Intenta poner el valor; si ya tenía uno, devuelve `Err(valor)`.
+
+### `get_or_init`
+
+```rust
+pub fn get_or_init<F>(&self, f: F) -> &T
+where
+    F: FnOnce() -> T,
+```
+
+Devuelve el valor, calculándolo con la closure si todavía no existe.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/cell-oncecell" />
+
+**Salida:**
+
+```text
+None
+calculando...
+valor
+valor
+Err("nuevo")
+```
+
+## Desde
+
+Rust 1.70 (estable).
+
+## Ver también
+
+- [RefCell](/ref/std/cell/refcell/)
+- [std::sync (OnceLock, LazyLock)](/ref/std/sync/)
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

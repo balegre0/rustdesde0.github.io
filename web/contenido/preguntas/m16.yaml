@@ -1,0 +1,914 @@
+# Banco de preguntas del mundo 16 (CONTENIDO.md §7.1). Todo verificado con rustc/cargo 1.99.1, ed. 2024.
+# Las salidas de `cargo test` se obtuvieron compilando las pruebas a wasm32-wasip1 con un runner.
+
+- id: m16-assert-eq-left-right
+  titulo: "La suma que resta"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m16/assert-falla
+  opciones:
+    - "`Comprobando suma...` y después `suma funciona`"
+    - "`Comprobando suma...` y un pánico con `left: 0` y `right: 4`"
+    - "No compila: `assert_eq!` solo vale dentro de `#[test]`"
+    - "`Comprobando suma...` y después `false`"
+  correcta: 1
+  solucion: |
+    `suma(2, 2)` devuelve `2 - 2 = 0`. `assert_eq!` compara `0` con `4` y entra en pánico mostrando los dos lados:
+    `left` es el primer argumento (`0`) y `right` el segundo (`4`). La última línea no llega a imprimirse.
+    - `assert_eq!` es una macro normal: se puede usar en `main` o en cualquier función.
+    - No devuelve un `bool`: o no hace nada, o entra en pánico.
+  etiquetas: ["assert_eq!", "pánico"]
+
+- id: m16-mensaje-propio
+  titulo: "1900 no fue bisiesto"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué mensaje tiene el pánico?"
+  ej: m16/assert-mensaje
+  opciones:
+    - "`assertion failed: !es_bisiesto(año)`"
+    - "`1900 no es bisiesto, pero es_bisiesto dice que sí`"
+    - "No hay pánico: imprime `todo bien`"
+    - "`{año} no es bisiesto, pero es_bisiesto dice que sí`"
+  correcta: 1
+  solucion: |
+    `1900 % 4 == 0`, así que la función devuelve `true` y la condición `!true` falla.
+    Como el `assert!` lleva un mensaje propio, se muestra ese mensaje con `{año}` ya sustituido por `1900`.
+    El texto genérico `assertion failed: …` solo aparece cuando no das mensaje.
+  etiquetas: ["assert!", "mensaje"]
+
+- id: m16-sin-partialeq
+  titulo: "Comparar puntos sin decir cómo"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m16/sin-partialeq
+  opciones:
+    - "`Punto` no implementa `PartialEq` (E0369) ni `Debug` (E0277), y `assert_eq!` necesita los dos"
+    - "Los structs no se pueden comparar nunca en Rust"
+    - "`origen()` devuelve el `Punto` por valor y `assert_eq!` exige referencias"
+    - "Falta `#[test]` encima de `main`"
+  correcta: 0
+  solucion: |
+    rustc da `error[E0369]: binary operation == cannot be applied to type Punto` y dos `error[E0277]: Punto doesn't implement Debug`.
+    `assert_eq!` compara con `==` (necesita `PartialEq`) y, si falla, imprime los lados con `{:?}` (necesita `Debug`).
+    El arreglo es `#[derive(Debug, PartialEq)]` encima del struct.
+    - Los structs se pueden comparar si implementan `PartialEq`.
+    - `assert_eq!` toma él mismo préstamos de los dos lados; no hace falta escribir `&`.
+  etiquetas: ["E0369", "E0277", "derive", "assert_eq!"]
+
+- id: m16-que-es-test
+  titulo: "El atributo mágico"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué convierte una función en una prueba que `cargo test` ejecuta?"
+  opciones:
+    - "Que su nombre empiece por `test_`"
+    - "El atributo `#[test]` encima de ella"
+    - "Que esté en un archivo llamado `tests.rs`"
+    - "Que devuelva `bool`"
+  correcta: 1
+  solucion: |
+    El arnés de pruebas busca las funciones marcadas con `#[test]`. El nombre, el archivo y el tipo de retorno no las convierten en pruebas.
+    (Las pruebas pueden devolver `()` o `Result<(), E>`, pero no `bool`.)
+  etiquetas: ["#[test]"]
+
+- id: m16-panico-cuenta
+  titulo: "Sin asserts, pero con pánico"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Una función `#[test]` no tiene ningún `assert!`, pero hace `let v = vec![1, 2, 3]; let x = v[10];`. ¿Qué resultado da?"
+  opciones:
+    - "Pasa: no hay ningún `assert!` que falle"
+    - "Falla: el índice fuera de rango entra en pánico y cualquier pánico hace fallar la prueba"
+    - "Se ignora porque no comprueba nada"
+    - "No compila"
+  correcta: 1
+  solucion: |
+    Para el arnés solo hay una regla: si la prueba entra en pánico (o devuelve `Err`), falla.
+    `v[10]` sobre un vector de 3 elementos entra en pánico con `index out of bounds`.
+  etiquetas: ["pánico", "índices"]
+
+- id: m16-assert-eq-mejor
+  titulo: "¿Por qué assert_eq!?"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué ventaja tiene `assert_eq!(a, b)` sobre `assert!(a == b)`?"
+  opciones:
+    - "Es más rápido"
+    - "Si falla, muestra los dos valores (`left` y `right`)"
+    - "Funciona con tipos que no implementan `PartialEq`"
+    - "No entra en pánico, solo avisa"
+  correcta: 1
+  solucion: |
+    Las dos comprueban lo mismo. Pero `assert!` solo sabe que la condición fue falsa; `assert_eq!` imprime los dos lados, que es lo que necesitas para encontrar el fallo.
+    `assert_eq!` exige `PartialEq` **y** `Debug`, y entra en pánico igual que `assert!`.
+  etiquetas: ["assert_eq!"]
+
+- id: m16-debug-assert-perfiles
+  titulo: "La comprobación que desaparece"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime este programa compilado en **release**?"
+  ej: m16/debug-assert
+  opciones:
+    - "`25%` y después un pánico con `parte (5) mayor que total (4)`"
+    - "`25%` y `125%`"
+    - "Solo `25%`"
+    - "Un pánico antes de imprimir nada"
+  correcta: 1
+  solucion: |
+    `debug_assert!` solo se comprueba con las comprobaciones de depuración activas (perfil debug). En release desaparece y el programa calcula `5 * 100 / 4 = 125`.
+    En debug, en cambio, imprime `25%` y entra en pánico con el mensaje del `debug_assert!` (la primera opción).
+    Moraleja: `debug_assert!` es para detectar errores tuyos durante el desarrollo, nunca para validar datos externos.
+  etiquetas: ["debug_assert!", "release"]
+
+- id: m16-should-panic-expected
+  titulo: "Cualquier pánico vale"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué resultado da esta prueba, si `reparto(total, personas)` hace `total / personas`?"
+  codigo: |
+    #[test]
+    #[should_panic]
+    fn repartir_entre_nadie() {
+        let grupos: Vec<u32> = vec![];
+        reparto(100, grupos[0]);
+    }
+  opciones:
+    - "Pasa, aunque el pánico sea por el índice y no por dividir entre cero"
+    - "Falla, porque el pánico no es una división entre cero"
+    - "No compila"
+    - "Se ignora"
+  correcta: 0
+  solucion: |
+    `grupos[0]` sobre un vector vacío entra en pánico con `index out of bounds: the len is 0 but the index is 0`, antes de llegar a dividir.
+    Sin `expected`, `#[should_panic]` acepta **cualquier** pánico, así que la prueba pasa sin probar lo que querías.
+    Con `#[should_panic(expected = "attempt to divide by zero")]` solo pasaría si el mensaje del pánico contiene ese texto.
+  etiquetas: ["should_panic", "expected"]
+
+- id: m16-test-result
+  titulo: "Una prueba que devuelve Err"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué pasa al ejecutar esta prueba?"
+  codigo: |
+    #[test]
+    fn leer_numero() -> Result<(), std::num::ParseIntError> {
+        let n: i32 = "abc".parse()?;
+        assert_eq!(n, 0);
+        Ok(())
+    }
+  opciones:
+    - "Pasa, porque el `assert_eq!` no llega a ejecutarse"
+    - "Falla, porque el `?` devuelve el `Err` y una prueba que devuelve `Err` cuenta como fallida"
+    - "No compila: las pruebas no pueden devolver `Result`"
+    - "Entra en pánico dentro de `parse`"
+  correcta: 1
+  solucion: |
+    `"abc".parse::<i32>()` da `Err`. El `?` lo devuelve desde la función y el arnés trata ese `Err` como un fallo (lo muestra con `Debug`).
+    Las pruebas pueden devolver `Result<(), E>` si `E: Debug`. `parse` no entra en pánico: devuelve `Err`.
+  etiquetas: ["Result", "?"]
+
+- id: m16-ignored
+  titulo: "Las apartadas"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué ejecuta `cargo test -- --ignored`?"
+  opciones:
+    - "Todas las pruebas"
+    - "Solo las marcadas con `#[ignore]`"
+    - "Ninguna: solo las lista"
+    - "Las que fallaron la última vez"
+  correcta: 1
+  solucion: |
+    `--ignored` ejecuta únicamente las ignoradas; las demás salen como `filtered out` en el resumen.
+    Para todas a la vez está `--include-ignored`, y para listarlas sin ejecutar, `--list`.
+  etiquetas: ["#[ignore]", "cargo test"]
+
+- id: m16-guion-guion
+  titulo: "El doble guion"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: media
+  tipo: opcion
+  enunciado: "En `cargo test media -- --nocapture`, ¿para quién es cada parte?"
+  opciones:
+    - "`media` y `--nocapture` son para Cargo"
+    - "`media` lo usa Cargo como filtro y `--nocapture`, tras el `--`, va al programa de pruebas"
+    - "Todo va al compilador"
+    - "`--` comenta el resto de la línea"
+  correcta: 1
+  solucion: |
+    Lo que va antes de `--` lo interpreta `cargo test` (el filtro `media` lo reenvía él al arnés). Lo que va después se pasa tal cual al programa de pruebas: `--nocapture`, `--ignored`, `--test-threads=1`, `--exact`, `--list`…
+  etiquetas: ["cargo test", "--nocapture"]
+
+- id: m16-cfg-test
+  titulo: "El módulo fantasma"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa con un `rustc` normal?"
+  ej: m16/cfg-test
+  opciones:
+    - "Porque `#[cfg(test)]` elimina el módulo `tests` fuera del modo prueba, y `main` no lo encuentra (E0433)"
+    - "Porque `caso_basico` es privada"
+    - "Porque un módulo no puede llamarse `tests`"
+    - "Porque `super::doble` no existe"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0433]: cannot find module or crate tests in this scope`. La compilación condicional se resuelve al principio: con `cfg(test)` falso, el módulo se borra antes de resolver nombres.
+    `caso_basico` es `pub`, y `super::doble` sí existe dentro del módulo; pero el módulo entero no existe en este build.
+  etiquetas: ["E0433", "cfg(test)"]
+
+- id: m16-privado-unitario
+  titulo: "Probar lo privado"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: media
+  tipo: opcion
+  enunciado: "Una función privada `fn suma_interna` está en `src/lib.rs`. ¿Desde dónde se puede probar?"
+  opciones:
+    - "Desde `tests/`, con `use mi_crate::suma_interna;`"
+    - "Desde el módulo `#[cfg(test)] mod tests` del mismo archivo, con `use super::*;`"
+    - "Desde ningún sitio: hay que hacerla `pub`"
+    - "Solo desde un doctest"
+  correcta: 1
+  solucion: |
+    El módulo `tests` es hijo del módulo que contiene la función, y un hijo ve todo lo de sus antepasados, también lo privado.
+    Desde `tests/` (otro crate) o desde un doctest (que también se compila como crate externo) solo se ve lo `pub`.
+  etiquetas: ["visibilidad", "use super::*"]
+
+- id: m16-filtro
+  titulo: "Filtrar por nombre"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Hay pruebas `tests::suma_basica`, `tests::resta` y `tests::suma_negativa`. ¿Cuáles ejecuta `cargo test suma`?"
+  opciones:
+    - "Ninguna: el filtro debe ser el nombre exacto"
+    - "`tests::suma_basica` y `tests::suma_negativa`"
+    - "Las tres"
+    - "Solo la primera que encuentre"
+  correcta: 1
+  solucion: |
+    El filtro es una **subcadena** del nombre completo. Para exigir el nombre exacto: `cargo test -- --exact tests::suma_basica`.
+  etiquetas: ["cargo test", "filtro"]
+
+- id: m16-captura-salida
+  titulo: "¿Dónde está mi println?"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Tu prueba hace `println!(\"calculando...\")` y pasa, pero en `cargo test` no ves el texto. ¿Por qué?"
+  opciones:
+    - "`println!` no funciona en las pruebas"
+    - "El arnés captura la salida de cada prueba y solo la muestra si falla"
+    - "La salida va a un archivo de registro"
+    - "`#[cfg(test)]` desactiva `println!`"
+  correcta: 1
+  solucion: |
+    Cada prueba escribe en un búfer propio que se descarta si pasa. Con `cargo test -- --nocapture` la salida aparece en directo
+    (salida real: `test tests::triple_de_dos ... calculando triple(2)...` y luego `ok`).
+  etiquetas: ["--nocapture", "captura"]
+
+- id: m16-paralelo
+  titulo: "El orden no está garantizado"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: media
+  tipo: opcion
+  enunciado: "Dos pruebas escriben y leen el mismo archivo `datos.txt`. A veces fallan y a veces no. ¿Por qué?"
+  opciones:
+    - "Porque los archivos no se pueden usar en pruebas"
+    - "Porque las pruebas se ejecutan en paralelo en varios hilos y se pisan"
+    - "Porque Rust borra los archivos entre pruebas"
+    - "Porque el arnés ejecuta cada prueba dos veces"
+  correcta: 1
+  solucion: |
+    Por defecto el arnés reparte las pruebas entre varios hilos. Si comparten un recurso, el resultado depende de quién llegue antes.
+    Soluciones: que cada prueba use sus propios recursos, o `--test-threads=1` (más lento).
+  etiquetas: ["paralelismo", "--test-threads"]
+
+- id: m16-integracion-privada
+  titulo: "Desde fuera no se ve"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "`main` hace de prueba de integración que usa el módulo `notas` desde fuera. ¿Por qué no compila?"
+  ej: m16/privada
+  opciones:
+    - "`suma` no es `pub` y desde fuera del módulo es privada (E0603)"
+    - "`media` no es `pub`"
+    - "Los módulos no pueden tener funciones que se llamen igual que macros"
+    - "`assert_eq!` no admite `f64`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0603]: function suma is private`. Igual que una prueba de `tests/` (otro crate), `main` solo ve lo `pub`.
+    `media` sí es `pub`, y `assert_eq!` funciona con `f64` (implementa `PartialEq` y `Debug`).
+  etiquetas: ["E0603", "integración"]
+
+- id: m16-tests-subcarpeta
+  titulo: "Ayudas compartidas"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: media
+  tipo: opcion
+  enunciado: "Tienes `tests/a.rs`, `tests/b.rs` y `tests/comun/mod.rs`. ¿Cuántos programas de pruebas de integración compila Cargo?"
+  opciones:
+    - "1"
+    - "2"
+    - "3"
+    - "Ninguno sin un `tests/main.rs`"
+  correcta: 1
+  solucion: |
+    Cada `.rs` directamente en `tests/` es un crate y un programa: `a` y `b`. La subcarpeta `comun/` no se compila sola; se usa con `mod comun;`.
+    Si hubieras puesto `tests/comun.rs`, Cargo lo ejecutaría como otro archivo de pruebas (salida real: `Running tests\comun.rs` … `running 0 tests`).
+  etiquetas: ["tests/", "integración"]
+
+- id: m16-binario-sin-lib
+  titulo: "Solo hay main.rs"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: media
+  tipo: opcion
+  enunciado: "Tu crate solo tiene `src/main.rs`. ¿Qué haces para poder escribir pruebas en `tests/`?"
+  opciones:
+    - "Llamar a `main()` desde `tests/`"
+    - "Mover la lógica a `src/lib.rs` y dejar `main.rs` como una capa fina que la usa"
+    - "Poner `pub` a todo en `main.rs`"
+    - "No se puede probar un binario de ninguna forma"
+  correcta: 1
+  solucion: |
+    Un binario no puede ser dependencia de otro crate, así que `tests/` no puede importar nada de él. Con la lógica en `lib.rs`, todo es probable desde fuera.
+    Las pruebas unitarias dentro de `main.rs` sí funcionan; lo que no hay es acceso desde `tests/`.
+  etiquetas: ["lib.rs", "main.rs"]
+
+- id: m16-doctest-que-es
+  titulo: "El ejemplo que se ejecuta"
+  mundo: 16-pruebas-y-herramientas
+  tema: documentacion
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Un bloque de código dentro de un comentario `///` de una función pública… "
+  opciones:
+    - "…es solo texto para la documentación"
+    - "…lo ejecuta `cargo test` como una prueba (doctest)"
+    - "…se copia dentro de la función al compilar"
+    - "…lo ejecuta `cargo doc` al generar la web"
+  correcta: 1
+  solucion: |
+    rustdoc extrae cada bloque, lo envuelve en un `fn main` si no lo tiene, lo compila como crate externo y lo ejecuta. En la salida aparece como `Doc-tests` con nombres tipo `src\lib.rs - media (line 7)`.
+    `cargo doc` genera la web pero no ejecuta los ejemplos.
+  etiquetas: ["doctest", "///"]
+
+- id: m16-doctest-almohadilla
+  titulo: "Líneas invisibles"
+  mundo: 16-pruebas-y-herramientas
+  tema: documentacion
+  dificultad: media
+  tipo: opcion
+  enunciado: "En un doctest, ¿qué hace una línea que empieza por `# ` (almohadilla y espacio), como `# use calculo::divide;`?"
+  opciones:
+    - "Es un comentario y no se compila"
+    - "Se compila y se ejecuta, pero no aparece en la documentación generada"
+    - "Marca el inicio de una sección"
+    - "Hace que el doctest se ignore"
+  correcta: 1
+  solucion: |
+    Sirve para esconder preparativos (`use`, datos de ejemplo, un `Ok::<(), E>(())` final) que distraerían del ejemplo, sin dejar de comprobarlos.
+  etiquetas: ["doctest"]
+
+- id: m16-doctest-atributos
+  titulo: "No ejecutar, pero sí compilar"
+  mundo: 16-pruebas-y-herramientas
+  tema: documentacion
+  dificultad: media
+  tipo: opcion
+  enunciado: "El ejemplo de una función se conecta a internet. ¿Qué atributo le pones al bloque del doctest para que no se pudra sin ejecutarlo?"
+  opciones:
+    - "`ignore`"
+    - "`no_run`"
+    - "`should_panic`"
+    - "`text`"
+  correcta: 1
+  solucion: |
+    `no_run` compila el ejemplo pero no lo ejecuta: si cambias la API, lo descubres. En la salida real aparece como `- compile ... ok`.
+    `ignore` ni lo compila (sale `ignored`), y `text` no lo trata como Rust.
+  etiquetas: ["doctest", "no_run"]
+
+- id: m16-compile-fail
+  titulo: "Debe fallar al compilar"
+  mundo: 16-pruebas-y-herramientas
+  tema: documentacion
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Un doctest ```` ```compile_fail ```` contiene un error de escritura (`Strin::from`) en vez del error que querías demostrar. En Rust estable, ¿qué pasa?"
+  opciones:
+    - "El doctest falla, porque el error no es el esperado"
+    - "El doctest pasa: solo comprueba que no compile, no por qué"
+    - "rustdoc corrige la errata"
+    - "No compila la biblioteca"
+  correcta: 1
+  solucion: |
+    `compile_fail` solo exige que la compilación falle. Se puede añadir el código esperado (`compile_fail,E0382`), pero en estable rustdoc no lo comprueba:
+    verificado, un `compile_fail,E0599` cuyo error real era otro pasó igualmente (`- compile fail ... ok`). Revisa tus `compile_fail` a mano.
+  etiquetas: ["compile_fail", "doctest"]
+
+- id: m16-compile-fail-e0382
+  titulo: "El ejemplo de lo prohibido"
+  mundo: 16-pruebas-y-herramientas
+  tema: documentacion
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "Este es el código de un doctest `compile_fail`. ¿Qué error demuestra?"
+  ej: m16/doc-compile-fail
+  opciones:
+    - "E0382: usar `nombre` después de moverlo a `otro`"
+    - "E0499: dos préstamos exclusivos"
+    - "E0308: tipos distintos"
+    - "Ninguno: compila bien y el doctest fallaría"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of moved value: nombre`. `let otro = nombre;` mueve la `String`; después `println!` intenta tomarla prestada.
+    Como no compila, un doctest `compile_fail` con este código pasa.
+  etiquetas: ["E0382", "compile_fail"]
+
+- id: m16-edicion-2024-doctests
+  titulo: "Doctests en un solo programa"
+  mundo: 16-pruebas-y-herramientas
+  tema: documentacion
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En la salida de `cargo test` de un proyecto con edición 2024 aparece `merged doctests compilation took 0.46s`. ¿Qué significa?"
+  opciones:
+    - "Que rustdoc ha juntado en un único programa los doctests que podía, en vez de compilar uno por ejemplo"
+    - "Que los doctests se han mezclado con las pruebas unitarias"
+    - "Que algunos doctests se han borrado por duplicados"
+    - "Que se han compilado en release"
+  correcta: 0
+  solucion: |
+    Desde la edición 2024, rustdoc combina los doctests compatibles en un solo binario, mucho más rápido de compilar.
+    Los `compile_fail` y los marcados `standalone_crate` se compilan aparte: por eso la salida real muestra dos tandas de `running N tests`.
+  etiquetas: ["edición 2024", "doctest"]
+
+- id: m16-doc-interna
+  titulo: "Barra, barra, exclamación"
+  mundo: 16-pruebas-y-herramientas
+  tema: documentacion
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué documenta `//! Utilidades para notas.` escrito en la primera línea de `src/lib.rs`?"
+  opciones:
+    - "La primera función del archivo"
+    - "El crate entero"
+    - "Nada, es un comentario normal"
+    - "El archivo `Cargo.toml`"
+  correcta: 1
+  solucion: |
+    `//!` documenta el elemento que **contiene** el comentario (aquí, el crate). `///` documenta el elemento que viene **después**.
+    Los dos son azúcar de atributos: `#![doc = "…"]` y `#[doc = "…"]`.
+  etiquetas: ["rustdoc", "//!"]
+
+- id: m16-secciones-doc
+  titulo: "Las secciones de costumbre"
+  mundo: 16-pruebas-y-herramientas
+  tema: documentacion
+  dificultad: media
+  tipo: opcion
+  enunciado: "Una función pública devuelve `Result` y entra en pánico con un slice vacío. ¿Qué secciones debería tener su documentación?"
+  opciones:
+    - "`# Ejemplos`, `# Errores` y `# Pánicos`"
+    - "Solo `# Safety`"
+    - "Ninguna: el tipo lo dice todo"
+    - "`# Tests`"
+  correcta: 0
+  solucion: |
+    `# Errores` explica qué casos dan `Err` y `# Pánicos`, cuándo entra en pánico: son parte del contrato y el tipo no los cuenta.
+    `# Safety` es para `unsafe fn` (qué debe garantizar quien la llama).
+  etiquetas: ["rustdoc", "secciones"]
+
+- id: m16-enlace-roto
+  titulo: "Un enlace a ninguna parte"
+  mundo: 16-pruebas-y-herramientas
+  tema: documentacion
+  dificultad: media
+  tipo: opcion
+  enunciado: "Escribes ``[`a_kelvin`]`` en un comentario `///`, pero no existe ninguna función `a_kelvin`. ¿Qué hace `cargo doc`?"
+  opciones:
+    - "Falla y no genera nada"
+    - "Genera la documentación y avisa con `unresolved link to a_kelvin` (lint `rustdoc::broken_intra_doc_links`)"
+    - "Crea una página vacía para `a_kelvin`"
+    - "Nada: los corchetes son texto normal"
+  correcta: 1
+  solucion: |
+    rustdoc resuelve los enlaces internos como lo haría el compilador. Si el nombre no existe, avisa (salida real: `warning: unresolved link to a_kelvin` … `no item named a_kelvin in scope`) y sigue.
+  etiquetas: ["rustdoc", "intra-doc links"]
+
+- id: m16-clippy-sin-linker
+  titulo: "Sin link.exe"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: facil
+  tipo: opcion
+  enunciado: "En tu Windows falta `link.exe` y `cargo build` falla. ¿Cuáles de estos comandos siguen funcionando?"
+  opciones:
+    - "Ninguno"
+    - "`cargo check`, `cargo clippy`, `cargo fmt` y `cargo doc`"
+    - "Solo `cargo test`"
+    - "`cargo run --release`"
+  correcta: 1
+  solucion: |
+    Ninguno de ellos produce un ejecutable, así que no enlazan. `cargo test` y `cargo run` sí necesitan el enlazador, porque construyen y ejecutan un programa.
+  etiquetas: ["clippy", "link.exe", "Windows"]
+
+- id: m16-clippy-predice
+  titulo: "Correcto pero mejorable"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué hace este programa al compilarlo con `rustc` y ejecutarlo?"
+  ej: m16/clippy-antes
+  opciones:
+    - "No compila por `&Vec<i32>`"
+    - "Imprime `¿vacía? false` y `total: 21`"
+    - "Compila con 7 avisos del compilador"
+    - "Entra en pánico en el bucle"
+  correcta: 1
+  solucion: |
+    El programa es correcto y el compilador no avisa de nada. Los 7 avisos (`ptr_arg`, `needless_return` ×2, `needless_bool`, `len_zero`, `needless_range_loop`, `assign_op_pattern`) solo aparecen con Clippy.
+  etiquetas: ["clippy"]
+
+- id: m16-clippy-grupo-deny
+  titulo: "El grupo que da errores"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: media
+  tipo: opcion
+  enunciado: "`cargo clippy` da un **error** (no un aviso) en `if edad == edad`. ¿De qué grupo es el lint?"
+  opciones:
+    - "`clippy::style`"
+    - "`clippy::correctness`"
+    - "`clippy::pedantic`"
+    - "`clippy::perf`"
+  correcta: 1
+  solucion: |
+    El lint `eq_op` es de `correctness`, el único grupo en nivel `deny` por defecto: código que casi seguro está mal.
+    Salida real: `error: equal expressions as operands to ==` … `#[deny(clippy::eq_op)] on by default`.
+  etiquetas: ["clippy", "eq_op", "niveles"]
+
+- id: m16-clippy-expect
+  titulo: "Silenciar con fecha de caducidad"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Qué hace `#[expect(clippy::needless_range_loop)]` que no haga `#[allow(clippy::needless_range_loop)]`?"
+  opciones:
+    - "Convierte el aviso en error"
+    - "Avisa si el lint ya no se dispara en ese código (`unfulfilled_lint_expectations`)"
+    - "Aplica la corrección automáticamente"
+    - "Nada, son sinónimos"
+  correcta: 1
+  solucion: |
+    Los dos silencian el lint. `expect` además avisa cuando el silencio sobra (salida real: `warning: this lint expectation is unfulfilled`), y su `reason = "…"` aparece en el aviso.
+  etiquetas: ["clippy", "expect", "allow"]
+
+- id: m16-clippy-fix
+  titulo: "Lo que --fix no toca"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: media
+  tipo: opcion
+  enunciado: "`cargo clippy --fix` aplicó 5 arreglos y dejó como aviso `ptr_arg` (cambiar `&Vec<i32>` por `&[i32]`). ¿Por qué no lo aplicó?"
+  opciones:
+    - "Porque no sabe hacerlo"
+    - "Porque cambiar la firma de una función puede afectar a quien la llama; solo aplica lo que considera seguro"
+    - "Porque `--fix` solo arregla errores"
+    - "Porque necesita nightly"
+  correcta: 1
+  solucion: |
+    La sugerencia aparece en el aviso, pero `--fix` solo aplica cambios que está seguro de que no alteran el comportamiento ni rompen a nadie. El resto lo decides tú.
+  etiquetas: ["clippy", "--fix"]
+
+- id: m16-lints-cargo-toml
+  titulo: "Lints para todo el proyecto"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: media
+  tipo: respuesta
+  enunciado: "¿Cómo se llama la tabla de `Cargo.toml` donde escribes, por ejemplo, `unwrap_used = \"warn\"` para activar un lint de Clippy en todo el crate? Escríbela con corchetes."
+  respuestas: ["[lints.clippy]"]
+  solucion: |
+    `[lints.clippy]` (y `[lints.rust]` para los lints del compilador). Con `unwrap_used = "warn"`, cada `unwrap()` produce el aviso real `used unwrap() on a Result value`.
+  etiquetas: ["clippy", "Cargo.toml"]
+
+- id: m16-fmt-predice
+  titulo: "Feo pero válido"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué hace este programa tan mal formateado?"
+  ej: m16/fmt-feo
+  opciones:
+    - "No compila por la sangría"
+    - "Imprime `¡buen trimestre! 21`"
+    - "Compila con avisos de formato"
+    - "No compila por faltar espacios"
+  correcta: 1
+  solucion: |
+    Al compilador le dan igual los espacios y saltos de línea. El formato es para las personas; lo arregla `cargo fmt`.
+  etiquetas: ["rustfmt"]
+
+- id: m16-fmt-check
+  titulo: "Comprobar sin tocar"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué hace `cargo fmt --check` si un archivo no está formateado?"
+  opciones:
+    - "Lo formatea en silencio"
+    - "Muestra las diferencias y termina con código de salida 1"
+    - "Borra el archivo"
+    - "Da un error de compilación"
+  correcta: 1
+  solucion: |
+    No modifica nada: imprime un `Diff in …` con las líneas `-` actuales y `+` propuestas y termina con 1 (verificado). Así la integración continua puede rechazar el cambio.
+  etiquetas: ["rustfmt", "CI"]
+
+- id: m16-fmt-tipos
+  titulo: "rustfmt y los errores de tipos"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: media
+  tipo: opcion
+  enunciado: "Pasas rustfmt por `fn main(){let x:u8=\"hola\";println!(\"{x}\");}`, que no compila por un error de tipos. ¿Qué pasa?"
+  opciones:
+    - "Falla porque el código no compila"
+    - "Lo formatea sin problema: rustfmt solo necesita que la sintaxis sea válida"
+    - "Corrige el tipo a `&str`"
+    - "Borra la línea"
+  correcta: 1
+  solucion: |
+    rustfmt construye el árbol de sintaxis y lo reimprime; no comprueba tipos. Verificado: lo formatea y termina con 0.
+    Con un error de **sintaxis** (`let x = ;`) sí falla, con `expected expression`.
+  etiquetas: ["rustfmt", "AST"]
+
+- id: m16-black-box
+  titulo: "La caja negra"
+  mundo: 16-pruebas-y-herramientas
+  tema: rendimiento
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Para qué sirve `std::hint::black_box` en un benchmark?"
+  opciones:
+    - "Para medir el tiempo"
+    - "Para impedir que el optimizador precalcule o elimine el trabajo que quieres medir"
+    - "Para ejecutar el código en otro hilo"
+    - "Para desactivar todas las optimizaciones"
+  correcta: 1
+  solucion: |
+    Devuelve su argumento sin cambiarlo, pero el optimizador no puede razonar sobre él. Sin esa barrera, en el ensamblador real una función que llamaba diez veces a una suma de 0 a 999 quedó en `mov eax, 4995000`: el resultado calculado al compilar.
+  etiquetas: ["black_box", "benchmark"]
+
+- id: m16-gauss-asm
+  titulo: "El bucle que desapareció"
+  mundo: 16-pruebas-y-herramientas
+  tema: rendimiento
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Compilas con `-O` una función que suma de 0 a n−1 con un `while`. En el ensamblador no hay ningún salto hacia atrás, sino un `mul` y un `shld … 63`. ¿Qué ha pasado?"
+  opciones:
+    - "El compilador ha fallado"
+    - "LLVM ha reconocido el patrón y lo ha sustituido por la fórmula n(n−1)/2"
+    - "El bucle se ejecuta en otro núcleo"
+    - "Es el código de depuración"
+  correcta: 1
+  solucion: |
+    Es un caso real de la lección: el optimizador sustituyó el bucle por una multiplicación y un desplazamiento (dividir entre 2). Por eso medir dice lo que pasa de verdad, que no siempre es lo que parece el código fuente.
+  etiquetas: ["LLVM", "asm", "optimización"]
+
+- id: m16-medir-debug
+  titulo: "Cronometrar en debug"
+  mundo: 16-pruebas-y-herramientas
+  tema: rendimiento
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Por qué no debes medir el rendimiento con `cargo run` a secas?"
+  opciones:
+    - "Porque `Instant` no funciona en debug"
+    - "Porque debug no optimiza y añade comprobaciones: mides un programa distinto del final"
+    - "Porque `cargo run` no imprime tiempos"
+    - "No hay ningún problema"
+  correcta: 1
+  solucion: |
+    Se mide en release (`cargo run --release`) o con `cargo bench`, que usa un perfil optimizado.
+  etiquetas: ["release", "benchmark"]
+
+- id: m16-fuzz-encuentra
+  titulo: "El fuzzer de juguete"
+  mundo: 16-pruebas-y-herramientas
+  tema: fuzzing
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué encuentra este fuzzer casero?"
+  ej: m16/fuzz-casero
+  opciones:
+    - "`Ningún fallo en 100 000 intentos`"
+    - "Un texto con `+` y ceros de más que la función acepta como hora"
+    - "Un pánico por `parse`"
+    - "Un desbordamiento al multiplicar"
+  correcta: 1
+  solucion: |
+    Salida real: `Intento 270: «+0005:5» -> Some(305)`. `parse` acepta un signo `+` y ceros a la izquierda, así que `+0005` vale 5.
+    Los fallos de `parse` se convierten en `None` con `.ok()?` (no hay pánico), y los números se limitan antes de multiplicar.
+  etiquetas: ["fuzzing", "parse"]
+
+- id: m16-propiedad-ida-vuelta
+  titulo: "La propiedad estrella"
+  mundo: 16-pruebas-y-herramientas
+  tema: propiedades
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál es una buena propiedad para probar `comprimir` y `descomprimir`?"
+  opciones:
+    - "`comprimir(\"hola\")` da exactamente ciertos bytes"
+    - "`descomprimir(comprimir(x)) == x` para cualquier `x`"
+    - "`comprimir` tarda menos de un segundo"
+    - "`comprimir` nunca devuelve algo vacío"
+  correcta: 1
+  solucion: |
+    La ida y vuelta no exige conocer la salida exacta, solo que se puede deshacer. Se comprueba con miles de entradas generadas.
+    La primera opción es un ejemplo, no una propiedad; la tercera depende de la máquina; la cuarta es falsa para la entrada vacía.
+  etiquetas: ["propiedades", "round trip"]
+
+- id: m16-semilla
+  titulo: "El fallo que no vuelve"
+  mundo: 16-pruebas-y-herramientas
+  tema: propiedades
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué los generadores aleatorios de las pruebas deben usar una semilla fija o imprimirla?"
+  opciones:
+    - "Para que sean más rápidos"
+    - "Para poder reproducir un fallo: la misma semilla genera la misma secuencia"
+    - "Porque Rust no tiene números aleatorios"
+    - "Para que generen menos casos"
+  correcta: 1
+  solucion: |
+    Sin semilla conocida, un fallo puede aparecer una vez y no volver nunca. Con ella, lo repites cuantas veces quieras, lo arreglas y lo conviertes en una prueba fija.
+  etiquetas: ["propiedades", "semilla"]
+
+- id: m16-cobertura
+  titulo: "Fuzzing con brújula"
+  mundo: 16-pruebas-y-herramientas
+  tema: fuzzing
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Qué hace un fuzzer guiado por cobertura, como libFuzzer (el que usa cargo-fuzz)?"
+  opciones:
+    - "Genera entradas totalmente al azar sin mirar el programa"
+    - "Mide qué ramas recorre cada entrada y muta preferentemente las que llegan a código nuevo"
+    - "Lee el código fuente para deducir las entradas"
+    - "Ejecuta solo las pruebas unitarias"
+  correcta: 1
+  solucion: |
+    El compilador inserta contadores en cada rama; las entradas que mueven contadores nuevos se guardan en el corpus y se mutan. Así el fuzzer «excava» hacia código profundo.
+    cargo-fuzz necesita nightly por las opciones de instrumentación.
+  etiquetas: ["fuzzing", "cargo-fuzz", "libFuzzer"]
+
+- id: m16-get-seguro
+  titulo: "Leer fuera, en Rust seguro"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa antes de terminar?"
+  ej: m16/get-seguro
+  opciones:
+    - "`v.get(3) = Some(0)` y luego un valor cualquiera para `v[3]`"
+    - "`v.get(1) = Some(20)`, `v.get(3) = None`, `v[3] = ...` y un pánico por índice fuera de rango"
+    - "No compila: `v[i]` con `i = 3` está fuera de rango"
+    - "`v.get(3) = None` y `v[3] = 0`"
+  correcta: 1
+  solucion: |
+    En Rust seguro no se lee memoria ajena: `get` devuelve `None` y `v[3]` entra en pánico con `index out of bounds: the len is 3 but the index is 3`.
+    El compilador no puede saber el valor de `i` (viene de `v.len()`), así que el error es al ejecutar.
+  etiquetas: ["get", "índices", "seguridad"]
+
+- id: m16-miri-que-es
+  titulo: "El intérprete que vigila"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué es Miri?"
+  opciones:
+    - "Un linter como Clippy"
+    - "Un intérprete de MIR que ejecuta tu programa comprobando cada operación de memoria y se detiene ante comportamiento indefinido"
+    - "Un formateador"
+    - "Un compilador más rápido para debug"
+  correcta: 1
+  solucion: |
+    Miri lleva la cuenta de cada asignación, de qué bytes están inicializados, de la procedencia de cada puntero y de los préstamos vivos (Stacked o Tree Borrows).
+    Se usa con `cargo +nightly miri test` o en el Playground (*Tools → Miri*). Es muy lento y solo ve los caminos que se ejecutan.
+  etiquetas: ["Miri", "UB"]
+
+- id: m16-miri-limite
+  titulo: "Miri no dice nada"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Ejecutas tus pruebas bajo Miri y no detecta nada. ¿Qué puedes concluir?"
+  opciones:
+    - "Que tu programa no tiene UB en ningún caso"
+    - "Que no hay UB en los caminos que han recorrido tus pruebas"
+    - "Que no hay `unsafe` en tu crate"
+    - "Que tus dependencias no tienen vulnerabilidades"
+  correcta: 1
+  solucion: |
+    Miri comprueba lo que ejecuta. Una rama que tus pruebas no recorren puede tener UB sin que Miri la vea. Las vulnerabilidades conocidas de dependencias las busca `cargo audit`.
+  etiquetas: ["Miri"]
+
+- id: m16-audit-lock
+  titulo: "Versiones exactas"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué archivo lee `cargo audit` para comparar tus dependencias con la base de datos RustSec?"
+  opciones:
+    - "`Cargo.toml`"
+    - "`Cargo.lock`"
+    - "`deny.toml`"
+    - "`target/debug/deps`"
+  correcta: 1
+  solucion: |
+    `Cargo.toml` tiene rangos de versiones aceptadas; `Cargo.lock` registra las versiones exactas que usas, que son las que se comparan con los avisos.
+    `deny.toml` es la configuración de `cargo deny`.
+  etiquetas: ["cargo audit", "RustSec", "Cargo.lock"]
+
+- id: m16-leak-seguro
+  titulo: "¿Filtrar memoria es UB?"
+  mundo: 16-pruebas-y-herramientas
+  tema: herramientas
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Es comportamiento indefinido llamar a `Box::leak` o a `std::mem::forget`?"
+  opciones:
+    - "Sí, por eso son `unsafe`"
+    - "No: son funciones seguras; la memoria simplemente no se libera"
+    - "Solo en release"
+    - "Solo con tipos que implementan `Drop`"
+  correcta: 1
+  solucion: |
+    En Rust, una fuga de memoria es un error de recursos, no de seguridad: no rompe ninguna regla de memoria. Las dos funciones se llaman sin `unsafe`. Miri, eso sí, avisa de las fugas al terminar.
+  etiquetas: ["fugas", "mem::forget", "Box::leak"]
+
+- id: m16-bytes-chars
+  titulo: "Bytes o letras"
+  mundo: 16-pruebas-y-herramientas
+  tema: pruebas
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m16/bytes-o-letras
+  opciones:
+    - "`len() = 5` y `chars().count() = 5`"
+    - "`len() = 9` y `chars().count() = 5`"
+    - "`len() = 5` y `chars().count() = 9`"
+    - "`len() = 10` y `chars().count() = 5`"
+  correcta: 1
+  solucion: |
+    `len()` cuenta bytes: cada `Ñ` ocupa 2 en UTF-8 (4 × 2 + 1 = 9). `chars().count()` cuenta caracteres (5).
+    Una validación con `len() < 8` aceptaría esta clave de 5 caracteres: solo una prueba con «ñ» lo descubre.
+  etiquetas: ["UTF-8", "len", "casos límite"]

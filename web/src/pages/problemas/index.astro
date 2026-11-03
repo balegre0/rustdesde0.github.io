@@ -1,0 +1,63 @@
+---
+// /problemas/ — problemas de código con editor y pruebas.
+import Practica from '../../components/paginas/Practica.astro';
+import { problemas, DIFICULTAD, nombreMundo, nombreTema, numMundo, ordenDif } from '../../lib/practica';
+import { mundos } from '../../lib/lecciones';
+
+const titulos = new Map((await mundos()).map((m) => [m.slug, m.titulo]));
+const temas = [...new Set(problemas.map((p) => p.tema).filter(Boolean) as string[])].sort();
+const ms = [...new Set(problemas.map((p) => p.mundo).filter(Boolean) as string[])].sort();
+---
+<Practica titulo="Problemas" descripcion="Problemas de programación en Rust con editor y pruebas automáticas: escribe la función, ejecuta los casos y compara con la solución.">
+  <div class="rdc-tabla-cab">
+    <p class="rdc-lead">Escribe la función que se pide y pasa las pruebas. Se ejecutan en el <strong>Rust Playground</strong> (tu código se envía a play.rust-lang.org al pulsar «Ejecutar pruebas»).</p>
+    <dl class="rdc-mini-cifras">
+      <div><dt>Problemas</dt><dd class="rdc-num">{problemas.length}</dd></div>
+      <div><dt>Resueltos</dt><dd class="rdc-num" data-resueltos>0</dd></div>
+    </dl>
+  </div>
+  <form class="rdc-filtros" data-filtros role="search" aria-label="Filtrar problemas" onsubmit="return false">
+    <label class="rdc-filtro rdc-filtro-busca"><span class="rdc-sr">Buscar</span><input type="search" name="q" placeholder="Buscar problema…" autocomplete="off" /></label>
+    <label class="rdc-filtro"><span>Tema</span><select name="tema"><option value="">Todos</option>{temas.map((t) => <option value={t}>{nombreTema(t)}</option>)}</select></label>
+    <label class="rdc-filtro"><span>Mundo</span><select name="mundo"><option value="">Todos</option>{ms.map((m) => <option value={m}>{nombreMundo(m, titulos)}</option>)}</select></label>
+    <label class="rdc-filtro"><span>Dificultad</span><select name="dificultad"><option value="">Todas</option>{Object.entries(DIFICULTAD).map(([k, v]) => <option value={k}>{v}</option>)}</select></label>
+    <label class="rdc-filtro"><span>Estado</span><select name="estado"><option value="">Todos</option><option value="nueva">Sin intentar</option><option value="intentado">Intentados</option><option value="resuelto">Resueltos</option></select></label>
+  </form>
+  <p class="rdc-tabla-cuenta" aria-live="polite"><span data-cuenta>{problemas.length}</span> de {problemas.length} problemas <button type="button" class="rdc-boton sutil pequeno" data-limpiar hidden>Quitar filtros</button></p>
+  <div class="rdc-tabla-scroll">
+    <table class="rdc-tabla" data-tabla>
+      <thead><tr>
+        <th scope="col" data-orden="titulo" aria-sort="none"><button type="button">Título</button></th>
+        <th scope="col" data-orden="tema" aria-sort="none"><button type="button">Tema</button></th>
+        <th scope="col" data-orden="mundo" aria-sort="ascending" class="rdc-col-mundo"><button type="button">Mundo</button></th>
+        <th scope="col" data-orden="dificultad" aria-sort="none"><button type="button">Dificultad</button></th>
+        <th scope="col" data-orden="estado" aria-sort="none" class="rdc-col-estado"><button type="button">Estado</button></th>
+      </tr></thead>
+      <tbody>
+        {problemas.map((p, i) => (
+          <tr data-id={p.slug} data-tema={p.tema ?? ''} data-mundo={p.mundo ?? ''} data-dificultad={p.dificultad} data-i={i}
+              data-texto={[p.titulo, p.tema ?? '', p.slug].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')}
+              data-k-titulo={p.titulo} data-k-tema={nombreTema(p.tema)} data-k-mundo={String(numMundo(p.mundo)).padStart(2, '0')} data-k-dificultad={ordenDif(p.dificultad)}>
+            <td class="rdc-col-titulo"><a href={`/problemas/${p.slug}/`}>{p.titulo}</a></td>
+            <td>{nombreTema(p.tema)}</td>
+            <td class="rdc-col-mundo">{nombreMundo(p.mundo, titulos)}</td>
+            <td><span class="rdc-dif" data-dif={p.dificultad}>{DIFICULTAD[p.dificultad]}</span></td>
+            <td class="rdc-col-estado"><span class="rdc-estado" data-estado="nueva"></span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {problemas.length === 0 && <p>Todavía no hay problemas publicados.</p>}
+    <p class="rdc-tabla-vacia" data-vacia hidden>Ningún problema cumple esos filtros.</p>
+  </div>
+</Practica>
+
+<script>
+  import { iniciarTabla } from '../../runtime/tabla';
+  import { leer, EVENTO } from '../../runtime/progreso';
+  const estadoDe = (id: string) => { const r = leer().problemas[id]; return r ? (r.ok ? 'resuelto' : 'intentado') : 'nueva'; };
+  const t = iniciarTabla({ estadoDe, textos: { resuelto: ['✓', 'Resuelto'], intentado: ['…', 'Intentado, sin resolver'], nueva: ['—', 'Sin intentar'] } });
+  const resumen = () => { document.querySelector('[data-resueltos]')!.textContent = String(Object.values(leer().problemas).filter((x) => x.ok).length); };
+  resumen();
+  window.addEventListener(EVENTO, () => { t.refrescar(); resumen(); });
+</script>

@@ -1,0 +1,31 @@
+---
+// Consola de salida reutilizada por <Ejecutar>, <Predice>, <NoCompila>, <Reto> y los problemas.
+// La controla src/runtime/consola.ts.
+interface Props { titulo?: string }
+const { titulo = 'Salida' } = Astro.props;
+const id = `rdc-in-${Math.random().toString(36).slice(2, 9)}`;
+---
+<div class="rdc-consola" data-consola hidden>
+  <div class="rdc-consola-cab">
+    <span class="rdc-consola-titulo">{titulo}</span>
+    <span class="rdc-consola-estado" data-estado aria-live="polite"></span>
+    <button type="button" class="rdc-boton sutil pequeno" data-detener hidden>Detener</button>
+  </div>
+  <pre class="rdc-consola-texto" data-texto tabindex="0" aria-label="Salida del programa"></pre>
+  <form class="rdc-consola-entrada" data-entrada hidden>
+    <label for={id}>El programa espera que escribas algo y pulses Intro:</label>
+    <div class="rdc-fila">
+      <input id={id} type="text" autocomplete="off" spellcheck="false" autocapitalize="off" enterkeyhint="send" />
+      <button type="submit" class="rdc-boton pequeno">Enviar</button>
+      <button type="button" class="rdc-boton secundario pequeno" data-eof title="Ctrl+D">Fin de entrada</button>
+    </div>
+  </form>
+  <div class="rdc-panico" data-panico role="alert" hidden>
+    <p class="rdc-panico-titulo">
+      <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18"><path fill="currentColor" d="M12 2 1 21h22L12 2Zm0 4.2L19.5 19h-15L12 6.2ZM11 10v5h2v-5h-2Zm0 6v2h2v-2h-2Z"/></svg>
+      <span>Pánico: <code data-panico-msg></code></span>
+    </p>
+    <p data-panico-texto></p>
+  </div>
+  <p class="rdc-consola-pie" data-pie></p>
+</div>

@@ -1,0 +1,88 @@
+---
+title: "From y la conversión con ?"
+description: "Haz que ? convierta automáticamente los errores de otros tipos en el tuyo implementando From."
+sidebar:
+  order: 7
+duracion: 12
+desde: "1.0"
+requiere: ["10-errores/06-errores-propios", "10-errores/04-el-operador-interrogacion"]
+tarjetas:
+  - p: "¿Qué llama `?` sobre el error antes de devolverlo?"
+    r: "`From::from(e)`, que convierte el error al tipo de error de la función. Si no existe esa conversión, E0277: «? couldn't convert the error»."
+  - p: "¿Cómo se escribe una conversión de `ParseIntError` a `MiError`?"
+    r: "`impl From<ParseIntError> for MiError { fn from(e: ParseIntError) -> Self { MiError::Numero(e) } }`."
+  - p: "Si no quieres escribir `impl From`, ¿cómo conviertes a mano?"
+    r: "Con `map_err` antes del `?`: `texto.parse::<u32>().map_err(MiError::Numero)?`. Una variante con datos se puede usar como función."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a conectar tus errores con los de la biblioteca estándar, para que `?` haga las conversiones solo.
+
+## Predice
+
+<Predice
+  ej="m10/from-predice"
+  opciones={["`Ok(3)`, `Err(Cero)` y `Err(Cantidad(ParseIntError { kind: InvalidDigit }))`", "`Ok(3)`, `Err(Cero)` y un pánico", "No compila: `parse` devuelve `ParseIntError`, no `ErrorPedido`", "`Ok(3)`, `Ok(0)` y `Err(…)`"]}
+  correcta={0}
+  explicacion="Gracias al `impl From<ParseIntError> for ErrorPedido`, el `?` envuelve el error de `parse` en `ErrorPedido::Cantidad`. El cero lo rechazamos nosotros con `Err(ErrorPedido::Cero)`."
+  porque={["Correcto.", "`?` nunca entra en pánico.", "Compilaría así si no existiera el `impl From`; con él, `?` convierte.", "El cero se comprueba y se devuelve como `Err(Cero)`."]}
+/>
+
+## La idea
+
+Ya sabes (lección 4) que `?` hace `return Err(From::from(e))`. Ese `From::from` es la pieza que faltaba: **una conversión de un tipo a otro**. Si tu función devuelve `Result<_, ErrorProducto>` y dentro hay un `parse` que falla con `ParseIntError`, `?` busca una forma de convertir `ParseIntError` en `ErrorProducto`. Esa forma la escribes tú:
+
+```rust
+impl From<ParseIntError> for ErrorProducto {
+    fn from(e: ParseIntError) -> Self {
+        ErrorProducto::Unidades(e)
+    }
+}
+```
+
+Con una conversión por cada error «de fuera», tu función puede usar `?` sobre todos ellos y seguir devolviendo **un único tipo de error**, con un caso para cada origen. Y el error original no se pierde: va guardado dentro de la variante.
+
+## Pruébalo
+
+<Ejecutar ej="m10/from" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`From<T>` es un trait genérico de la biblioteca estándar (lo verás entero en el mundo 13). Hay muchas conversiones ya escritas: por ejemplo, de `&str` y `String` a `Box<dyn Error>` (lección 8), o entre tipos numéricos que no pierden información (`u8` → `u32`). Y una que se aplica a todo: `impl<T> From<T> for T`, la conversión de un tipo en sí mismo, que no hace nada. Por eso `?` funciona sin `impl` cuando el error ya es del tipo de la función.
+
+Implementar `From<A> for B` te da gratis la dirección contraria con `Into`: `let b: B = a.into();`. El compilador resuelve cuál `from` llamar **al compilar**, a partir de los tipos; al ejecutar, la conversión es una llamada normal (a menudo, ni eso: se integra en el código).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m10/sin-from"
+  explicacion="Sin el `impl From<ParseIntError> for ErrorPedido`, `?` no sabe convertir el error (E0277). La nota de rustc lo explica: `?` hace una conversión implícita con el trait `From`. El arreglo convierte a mano con `map_err(ErrorPedido::Cantidad)`: una variante con datos se puede usar como si fuera una función."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m10/from-edad"
+  enunciado="Ahora mismo no compila: escribe `impl From<ParseIntError> for ErrorEdad` que devuelva `ErrorEdad::NoNumero`. Debe imprimir `Ok(33)`, `Err(Imposible(200))` y `Err(NoNumero)`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tu función devuelve `Result<(), MiError>` y usa `?` sobre un `Result<u8, ParseIntError>` y sobre un `Result<f64, ParseFloatError>`. ¿Qué necesitas?"
+  opciones={["`impl From<ParseIntError> for MiError` y `impl From<ParseFloatError> for MiError`", "Solo `impl Error for MiError`", "Un `impl From<MiError> for ParseIntError`", "Nada: `?` convierte cualquier error"]}
+  correcta={0}
+  porque={["Correcto: una conversión por cada origen.", "`Error` no dice cómo convertir otros errores en el tuyo.", "Es la dirección contraria.", "Solo convierte si existe un `From` adecuado."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `?` funciona sin ningún `impl` cuando el error ya es del tipo de la función?"
+  opciones={["Porque existe `impl<T> From<T> for T`, la conversión de un tipo en sí mismo", "Porque `?` no llama a `From` en ese caso", "Porque el compilador desactiva la conversión", "Porque `Result` implementa `Copy`"]}
+  correcta={0}
+  porque={["Correcto.", "`?` llama siempre a `From::from`; aquí es la conversión que no hace nada.", "No hay ningún caso especial: es una implementación normal de la biblioteca.", "`Copy` no tiene nada que ver con las conversiones."]}
+/>

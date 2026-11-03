@@ -1,0 +1,60 @@
+---
+title: "std::process"
+description: "Procesos: terminar con un código de salida (exit, ExitCode) y lanzar otros programas (Command)."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::process`
+
+## Para qué sirve
+
+Cuando un programa termina, devuelve al sistema un **código de salida**: `0` significa «todo bien» y cualquier otro número, «algo falló». Este módulo permite elegir ese código (`ExitCode`, `exit`) y lanzar otros programas (`Command`).
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`exit`](/ref/std/process/exit/) | Termina el programa ya, con un código. | 1.0 |
+| `ExitCode` | Código de salida que `main` puede devolver. | 1.61 |
+| `Command` | Prepara y lanza otro programa. | 1.0 |
+| `abort` | Termina de golpe, sin limpiar nada. | 1.17 |
+| `id` | El identificador del proceso. | 1.26 |
+
+## Conceptos clave
+
+- **Mejor devolver que salir**: `fn main() -> ExitCode` (o `-> Result<(), E>`) termina limpiamente, ejecutando los destructores. `exit` no los ejecuta.
+- **Si `main` devuelve `Err`**, Rust muestra el error con `Debug` y sale con código `1`.
+- **`Command` no funciona en el navegador** (no hay otros programas). En tu PC, `output()` lo ejecuta y recoge su salida.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/process-exitcode" />
+
+**Salida de error** (*stderr*):
+
+```text
+no es un número: invalid digit found in string
+```
+
+El programa termina con el código de salida `3`.
+
+<Ejecutar ej="ref-std/process-command" />
+
+**Salida:**
+
+```text
+no se pudo ejecutar: operation not supported on this platform
+```
+
+## Ver también
+
+- [std::env](/ref/std/env/)
+- [Result](/ref/std/result/result/)
+
+## Aprende esto en
+
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)
+- [Mundo 10 · Errores](/curso/10-errores/)

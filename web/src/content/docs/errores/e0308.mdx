@@ -1,0 +1,85 @@
+---
+title: "E0308: tipos que no coinciden"
+description: "El tipo de un valor no es el que se esperaba en ese sitio (argumento, retorno, rama de if…)."
+sidebar:
+  order: 25
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` mismatched types ``
+
+## Qué significa
+
+Rust no convierte tipos por su cuenta. Si una función pide `i32`, hay que darle un `i32`; un `&str` que contiene `"21"` es **texto**, no un número. Es el error más general del comprobador de tipos: la parte `expected X, found Y` te dice qué quería y qué encontró.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0308" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0308]: mismatched types
+ --> E0308.rs:7:26
+  |
+7 |     println!("{}", doble(texto));
+  |                    ----- ^^^^^ expected `i32`, found `&str`
+  |                    |
+  |                    arguments to this function are incorrect
+  |
+note: function defined here
+ --> E0308.rs:1:4
+  |
+1 | fn doble(n: i32) -> i32 {
+  |    ^^^^^ ------
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Pasar texto donde se espera un número (o al revés).
+- Las ramas de un `if`/`match` usados como expresión devuelven tipos distintos.
+- Terminar con `;` la última línea de una función que debe devolver algo: devuelve `()`.
+- Mezclar `i32` con `i64`, `u8` con `usize`, `f64` con enteros.
+- Pasar `String` donde se espera `&str` (o `T` donde se espera `&T`).
+
+## Cómo arreglarlo
+
+Lee las dos partes del mensaje (`expected` y `found`) y convierte de forma explícita: `texto.parse()` para pasar de texto a número, `as` entre números, `&s` o `s.as_str()` para prestar un `String` como `&str`, `.to_string()` para lo contrario. Si sobra un `;` al final de la función, quítalo.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn doble(n: i32) -> i32 {
+    n * 2
+}
+
+fn main() {
+    let texto = "21";
+    let n: i32 = texto.parse().unwrap(); // convertir el texto en número
+    println!("{}", doble(n));
+}
+```
+
+**Salida:**
+
+```text
+42
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0308` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0277](/errores/e0277/): un tipo no implementa el trait que se necesita
+- [E0061](/errores/e0061/): número de argumentos incorrecto
+- [E0053](/errores/e0053/): firma incompatible con la del trait
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)
+- [Mundo 05 · Funciones y la pila](/curso/05-funciones-y-la-pila/)

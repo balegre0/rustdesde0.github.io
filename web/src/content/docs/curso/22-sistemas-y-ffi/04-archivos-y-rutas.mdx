@@ -1,0 +1,113 @@
+---
+title: "Archivos y rutas"
+description: "Construye rutas con `Path` y `PathBuf` sin pegar barras a mano y lee, escribe y recorre archivos con `std::fs` manejando cada error."
+sidebar:
+  order: 4
+duracion: 12
+desde: "1.0"
+requiere: ["22-sistemas-y-ffi/03-escribir-la-salida"]
+tarjetas:
+  - p: "¿Qué relación hay entre `Path` y `PathBuf`?"
+    r: "La misma que entre `&str` y `String`: `&Path` es una ruta prestada; `PathBuf` es una ruta con propiedad que puedes modificar (`push`, `set_extension`)."
+  - p: "¿Qué hacen `fs::read_to_string` y `fs::write`?"
+    r: "Leer un archivo entero como `String` (UTF-8) y escribir un archivo entero (creándolo o sobrescribiéndolo). Los dos devuelven `io::Result`."
+  - p: "¿Cuándo se cierra un `File`?"
+    r: "Al destruirse (`Drop`): RAII. No hay función `close`."
+  - p: "¿Cómo distingues un archivo que no existe de uno sin permisos?"
+    r: "Mirando `err.kind()`: `ErrorKind::NotFound` frente a `ErrorKind::PermissionDenied`."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Leer y escribir archivos parece fácil hasta que piensas en todo lo que puede salir mal: el archivo no existe, no tienes permiso, el disco está lleno, el nombre usa la barra de otro sistema. Rust te obliga a mirar cada caso, y te da tipos para no equivocarte con las rutas.
+
+## Predice
+
+<Pregunta
+  pregunta={"¿Qué imprime `Path::new(\"proyectos/juego/src/main.rs\").file_stem()`?"}
+  opciones={["`Some(\"main.rs\")`", "`Some(\"main\")`", "`Some(\"rs\")`", "`Some(\"proyectos/juego/src\")`"]}
+  correcta={1}
+  explicacion="`file_stem` es el nombre del archivo sin la extensión. `file_name` daría `main.rs`; `extension`, `rs`; `parent`, la carpeta."
+  porque={["Eso es `file_name()`.", "", "Eso es `extension()`.", "Eso es `parent()`."]}
+/>
+
+## La idea
+
+**Rutas.** Una ruta no es un texto cualquiera: cada sistema tiene sus separadores (`/` o `\`), sus prefijos (`C:`) y hasta sus reglas de codificación. `std::path::Path` (prestado) y `PathBuf` (con propiedad) encapsulan todo eso. En lugar de pegar cadenas con `format!("{}/{}", a, b)`, usa `join` o `push`, que ponen el separador correcto; y para mirar partes, `file_name`, `extension`, `parent`, `components`. Para mostrar una ruta, `.display()`.
+
+**Archivos.** `std::fs` tiene funciones de «todo de una vez» (`read_to_string`, `read`, `write`) y el tipo `File` para leer o escribir poco a poco. `File::open` abre para leer; `File::create`, para escribir (crea o vacía); `OpenOptions` para combinaciones como «añadir al final». Un `File` implementa `Read` y `Write`, así que lo envuelves en `BufReader` o `BufWriter` como en las lecciones anteriores. Y se **cierra solo** al salir del ámbito (RAII).
+
+**Carpetas.** `fs::create_dir_all`, `fs::read_dir` (itera las entradas), `fs::remove_file`, `fs::rename`, `fs::metadata` (tamaño, fechas, si es carpeta). Todas devuelven `io::Result`, y `io::Error::kind()` te dice qué pasó: `NotFound`, `PermissionDenied`, `AlreadyExists`…
+
+## Pruébalo
+
+<Ejecutar ej="m22/rutas" />
+
+Las rutas se manipulan perfectamente en el navegador (aquí con `/`, el separador del entorno WASI). La lectura final falla, porque el programa no tiene acceso a ningún disco: la salida muestra el `ErrorKind` que recibió.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`Path` es un `OsStr` con métodos.** Por dentro, `Path` envuelve un `OsStr` (lección 7): los bytes de la ruta tal como los entiende el sistema, que **no tienen por qué ser UTF-8**. Por eso `file_name()` devuelve `Option<&OsStr>` y no `&str`, y por eso `to_str()` devuelve `Option`. Si tu programa convierte todas las rutas a `String` con `unwrap()`, fallará con nombres de archivo raros.
+
+**`File` es un descriptor.** Un `File` guarda el número que el sistema operativo usa para el archivo abierto (un *file descriptor* en Unix, un `HANDLE` en Windows). Su `Drop` llama a la función del sistema que lo cierra. Si cerrar falla, el error se ignora; si necesitas saber que los datos llegaron al disco, llama antes a `file.sync_all()`.
+
+**En el navegador** el entorno WASI no ofrece ninguna carpeta al programa (no hay «carpetas preabiertas»), así que cualquier operación de archivos falla. En tu PC, la misma lectura funcionará si el archivo existe junto al ejecutable.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m22/path-no-es-pathbuf" explicacion="E0308: la firma promete un `PathBuf` (ruta con propiedad) y el cuerpo devuelve un `&Path` prestado de un temporal que muere al final de la línea. Devuelve el `PathBuf` que crea `join`, como sugiere el `help:`." />
+
+<Trampa titulo="Construir rutas con `format!`">
+
+❌ `let p = format!("{}/{}", carpeta, archivo);` funciona en tu máquina y falla en otra, o duplica barras si `carpeta` ya acababa en `/`.
+
+✅ `let p = Path::new(carpeta).join(archivo);`. Y si el usuario te da una ruta absoluta en `archivo`, `join` la respeta en lugar de concatenarla.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta={"¿Qué hace `PathBuf::from(\"datos/informe.txt\").with_extension(\"md\")`?"}
+  opciones={[
+    "Devuelve `datos/informe.txt.md`",
+    "Devuelve un `PathBuf` nuevo `datos/informe.md`, sin tocar el original",
+    "Cambia la extensión del archivo en el disco",
+    "Da error porque el archivo no existe"
+  ]}
+  correcta={1}
+  explicacion="Los métodos de `Path` solo manipulan la ruta en memoria: no tocan el disco. `with_extension` sustituye la extensión."
+  porque={["Sustituye la extensión, no la añade.", "", "Para renombrar en disco existe `fs::rename`.", "No mira si el archivo existe."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `Path::file_name()` devuelve `Option<&OsStr>` y no `&str`?"
+  opciones={[
+    "Porque los nombres de archivo siempre son ASCII",
+    "Porque la ruta puede no tener nombre de archivo (por ejemplo `/` o `..`) y porque los nombres pueden no ser UTF-8 válido",
+    "Por compatibilidad con versiones antiguas",
+    "Porque `&str` no puede contener puntos"
+  ]}
+  correcta={1}
+  explicacion="`Option` cubre «no hay nombre»; `OsStr` cubre «son bytes del sistema que quizá no sean UTF-8»."
+  porque={["Pueden contener cualquier carácter que el sistema acepte.", "", "Es el diseño desde 1.0.", "`&str` puede contener puntos sin problema."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué función usarías para añadir líneas al final de un archivo existente sin borrar lo que tenía?"
+  opciones={["`File::create`", "`OpenOptions::new().append(true).open(ruta)`", "`fs::write`", "`File::open`"]}
+  correcta={1}
+  explicacion="`create` y `fs::write` vacían el archivo; `open` lo abre solo para leer. `OpenOptions` permite elegir modo de apertura."
+  porque={["`create` trunca el archivo a 0 bytes.", "", "`fs::write` sobrescribe el contenido entero.", "`File::open` es solo lectura."]}
+/>
+
+## Para saber más
+
+- Documentación de `std::fs` y `std::path`: https://doc.rust-lang.org/std/fs/index.html
+- Crates útiles: `walkdir` (recorrer carpetas), `tempfile` (archivos temporales).

@@ -1,0 +1,105 @@
+---
+title: "Coherencia y la regla huérfana"
+description: "Entiende por qué Rust no te deja implementar cualquier trait para cualquier tipo, y cómo saltarte la limitación con un newtype."
+sidebar:
+  order: 7
+duracion: 12
+desde: "1.0"
+requiere: ["13-traits-y-genericos/06-tipos-asociados", "12-modulos-crates-y-cargo"]
+tarjetas:
+  - p: "¿Qué dice la coherencia?"
+    r: "Que para cada par (trait, tipo) existe como mucho UNA implementación en todo el programa, contando todos los crates. Si hubiera dos, sería ambiguo cuál usar."
+  - p: "¿Qué dice la regla huérfana (orphan rule)?"
+    r: "Solo puedes escribir `impl Trait for Tipo` si el trait o el tipo están definidos en tu crate. `impl Display for Vec<u8>` da E0117."
+  - p: "¿Qué es el patrón newtype?"
+    r: "Envolver un tipo ajeno en un struct propio de un campo, `struct Bytes(Vec<u8>)`. Como `Bytes` es tuyo, puedes implementarle cualquier trait."
+  - p: "¿Qué error da implementar dos veces un trait para el mismo tipo, por ejemplo con una impl general que lo cubre?"
+    r: "E0119, «conflicting implementations of trait … for type …»."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a toparte con una de las reglas más sorprendentes de Rust, entender qué problema evita y aprender el truco estándar para rodearla.
+
+## Predice
+
+<Predice
+  ej="m13/extension"
+  opciones={["`true false` y `¡ÑANDÚ!`", "No compila: no puedes añadir métodos a `i32`, que no es tuyo", "No compila: no puedes implementar traits para `str`", "`false true` y `¡ñandú!`"]}
+  correcta={0}
+  explicacion="Los traits `EsPar` y `Gritar` son **tuyos**, así que puedes implementarlos para cualquier tipo, también para `i32` y `str`. A esto se le llama **trait de extensión**. `to_uppercase` sabe poner en mayúscula la ñ y la ú."
+  porque={["Correcto.", "La regla huérfana pide que el trait **o** el tipo sean tuyos; aquí el trait lo es.", "Mismo motivo: el trait es local.", "4 es par y 7 no; y `to_uppercase` convierte también ñ y ú."]}
+/>
+
+## La idea
+
+Rust garantiza la **coherencia** (*coherence*): para cada par (trait, tipo) hay **como mucho una** implementación en todo el programa. Piensa por qué importa: si tu crate y otro crate escribieran cada uno su propio `impl Display for Vec<u8>`, ¿cuál usaría `println!("{v}")`? El resultado dependería de qué crates hay en el programa, y añadir una dependencia podría cambiar lo que imprime código que ni tocaste.
+
+Para que eso no pueda pasar **nunca**, ni siquiera entre crates que no se conocen, Rust aplica la **regla huérfana** (*orphan rule*): solo puedes escribir `impl Trait for Tipo` si **el trait o el tipo** son de tu crate. Una implementación de un trait ajeno para un tipo ajeno sería «huérfana»: no pertenece a ninguno de los dos dueños. Así, cada implementación posible tiene un único crate que puede escribirla.
+
+¿Y si de verdad quieres que tu `Vec<u8>` se muestre a tu manera? El **patrón newtype**: un struct de un solo campo que envuelve el tipo ajeno, `struct Bytes(Vec<u8>)`. `Bytes` es tuyo, así que puedes implementarle `Display`. Y de regalo obtienes tipos que no se confunden: `Metros(f64)` y `Segundos(f64)` son dos tipos distintos, aunque por dentro sean lo mismo.
+
+## Pruébalo
+
+<Ejecutar ej="m13/newtype" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un newtype **no cuesta nada**: `Bytes` tiene exactamente el mismo tamaño y la misma representación en memoria que el `Vec<u8>` que envuelve (24 bytes en un PC de 64 bits: puntero, capacidad y longitud). El struct existe solo para el sistema de tipos. Si quieres garantizarlo también para llamadas a otros lenguajes y conversiones a bajo nivel, existe `#[repr(transparent)]`, que lo verás en el mundo de sistemas.
+
+La regla exacta es algo más fina que «trait o tipo locales», para que sean posibles cosas útiles: `impl From<MiTipo> for Vec<u8>` está permitido aunque `From` y `Vec` sean ajenos, porque `MiTipo` aparece como parámetro y es local. Además, `&T`, `&mut T`, `Box<T>` y `Pin<T>` son tipos **fundamentales**: `impl Trait for Box<MiTipo>` cuenta como local. La nota del error lo resume como «no hay ningún tipo local antes de los parámetros no cubiertos».
+
+La otra mitad de la coherencia es la **comprobación de solapamiento** (*overlap check*). Una **impl general** (*blanket impl*), como `impl<T: Debug> Describir for T`, implementa el trait para *todos* los tipos que cumplen el bound; si luego escribes otra para `i32`, que también es `Debug`, hay dos candidatas (E0119). La biblioteca estándar usa impls generales con mucho cuidado: por ejemplo, `impl<T: Display> ToString for T` es el motivo por el que todo lo que tiene `Display` tiene `.to_string()`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m13/huerfana"
+  explicacion="Ni `Display` ni `Vec` son tuyos: los dos vienen de la biblioteca estándar (E0117). La última nota del error te da la salida: «define and implement a trait or new type instead». El arreglo envuelve el vector en `struct Bytes(Vec<u8>)`."
+/>
+
+<Trampa titulo="Dos impl que se pisan">
+
+<NoCompila
+  ej="m13/solapamiento"
+  explicacion="La impl general cubre **todo** tipo `Debug`, incluido `i32`. La segunda impl para `i32` crea dos candidatas para el mismo par (trait, tipo) y rompe la coherencia (E0119)."
+/>
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m13/reto-newtype"
+  enunciado="Crea un newtype `Grados(f64)` e implementa `Display` para que se muestre con un decimal y el símbolo `°`: `Grados(21.456)` debe imprimirse como `21.5°`. Después descomenta las líneas de `main`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estas impl puedes escribir en tu crate (con `struct Punto` tuyo)?"
+  opciones={["`impl std::fmt::Display for Punto`", "`impl std::fmt::Display for String`", "`impl std::ops::Add for i32`", "`impl Iterator for Vec<i32>`"]}
+  correcta={0}
+  explicacion="El tipo `Punto` es local, así que puedes implementarle cualquier trait, aunque sea ajeno."
+  porque={["Correcto.", "Trait y tipo ajenos: E0117.", "Trait y tipo ajenos (y además ya existe).", "Trait y tipo ajenos."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué problema evita la regla huérfana?"
+  opciones={["Que dos crates distintos escriban implementaciones diferentes del mismo trait para el mismo tipo", "Que un programa use demasiada memoria", "Que un trait tenga métodos sin cuerpo", "Que se use `unsafe` sin querer"]}
+  correcta={0}
+  explicacion="Con la regla, cada implementación posible solo puede escribirla el dueño del trait o el del tipo: nunca dos crates a la vez."
+  porque={["Correcto.", "No tiene que ver con memoria.", "Los métodos sin cuerpo son normales.", "No tiene relación con `unsafe`."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuánto ocupa `struct Bytes(Vec<u8>)` comparado con `Vec<u8>`?"
+  opciones={["Lo mismo", "8 bytes más, por la etiqueta del struct", "El doble", "Depende de cuántos traits implemente"]}
+  correcta={0}
+  explicacion="Un struct de un campo es ese campo. El newtype existe solo para el sistema de tipos."
+  porque={["Correcto.", "Los structs no llevan etiqueta; eso es de los enums.", "Solo hay un campo.", "Los traits no ocupan sitio en los valores."]}
+/>

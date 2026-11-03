@@ -1,0 +1,81 @@
+---
+title: "E0597: un valor no vive lo suficiente"
+description: "Una referencia se sigue usando después de que el valor al que apunta haya salido de su ámbito."
+sidebar:
+  order: 53
+insignias: ["Tiempos de vida"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` `x` does not live long enough ``
+
+## Qué significa
+
+`x` vive solo dentro del bloque `{ }`. `r = &x` toma prestado `x`, pero `r` se usa fuera del bloque, cuando `x` ya se ha destruido. El préstamo tendría que durar más que el valor prestado, y eso es imposible.
+
+## Qué error evita
+
+Una **referencia colgante**: leer `r` sería leer memoria que ya pertenece a otra cosa.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0597" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0597]: `x` does not live long enough
+ --> E0597.rs:5:13
+  |
+4 |         let x = 5;
+  |             - binding `x` declared here
+5 |         r = &x;
+  |             ^^ borrowed value does not live long enough
+6 |     }
+  |     - `x` dropped here while still borrowed
+7 |     println!("{r}");
+  |                - borrow later used here
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Guardar en una variable exterior una referencia a algo creado en un bloque interior o en un bucle.
+- Meter en un `Vec` declarado fuera referencias a valores creados dentro de un bucle.
+- Pasar una referencia a algo que exige `'static` (por ejemplo, `thread::spawn`).
+
+## Cómo arreglarlo
+
+Haz que el valor viva al menos tanto como la referencia (decláralo fuera del bloque), o guarda el valor con su propiedad (`String` en vez de `&str`, `Vec<T>` en vez de `Vec<&T>`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let r;
+    let x = 5; // ahora `x` vive tanto como `r`
+    r = &x;
+    println!("{r}");
+}
+```
+
+**Salida:**
+
+```text
+5
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0597` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0515](/errores/e0515/): devolver una referencia a una variable local
+- [E0716](/errores/e0716/): un temporal se destruye mientras está prestado
+- [E0505](/errores/e0505/): mover un valor que está prestado
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/)

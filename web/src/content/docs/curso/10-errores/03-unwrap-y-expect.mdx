@@ -1,0 +1,110 @@
+---
+title: "unwrap y expect"
+description: "Saca el valor de un Result u Option a la fuerza solo cuando de verdad no puede fallar, y conoce las alternativas sin pánico."
+sidebar:
+  order: 3
+duracion: 10
+desde: "1.0"
+requiere: ["10-errores/02-result"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre `unwrap()` y `expect(\"msg\")`?"
+    r: "Las dos sacan el valor o entran en pánico. `expect` añade tu mensaje al pánico, que explica qué suponías; por eso es preferible."
+  - p: "¿Qué imprime `\"-3\".parse::<u8>().unwrap()`?"
+    r: "Un pánico: «called `Result::unwrap()` on an `Err` value: ParseIntError { kind: InvalidDigit }»."
+  - p: "Tres formas de sacar el valor SIN pánico:"
+    r: "`unwrap_or(valor)`, `unwrap_or_default()` y `unwrap_or_else(|e| …)`. (Y, por supuesto, `match`, `if let` y `?`.)"
+  - p: "¿Cuándo es razonable `unwrap`/`expect`?"
+    r: "En pruebas, prototipos y ejemplos, y cuando el fallo es imposible por cómo está escrito el programa (y entonces `expect` explica por qué)."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer el atajo más usado (y más abusado) de Rust, y a decidir cuándo usarlo.
+
+## Predice
+
+<Predice
+  ej="m10/unwrap-predice"
+  opciones={["`a = 15` y luego un pánico con el mensaje `la configuración debe traer un número: ParseIntError { kind: InvalidDigit }`", "`a = 15` y `b = 0`", "Un pánico antes de imprimir nada", "No compila: `expect` necesita un `Option`"]}
+  correcta={0}
+  explicacion="«15» se convierte bien. «quince» no: `expect` entra en pánico con tu mensaje seguido del error (`: ParseIntError { … }`)."
+  porque={["Correcto.", "`expect` no inventa un valor: entra en pánico.", "La primera línea se ejecuta y se imprime antes del fallo.", "`expect` existe tanto en `Option` como en `Result`."]}
+/>
+
+## La idea
+
+`unwrap()` dice: «sé que esto es `Ok` (o `Some`); dame el valor. Si me equivoco, pánico». `expect("…")` hace lo mismo, pero el mensaje del pánico incluye **tu explicación**. Cuando falle, sabrás qué suponías:
+
+```text
+la configuración debe traer un número: ParseIntError { kind: InvalidDigit }
+```
+
+frente a
+
+```text
+called `Result::unwrap()` on an `Err` value: ParseIntError { kind: InvalidDigit }
+```
+
+Son herramientas legítimas en **tres** situaciones: pruebas (mundo 16), prototipos que aún no tratan errores, y valores que **no pueden fallar** por cómo está escrito el programa (un número escrito a mano en el código). Fuera de eso, convierten un error normal en un pánico. Si hay un valor razonable de reserva, usa `unwrap_or`, `unwrap_or_default` o `unwrap_or_else`; si no, propaga el error con `?` (lección 4).
+
+## Pruébalo
+
+<Ejecutar ej="m10/unwrap" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`unwrap` es un `match` con un pánico en el brazo de error. Simplificando, la biblioteca estándar hace:
+
+```rust
+match self {
+    Ok(t) => t,
+    Err(e) => unwrap_failed("called `Result::unwrap()` on an `Err` value", &e),
+}
+```
+
+Por eso `unwrap` sobre un `Result<T, E>` **exige** que `E` se pueda imprimir con `{:?}` (que implemente `Debug`): necesita mostrar el error en el mensaje. Y la ubicación del pánico (`archivo:línea:columna`) apunta a **tu** llamada, no al interior de la biblioteca, gracias al atributo `#[track_caller]`, que le pasa a la función la posición de quien la llamó.
+
+`unwrap_or(x)` evalúa `x` **siempre**, aunque no se use; `unwrap_or_else(|| …)` solo lo calcula si hace falta. Si el valor de reserva es caro de construir, usa la versión `_else`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="unwrap no explica nada">
+
+❌ Con `unwrap`, el mensaje no dice qué esperabas:
+
+<Ejecutar ej="m10/unwrap-err" titulo="unwrap: mensaje genérico" />
+
+✅ Con `expect`, el pánico se explica solo:
+
+<Ejecutar ej="m10/expect-err" titulo="expect: tu mensaje + el error" />
+
+Mejor aún: si la edad viene de un usuario, no entres en pánico. Pídela otra vez o devuelve un `Result`.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m10/reserva"
+  enunciado="Completa `leer_volumen(texto: &str) -> u8`: convierte el texto a `u8` y, si no se puede, devuelve 50, sin pánicos (usa `unwrap_or`). Debe imprimir `80`, `50` y `50`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿En cuál de estos casos es razonable `expect`?"
+  opciones={["`let max: u32 = \"100\".parse().expect(\"literal escrito a mano\");`", "Convertir lo que el usuario teclea en su edad", "Abrir el archivo que el usuario eligió", "Leer un número de una petición de red"]}
+  correcta={0}
+  porque={["Correcto: el texto está en el propio código y no puede cambiar.", "El usuario puede escribir cualquier cosa: es un error esperable.", "El archivo puede no existir o no tener permisos.", "La red puede traer basura."]}
+/>
+
+<Pregunta
+  pregunta={'¿Qué devuelve `"nada".parse::<i32>().unwrap_or_default()`?'}
+  opciones={["`0`", "Un pánico", "`None`", "`-1`"]}
+  correcta={0}
+  porque={["Correcto: el valor por defecto de `i32` es 0.", "`unwrap_or_default` nunca entra en pánico.", "Devuelve un `i32`, no un `Option`.", "El valor por defecto de un entero es 0."]}
+/>

@@ -1,0 +1,72 @@
+---
+title: "Tipos como conjuntos"
+description: "Un tipo es el conjunto de valores que puede tomar. Contarlos (su cardinalidad) explica cuánta memoria hace falta y qué valores son imposibles."
+sidebar:
+  order: 1
+duracion: 10
+requiere: ["23-embebido-y-tu-so"]
+tarjetas:
+  - p: "¿Qué es un tipo, visto como conjunto?"
+    r: "El conjunto de todos los valores que puede tomar. `bool` = {false, true}; `u8` = {0, 1, …, 255}."
+  - p: "¿Qué es la cardinalidad de un tipo?"
+    r: "Cuántos valores tiene: |bool| = 2, |u8| = 256, |()| = 1."
+  - p: "¿Cuántos valores tiene el tipo `()`?"
+    r: "Uno solo, `()`. Por eso ocupa 0 bytes: no hay nada que distinguir."
+  - p: "¿Qué relación hay entre la cardinalidad y el tamaño?"
+    r: "Para distinguir n valores hacen falta al menos log₂(n) bits. El compilador redondea a bytes y añade alineación."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+La forma más útil de pensar en un tipo es la más simple: **un tipo es un conjunto de valores**. De esta idea salen las demás lecciones del mundo.
+
+## La idea
+
+| Tipo | Conjunto de valores | Cardinalidad |
+|---|---|---|
+| `bool` | `{false, true}` | 2 |
+| `u8` | `{0, 1, …, 255}` | 256 |
+| `char` | los valores escalares de Unicode | 1 112 064 |
+| `()` | `{()}` | 1 |
+| `(bool, bool)` | `{(f,f), (f,t), (t,f), (t,t)}` | 4 |
+| `Option<bool>` | `{None, Some(false), Some(true)}` | 3 |
+
+La **cardinalidad** (|T|, «cuántos valores tiene T») es una pregunta que puedes hacerte de cualquier tipo, y tiene consecuencias prácticas:
+
+- **Memoria.** Para distinguir `n` valores hacen falta al menos log₂(n) bits. `()` tiene un valor: 0 bits. `bool` tiene dos: 1 bit (el compilador usa un byte, porque es lo mínimo direccionable).
+- **Estados imposibles.** Si tu programa tiene 3 estados posibles y los guardas en un `u8`, hay 253 valores que no significan nada, y algún día uno de ellos aparecerá por error. Un `enum` de 3 variantes tiene exactamente 3.
+- **Comprobaciones.** Un `match` exhaustivo es, literalmente, cubrir todo el conjunto.
+
+## Pruébalo
+
+<Ejecutar ej="m24/cardinalidad" />
+
+`Option<bool>` tiene 3 valores y ocupa **1 byte**, igual que `bool`. Con un byte hay sitio para 256 valores; el compilador usa uno de los 254 que `bool` no utiliza para representar `None`. Es la **optimización de nicho** que viste en el mundo 21.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Validez.** Que `bool` sea `{false, true}` no es solo una forma de hablar: es una regla del lenguaje. Un byte con el valor 3 **no es** un `bool` válido, y crearlo (con `unsafe`, por ejemplo con `transmute`) es **comportamiento indefinido**, aunque nunca lo leas. Esa regla es la que permite al compilador usar los valores sobrantes como nichos. Es el *invariante de validez* del tipo, que verás en la lección 8.
+
+**Los tipos de tamaño cero** (`()`, `struct Marca;`, `PhantomData<T>`) tienen cardinalidad 1: un solo valor posible, así que no hace falta guardar nada. Un `Vec<()>` puede tener mil millones de elementos sin reservar memoria para ellos.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántos valores tiene `(bool, u8)`?"
+  opciones={["258", "512", "256", "2"]}
+  correcta={1}
+  explicacion="Una tupla tiene un valor de cada componente: 2 × 256 = 512. Es un **producto** (próxima lección)."
+  porque={["Eso sería una suma (2 + 256): un valor de uno **o** del otro.", "", "Te faltan las dos posibilidades del `bool`.", "Te falta el `u8`."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `()` ocupa 0 bytes?"
+  opciones={["Por un error del compilador", "Porque tiene un único valor posible: no hay nada que distinguir", "Porque está vacío y no se puede crear", "No es cierto: ocupa 1"]}
+  correcta={1}
+  explicacion="Con un solo valor posible, saber el tipo ya te dice el valor. No hace falta guardar ningún bit."
+  porque={["Es intencionado y muy útil.", "", "Sí se puede crear: `()`. El tipo que no se puede crear es el vacío (lección 3).", "La salida del ejemplo muestra 0."]}
+/>

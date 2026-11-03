@@ -1,0 +1,46 @@
+---
+title: "Mundo 20 · Unsafe y comportamiento indefinido"
+description: "Qué hace de verdad unsafe, qué es el comportamiento indefinido y cómo se construyen abstracciones seguras encima."
+sidebar:
+  order: 0
+---
+
+Hasta aquí, el compilador ha sido tu red de seguridad: si un programa compilaba sin `unsafe`, no podía
+leer memoria liberada, ni tener carreras de datos, ni crear referencias nulas. En este mundo bajas al
+sótano donde esa red **se construye**. Vas a ver que `Vec`, `String`, `Cell`, `Mutex` y `split_at_mut`
+están hechos con `unsafe` por dentro… y que aun así son seguros por fuera.
+
+La idea que lo atraviesa todo: **`unsafe` no apaga ninguna comprobación. Es una promesa**. Escribes
+`unsafe` cuando tú garantizas algo que el compilador no puede demostrar. Si la promesa es falsa, el
+programa tiene *comportamiento indefinido* (UB, *undefined behavior*): deja de tener significado, aunque
+«parezca funcionar».
+
+## Qué vas a conseguir
+
+| # | Lección | Te llevas |
+|---|---|---|
+| 1 | [Qué es `unsafe` (y qué no)](./01-que-es-unsafe/) | Los cinco superpoderes; por qué el borrow checker sigue activo |
+| 2 | [Punteros crudos](./02-punteros-crudos/) | `*const T`, `*mut T`, `&raw`, aritmética, alineación |
+| 3 | [La lista del comportamiento indefinido](./03-la-lista-de-ub/) | Qué es UB según la Reference y los valores inválidos |
+| 4 | [Abstracciones seguras](./04-abstracciones-seguras/) | *Soundness*, invariantes de seguridad y de validez, la frontera de privacidad |
+| 5 | [Aliasing: de Stacked a Tree Borrows](./05-aliasing-y-tree-borrows/) | Por qué `&mut` es exclusivo hasta para el código unsafe |
+| 6 | [Miri, el detector de UB](./06-miri/) | Ejecutar tu código en una máquina abstracta que vigila cada byte |
+| 7 | [`MaybeUninit`](./07-maybeuninit/) | Memoria sin inicializar, sin UB |
+| 8 | [`UnsafeCell`](./08-unsafecell/) | La única puerta legal a la mutabilidad interior |
+| 9 | [Provenance](./09-provenance/) | Un puntero es más que una dirección |
+| 10 | [Varianza y `PhantomData`](./10-varianza-y-phantomdata/) | Cuándo se puede acortar una vida y cómo declararlo |
+| 11 | [Drop check](./11-drop-check/) | Por qué `Drop` cambia lo que acepta el borrow checker |
+| 12 | [La frontera con C (FFI)](./12-ffi/) | `unsafe extern "C"`, `repr(C)`, `CStr`, pánicos en la frontera |
+| 13 | [Unsafe en la edición 2024](./13-edicion-2024/) | Los cinco cambios y por qué se hicieron |
+| 14 | [Agujeros de solidez famosos](./14-agujeros-de-solidez/) | #25860, la *leakpocalypse* y RustBelt |
+| 15 | [Auditar unsafe](./15-auditar-unsafe/) | `// SAFETY:`, lints, `forbid(unsafe_code)`, RustSec, Miri en CI |
+| 16 | [Jefe: tu propio `Vec`](./16-jefe/) | Un contenedor unsafe por dentro y sound por fuera |
+
+## Antes de empezar
+
+- Necesitas los mundos 06–08 (propiedad, préstamos, tiempos de vida), 13 (traits) y 15 (punteros inteligentes).
+- Varios ejemplos tienen UB **a propósito**. Esos no se ejecutan en el navegador: llevan un aviso y se
+  abren en el Rust Playground, donde puedes pasarlos por **Miri** (menú *Tools → Miri*). Nunca saques
+  conclusiones de la salida de un programa con UB: «me imprimió 3» no significa nada.
+- Si nunca escribes `unsafe`, este mundo te sigue sirviendo: entender cómo se construye la seguridad
+  es lo que separa a quien usa el lenguaje de quien lo diseña.

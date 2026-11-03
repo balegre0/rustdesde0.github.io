@@ -1,0 +1,147 @@
+---
+title: "Tipos"
+description: "Todos los tipos de Rust: primitivos, compuestos, punteros, funciones, closures, objetos trait y tipos especiales."
+sidebar:
+  order: 100
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Cada valor de Rust tiene un **tipo**, y el tipo dice qué valores son posibles, cuánta memoria ocupan y qué operaciones admite. Esta página es el catálogo completo.
+
+## En una frase
+
+Rust tiene tipos **primitivos** (números, `bool`, `char`, `str`, `!`), **compuestos** (tuplas, arrays, slices, structs, enums, unions), **punteros** (referencias, punteros crudos, punteros a función), tipos **anónimos** (funciones, closures, `impl Trait`) y **objetos trait** (`dyn Trait`). El compilador conoce el tipo de todo **al compilar**.
+
+## Primitivos
+
+### Enteros
+
+| Tipo | Bits | Rango |
+|---|---|---|
+| `u8` / `i8` | 8 | 0…255 / −128…127 |
+| `u16` / `i16` | 16 | 0…65 535 / −32 768…32 767 |
+| `u32` / `i32` | 32 | 0…≈4,29·10⁹ / ≈±2,1·10⁹ |
+| `u64` / `i64` | 64 | 0…≈1,8·10¹⁹ / ≈±9,2·10¹⁸ |
+| `u128` / `i128` | 128 | 0…≈3,4·10³⁸ / ≈±1,7·10³⁸ |
+| `usize` / `isize` | los de un puntero | 64 en un PC de 64 bits, 32 en wasm32 |
+
+- `u` = sin signo; `i` = con signo (complemento a dos).
+- Un literal entero sin más pistas es `i32`; uno flotante, `f64`.
+- **Desbordamiento**: en modo debug, `255u8 + 1` es un **pánico** (`attempt to add with overflow`); en modo release da la vuelta (`0`). Para elegir el comportamiento: `wrapping_add`, `checked_add` (devuelve `Option`), `saturating_add`, `overflowing_add`, `strict_add`.
+- `usize` es el tipo de los índices y de las longitudes.
+
+### Flotantes
+
+`f32` y `f64` siguen IEEE 754: existen `inf`, `-inf` y `NaN` (que no es igual ni a sí mismo). `0.1 + 0.2` no es exactamente `0.3`. `f16` y `f128` existen pero son inestables.
+
+### `bool`
+
+`true` o `false`. Ocupa 1 byte; cualquier otro valor en ese byte es [UB](/ref/ub/).
+
+### `char`
+
+Un **valor escalar Unicode**: de `U+0000` a `U+10FFFF`, sin los suplentes `U+D800…U+DFFF`. Ocupa **4 bytes**, aunque en texto UTF-8 ocupe entre 1 y 4.
+
+### `str`
+
+Texto **UTF-8 válido**. Es un tipo de tamaño dinámico: se usa detrás de un puntero (`&str`, `Box<str>`, dentro de `String`). `len()` cuenta **bytes**.
+
+### `!` (never)
+
+El tipo de las expresiones que **nunca terminan** de evaluarse: `panic!()`, `return`, `break`, `continue`, `loop {}` sin `break`, `process::exit`. No tiene ningún valor, y se convierte a cualquier tipo. En Rust estable 1.99 solo se puede escribir como tipo de retorno (`-> !`).
+
+### `()` (unidad)
+
+La tupla vacía. Tiene un solo valor, `()`, y ocupa 0 bytes. Es lo que «devuelven» las funciones sin `->` y las sentencias.
+
+## Compuestos
+
+| Tipo | Escritura | Notas |
+|---|---|---|
+| tupla | `(A, B, C)`, `(T,)` | campos por posición: `t.0`; tamaño fijo |
+| array | `[T; N]` | `N` elementos del mismo tipo, contiguos; `N` es parte del tipo |
+| slice | `[T]` | una vista de longitud desconocida al compilar; se usa como `&[T]` (puntero + longitud) |
+| struct | `struct S { … }` | tipo **nominal**: dos structs con los mismos campos son tipos distintos |
+| enum | `enum E { … }` | una de varias variantes |
+| union | `union U { … }` | campos que comparten memoria |
+
+Indexar un array o un slice fuera de rango es un **pánico**, nunca una lectura fuera de la memoria.
+
+## Punteros
+
+| Tipo | Qué es |
+|---|---|
+| `&'a T` | **préstamo compartido**: permite leer; puede haber muchos a la vez |
+| `&'a mut T` | **préstamo exclusivo**: permite modificar; solo uno a la vez |
+| `*const T`, `*mut T` | **punteros crudos**: sin garantías; desreferenciarlos exige `unsafe` |
+| `fn(A) -> R` | **puntero a función**; nunca nulo |
+| `Box<T>`, `Rc<T>`, `Arc<T>`… | punteros inteligentes de la biblioteca (propietarios) |
+
+Si `T` no tiene tamaño conocido (`[T]`, `str`, `dyn Trait`), el puntero es **ancho**: lleva un dato extra (la longitud o la vtable).
+
+## Tipos anónimos
+
+- **Item de función**: cada `fn` tiene su propio tipo, de tamaño 0. Se convierte a puntero a función cuando hace falta.
+- **Closure**: cada closure tiene un tipo único que contiene lo que captura. Implementa `Fn`, `FnMut` o `FnOnce` según lo que haga.
+- **`impl Trait`**: en un argumento, un genérico anónimo; en un retorno, un tipo concreto oculto.
+- **Futuros** de `async`: tipos anónimos que implementan `Future`.
+
+## Objetos trait
+
+`dyn Trait` es «algún tipo que implementa `Trait`». Tamaño dinámico; siempre detrás de un puntero ancho (datos + vtable). Ver [`dyn`](/ref/lenguaje/palabras-clave/dyn/).
+
+## Otros tipos que aparecen en el código
+
+- **Parámetros genéricos** `T`, con límites (`T: Clone`).
+- **`Self`**, el tipo actual.
+- **Tipos inferidos** `_`: «dedúcelo».
+- **Rutas calificadas** `<T as Trait>::Assoc`.
+- **Tipos vacíos**: `enum Nunca {}` no tiene valores, como `!`. `std::convert::Infallible` es uno.
+- **Alias** con `type`: otro nombre, no otro tipo.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/tipos-primitivos" />
+
+Salida (en el navegador, donde un puntero mide 4 bytes):
+
+```text
+u8: 0..=255
+i8: -128..=127
+i128 máx: 170141183460469231731687303715884105727
+0.30000000000000004 0.0000000000000002220446049250313
+inf -inf true
+ñ 4 bytes, U+00F1, en UTF-8 ocupa 2
+4 bytes, 3 caracteres
+1 2.5 x | [1, 2, 3, 4] | [2, 3]
+() ocupa 0 bytes; [u8; 0] ocupa 0
+item: 0 bytes, puntero: 4 bytes
+```
+
+El desbordamiento, en los dos perfiles:
+
+<Ejecutar ej="ref-lenguaje/tipos-overflow" />
+
+En debug, el programa se detiene con `attempt to add with overflow`; en release imprime `0`.
+
+## Errores típicos
+
+Rust **no** convierte números de un tipo a otro por su cuenta:
+
+<NoCompila ej="ref-lenguaje/tipos-error" />
+
+`error[E0308]: mismatched types` (`expected i32, found i64`) y `error[E0277]: cannot add i64 to i32`. El arreglo convierte con `i64::from(a)`, que nunca pierde información; `as` también serviría, pero trunca en silencio si el valor no cabe.
+
+## Desde
+
+Rust 1.0. `i128`/`u128`: 1.26. `!` como tipo de primera clase llega en Rust 1.100 (aún no en 1.99).
+
+## Ver también
+
+- [Layout de tipos](/ref/lenguaje/layout-de-tipos/) · [Coerciones](/ref/lenguaje/coerciones/) · [Subtipos y varianza](/ref/lenguaje/subtipos-y-varianza/) · [`as`](/ref/lenguaje/palabras-clave/as/) · [Comportamiento indefinido](/ref/ub/)
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)

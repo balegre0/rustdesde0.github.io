@@ -1,0 +1,35 @@
+---
+title: "Mundo 23 · Embebido y tu sistema operativo"
+description: "Rust sin sistema operativo: no_std, registros y volatile, embedded-hal, interrupciones, Embassy y probe-rs en microcontroladores; y tu propio núcleo x86_64 al estilo de blog_os."
+sidebar:
+  order: 0
+---
+
+Hasta ahora, debajo de tus programas siempre había un sistema operativo: él cargaba el programa, le daba memoria, archivos e hilos. En este mundo lo quitas. Vas a programar **directamente el hardware**: primero un microcontrolador (un ordenador diminuto de unos pocos euros) y después **tu propio núcleo** de sistema operativo para PC.
+
+Es el lugar donde se ve mejor por qué Rust es especial: las mismas garantías de memoria, sin sistema operativo, sin recolector de basura y sin coste.
+
+:::note[Sin placa también se puede]
+Los ejemplos de este mundo **simulan** el hardware para que se ejecuten aquí. Para la parte real, puedes usar el simulador **Wokwi** (en el navegador) o **QEMU** (en tu PC) antes de comprar una placa. La recomendada para empezar es la **micro:bit v2** (unos 20 €), la que usa el libro oficial *Discovery*.
+:::
+
+## Lecciones
+
+**Parte 1 · Microcontroladores**
+
+1. [Sin sistema operativo](/curso/23-embebido-y-tu-so/01-sin-sistema-operativo/): `no_std`, `core` y `alloc`.
+2. [Registros y `volatile`](/curso/23-embebido-y-tu-so/02-registros-y-volatile/): hablar con el hardware a través de la memoria.
+3. [Del PAC al HAL](/curso/23-embebido-y-tu-so/03-pac-hal-embedded-hal/): capas de abstracción y `embedded-hal` 1.0.
+4. [Interrupciones](/curso/23-embebido-y-tu-so/04-interrupciones/): secciones críticas y RTIC.
+5. [Embassy: async sin sistema operativo](/curso/23-embebido-y-tu-so/05-embassy/).
+6. [De tu PC a la placa](/curso/23-embebido-y-tu-so/06-de-tu-pc-a-la-placa/): targets, probe-rs y defmt.
+
+**Parte 2 · Tu núcleo**
+
+7. [Un binario autónomo](/curso/23-embebido-y-tu-so/07-binario-autonomo/): el primer paso de blog_os.
+8. [Texto en pantalla](/curso/23-embebido-y-tu-so/08-texto-en-pantalla/): el búfer VGA.
+9. [Excepciones e interrupciones de la CPU](/curso/23-embebido-y-tu-so/09-excepciones/).
+10. [Paginación](/curso/23-embebido-y-tu-so/10-paginacion/): memoria virtual.
+11. [Tu propio asignador](/curso/23-embebido-y-tu-so/11-tu-propio-asignador/): `Box` y `Vec` en tu núcleo.
+12. [Rust en Linux y en otros núcleos](/curso/23-embebido-y-tu-so/12-rust-en-linux/).
+13. [Jefe: la terminal de tu núcleo](/curso/23-embebido-y-tu-so/13-jefe/).

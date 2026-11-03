@@ -1,0 +1,135 @@
+---
+title: "El procesador"
+description: "Descubre qué hace de verdad la CPU: repetir sin parar buscar una instrucción, entenderla y ejecutarla."
+sidebar:
+  order: 1
+duracion: 10
+desde: "1.0"
+requiere: ["00-el-taller/06-cargo-new-y-run"]
+tarjetas:
+  - p: "¿Cuáles son los tres pasos que la CPU repite sin parar?"
+    r: "Buscar la instrucción (fetch), decodificarla (decode) y ejecutarla (execute)."
+  - p: "¿Qué es un registro?"
+    r: "Una casilla de memoria diminuta y rapidísima que está dentro de la propia CPU. La CPU hace las cuentas con los valores que tiene en sus registros."
+  - p: "¿Qué guarda el contador de programa?"
+    r: "La posición de la próxima instrucción que hay que buscar. Después de cada instrucción avanza, salvo que la instrucción lo mande a otro sitio."
+  - p: "¿Entiende la CPU el código Rust que escribes?"
+    r: "No. Solo entiende código máquina: instrucciones guardadas como bytes. El compilador rustc traduce tu código Rust a código máquina antes de ejecutarlo."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a ver qué hace el corazón del ordenador. Spoiler: algo muy simple, repetido miles de millones de veces por segundo.
+
+## Predice
+
+Un programa es una lista de **instrucciones** que se ejecutan en orden, de arriba abajo. Este guarda un número en una variable llamada `acumulador` y lo va cambiando paso a paso. ¿Qué imprime al final?
+
+<Predice
+  ej="m01/cpu-pasos"
+  opciones={["`7`", "`10`", "`5`", "`4`"]}
+  correcta={0}
+  explicacion="Las instrucciones se ejecutan **una detrás de otra**: 0 + 5 = 5, luego 5 × 2 = 10, luego 10 − 3 = 7."
+  porque={["Correcto: cada paso parte del resultado del anterior.", "10 es el valor después del paso 2; falta el paso 3, que resta 3.", "5 es el valor después del paso 1; el programa no se detiene ahí.", "4 saldría si se restara antes de multiplicar ((5 − 3) × 2). Pero el orden es el del texto: primero se multiplica."]}
+/>
+
+## La idea
+
+El **procesador** (*CPU*, *central processing unit*) es el chip que ejecuta los programas. Es rapidísimo y muy obediente, pero muy limitado: solo sabe hacer operaciones pequeñas. Sumar dos números. Copiar un dato de un sitio a otro. Comparar. Saltar a otra instrucción.
+
+Dentro de la CPU hay unas pocas casillas especiales llamadas **registros** (*registers*). Son diminutas y las más rápidas de todo el ordenador. La CPU no suma «números en general»: suma lo que hay en un registro con lo que hay en otro. Uno de esos registros es especial: el **contador de programa** (*program counter*). Guarda dónde está la próxima instrucción.
+
+Con eso, la CPU repite un ciclo sin descanso:
+
+1. **Buscar** (*fetch*): leer la instrucción a la que apunta el contador de programa, y avanzar el contador.
+2. **Decodificar** (*decode*): averiguar qué instrucción es («sumar», «copiar»…).
+3. **Ejecutar** (*execute*): hacerla.
+
+Y vuelta a empezar. Las instrucciones son números guardados en memoria: el **código máquina** (*machine code*). Tú no escribes código máquina. Escribes Rust, y el compilador `rustc` lo traduce.
+
+## Pruébalo
+
+Este programa **simula** una CPU de juguete con dos registros, A y B. Su «memoria» es una lista de números, y cada número es una instrucción: 1 = cargar, 2 = sumar, 3 = copiar, 0 = parar. Fíjate en los comentarios 1, 2 y 3: son los tres pasos del ciclo.
+
+<Ejecutar ej="m01/cpu-juguete" />
+
+Salida real:
+
+```text
+cargar 7 en A        -> A=7 B=0
+copiar A en B         -> A=7 B=7
+cargar 5 en A        -> A=5 B=7
+sumar A + B en A      -> A=12 B=7
+parar
+```
+
+La memoria `[1, 7, 3, 1, 5, 2, 0]` se lee así: «cargar 7», «copiar», «cargar 5», «sumar», «parar». La instrucción 1 va seguida de su dato; por eso ocupa dos casillas. Una CPU real hace exactamente esto, con cientos de instrucciones distintas en lugar de cuatro.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Puedes pedirle a `rustc` que te enseñe el código máquina que genera, escrito con nombres legibles. Esa forma legible se llama **ensamblador** (*assembly*). Para esta función de Rust, que suma dos números:
+
+```rust
+#[unsafe(no_mangle)]
+pub fn suma(a: u32, b: u32) -> u32 {
+    a.wrapping_add(b)
+}
+```
+
+con el comando `rustc --edition 2024 --crate-type=lib -C opt-level=3 --emit=asm -C llvm-args=-x86-asm-syntax=intel --target x86_64-pc-windows-msvc suma.rs`, el ensamblador para un PC x86-64 es este.
+
+Salida real (líneas de instrucciones del archivo `suma.s`):
+
+```text
+suma:
+	lea	eax, [rcx + rdx]
+	ret
+```
+
+Dos instrucciones. En esta plataforma, los dos números llegan a la función en los registros `rcx` y `rdx`. `lea` los suma y deja el resultado en el registro `eax`, que es donde se espera la respuesta. `ret` vuelve a quien llamó a la función. No hay variables ni nombres: solo registros e instrucciones. Volverás a leer ensamblador en mundos posteriores; por ahora basta con saber que existe y que puedes verlo.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«El ordenador entiende mi programa»">
+
+❌ Pensar que la CPU lee tu archivo `main.rs` y lo entiende.
+
+✅ La CPU solo entiende código máquina. `rustc` traduce todo tu programa **antes** de ejecutarlo (por eso se llama *compilador*). Si hay un error, lo encuentra durante esa traducción, y el programa ni siquiera llega a la CPU. Por eso muchos errores de Rust aparecen **al compilar** y no al ejecutar: es una ventaja, no una molestia.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m01/cpu-reto"
+  enunciado="Cambia SOLO la lista `memoria` para que la CPU de juguete termine con `A=10`. Recuerda: 1 = cargar el número siguiente en A, 2 = A + B en A, 3 = copiar A en B, 0 = parar. Pista: cargar 5, copiarlo en B y sumar."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿En qué orden repite la CPU los pasos de su ciclo?"
+  opciones={["Buscar, decodificar, ejecutar", "Decodificar, buscar, ejecutar", "Ejecutar, buscar, decodificar", "Compilar, buscar, ejecutar"]}
+  correcta={0}
+  explicacion="Primero hay que traer la instrucción (buscar), luego saber qué es (decodificar) y por último hacerla (ejecutar)."
+  porque={["Correcto.", "No se puede decodificar algo que todavía no se ha traído de la memoria.", "No se puede ejecutar una instrucción que aún no se ha leído ni entendido.", "Compilar no es parte del ciclo de la CPU: lo hace `rustc` antes, una sola vez."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué es un **registro**?"
+  opciones={["Una casilla muy rápida dentro de la CPU", "Un archivo donde el sistema anota lo que pasa", "Una lista con todas las instrucciones del programa", "Otra forma de llamar a la memoria RAM"]}
+  correcta={0}
+  porque={["Correcto: hay pocos registros, pero son lo más rápido del ordenador.", "Esa palabra se usa a veces así en el habla normal, pero en una CPU un registro es una casilla interna.", "Las instrucciones están en la memoria; el contador de programa solo guarda **dónde** está la próxima.", "La memoria está fuera de la CPU y es mucho más grande y más lenta que los registros."]}
+/>
+
+<Pregunta
+  pregunta="En la CPU de juguete, ¿para qué sirve la variable `pc`?"
+  opciones={["Guarda la posición de la próxima instrucción", "Cuenta cuántas sumas se han hecho", "Guarda el resultado final", "Indica cuántos registros hay"]}
+  correcta={0}
+  explicacion="`pc` es el **contador de programa**: el paso «buscar» lee `memoria[pc]` y luego lo avanza."
+  porque={["Correcto.", "No cuenta sumas: avanza con **cualquier** instrucción (y dos veces con «cargar», que lleva un dato).", "El resultado está en el registro A.", "Los registros son `a` y `b`; `pc` es un tercer registro, el que dice por dónde vamos."]}
+/>

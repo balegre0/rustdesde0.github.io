@@ -1,0 +1,61 @@
+---
+title: "Jefe: tu taller, listo"
+description: "Monta el taller completo de principio a fin: carpeta, proyecto con Cargo, código, compilación, Git. Y tu primer reto de código."
+sidebar:
+  order: 11
+duracion: 20
+requiere: ["00-el-taller/10-aprender-con-ia"]
+tarjetas:
+  - p: "Los pasos para empezar un proyecto nuevo:"
+    r: "`cd C:\\dev`, `cargo new nombre`, `cd nombre`, `code .`, editar `src\\main.rs`, `cargo run` y, cuando funcione, `git add .` y `git commit`."
+---
+
+import { Reto, Pregunta } from '~/components';
+
+Es hora de juntarlo todo. Este jefe tiene dos partes: una en tu PC y otra aquí mismo, en el navegador.
+
+## Parte 1: en tu PC
+
+Haz esta lista de principio a fin, sin mirar las lecciones si puedes. Marca cada paso cuando lo consigas:
+
+1. Abre **Terminal** (PowerShell) y ve a tu carpeta de proyectos: `cd C:\dev`.
+2. Crea un proyecto: `cargo new taller`.
+3. Entra: `cd taller`.
+4. Ábrelo en VS Code: `code .` (el punto es «esta carpeta»).
+5. Cambia `src\main.rs` para que imprima dos líneas: `Hola, taller` y `Mi primer programa en Rust`.
+6. `cargo check`. Si falla, lee el error.
+7. `cargo run`. Si dice ``linker `link.exe` not found``, vuelve a la [lección 4](/curso/00-el-taller/04-la-trampa-de-link/).
+8. `git add .` y `git commit -m "Primer programa"`.
+9. `git log --oneline`: tu primera foto.
+
+Si todo eso ha funcionado, tienes un taller de verdad. Si algo falla, **ese** es el aprendizaje del día: lee el error, búscalo en la lección correspondiente y vuelve a intentarlo.
+
+## Parte 2: aquí
+
+Haz lo mismo en el editor del curso. El código se compila en el Rust Playground oficial (te lo avisa antes de enviarlo).
+
+<Reto
+  ej="m00/saludo"
+  enunciado="Cambia el programa para que imprima exactamente dos líneas: `Hola, taller` y, debajo, `Mi primer programa en Rust`. Cada `println!` imprime una línea."
+/>
+
+## Repaso relámpago
+
+<Pregunta
+  pregunta="`cargo run` falla con «could not find `Cargo.toml`». ¿Qué ha pasado?"
+  opciones={["No tienes el enlazador", "Estás en una carpeta que no es la del proyecto", "El código tiene un error", "Falta Git"]}
+  correcta={1}
+  explicacion="Cargo busca `Cargo.toml` en la carpeta actual y en las de arriba. Haz `cd` a la carpeta del proyecto."
+  porque={["Si faltara el enlazador, el error hablaría de `link.exe`.", "", "Antes de mirar el código, Cargo necesita encontrar el proyecto.", "Git no es necesario para compilar."]}
+/>
+
+## Lo que te llevas del mundo 00
+
+- Rutas absolutas y relativas, y dónde guardar tus proyectos (fuera de OneDrive).
+- PowerShell: `pwd`, `ls`, `cd`, `mkdir`.
+- rustup, rustc y cargo; las Build Tools para enlazar.
+- VS Code con rust-analyzer, como tutor.
+- `cargo new`, `check`, `build`, `run`, `--release` y `Cargo.toml`.
+- Git: commits pequeños y frecuentes.
+
+En el mundo 01 vas a mirar dentro de la máquina: qué es la memoria, qué son los bits y por qué todo eso importa para entender Rust.

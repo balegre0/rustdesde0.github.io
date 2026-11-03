@@ -1,0 +1,71 @@
+---
+title: "if"
+description: "Palabra clave estricta: elige entre ramas según una condición o un patrón; también guardas en match."
+sidebar:
+  order: 16
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`if` ejecuta un bloque **solo si** se cumple una condición. En Rust es una expresión: produce un valor.
+
+## Sinopsis
+
+```text
+if condición { … } else { … }                  // condición: bool
+if let patrón = expresión { … } else { … }     // ¿encaja el patrón?
+if let A = x && condición && let B = y { … }   // cadena let (edición 2024)
+patrón if condición => …                       // guarda en una rama de match
+patrón if let P = e => …                       // guarda if let (1.95)
+```
+
+## Qué hace
+
+### Uso 1 · Condición
+
+La condición tiene que ser de tipo `bool`, y no lleva paréntesis. Las llaves son obligatorias. Como expresión, ambas ramas deben dar el mismo tipo; sin `else`, el tipo es `()`.
+
+### Uso 2 · `if let`
+
+Comprueba si un valor encaja con un patrón **refutable** (que puede fallar) y, si encaja, enlaza sus variables dentro del bloque.
+
+### Uso 3 · Cadenas `let`
+
+En la edición 2024 puedes unir con `&&` varias condiciones y varios `let`. Las variables de un `let` ya están disponibles en las condiciones siguientes. No se admite `||` en una cadena.
+
+### Uso 4 · Guardas de `match`
+
+En `patrón if condición =>`, la rama solo se elige si el patrón encaja **y** la condición es verdadera. Desde Rust 1.95 la guarda también puede ser un `if let`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-if" />
+
+Salida:
+
+```text
+negativo
+hay un 3
+3 es mayor que 2
+-4 es par
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-if-error" />
+
+`error[E0308]: if and else have incompatible types`: una rama da un entero y la otra un `&str`.
+
+## Desde
+
+Rust 1.0. Cadenas `let`: 1.88, solo en la edición 2024. Guardas `if let`: 1.95.
+
+## Ver también
+
+- [`else`](/ref/lenguaje/palabras-clave/else/) · [`match`](/ref/lenguaje/palabras-clave/match/) · [`let`](/ref/lenguaje/palabras-clave/let/) · [Patrones](/ref/lenguaje/patrones/) · [Ediciones](/ref/ediciones/): ámbito de los temporales de `if let` en 2024.
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/)

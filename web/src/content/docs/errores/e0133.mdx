@@ -1,0 +1,76 @@
+---
+title: "E0133: operación insegura fuera de unsafe"
+description: "Haces algo que requiere unsafe (desreferenciar un puntero crudo, llamar a una unsafe fn…) fuera de un bloque unsafe."
+sidebar:
+  order: 18
+insignias: ["Constantes, unsafe, async y otros"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` dereference of raw pointer is unsafe and requires unsafe block ``
+
+## Qué significa
+
+Algunas operaciones no las puede comprobar el compilador: leer a través de un **puntero crudo** (`*const T`), llamar a funciones `unsafe`, acceder a `static mut`, usar uniones… Rust te obliga a marcarlas con `unsafe { }` para que quede claro que **tú** garantizas las reglas.
+
+## Qué error evita
+
+Un puntero crudo puede ser nulo, colgante o estar desalineado; leerlo sin cuidado es **comportamiento indefinido**. `unsafe` no lo hace seguro: marca el sitio donde tienes que demostrarlo.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0133" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0133]: dereference of raw pointer is unsafe and requires unsafe block
+ --> E0133.rs:4:17
+  |
+4 |     let leido = *p;
+  |                 ^^ dereference of raw pointer
+  |
+  = note: raw pointers may be null, dangling or unaligned; they can violate aliasing rules and cause data races: all of these are undefined behavior
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Desreferenciar `*const T` / `*mut T` fuera de `unsafe`.
+- Llamar a funciones `unsafe fn` (o de FFI).
+- Leer o escribir una `static mut`.
+
+## Cómo arreglarlo
+
+Envuelve **solo** la operación en `unsafe { ... }` y escribe encima un comentario `// SEGURIDAD:` que explique por qué es correcta. Mejor aún: usa referencias normales si puedes.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let x = 42;
+    let p = &raw const x;
+    // SEGURIDAD: `p` apunta a `x`, que está viva e inicializada.
+    let leido = unsafe { *p };
+    println!("{leido}");
+}
+```
+
+**Salida:**
+
+```text
+42
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0133` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0658](/errores/e0658/): característica inestable
+
+## Aprende esto en
+
+- [Mundo 20 · Unsafe y comportamiento indefinido](/curso/20-unsafe-y-ub/)

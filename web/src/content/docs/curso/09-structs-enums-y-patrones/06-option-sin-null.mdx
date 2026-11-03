@@ -1,0 +1,108 @@
+---
+title: "Option: por qué no existe el null"
+description: "Trabaja con valores que pueden faltar sin que se te olvide comprobarlo."
+sidebar:
+  order: 6
+duracion: 12
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones/05-enums-con-datos"]
+tarjetas:
+  - p: "¿Qué es `Option<T>`?"
+    r: "Un enum de la biblioteca estándar con dos variantes: `Some(T)` (hay un valor) y `None` (no lo hay)."
+  - p: "¿Por qué no se puede sumar `Option<i32>` + `i32`?"
+    r: "Porque son tipos distintos: el `Option` podría ser `None`. Hay que sacar el valor antes (con `match`, `if let`, `unwrap_or`…). El error es E0369."
+  - p: "¿Qué hace `unwrap()` sobre un `None`?"
+    r: "Provoca un pánico: «called `Option::unwrap()` on a `None` value». Úsalo solo cuando un `None` sea imposible o en pruebas rápidas."
+  - p: "¿Qué hace `opcion.map(f)`?"
+    r: "Si es `Some(x)`, devuelve `Some(f(x))`; si es `None`, devuelve `None` sin llamar a `f`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer `Option`, la forma que tiene Rust de decir «aquí puede que no haya nada», y por qué eso evita una familia entera de fallos.
+
+## Predice
+
+<Predice
+  ej="m09/option-predice"
+  opciones={["`Some(7) None` y luego `0`", "`7` y luego un pánico por leer la posición 10", "`Some(7) Some(0)` y luego `0`", "No compila: no se puede imprimir un `None`"]}
+  correcta={0}
+  explicacion="`first()` y `get(10)` devuelven `Option<&i32>`: hay primero (`Some(7)`), pero no hay décimo (`None`). `unwrap_or(&0)` da el valor de dentro o, si no hay, el que le pasas."
+  porque={["Correcto.", "`get` no da pánico: devuelve `None` cuando la posición no existe. El que da pánico es `notas[10]`.", "`get(10)` no inventa un cero: devuelve `None`.", "`{:?}` imprime `None` sin problema."]}
+/>
+
+## La idea
+
+Muchas operaciones pueden no tener respuesta: buscar un nombre que no está, pedir el primer elemento de una lista vacía, leer un campo opcional. En Rust **no existe un valor «nulo»** escondido dentro de cualquier tipo. Si algo puede faltar, su tipo lo dice:
+
+```rust
+enum Option<T> {
+    Some(T),   // hay un valor de tipo T
+    None,      // no hay nada
+}
+```
+
+Es un enum normal (de la lección anterior), con un parámetro `T` que significa «cualquier tipo» (los genéricos llegan en el mundo 13). Un `i32` **siempre** es un número. Un `Option<i32>` puede ser un número o nada, y el compilador **no te deja usarlo como número** hasta que trates el caso `None`. El olvido («daba por hecho que estaba») deja de ser un fallo al ejecutar y pasa a ser un error de compilación.
+
+## Pruébalo
+
+<Ejecutar ej="m09/option" />
+
+Escalera para sacar el valor, de más explícito a más cómodo: `match` → `if let` (lección 9) → métodos como `unwrap_or`, `map`, `is_some` → el operador `?` (mundo 10).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+¿Cuesta memoria esta seguridad? A veces nada. En wasm32, un `&i32` ocupa 4 bytes y un `Option<&i32>` **también 4**: una referencia nunca puede valer 0, así que el compilador usa la dirección 0 para representar `None`. Ese valor «imposible» que sobra se llama **nicho** (*niche*). En cambio, un `Option<u32>` ocupa 8, porque un `u32` puede valer cualquier cosa y hace falta una etiqueta aparte. Lo medirás tú mismo en la lección 10.
+
+Así, `Option<&T>` tiene en memoria **exactamente la misma forma** que un puntero que puede ser nulo, pero con una diferencia: el tipo te obliga a comprobarlo antes de usarlo. Leer a través de una referencia nula es **comportamiento indefinido**; en Rust seguro no se puede ni escribir.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m09/option-suma"
+  explicacion="`edades.get(1)` devuelve `Option<&i32>`, no un número, y un `Option` no se puede sumar (E0369). Puede que no haya edad: ¿qué sería «nada + 10»? El arreglo trata los dos casos con `match`."
+/>
+
+<Trampa titulo="unwrap es un pánico en potencia">
+
+`unwrap()` dice «sé que hay algo; si no, para el programa». Cuando te equivocas:
+
+<Ejecutar ej="m09/option-unwrap-none" titulo="unwrap sobre None" />
+
+El mensaje real es `called Option::unwrap() on a None value`, con la línea exacta. Úsalo solo cuando un `None` sea imposible por cómo está escrito el programa; si no, trata el caso.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m09/inicial"
+  enunciado="Escribe `inicial(texto: &str) -> Option<char>`, que devuelve la primera letra o `None` si el texto está vacío. Debe imprimir `Some('Ñ')` y `None`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una función devuelve `Option<String>`. ¿Qué te dice esa firma?"
+  opciones={["Que puede no devolver ningún texto, y tendrás que tratar ese caso", "Que el texto puede estar vacío", "Que puede dar un pánico", "Que el texto es opcional, pero si falta se usa uno vacío"]}
+  correcta={0}
+  porque={["Correcto.", "Un texto vacío es `Some(String::new())`, que es distinto de `None`.", "`Option` no tiene nada que ver con los pánicos.", "No hay ningún valor por defecto automático: `None` es `None`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué devuelve `None::<i32>.map(|x| x + 1)`?"
+  opciones={["`None`", "`Some(1)`", "Un pánico", "`0`"]}
+  correcta={0}
+  porque={["Correcto: con `None`, `map` no llama a la función.", "No hay ningún `x` al que sumar 1.", "`map` nunca da pánico por sí mismo.", "`map` devuelve otro `Option`, no un número."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `Option<&u8>` ocupa lo mismo que `&u8`?"
+  opciones={["Porque una referencia nunca vale 0, y ese valor libre representa `None`", "Porque `Option` se borra al compilar", "Porque el `None` se guarda en otra parte de la memoria", "No es cierto: siempre ocupa el doble"]}
+  correcta={0}
+  porque={["Correcto: es la optimización de nicho.", "`Option` sí existe en memoria; solo que aquí no necesita etiqueta aparte.", "No hay ninguna tabla escondida.", "Medido en wasm32: los dos ocupan 4 bytes."]}
+/>

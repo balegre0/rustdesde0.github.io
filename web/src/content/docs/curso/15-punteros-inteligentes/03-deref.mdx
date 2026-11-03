@@ -1,0 +1,107 @@
+---
+title: "Deref y la coerción automática"
+description: "Haces que tu propio tipo se use como un puntero con el trait Deref y entiendes por qué &Box<String> se convierte solo en &str."
+sidebar:
+  order: 3
+duracion: 12
+desde: "1.0"
+requiere: ["15-punteros-inteligentes/01-box"]
+tarjetas:
+  - p: "¿En qué se convierte `*x` si `x` es de un tipo que implementa `Deref`?"
+    r: "En `*(x.deref())`: primero se llama a `deref`, que devuelve una referencia, y luego se desreferencia esa referencia."
+  - p: "¿Qué es la coerción de desreferencia (*deref coercion*)?"
+    r: "Cuando pasas `&A` donde se espera `&B` y `A: Deref<Target = B>`, el compilador inserta las llamadas a `deref` necesarias, en tantos pasos como haga falta."
+  - p: "¿Qué trait necesitas para modificar a través de `*x`?"
+    r: "`DerefMut`, además de `Deref`. Sin él solo puedes leer."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a construir tu propia «caja» y a enseñarle a Rust qué hay dentro, para que `*` y los métodos funcionen con ella igual que con una `Box`.
+
+## Predice
+
+¿Por qué no compila? `MiCaja` guarda un número, pero…
+
+<NoCompila
+  ej="m15/deref-sin"
+  explicacion="El operador `*` solo funciona con referencias y con tipos que implementan el trait `Deref`. `MiCaja` es un struct cualquiera: Rust no sabe que su campo es «lo de dentro». El arreglo implementa `Deref`."
+/>
+
+## La idea
+
+El operador `*` sobre una referencia `&T` da el `T` al que apunta. Para que funcione con **tus** tipos, implementas el trait `Deref` (*desreferenciar*), que tiene un tipo asociado `Target` (qué hay dentro) y un método `deref(&self) -> &Target`. A partir de ahí, cuando escribes `*c`, el compilador lo reescribe como `*(c.deref())`. Así funcionan `Box`, `String` (cuyo `Target` es `str`), `Vec<T>` (`Target = [T]`), `Rc` y todos los punteros inteligentes de este mundo.
+
+`Deref` hace una segunda cosa, todavía más útil: la **coerción de desreferencia** (*deref coercion*). Si una función pide `&str` y le pasas `&String`, el compilador ve que `String: Deref<Target = str>` y convierte sola la referencia. Y lo hace en **cadena**: `&Box<String>` → `&String` → `&str`. También ocurre al llamar a métodos: `s.len()` sobre una `MiCaja<String>` encuentra el `len` de `String` a través de `deref`.
+
+Para **modificar** a través de `*` hace falta un segundo trait, `DerefMut`. Lo verás en la lección 5: `Rc` implementa `Deref` pero no `DerefMut`, y por eso no puedes cambiar lo que comparte.
+
+## Pruébalo
+
+<Ejecutar ej="m15/deref-propio" />
+
+La coerción, en acción con tres tipos distintos que acaban siendo `&str`:
+
+<Ejecutar ej="m15/coercion" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+La coerción no es magia en ejecución: ocurre **al compilar**. El compilador ve que el tipo no encaja e inserta las llamadas a `deref`. La llamada `saluda(&b)` con `b: Box<String>` se convierte en algo equivalente a:
+
+```rust
+saluda(&**b);          // *b: String,  **b: str,  &**b: &str
+// o, con los métodos a la vista:
+saluda(Deref::deref(Deref::deref(&b)));
+```
+
+Cada `deref` de `Box` y `String` es trivial (devolver un puntero que ya tienen), así que con optimización desaparecen por completo: la coerción **no cuesta nada** en ejecución.
+
+Reglas exactas (Reference, *Type coercions*): de `&T` a `&U` si `T: Deref<Target = U>`; de `&mut T` a `&mut U` si `T: DerefMut<Target = U>`; y de `&mut T` a `&U` si `T: Deref<Target = U>`. Nunca de `&T` a `&mut U`: eso rompería la regla de que un préstamo compartido no permite mutar (aliasing con mutación).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Usar Deref para «heredar» métodos">
+
+❌ Implementar `Deref` en un struct cualquiera solo para no escribir `self.campo.metodo()`:
+
+```rust
+struct Usuario { nombre: String, edad: u32 }
+impl Deref for Usuario {
+    type Target = String;
+    fn deref(&self) -> &String { &self.nombre }
+}
+// usuario.len() ahora compila... ¿y qué significa la «longitud» de un usuario?
+```
+
+✅ `Deref` es para tipos que **son** un puntero o un envoltorio fino de otro valor (`Box`, `String`, un *newtype* `Nombre(String)`). Para lo demás, escribe métodos propios que deleguen: `fn nombre(&self) -> &str { &self.nombre }`.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m15/r-deref"
+  enunciado="Completa `deref` para el *newtype* `Nombre(String)`. Cuando funcione, `saluda(&n)` compilará por coerción y `n.chars()` encontrará el método de `String`. Debe imprimir `Hola, Lucía` y `5 letras`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`fn f(x: &str)`. ¿Cuál de estas llamadas NO compila?"
+  opciones={["`f(&String::from(\"a\"))`", "`f(&Box::new(String::from(\"a\")))`", "`f(String::from(\"a\"))`", "`f(\"a\")`"]}
+  correcta={2}
+  explicacion="La coerción de desreferencia trabaja entre **referencias**. Un `String` por valor no es una referencia, así que no se convierte en `&str`."
+  porque={["`&String` → `&str` en un paso.", "`&Box<String>` → `&String` → `&str` en dos pasos.", "Correcto: falta el `&` (error E0308).", "Un literal ya es `&str`."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuándo se ejecuta la coerción de desreferencia?"
+  opciones={["En ejecución, cada vez que se llama a la función", "Al compilar: el compilador inserta las llamadas a `deref`", "Solo en modo release", "Solo si el tipo implementa `Clone`"]}
+  correcta={1}
+  explicacion="Es una transformación del compilador; en ejecución quedan, como mucho, unas llamadas triviales que se optimizan."
+  porque={["No hay comprobación en ejecución: el tipo se decide al compilar.", "Correcto.", "Ocurre en cualquier perfil.", "No tiene nada que ver con `Clone`."]}
+/>

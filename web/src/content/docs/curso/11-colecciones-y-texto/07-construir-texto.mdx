@@ -1,0 +1,94 @@
+---
+title: "Construir texto"
+description: "Junta y compón texto con push_str, format!, + y join, y convierte bytes en texto sin romper UTF-8."
+sidebar:
+  order: 7
+duracion: 11
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/06-cortar-texto"]
+tarjetas:
+  - p: "¿Qué hace `a + &b` con dos `String`?"
+    r: "Mueve `a` (se reutiliza su memoria), le añade una copia del texto de `b` y devuelve el resultado. Después `a` ya no se puede usar; `b` sí."
+  - p: "¿Por qué `nombre + \" \" + apellido` no compila si `apellido` es `String`?"
+    r: "Porque el lado derecho de `+` debe ser `&str` (E0308). Se arregla con `&apellido`, o mejor con `format!`."
+  - p: "¿Qué hace `[\"a\", \"b\"].join(\", \")`?"
+    r: "Une los elementos con el separador: `\"a, b\"`. `concat()` los une sin separador."
+  - p: "¿Qué hace `String::from_utf8(bytes)`?"
+    r: "Comprueba que los bytes son UTF-8 válido: `Ok(String)` si lo son, `Err` si no. `from_utf8_lossy` sustituye lo inválido por �."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a componer texto de todas las formas habituales y a elegir la más clara (que casi siempre es `format!`).
+
+## Predice
+
+<Predice
+  ej="m11/construir-predice"
+  opciones={["`pan con queso / queso`", "No compila: `a` y `b` son `String`", "`pan con queso / pan`", "No compila: `b` se movió"]}
+  correcta={0}
+  explicacion={'`a + " con " + &b`: el `+` se queda con `a` y pide `&str` a la derecha; `&b` presta `b`, que sigue vivo para el `println!`.'}
+  porque={["Correcto.", "El primer operando puede ser `String` (se mueve); los demás deben ser `&str`, y lo son.", "Imprimimos `b`, no `a`.", "`b` solo se prestó (`&b`)."]}
+/>
+
+## La idea
+
+Formas de construir texto, de más a menos recomendable para empezar:
+
+1. **`format!("{nombre} tiene {edad} años")`**: crea un `String` nuevo. No mueve nada, se lee bien y admite cualquier cosa que se pueda imprimir.
+2. **`s.push_str("…")` y `s.push('c')`**: añaden al final de un `String` existente (tiene que ser `mut`). Ideal en bucles.
+3. **`lista.join(", ")`**: une una lista de textos con un separador; `concat()` sin separador.
+4. **`a + &b`**: funciona, pero tiene reglas raras: **mueve** `a` y exige `&str` a la derecha. Útil para una concatenación rápida; si te confunde, usa `format!`.
+
+Y para pasar de **bytes** a texto: `String::from_utf8(vec_de_bytes)` devuelve `Result`, porque los bytes podrían no ser UTF-8 válido. `String::from_utf8_lossy` nunca falla: cambia lo inválido por el carácter de reemplazo `�`.
+
+## Pruébalo
+
+<Ejecutar ej="m11/construir" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`a + &b` llama a `Add::add(a, &b)`, cuya firma es `fn add(self, other: &str) -> String`. Recibe `a` **por valor**: reutiliza su bloque del heap y solo copia los bytes de `b` al final (si no caben, lo amplía, como un `Vec`). Por eso es eficiente… y por eso `a` queda movido.
+
+`format!` calcula el texto pieza a pieza y lo escribe en un `String` nuevo. Si construyes un texto grande en un bucle, `String::with_capacity(n)` reserva de una vez (en el ejemplo, capacidad 32 y longitud 9: ninguna mudanza).
+
+`from_utf8` recorre los bytes comprobando la estructura de UTF-8 que viste en la lección 5. Si la conversión tiene éxito, **no copia**: el `Vec<u8>` se convierte en el `String` reutilizando su memoria.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m11/suma-strings"
+  explicacion="A la derecha de `+` hace falta un `&str`, y `apellido` es un `String` (E0308). rustc propone `&apellido`. Mejor aún, el arreglo usa `format!`, que no mueve nada: `nombre` y `apellido` siguen disponibles."
+/>
+
+<NoCompila
+  ej="m11/usar-tras-suma"
+  explicacion={'`a + &b` movió `a` dentro del resultado (E0382). Es el precio de que `+` reutilice la memoria de `a`. Si necesitas `a` después, usa `format!("{a}{b}")`.'}
+/>
+
+## Tu turno
+
+<Reto
+  ej="m11/csv"
+  enunciado="Escribe `fila_csv(campos: &[&str]) -> String` que una los campos con `;` (usa `join`) y añada un salto de línea al final. Debe imprimir `nombre;edad;ciudad` e `Íñigo;40;Logroño`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta={'Tienes `nombre: String` y `ciudad: String` y quieres `"nombre (ciudad)"` sin perder ninguno de los dos. ¿Qué escribes?'}
+  opciones={["`format!(\"{nombre} ({ciudad})\")`", "`nombre + \" (\" + ciudad + \")\"`", "`nombre.push_str(ciudad)`", "`[nombre, ciudad].concat()`"]}
+  correcta={0}
+  porque={["Correcto: no mueve nada.", "No compila (`ciudad` no es `&str`) y movería `nombre`.", "Cambia `nombre` y no compila: `push_str` pide `&str`.", "El array se lleva los dos `String`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué devuelve `String::from_utf8(vec![0x61, 0xC3])`?"
+  opciones={["`Err(…)`: 0xC3 empieza una letra de 2 bytes que no termina", "`Ok(\"a\")`", "`Ok(\"aÃ\")`", "Un pánico"]}
+  correcta={0}
+  porque={["Correcto.", "No ignora bytes: o todo es válido o devuelve error.", "0xC3 solo no es un carácter válido en UTF-8.", "`from_utf8` devuelve `Result`, no entra en pánico."]}
+/>

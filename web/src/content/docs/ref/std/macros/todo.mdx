@@ -1,0 +1,53 @@
+---
+title: "todo!"
+description: "Marca código sin terminar: compila con cualquier tipo, pero entra en pánico si se ejecuta."
+sidebar:
+  order: 7
+insignias: ["Desde 1.40", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::todo`
+
+## Sinopsis
+
+```rust
+macro_rules! todo {
+    () => { ... };
+    ($($arg:tt)+) => { ... };
+}
+```
+
+## Qué hace
+
+`todo!()` tiene el tipo `!` («nunca devuelve»), que encaja con cualquier tipo de retorno. Así puedes dejar funciones a medias y el programa compila. Si llega a ejecutarse, entra en pánico con «not yet implemented». `unimplemented!` es parecido, pero da a entender que no se va a implementar.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-todo" />
+
+**Salida:**
+
+```text
+9
+```
+
+**Salida de error** (*stderr*):
+
+```text
+thread 'main' (1) panicked at macros-todo.rs:14:9:
+not yet implemented: falta calcular el perímetro
+```
+
+## Desde
+
+Rust 1.40 (estable).
+
+## Ver también
+
+- [unreachable!](/ref/std/macros/unreachable/)
+- [panic!](/ref/std/macros/panic/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

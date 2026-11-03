@@ -1,0 +1,158 @@
+---
+title: "Coma flotante"
+description: "Abre un f32 y mira sus tres partes: signo, exponente y mantisa. Entenderás por qué 0.1 + 0.2 no es exactamente 0.3."
+sidebar:
+  order: 8
+duracion: 15
+desde: "1.0"
+requiere: ["01-la-maquina/07-complemento-a-dos"]
+tarjetas:
+  - p: "¿Cómo se reparten los 32 bits de un `f32`?"
+    r: "1 bit de signo, 8 de exponente y 23 de mantisa. Un `f64` usa 1, 11 y 52."
+  - p: "¿Por qué `0.1 + 0.2 == 0.3` es `false`?"
+    r: "Porque 0.1, 0.2 y 0.3 no tienen representación exacta en binario. Se guardan aproximaciones, y la suma de dos aproximaciones no coincide con la aproximación de 0.3."
+  - p: "¿Qué hacen `f32::to_bits` y `f32::from_bits`?"
+    r: "`to_bits` da los 32 bits de un `f32` como un `u32`, sin cambiarlos; `from_bits` hace el camino de vuelta."
+  - p: "¿Qué tiene de raro NaN?"
+    r: "No es igual a nada, ni siquiera a sí mismo: `nan == nan` es `false`. Para detectarlo se usa `is_nan()`."
+  - p: "¿Cuál es el sesgo del exponente de un `f32`?"
+    r: "127: el exponente real es el número guardado menos 127. En un `f64` el sesgo es 1023."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a ver cómo se guardan los números con decimales y por qué a veces no son exactos.
+
+## Predice
+
+Este programa suma 0.1 y 0.2 y compara el resultado con 0.3. ¿Qué imprime?
+
+<Predice
+  ej="m01/decimas-predice"
+  opciones={["`false`", "`true`", "No compila: no se pueden comparar decimales", "`0.3`"]}
+  correcta={0}
+  explicacion="0.1 y 0.2 no se pueden guardar exactos en binario. La suma da `0.30000000000000004`, que no es el 0.3 guardado."
+  porque={["Correcto, aunque sorprenda.", "Sería lo esperable con papel y lápiz, pero la máquina guarda aproximaciones en binario.", "Sí se pueden comparar con `==`; el problema es que el resultado engaña.", "El programa imprime el resultado de la comparación (un `bool`), no la suma."]}
+/>
+
+## La idea
+
+Los enteros no sirven para 3,75 ni para 0,000001. Para eso están los números de **coma flotante** (*floating point*): `f32` (4 bytes) y `f64` (8 bytes). Siguen una norma que usan casi todas las CPU: **IEEE 754**. Rust escribe los decimales con punto: `3.75`.
+
+La idea es la de la notación científica, pero en base 2. En lugar de 3,75 = 3,75 × 10⁰, se escribe 3,75 = 1,111₂ × 2¹. Un `f32` guarda tres piezas:
+
+```text
+ 1 bit    8 bits       23 bits
+[signo][ exponente ][      mantisa      ]
+```
+
+- **Signo** (*sign*): 0 positivo, 1 negativo.
+- **Exponente** (*exponent*): la potencia de 2. Se guarda sumándole 127, el **sesgo** (*bias*), para no necesitar negativos. Si se guarda 128, el exponente real es 1.
+- **Mantisa** (*mantissa* o *significand*): las cifras binarias que van detrás de «1,». El 1 inicial no se guarda: siempre está ahí.
+
+El problema: igual que 1/3 = 0,333… nunca termina en decimal, **0,1 nunca termina en binario** (0,000110011001100…). Con 23 bits hay que cortar, y lo guardado es una aproximación.
+
+## Pruébalo
+
+`to_bits` te da los 32 bits de un `f32` sin cambiarlos, para que puedas mirarlos. El programa separa las tres piezas:
+
+<Ejecutar ej="m01/bits-de-un-f32" />
+
+Salida real:
+
+```text
+     1 -> 0x3f800000 -> signo 0 | exponente 01111111 (127) | mantisa 00000000000000000000000
+     2 -> 0x40000000 -> signo 0 | exponente 10000000 (128) | mantisa 00000000000000000000000
+    -2 -> 0xc0000000 -> signo 1 | exponente 10000000 (128) | mantisa 00000000000000000000000
+   0.5 -> 0x3f000000 -> signo 0 | exponente 01111110 (126) | mantisa 00000000000000000000000
+   0.1 -> 0x3dcccccd -> signo 0 | exponente 01111011 (123) | mantisa 10011001100110011001101
+0x40490fdb es 3.1415927
+0.1 guardado de verdad: 0.10000000149011611938
+```
+
+Léelo así: 1 = 1,0 × 2⁽¹²⁷⁻¹²⁷⁾ = 1,0 × 2⁰. El 2 solo cambia el exponente (128 → 2¹). El −2 solo cambia el signo. El 0,5 es 2⁻¹ (126 − 127). Y el 0,1 tiene una mantisa que repite `1001` hasta que se acaban los bits: por eso lo guardado es 0,10000000149…, no 0,1.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+La norma reserva algunas combinaciones para **valores especiales**:
+
+<Ejecutar ej="m01/flotantes-especiales" />
+
+Salida real:
+
+```text
+1 / 0     = inf
++0 bits   = 0x0000000000000000
+-0 bits   = 0x8000000000000000
++0 == -0  : true
+0 / 0     = NaN
+NaN == NaN: false
+es NaN    : true
+```
+
+- **Infinito** (*infinity*): exponente todo a 1 y mantisa a 0. Sale, por ejemplo, de dividir entre 0.
+- **Dos ceros**: +0 y −0 solo se diferencian en el bit de signo. Se consideran iguales.
+- **NaN** (*Not a Number*, «no es un número»): exponente todo a 1 y mantisa distinta de 0. Sale de operaciones sin sentido como 0/0. Un NaN **no es igual a nada, ni a sí mismo**.
+- **Subnormales** (*subnormals*): con el exponente todo a 0, el 1 inicial implícito desaparece y se pueden guardar números aún más cerca del cero, con menos precisión.
+
+Lo de NaN tiene consecuencias en Rust: como `x == x` no siempre es cierto para un flotante, los flotantes no cumplen las reglas de una igualdad «total». Lo verás cuando aprendas los traits `PartialEq` y `Eq`.
+
+Un `f64` funciona igual con 11 bits de exponente (sesgo 1023) y 52 de mantisa. Tiene muchos más decimales de precisión, por eso es el tipo decimal por defecto de Rust.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Comparar decimales con ==">
+
+❌ Comprobar si un cálculo con decimales «da exactamente» un valor.
+
+✅ Pregunta si está **lo bastante cerca**: si la distancia entre los dos números (su resta, sin signo, con `abs()`) es menor que una tolerancia que elijas según tu problema.
+
+<Ejecutar ej="m01/comparar-flotantes" />
+
+Salida real:
+
+```text
+0.1 + 0.2 = 0.30000000000000004
+suma == 0.3: false
+cerca de 0.3: true
+```
+
+Para dinero, donde cada céntimo cuenta, lo habitual es no usar flotantes: se guardan céntimos en un entero.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m01/float-reto"
+  enunciado="`0x3f800000` son los bits del `f32` 1.0. Cambia SOLO ese número hexadecimal para que el programa imprima `2`. Pista: mira en la salida de «Pruébalo» qué cambia entre el 1 y el 2."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántos bits de exponente tiene un `f32`?"
+  opciones={["8", "23", "1", "11"]}
+  correcta={0}
+  porque={["Correcto: 1 de signo + 8 de exponente + 23 de mantisa = 32.", "23 son los de la mantisa.", "1 es el bit de signo.", "11 son los de un `f64`."]}
+/>
+
+<Pregunta
+  pregunta="El exponente guardado de un `f32` es 130. ¿Cuál es la potencia de 2 real?"
+  opciones={["2³", "2¹³⁰", "2⁻³", "2²⁵⁷"]}
+  correcta={0}
+  explicacion="Se resta el sesgo: 130 − 127 = 3."
+  porque={["Correcto.", "Falta restar el sesgo de 127.", "El sesgo se resta del guardado, no al revés: 130 − 127 = +3.", "El sesgo se **resta**, no se suma."]}
+/>
+
+<Pregunta
+  pregunta="`let x = f64::NAN;` ¿Qué da `x == x`?"
+  opciones={["`false`", "`true`", "Un pánico", "No compila"]}
+  correcta={0}
+  explicacion="NaN no es igual a nada, ni a sí mismo. Para detectarlo, usa `x.is_nan()`."
+  porque={["Correcto.", "Es lo que pasa con cualquier otro valor, pero NaN es la excepción.", "Comparar flotantes nunca entra en pánico.", "Compila sin problemas: los flotantes sí se pueden comparar con `==`."]}
+/>

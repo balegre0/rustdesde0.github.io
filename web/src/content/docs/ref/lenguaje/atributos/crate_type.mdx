@@ -1,0 +1,31 @@
+---
+title: "#![crate_type] y #![crate_name]"
+description: "Atributos de crate que eligen el tipo de crate (bin, lib, cdylib, staticlib…) y su nombre cuando se compila con rustc directamente."
+sidebar:
+  order: 23
+insignias: ["Desde 1.0", "ABI y enlazado"]
+---
+
+Dos atributos de crate que solo importan si compilas con `rustc` a mano: con Cargo, lo que manda es `Cargo.toml`.
+
+## Sinopsis
+
+```text
+#![crate_type = "lib"]      // bin | lib | rlib | dylib | cdylib | staticlib | proc-macro
+#![crate_name = "geometria"]
+```
+
+## Qué hace
+
+- **`crate_type`**: qué se genera. `bin` (ejecutable), `lib`/`rlib` (biblioteca de Rust), `dylib` (biblioteca dinámica de Rust), `cdylib` (biblioteca dinámica para otros lenguajes: `.dll`, `.so`, o un `.wasm`), `staticlib` (`.lib`/`.a` para enlazar desde otros lenguajes), `proc-macro`. Con Cargo se elige en `[lib] crate-type = ["cdylib"]`.
+- **`crate_name`**: el nombre del crate (por defecto, el del archivo).
+
+Las opciones de línea de órdenes (`--crate-type`, `--crate-name`) tienen prioridad.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[Binarios y bibliotecas](/curso/12-modulos-crates-y-cargo/05-binarios-y-bibliotecas/) · [Que te llamen a ti](/curso/22-sistemas-y-ffi/09-que-te-llamen-a-ti/)

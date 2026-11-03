@@ -1,0 +1,201 @@
+---
+title: "Jefe: la clave a prueba de bombas"
+description: "Escribe una función de validación y protégela con pruebas de ejemplos, casos límite y propiedades, como en un proyecto de verdad."
+sidebar:
+  order: 12
+duracion: 15
+desde: "1.0"
+requiere: ["16-pruebas-y-herramientas/11-dependencias-seguras-y-miri"]
+tarjetas:
+  - p: "¿Qué tipos de prueba conviene combinar para una función que valida datos?"
+    r: "Ejemplos concretos (uno por regla), casos límite (justo en el borde: 7 y 8 caracteres), casos con texto no ASCII (ñ, tildes) y propiedades con entradas generadas (nunca entra en pánico; si acepta, se cumplen todas las reglas)."
+  - p: "¿Por qué `clave.len() < 8` no comprueba «menos de 8 caracteres»?"
+    r: "Porque `len()` cuenta **bytes** en UTF-8. `\"ÑÑÑÑ1\"` tiene 9 bytes pero 5 caracteres. Para caracteres: `clave.chars().count()`."
+  - p: "¿Qué cuatro comandos forman la rutina de calidad de un proyecto en Rust?"
+    r: "`cargo fmt --check` (formato), `cargo clippy` (revisión), `cargo test` (unitarias, integración y doctests) y, si hay `unsafe`, `cargo +nightly miri test`."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+El jefe de este mundo no es un algoritmo difícil: es **hacerlo bien**. Vas a escribir una función que valida contraseñas y la vas a rodear de todas las redes de seguridad que has aprendido.
+
+## Predice
+
+Una de las reglas será «al menos 8 caracteres». Antes de escribirla, comprueba qué mide cada método:
+
+<Predice
+  ej="m16/bytes-o-letras"
+  opciones={["`len() = 5` y `chars().count() = 5`", "`len() = 9` y `chars().count() = 5`", "`len() = 5` y `chars().count() = 9`", "`len() = 10` y `chars().count() = 5`"]}
+  correcta={1}
+  explicacion="`len()` cuenta **bytes**. En UTF-8, la `Ñ` ocupa 2 bytes: 4 × 2 + 1 = 9. `chars().count()` cuenta caracteres: 5. Si usaras `len()`, la clave `ÑÑÑÑ1` (5 caracteres) pasaría la regla de los 8."
+  porque={["La `Ñ` no ocupa un byte en UTF-8.", "Correcto.", "Está al revés: los bytes son más que los caracteres.", "Cada `Ñ` ocupa 2 bytes, no más; el `1` ocupa 1."]}
+/>
+
+## La idea
+
+La función, `validar_clave(clave: &str) -> Result<(), ErrorClave>`, comprueba cuatro reglas **en este orden** y devuelve el primer error que encuentre:
+
+| Regla | Error |
+|---|---|
+| al menos 8 **caracteres** | `ErrorClave::Corta` |
+| ningún espacio en blanco | `ErrorClave::ConEspacio` |
+| al menos un dígito del 0 al 9 | `ErrorClave::SinNumero` |
+| al menos una mayúscula (también `Ñ`, `Á`…) | `ErrorClave::SinMayuscula` |
+
+El plan de pruebas, de lo concreto a lo general:
+
+1. **Un ejemplo por regla**: una clave que falla solo por esa regla.
+2. **Casos límite**: 7 caracteres (falla) y 8 (pasa). Los errores se esconden en los bordes.
+3. **Texto no ASCII**: `ñandú1Ñx` es válida; `ñandú1ñx`, no (la `ñ` minúscula no cuenta).
+4. **Propiedades** con 2000 claves aleatorias: la función nunca entra en pánico y, cuando acepta una clave, esa clave cumple todas las reglas.
+
+## Tu turno
+
+<Reto ej="m16/jefe-clave" enunciado="Escribe `validar_clave` para que pasen **todas** las pruebas de `main`: los nueve ejemplos y la prueba de propiedades. Usa `chars()` para contar y recorrer caracteres; `char::is_whitespace`, `char::is_uppercase` y `c.is_ascii_digit()` te ahorran trabajo." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+En el reto, todo vive en un archivo con `main` para que se pueda ejecutar en el navegador. En un proyecto de verdad, la misma solución se organiza como has visto en este mundo. Este es el proyecto `clave` completo, con documentación, un doctest, pruebas unitarias y una prueba de integración:
+
+````rust title="src/lib.rs"
+//! Validación de contraseñas.
+
+/// Motivo por el que una clave no es válida.
+#[derive(Debug, PartialEq)]
+pub enum ErrorClave {
+    /// Tiene menos de 8 caracteres.
+    Corta,
+    /// Contiene algún espacio en blanco.
+    ConEspacio,
+    /// No contiene ningún dígito.
+    SinNumero,
+    /// No contiene ninguna mayúscula.
+    SinMayuscula,
+}
+
+/// Comprueba que `clave` es aceptable.
+///
+/// # Ejemplos
+///
+/// ```
+/// use clave::{validar_clave, ErrorClave};
+///
+/// assert_eq!(validar_clave("Abcdefg1"), Ok(()));
+/// assert_eq!(validar_clave("Abc1"), Err(ErrorClave::Corta));
+/// ```
+///
+/// # Errores
+///
+/// Devuelve el primer [`ErrorClave`] que encuentre, en el orden en que
+/// están declaradas sus variantes.
+pub fn validar_clave(clave: &str) -> Result<(), ErrorClave> {
+    // … tu solución …
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn siete_caracteres_es_corta() {
+        assert_eq!(validar_clave("Abcdef1"), Err(ErrorClave::Corta));
+    }
+
+    #[test]
+    fn cuenta_caracteres_no_bytes() {
+        // «ÑÑÑÑ1» ocupa 9 bytes pero son 5 caracteres.
+        assert_eq!(validar_clave("ÑÑÑÑ1"), Err(ErrorClave::Corta));
+    }
+
+    #[test]
+    fn mayuscula_con_tilde_cuenta() {
+        assert_eq!(validar_clave("ñandú1Ñx"), Ok(()));
+    }
+}
+````
+
+```rust title="tests/reglas.rs"
+use clave::{ErrorClave, validar_clave};
+
+#[test]
+fn una_prueba_por_regla() {
+    assert_eq!(validar_clave("Abc def12"), Err(ErrorClave::ConEspacio));
+    assert_eq!(validar_clave("Abcdefgh"), Err(ErrorClave::SinNumero));
+    assert_eq!(validar_clave("abcdefg1"), Err(ErrorClave::SinMayuscula));
+}
+```
+
+Con la solución dentro, la rutina de calidad da esto (todo real). `cargo fmt --check` y `cargo clippy -q` no imprimen nada y terminan con 0: ni un espacio fuera de sitio ni un aviso. Y `cargo test` (con la ruta acortada y sin la línea de aviso del entorno wasm donde se ejecutó):
+
+```text title="cargo test (salida real)"
+   Compiling clave v0.1.0 (…)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.71s
+     Running unittests src\lib.rs (target\wasm32-wasip1\debug\deps\clave-bdeba394f9026a83.wasm)
+
+running 3 tests
+test tests::cuenta_caracteres_no_bytes ... ok
+test tests::mayuscula_con_tilde_cuenta ... ok
+test tests::siete_caracteres_es_corta ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\reglas.rs (target\wasm32-wasip1\debug\deps\reglas-df336392fc5ab81c.wasm)
+
+running 1 test
+test una_prueba_por_regla ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests clave
+
+running 1 test
+test src\lib.rs - validar_clave (line 20) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.56s; merged doctests compilation took 0.49s
+```
+
+Tres programas, cinco pruebas, todo en verde. La prueba de propiedades del reto iría en otro archivo de `tests/`; con proptest en `[dev-dependencies]`, generaría las claves por ti y encogería cualquier fallo.
+
+Una decisión de diseño que la documentación deja escrita: «el **primer** error, en el orden de las variantes». La clave `ab c` incumple las cuatro reglas a la vez (es corta, tiene un espacio, no tiene número ni mayúscula); que devuelva siempre `Corta` es parte del **contrato** de la función, y las pruebas lo fijan. Si mañana alguien pone la comprobación de espacios antes que la de longitud, `ab c` pasaría a dar `ConEspacio`; una prueba con `assert_eq!(validar_clave("ab c"), Err(ErrorClave::Corta))` se pondría roja y lo avisaría. Merece la pena añadirla.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Contar bytes cuando quieres contar letras">
+
+❌ `if clave.len() < 8 { return Err(ErrorClave::Corta); }` acepta `ÑÑÑÑ1` (9 bytes) aunque solo tenga 5 caracteres. Con claves en ASCII nunca lo notarías: solo una prueba con «ñ» lo descubre.
+
+✅ `if clave.chars().count() < 8 { … }`. Y una prueba que lo fije para siempre: `cuenta_caracteres_no_bytes`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tu validación pasa todos los ejemplos, pero la prueba de propiedades encuentra una clave aceptada que contiene un espacio. ¿Qué indica?"
+  opciones={["Que la prueba de propiedades está mal y hay que borrarla", "Que hay un camino en tu función que acepta claves con espacio y ningún ejemplo lo cubría", "Que el generador aleatorio tiene un error", "Nada: las propiedades solo son orientativas"]}
+  correcta={1}
+  explicacion="Para eso están las propiedades: encontrar lo que tus ejemplos no cubrían. Arregla la función y añade esa clave como ejemplo fijo."
+  porque={["La propiedad expresa una regla del enunciado: si falla, el fallo está en la función.", "Correcto.", "El generador solo produce claves; la que aceptó la función es la que importa.", "Una propiedad que falla es un fallo como cualquier otro."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué hay una prueba con `Abcdef1` (7 caracteres) además de otra con `Abc1`?"
+  opciones={["Por si acaso, cuantas más mejor", "Porque 7 está justo en el borde de la regla: detecta un `<=` puesto donde iba un `<`", "Porque `Abc1` no tiene mayúscula", "Porque las pruebas deben tener nombres distintos"]}
+  correcta={1}
+  explicacion="Los errores de «uno de más o uno de menos» (*off-by-one*) solo aparecen en el borde. `Abc1` está lejos del límite; `Abcdef1` y `Abcdefg1` (7 y 8) lo rodean."
+  porque={["Más pruebas no es mejor si todas comprueban lo mismo.", "Correcto.", "`Abc1` tiene la `A` mayúscula.", "El nombre no es la razón."]}
+/>
+
+<Pregunta
+  pregunta="El proyecto `clave` no tiene ningún bloque `unsafe` ni dependencias. ¿Qué herramientas de la rutina puedes saltarte?"
+  opciones={["Ninguna", "Miri y `cargo audit` no aportan casi nada; `fmt`, `clippy` y `test` siguen siendo útiles", "Todas menos `cargo test`", "`cargo test`, porque Clippy ya lo revisa"]}
+  correcta={1}
+  explicacion="Miri busca UB, que en Rust seguro no aparece (salvo en el `unsafe` interno de la biblioteca estándar, ya muy revisado). `cargo audit` revisa dependencias, y no hay. Formato, revisión y pruebas valen para cualquier código."
+  porque={["Algunas no tienen nada que revisar aquí.", "Correcto.", "Clippy y fmt cuestan un segundo y siempre aportan.", "Clippy revisa el estilo y patrones sospechosos, no si el resultado es correcto."]}
+/>

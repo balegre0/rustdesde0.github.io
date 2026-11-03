@@ -1,0 +1,119 @@
+---
+title: "Escribir la salida"
+description: "Escribe en stdout y stderr con el trait `Write`, acelera con `BufWriter` y haz que `main` devuelva errores con un código de salida."
+sidebar:
+  order: 3
+duracion: 10
+desde: "1.26"
+requiere: ["22-sistemas-y-ffi/02-leer-la-entrada"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre stdout y stderr?"
+    r: "stdout es para el resultado del programa; stderr, para avisos y errores. Se pueden redirigir por separado (`programa > salida.txt` deja los errores en pantalla)."
+  - p: "¿Para qué sirve `BufWriter`?"
+    r: "Junta muchas escrituras pequeñas en un buffer y las envía al sistema en pocas llamadas; se vacía con `flush()` o al destruirse."
+  - p: "¿Qué pasa si `main` devuelve `Err(e)`?"
+    r: "Rust imprime `Error: ` seguido de `e` con formato `Debug` en stderr y el proceso termina con código 1."
+  - p: "¿Por qué `writeln!(salida, ...)` puede dar E0599?"
+    r: "Porque `writeln!` llama al método `write_fmt` del trait `io::Write` (o `fmt::Write`) y el trait no está importado con `use`."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+`println!` es cómodo, pero una herramienta de verdad necesita más control: escribir en la salida de errores, escribir rápido muchas líneas, escribir en un archivo o en memoria con el mismo código, y terminar con un código que diga si todo fue bien.
+
+## Predice
+
+<Ejecutar ej="m22/main-con-error" />
+
+<Pregunta
+  pregunta={"El programa de arriba hace `edad(\"cuatrocientos\")?` dentro de un `main` que devuelve `Result`. ¿Qué ocurre?"}
+  opciones={[
+    "Imprime `edad = 0`",
+    "`main` devuelve el `Err`: Rust escribe `Error: ParseIntError { kind: InvalidDigit }` y el programa sale con código 1",
+    "Entra en pánico",
+    "No compila: `main` no puede devolver nada"
+  ]}
+  correcta={1}
+  explicacion="El `?` propaga el error hasta `main`. Cuando `main` devuelve `Err`, el runtime imprime el error con formato `Debug` precedido de `Error: ` y usa el código de salida 1. La última línea no llega a imprimirse."
+  porque={["`parse` no inventa valores.", "", "No hay `unwrap`: el error se devuelve, no se convierte en pánico.", "`main` puede devolver cualquier tipo que implemente `Termination`, como `Result<(), E>` con `E: Debug`."]}
+/>
+
+## La idea
+
+El trait **`std::io::Write`** es el que permite escribir bytes: `write`, `write_all`, `flush` y, a través de las macros `write!` y `writeln!`, texto con formato. Lo implementan `Stdout`, `Stderr`, `File`, `TcpStream`, `Vec<u8>` y muchos más, así que una función que recibe `&mut impl Write` sirve para todos.
+
+**Dos salidas.** `println!` va a *stdout*, pensada para el **resultado**; `eprintln!` va a *stderr*, para **avisos y errores**. La diferencia importa cuando alguien redirige: `programa > resultado.txt` guarda solo stdout, y los errores siguen viéndose en pantalla.
+
+**Buffer.** Cada escritura en stdout puede acabar en una llamada al sistema. Para miles de líneas, envuelve la salida en un `BufWriter`: acumula en memoria y escribe en bloques. Se vacía al llamar a `flush()` o al destruirse; si te importa enterarte de un error al vaciar, llama a `flush()` tú.
+
+**Códigos de salida.** Un proceso termina con un número: 0 es éxito y cualquier otro valor, fallo. Si `main` devuelve `Result<(), E>` y es `Err`, sale con 1. Para elegir el código, devuelve `std::process::ExitCode` (lección 5).
+
+## Pruébalo
+
+<Ejecutar ej="m22/salida-con-buffer" />
+
+Fíjate en `memoria`: un `Vec<u8>` recibe el texto exactamente igual que la salida estándar.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué hace falta importar `Write`.** `writeln!(w, "…")` se expande a una llamada a `w.write_fmt(format_args!("…"))`. Ese método pertenece al trait `io::Write` (o a `fmt::Write`, para escribir en `String`), y los métodos de un trait solo se pueden llamar si el trait está **en ámbito**. Por eso el error es E0599 y el `help:` te propone el `use`.
+
+**Los buffers de std.** `Stdout` ya tiene un buffer de **línea**: guarda hasta encontrar un `\n` y entonces escribe. Para salidas grandes eso sigue siendo una llamada al sistema por línea; `BufWriter` la convierte en una por bloque. `Stderr` **no** tiene buffer, para que los errores salgan enseguida aunque el programa muera a continuación.
+
+**`lock()` otra vez.** Igual que stdin, stdout está protegido por un cerrojo para que las líneas de dos hilos no se mezclen a mitad. `println!` lo toma y lo suelta en cada llamada; `io::stdout().lock()` lo toma una vez.
+
+**El formato de `Error: …`.** El `main` que devuelve `Result` usa el trait `Termination`: para `Err(e)` imprime `Error: {e:?}` (formato `Debug`, no `Display`). Si quieres un mensaje bonito, maneja el error tú en `main` con `eprintln!("{e}")` y devuelve un `ExitCode`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m22/falta-write" explicacion="E0599: `writeln!` necesita el método `write_fmt`, que viene del trait `Write`. El compilador lo dice en el `help:`: el trait está implementado pero no en ámbito. El «Ver arreglo» añade `use std::io::Write`." />
+
+<Trampa titulo="Mezclar resultados y errores en stdout">
+
+❌ `println!("error: archivo no encontrado")` en una herramienta cuya salida se va a procesar con otra.
+
+✅ `eprintln!` para todo lo que no sea el resultado. Así `mi_programa | sort` ordena solo los datos y los errores no se cuelan entre ellos.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Escribes 100 000 líneas con `writeln!` sobre un `BufWriter` y el programa termina sin llamar a `flush()`. ¿Se pierde algo?"
+  opciones={[
+    "Sí: todo lo que quedaba en el buffer",
+    "No en un final normal: el `Drop` del `BufWriter` vacía el buffer; pero si al vaciar hay un error, ese error se pierde en silencio",
+    "Sí, siempre se pierden las últimas 10 líneas",
+    "No compila sin `flush()`"
+  ]}
+  correcta={1}
+  explicacion="`Drop` hace `flush`, pero `drop` no puede devolver un `Result`. Llamar a `flush()` explícitamente al final te deja ver ese posible error."
+  porque={["El `Drop` lo vacía al salir del ámbito.", "", "No hay ninguna regla así.", "`flush` es opcional para el compilador."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace `programa > salida.txt` con lo que el programa escribe con `eprintln!`?"
+  opciones={["Lo guarda en `salida.txt`", "Lo sigue mostrando en la terminal, porque `>` solo redirige stdout", "Lo descarta", "Lo guarda en `salida.txt.err`"]}
+  correcta={1}
+  explicacion="`>` redirige el descriptor 1 (stdout). stderr es el descriptor 2; para redirigirlo se usa `2>`."
+  porque={["Solo stdout va al archivo.", "", "No se descarta: va a la terminal.", "No existe esa convención."]}
+/>
+
+<Pregunta
+  pregunta="¿Con qué código de salida termina un `main` que devuelve `Err(...)`?"
+  opciones={["0", "1", "-1", "Depende del tipo de error"]}
+  correcta={1}
+  explicacion="`Termination` para `Result` usa 1 en caso de error, sea cual sea el error. Para elegir otro código, devuelve un `ExitCode`."
+  porque={["0 significa éxito.", "", "Los códigos de salida de un proceso no son negativos en este contexto.", "El tipo de error solo cambia el mensaje, no el código."]}
+/>
+
+## Para saber más
+
+- Documentación de `std::io::Write`: https://doc.rust-lang.org/std/io/trait.Write.html
+- Mundo 10 (errores), para diseñar tus propios tipos de error.

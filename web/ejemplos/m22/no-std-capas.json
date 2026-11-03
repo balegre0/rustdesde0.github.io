@@ -1,0 +1,1 @@
+{"plataforma": "local", "nota": "Biblioteca no_std: se comprueba con rustc --crate-type lib --emit=metadata.", "flags": "--crate-type lib"}

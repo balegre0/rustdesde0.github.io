@@ -1,0 +1,83 @@
+---
+title: "E0061: número de argumentos incorrecto"
+description: "Llamas a una función con más o menos argumentos de los que declara."
+sidebar:
+  order: 10
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` this function takes 2 arguments but 1 argument was supplied ``
+
+## Qué significa
+
+En Rust no hay argumentos opcionales ni valores por defecto: cada llamada pasa **exactamente** los parámetros que declara la función, en su orden.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0061" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0061]: this function takes 2 arguments but 1 argument was supplied
+ --> E0061.rs:8:5
+  |
+8 |     saludar("Ana");
+  |     ^^^^^^^------- argument #2 of type `u32` is missing
+  |
+note: function defined here
+ --> E0061.rs:1:4
+  |
+1 | fn saludar(nombre: &str, veces: u32) {
+  |    ^^^^^^^               ----------
+help: provide the argument
+  |
+8 |     saludar("Ana", /* u32 */);
+  |                  +++++++++++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Olvidar un argumento.
+- Pasar uno de más.
+- Confundir dos funciones con nombres parecidos.
+
+## Cómo arreglarlo
+
+Pasa todos los argumentos. Si quieres algo «opcional», usa `Option<T>` como parámetro, crea otra función o un struct de configuración con `Default`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn saludar(nombre: &str, veces: u32) {
+    for _ in 0..veces {
+        println!("hola, {nombre}");
+    }
+}
+
+fn main() {
+    saludar("Ana", 2);
+}
+```
+
+**Salida:**
+
+```text
+hola, Ana
+hola, Ana
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0061` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0308](/errores/e0308/): tipos que no coinciden
+
+## Aprende esto en
+
+- [Mundo 05 · Funciones y la pila](/curso/05-funciones-y-la-pila/)

@@ -1,0 +1,81 @@
+---
+title: "VecDeque y cómo elegir colección"
+description: "Una cola por los dos extremos con VecDeque (un búfer circular), y una tabla para elegir la colección adecuada en cada caso."
+sidebar:
+  order: 10
+duracion: 11
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/09-btreemap-y-conjuntos"]
+tarjetas:
+  - p: "¿Por qué no usar Vec::remove(0) para una cola?"
+    r: "Porque quitar el primero desplaza todos los demás: O(n). VecDeque::pop_front es O(1)."
+  - p: "¿Qué es un búfer circular?"
+    r: "Un array en el que, al llegar al final, se sigue por el principio. Por eso un VecDeque puede tener sus elementos partidos en dos trozos (as_slices)."
+  - p: "Colección por defecto en Rust si no sabes cuál elegir:"
+    r: "Vec. Es la más rápida para casi todo, porque sus elementos están seguidos en memoria."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Un `Vec` es perfecto para añadir y quitar **por el final**. Pero una cola (la de un supermercado, la de tareas pendientes) añade por un lado y saca por el **otro**. Para eso existe `VecDeque`.
+
+## Predice
+
+<Predice
+  ej="m11/vecdeque-predice"
+  opciones={["`Some(\"Zoe\") [\"Ana\", \"Luis\"]`", "`Some(\"Ana\") [\"Luis\", \"Zoe\"]`", "`Some(\"Luis\") [\"Zoe\", \"Ana\"]`", "`None []`"]}
+  correcta={0}
+  explicacion="`push_front` pone a Zoe delante de todos, así que `pop_front` la saca primero."
+  porque={["", "Ana era la primera hasta que Zoe entró por delante.", "`pop_front` saca el de delante, no el de detrás.", "La cola tenía tres personas."]}
+/>
+
+## La idea
+
+`VecDeque<T>` (*double-ended queue*, «cola de dos extremos») tiene `push_back`, `push_front`, `pop_back` y `pop_front`, **todos O(1)**. Con un `Vec`, `remove(0)` o `insert(0, x)` mueven todos los elementos: O(n).
+
+Usos típicos: colas de tareas, recorridos en anchura (BFS), y **ventanas deslizantes** («las últimas N medidas»).
+
+## Pruébalo
+
+<Ejecutar ej="m11/vecdeque" />
+
+La última parte muestra el truco: con `as_slices()` se ve que los elementos están en **dos trozos** del mismo bloque de memoria.
+
+<Reto
+  ej="m11/rotar"
+  enunciado="Escribe `rotar(v, n)`, que mueve los `n` primeros elementos al final usando un `VecDeque`: `rotar(&[1, 2, 3, 4, 5], 2)` debe dar `[3, 4, 5, 1, 2]`, y `rotar(&[1, 2, 3], 0)`, `[1, 2, 3]`."
+/>
+
+## Cómo elegir colección
+
+| Necesitas… | Usa |
+|---|---|
+| una lista que crece, acceso por índice | **`Vec`** (la opción por defecto) |
+| añadir y quitar por los dos extremos | `VecDeque` |
+| buscar por clave, sin orden | `HashMap` |
+| buscar por clave, en orden, o por rangos | `BTreeMap` |
+| saber si algo está, sin repetidos | `HashSet` / `BTreeSet` |
+| sacar siempre el mayor (o el menor) | `BinaryHeap` |
+| un trozo de algo que ya existe | una slice: `&[T]` o `&str` |
+
+Y una regla práctica: **empieza por `Vec`**. Sus elementos están seguidos en memoria, así que recorrerlo es rapidísimo gracias a la caché del procesador. Muchas veces un `Vec` con una búsqueda lineal gana a un `HashMap` con pocos elementos. `LinkedList` existe, pero casi nunca es la mejor opción.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El búfer circular.** Un `VecDeque` es un bloque de memoria con capacidad fija (como el de un `Vec`), más el índice de dónde **empieza** la cola y su longitud. Al hacer `push_back` cuando se llega al final del bloque, se sigue escribiendo por el principio. Por eso no puede ofrecer `&[T]` de todo su contenido (no siempre es contiguo): da dos slices, o reorganiza el bloque con `make_contiguous()`.
+
+**Tamaño.** Su ficha mide un puntero más tres números (capacidad, inicio, longitud), en la práctica 16 bytes en el navegador (como muestra el ejemplo) y 32 en tu PC.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Simulas una cola de impresión: los trabajos llegan por detrás y se imprimen por delante. ¿Qué colección usas?"
+  opciones={["`VecDeque`", "`Vec` con `remove(0)`", "`HashSet`", "`BTreeMap`"]}
+  correcta={0}
+  explicacion="Entrar por un extremo y salir por el otro, en O(1): es para lo que existe `VecDeque`."
+  porque={["", "Funciona, pero cada `remove(0)` desplaza toda la cola.", "Un conjunto no tiene orden de llegada.", "Podría simularse con claves de llegada, pero es complicarlo."]}
+/>

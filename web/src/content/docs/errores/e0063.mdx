@@ -1,0 +1,72 @@
+---
+title: "E0063: falta un campo al crear un struct"
+description: "Creas un struct sin dar valor a todos sus campos."
+sidebar:
+  order: 11
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` missing field `vidas` in initializer of `Jugador` ``
+
+## Qué significa
+
+Al construir un struct hay que dar valor a **todos** sus campos: Rust nunca deja campos sin inicializar ni inventa valores.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0063" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0063]: missing field `vidas` in initializer of `Jugador`
+ --> E0063.rs:7:13
+  |
+7 |     let j = Jugador { nombre: String::from("Ana") };
+  |             ^^^^^^^ missing `vidas`
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Olvidar un campo.
+- Añadir un campo nuevo al struct y no actualizar los sitios donde se crea.
+
+## Cómo arreglarlo
+
+Da valor a todos los campos, o usa la sintaxis de actualización `..otro` para copiar el resto de otro valor (por ejemplo, `..Default::default()` si el tipo implementa `Default`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+struct Jugador {
+    nombre: String,
+    vidas: u8,
+}
+
+fn main() {
+    let j = Jugador { nombre: String::from("Ana"), vidas: 3 };
+    println!("{} {}", j.nombre, j.vidas);
+}
+```
+
+**Salida:**
+
+```text
+Ana 3
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0063` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0560](/errores/e0560/): el struct no tiene ese campo
+- [E0423](/errores/e0423/): se esperaba un valor y hay un tipo
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

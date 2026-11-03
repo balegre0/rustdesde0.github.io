@@ -1,0 +1,102 @@
+---
+title: "RwLock, Condvar y LazyLock"
+description: "Tres herramientas más allá del Mutex: muchos lectores o un escritor con RwLock, esperar a que algo ocurra con Condvar, e inicializar una sola vez con LazyLock y OnceLock."
+sidebar:
+  order: 7
+duracion: 14
+desde: "1.0"
+requiere: ["17-concurrencia/06-mutex"]
+tarjetas:
+  - p: "¿Qué permite un RwLock que un Mutex no permite?"
+    r: "Varios lectores a la vez (read). Un escritor (write) sigue necesitando exclusividad: es la regla de los préstamos llevada a los hilos."
+  - p: "¿Para qué sirve una Condvar?"
+    r: "Para que un hilo duerma hasta que otro le avise de que una condición ha cambiado, sin gastar CPU comprobando en bucle."
+  - p: "¿Por qué hay que comprobar la condición en un bucle (o con wait_while) al usar Condvar?"
+    r: "Porque puede haber despertares espurios y otro hilo pudo cambiar la condición entre el aviso y el despertar."
+  - p: "¿Qué diferencia hay entre LazyLock y OnceLock?"
+    r: "LazyLock lleva la función que lo inicializa y se construye solo en el primer uso. OnceLock empieza vacío y se rellena una vez con set o get_or_init."
+---
+
+import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+El `Mutex` es la herramienta universal, pero no siempre la mejor. Aquí tienes tres que cubren casos muy frecuentes: datos que casi siempre se leen, hilos que esperan un aviso y valores globales que se crean una sola vez.
+
+## Predice
+
+<Predice
+  ej="m17/rwlock-lectores"
+  pregunta="¿Qué imprimen las líneas «¿puede escribir?» y «¿puede leer otro?»?"
+  opciones={["`false` y `false`", "`true` y `true`", "`false` y `true`", "`true` y `false`"]}
+  correcta={0}
+  explicacion="Con dos lectores vivos, un escritor no puede entrar. Con un escritor vivo, nadie más puede entrar, ni para leer. Es exactamente la regla de los préstamos: muchos `&` o un `&mut`."
+  porque={["", "Si pudiera escribir con lectores dentro, leerían datos a medio cambiar.", "Con un escritor dentro, un lector vería el vector a medio modificar.", "Es al revés en los dos casos."]}
+/>
+
+## La idea
+
+**`RwLock<T>`** (*reader-writer lock*): como un `Mutex`, pero con dos formas de entrar:
+
+- `read()` → un guard de **lectura**. Puede haber muchos a la vez.
+- `write()` → un guard de **escritura**, exclusivo.
+
+Úsalo cuando los datos se **leen mucho y se escriben poco**: una configuración, una caché, un menú. Si se escribe a menudo, un `Mutex` suele ser igual de rápido y más sencillo.
+
+**`Condvar`** (*variable de condición*): permite a un hilo **dormir hasta que otro le avise**. Siempre va junto a un `Mutex` que protege la condición:
+
+1. El que espera llama a `wait` (o `wait_while`): suelta el candado y se duerme.
+2. El que cambia la condición la modifica **con el candado tomado** y llama a `notify_one` o `notify_all`.
+3. El que esperaba se despierta, vuelve a tomar el candado y comprueba la condición.
+
+**`LazyLock` y `OnceLock`**: valores que se inicializan **una sola vez**, aunque muchos hilos los pidan a la vez. Sustituyen al antiguo crate `lazy_static`.
+
+## Pruébalo
+
+Un cocinero avisa cuando la comida está lista (con hilos: se ejecuta en el Playground):
+
+<Ejecutar ej="m17/condvar-listo" />
+
+Y una tabla global que se construye en el primer uso:
+
+<Ejecutar ej="m17/lazylock" />
+
+El mensaje «construyendo la tabla» sale **una vez**, justo antes del primer uso, no al arrancar el programa. Y el segundo `set` de un `OnceLock` falla: el valor ya estaba fijado.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué `wait` suelta el candado.** Si el hilo que espera durmiera con el candado tomado, el otro hilo nunca podría cambiar la condición: interbloqueo. `wait` suelta el candado y se duerme en **una sola operación indivisible**, para que no se pierda un aviso que llegue justo entre las dos cosas.
+
+**Despertares espurios.** El sistema operativo puede despertar a un hilo sin que nadie haya llamado a `notify`. Por eso nunca se usa `wait` en un `if`, sino en un bucle `while !condicion { g = cv.wait(g).unwrap(); }`, o directamente `wait_while`, que hace ese bucle por ti.
+
+**`RwLock` y la inanición.** Si siempre hay algún lector dentro, un escritor podría esperar para siempre. Cada sistema operativo decide su política; la biblioteca estándar no garantiza ninguna. Si los escritores son críticos, mira crates como `parking_lot`, que documentan su política de equidad.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Pedir write con un read vivo en el mismo hilo">
+
+❌ `let l = m.read().unwrap(); … let mut e = m.write().unwrap();` en el mismo hilo, con `l` todavía viva. El escritor espera a que salgan los lectores, y el lector eres tú: el hilo se bloquea para siempre (o entra en pánico, según la plataforma).
+
+✅ Termina con la lectura antes de escribir. Si la lectura es una expresión dentro de un `if let`, mete el resultado en una variable y deja que el guard se destruya.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una caché de traducciones se consulta miles de veces por segundo y se actualiza una vez al día. ¿Qué la protege mejor?"
+  opciones={["`RwLock<HashMap<…>>`", "`Mutex<HashMap<…>>`", "`Condvar`", "`Cell<HashMap<…>>`"]}
+  correcta={0}
+  explicacion="Con `RwLock`, todas las consultas pueden ir en paralelo; solo la actualización diaria necesita exclusividad."
+  porque={["", "Funciona, pero cada consulta esperaría a las demás.", "`Condvar` sirve para esperar avisos, no para proteger datos.", "`Cell` no es `Sync`: no se puede compartir entre hilos."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace `cv.wait_while(guard, |listo| !*listo)`?"
+  opciones={["Suelta el candado y duerme mientras la condición sea cierta; al despertar la vuelve a comprobar", "Comprueba la condición sin parar, gastando CPU", "Espera un tiempo fijo", "Bloquea el mutex para siempre"]}
+  correcta={0}
+  explicacion="Es el bucle de espera correcto, ya escrito: tolera despertares espurios."
+  porque={["", "Eso sería un *spin loop*: justo lo que `Condvar` evita.", "Para eso está `wait_timeout`.", "Al dormir, suelta el candado."]}
+/>

@@ -1,0 +1,78 @@
+---
+title: "E0106: falta un especificador de tiempo de vida"
+description: "Una función o struct usa una referencia sin decir de quién viene o cuánto vive."
+sidebar:
+  order: 15
+insignias: ["Tiempos de vida"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` missing lifetime specifier ``
+
+## Qué significa
+
+Cuando una función devuelve una referencia, el compilador necesita saber **de qué parámetro** viene, para comprobar en cada llamada que no sobreviva a su origen. Si solo hay una referencia de entrada, lo deduce solo (**elisión**). Aquí hay dos (`a` y `b`) y la respuesta puede ser cualquiera de ellas, así que hay que decirlo con un tiempo de vida con nombre: `'a`. En un struct, todo campo referencia necesita su tiempo de vida declarado.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0106" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0106]: missing lifetime specifier
+ --> E0106.rs:1:35
+  |
+1 | fn mas_larga(a: &str, b: &str) -> &str {
+  |                 ----     ----     ^ expected named lifetime parameter
+  |
+  = help: this function's return type contains a borrowed value, but the signature does not say whether it is borrowed from `a` or `b`
+help: consider introducing a named lifetime parameter
+  |
+1 | fn mas_larga<'a>(a: &'a str, b: &'a str) -> &'a str {
+  |             ++++     ++          ++          ++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Devolver `&str` de una función con dos parámetros referencia.
+- Declarar un campo `&str` en un struct sin `<'a>`.
+- Devolver `&T` de una función sin parámetros referencia (en ese caso, el problema real suele ser E0515).
+
+## Cómo arreglarlo
+
+Declara un parámetro de tiempo de vida y úsalo en las referencias relacionadas: `fn mas_larga<'a>(a: &'a str, b: &'a str) -> &'a str`. Significa: «el resultado vive como mucho lo que viva el más corto de los dos». Si la función crea el dato, devuelve `String` en lugar de una referencia.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn mas_larga<'a>(a: &'a str, b: &'a str) -> &'a str {
+    if a.len() >= b.len() { a } else { b }
+}
+
+fn main() {
+    println!("{}", mas_larga("sol", "luna"));
+}
+```
+
+**Salida:**
+
+```text
+luna
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0106` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0261](/errores/e0261/): tiempo de vida no declarado
+- [E0515](/errores/e0515/): devolver una referencia a una variable local
+- [E0621](/errores/e0621/): se necesita un tiempo de vida explícito
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/)

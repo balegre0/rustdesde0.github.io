@@ -1,0 +1,41 @@
+---
+title: "#[non_exhaustive]"
+description: "Marca un struct, enum o variante como ampliable: otros crates no pueden construirlo entero ni hacer match sin un brazo comodín. Permite añadir campos y variantes sin romper a nadie."
+sidebar:
+  order: 5
+insignias: ["Desde 1.40", "Sistema de tipos"]
+---
+import { Ejecutar } from '~/components';
+
+`#[non_exhaustive]` declara: «a este tipo le pueden salir campos o variantes nuevos en el futuro».
+
+## Sinopsis
+
+```text
+#[non_exhaustive] pub struct Config { pub hilos: u32 }
+#[non_exhaustive] pub enum Error { Red, Disco }
+pub enum E { #[non_exhaustive] Variante { x: u8 } }
+```
+
+## Qué hace
+
+Solo tiene efecto **en otros crates** (dentro del tuyo, no cambia nada):
+
+- **En un enum**: un `match` sobre él tiene que llevar un brazo `_` (o un patrón comodín), aunque cubra todas las variantes actuales.
+- **En un struct o una variante**: no se puede construir con la sintaxis `Config { hilos: 4 }`, ni desmontar sin `..`. Hay que usar las funciones que ofrezca el crate.
+
+Así, la biblioteca puede añadir variantes o campos en una versión **menor** sin romper el código de nadie. `std::io::ErrorKind` es `#[non_exhaustive]`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-non-exhaustive" />
+
+En un crate que usara este, `match e { Error::Red => …, Error::Disco => … }` daría el error E0004 (falta el brazo `_`).
+
+## Desde
+
+Rust 1.40.
+
+## Ver también
+
+[Publicar en crates.io](/curso/12-modulos-crates-y-cargo/12-publicar/) · [Patrones](/ref/lenguaje/patrones/)

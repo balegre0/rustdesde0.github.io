@@ -1,0 +1,122 @@
+---
+title: "El préstamo exclusivo"
+description: "&mut x presta un valor para modificarlo. Exige que la dueña sea mut y que escribas a través de la referencia con *."
+sidebar:
+  order: 3
+duracion: 11
+desde: "1.0"
+requiere: ["07-prestamos/02-referencias-por-dentro"]
+tarjetas:
+  - p: "¿Qué dos cosas necesitas para crear `&mut x`?"
+    r: "Que `x` esté declarada con `let mut` y que no haya otros préstamos de `x` vivos en ese momento."
+  - p: "¿Qué error da `s.push('!')` si `s` es `&String`?"
+    r: "E0596: no se puede tomar prestado `*s` como mutable porque está detrás de una referencia `&`. Hace falta `&mut String`."
+  - p: "Si `r: &mut i32`, ¿por qué `r += 1` no compila y `*r += 1` sí?"
+    r: "Porque `r` es la referencia, no el número. Para sumar al número hay que seguir la flecha: `*r += 1` (E0368 en el primer caso)."
+  - p: "¿Por qué se llama «exclusivo» al préstamo `&mut`?"
+    r: "Porque mientras está vivo es el único camino para acceder al valor: ni la dueña ni nadie más puede leerlo ni modificarlo."
+---
+
+import { Ejecutar, NoCompila, Predice, Prestamos, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Leer prestado está bien, pero a veces una función tiene que **cambiar** tu valor: añadir texto, ordenar una lista, sumar puntos. Para eso existe el segundo tipo de préstamo, el **exclusivo**: `&mut`.
+
+## Predice
+
+<Predice
+  ej="m07/exclusivo-predice"
+  opciones={["`hola, mundo (11 bytes)`", "`hola (4 bytes)`: la función modifica una copia", "No compila: `frase` se mueve en la primera llamada", "`, mundo (7 bytes)`"]}
+  correcta={0}
+  explicacion="`agregar` recibe un préstamo exclusivo: escribe **en el propio** `frase`, no en una copia. Después de dos llamadas, `frase` vale `hola, mundo`."
+  porque={["", "Con `&mut` no hay copia: la función trabaja sobre el valor original.", "Un préstamo no mueve. Al volver de cada llamada, `frase` sigue siendo la dueña.", "`push_str` añade al final; no sustituye el texto."]}
+/>
+
+## La idea
+
+`&mut x` crea un **préstamo exclusivo** (*mutable reference*): quien lo tiene puede **leer y modificar** el valor. Hay dos condiciones:
+
+1. **La dueña tiene que ser `mut`.** No puedes prestar para modificar algo que tú mismo no puedes modificar. Si no, E0596.
+2. **Tiene que ser el único acceso.** Mientras el préstamo exclusivo está vivo, nadie más puede tocar el valor, ni siquiera la dueña. Es la regla de la próxima lección.
+
+Y una costumbre de escritura: para modificar **el valor** a través de la referencia hay que seguir la flecha con `*`:
+
+```rust
+fn duplicar(n: &mut i32) { *n *= 2; }  // *n es el i32; n es la referencia
+```
+
+Con métodos no hace falta, porque el punto desreferencia solo: `r.push(3)`.
+
+## Pruébalo
+
+<Ejecutar ej="m07/exclusivo" />
+
+Los permisos explican el adjetivo «exclusivo». Mientras `r` vive, `lista` lo pierde **todo**:
+
+<Prestamos lineas={[
+  { codigo: "let mut lista = vec![1, 2];", permisos: { lista: "RWO" } },
+  { codigo: "let r = &mut lista;", permisos: { lista: "---", r: "R-O", "*r": "RW-" }, nota: "lista no puede ni leerse: el único acceso es r. A través de r se puede leer y escribir." },
+  { codigo: "r.push(3);", permisos: { lista: "RWO" }, nota: "Último uso de r: lista recupera todos sus permisos." },
+  { codigo: "println!(\"{lista:?}\");", permisos: { lista: "RWO" } }
+]} />
+
+Compáralo con la lección 1: un préstamo compartido le quitaba a la dueña la **O** (y la **W**, si la tenía), pero le dejaba **R**. Uno exclusivo le quita también la **R**.
+
+Ahora, los tres errores típicos del préstamo exclusivo. Primero, la dueña no es `mut`:
+
+<NoCompila ej="m07/p-mut-sin-mut" explicacion="`v` no es `mut`, así que no tiene permiso **W**, y no se puede prestar un permiso que no tienes. Arreglo: `let mut v`." />
+
+Segundo, modificar a través de un préstamo compartido:
+
+<NoCompila ej="m07/p-escribir-por-compartida" explicacion="`agregar` pidió `&String`, que solo da **R**. Para que la función pueda modificar, la firma tiene que ser `fn agregar(s: &mut String)` y la llamada, `agregar(&mut s)`." />
+
+Tercero, olvidar el `*`:
+
+<NoCompila ej="m07/p-falta-deref" explicacion="`r` es una referencia; sumarle 1 a una dirección no tiene sentido. Lo que quieres es sumar al número: `*r += 1`." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por dentro, `&mut` es lo mismo que `&`**: una dirección del mismo tamaño. La diferencia solo existe para el compilador, que es exactamente lo que se busca: seguridad sin coste.
+
+**`noalias`.** Como un `&mut` es el **único** acceso a su valor, `rustc` le dice a LLVM que ningún otro puntero lo toca (`noalias`). Eso permite optimizaciones que en general no son seguras: por ejemplo, guardar el valor en un registro durante todo un bucle en vez de releerlo de memoria en cada vuelta. La exclusividad, además de evitar errores, hace el código **más rápido**.
+
+**`&mut` dice «exclusivo», no «mutable».** El nombre `mut` engaña un poco. Lo que de verdad garantiza `&mut` es que eres el único con acceso. En el mundo 15 verás tipos (`Cell`, `RefCell`, `Mutex`) que se modifican a través de un `&` compartido: la llamada *mutabilidad interior*. Por eso mucha gente prefiere leer `&` como «compartido» y `&mut` como «exclusivo», que es el vocabulario de este curso.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Poner mut en el sitio equivocado">
+
+Hay tres `mut` posibles y significan cosas distintas:
+
+| Escribes | Significa |
+|---|---|
+| `let mut v = …` | la variable `v` se puede modificar (y prestar como `&mut`) |
+| `let r = &mut v;` | `r` es un préstamo exclusivo: a través de `r` se modifica `v` |
+| `let mut r = &v;` | la variable `r` se puede **reasignar** para que apunte a otra cosa; a través de ella solo se lee |
+
+❌ Escribir `let mut r = &v;` esperando poder modificar `v`: no puedes, el préstamo sigue siendo compartido.
+
+✅ Si quieres modificar `v` a través de `r`, necesitas `let mut v` **y** `let r = &mut v;`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`fn vaciar(v: &mut Vec<i32>) { v.clear(); }`. ¿Qué llamada compila?"
+  opciones={["`let v = vec![1]; vaciar(&mut v);`", "`let mut v = vec![1]; vaciar(&v);`", "`let mut v = vec![1]; vaciar(&mut v);`", "`let mut v = vec![1]; vaciar(v);`"]}
+  correcta={2}
+  explicacion="Hacen falta las dos cosas: la dueña `mut` y prestarla con `&mut`."
+  porque={["`v` no es `mut`: E0596.", "La función pide `&mut`, y le das `&`: E0308.", "", "Le das el `Vec` entero (lo moverías), pero pide una referencia: E0308."]}
+/>
+
+<Pregunta
+  pregunta="Mientras existe `let r = &mut lista;` (y se va a usar después), ¿qué permisos tiene `lista`?"
+  opciones={["RWO, como siempre", "R--: puede leerse, pero no modificarse", "---: ninguno, el único acceso es r", "-W-: solo escribir"]}
+  correcta={2}
+  explicacion="Un préstamo exclusivo es el único camino al valor mientras está vivo. Si la dueña pudiera leer, podría leer a medio cambiar; si pudiera escribir, habría dos escritores."
+  porque={["Los permisos vuelven cuando `r` deja de usarse, no antes.", "Eso le pasa a la dueña con un préstamo **compartido**.", "", "No existe el permiso de escribir sin leer en este modelo."]}
+/>

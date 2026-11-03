@@ -1,0 +1,33 @@
+---
+title: "Mundo 13 · Traits y genéricos"
+description: "Escribe código que funciona con muchos tipos a la vez, y entiende qué hace el compilador con él: copias por tipo o una tabla de métodos."
+sidebar:
+  order: 0
+---
+
+Hasta ahora cada función trabajaba con un tipo concreto: un `i32`, una `String`, tu `struct Punto`. En este mundo aprendes a escribir código que sirve para **muchos tipos a la vez** sin perder ninguna comprobación del compilador. Dos ideas lo hacen posible:
+
+- Un **trait** es una lista de capacidades con nombre: «sabe mostrarse», «se puede sumar», «tiene área». Un tipo **implementa** un trait cuando aporta esas capacidades.
+- Un **genérico** es un hueco para un tipo: `fn mayor<T>(…)` funciona para cualquier `T`, siempre que `T` cumpla los traits que pidas (los **bounds**).
+
+Y lo bajarás hasta el ensamblador: verás que un genérico se convierte en **una copia de la función por cada tipo** (monomorfización) y que un `dyn Trait` es un **puntero doble** que salta a través de una **vtable**, con una sola instrucción.
+
+## Lo que vas a conseguir
+
+| # | Lección | Al terminar sabrás… |
+|---|---|---|
+| 1 | [Traits: capacidades con nombre](/curso/13-traits-y-genericos/01-traits/) | definir un trait, implementarlo y escribir métodos por defecto |
+| 2 | [Genéricos y bounds](/curso/13-traits-y-genericos/02-genericos-y-bounds/) | escribir funciones y structs genéricos y pedir traits con `:` y `where` |
+| 3 | [Monomorfización](/curso/13-traits-y-genericos/03-monomorfizacion/) | qué copia genera el compilador por cada tipo y cuánto cuesta |
+| 4 | [`impl Trait`](/curso/13-traits-y-genericos/04-impl-trait/) | aceptar y devolver «algo que implementa X», y las reglas de captura de 2024 |
+| 5 | [`dyn Trait` y vtables](/curso/13-traits-y-genericos/05-dyn-y-vtables/) | mezclar tipos distintos en una lista y leer la vtable en el asm real |
+| 6 | [Tipos y constantes asociados](/curso/13-traits-y-genericos/06-tipos-asociados/) | elegir entre `type Item` y un parámetro genérico |
+| 7 | [Coherencia y la regla huérfana](/curso/13-traits-y-genericos/07-coherencia-y-regla-huerfana/) | por qué E0117 y E0119 existen, y el patrón newtype |
+| 8 | [`derive` y los traits de comparar](/curso/13-traits-y-genericos/08-derive-y-comparar/) | `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash`, `Default` |
+| 9 | [Conversiones](/curso/13-traits-y-genericos/09-conversiones/) | `From`/`Into`, `TryFrom`, `AsRef`, `Display` y el resto del tour |
+| 10 | [Sobrecarga de operadores](/curso/13-traits-y-genericos/10-operadores/) | hacer que `+`, `*`, `-`, `+=` y `[]` funcionen con tus tipos |
+| 11 | [Compatibilidad con `dyn`](/curso/13-traits-y-genericos/11-compatibilidad-con-dyn/) | qué traits caben en una vtable (E0038) y cómo arreglarlos |
+| 12 | [GATs](/curso/13-traits-y-genericos/12-gats/) | tipos asociados genéricos: iteradores que prestan |
+| 13 | [Jefe: el taller de figuras](/curso/13-traits-y-genericos/13-jefe/) | juntarlo todo en un programa completo |
+
+Requisitos: los mundos 0–12. Sobre todo **structs y enums** (mundo 9), **préstamos** (mundo 7) y **lifetimes** (mundo 8): los traits se implementan para tus structs y muchos métodos reciben `&self`.

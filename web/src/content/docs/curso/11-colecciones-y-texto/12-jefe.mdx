@@ -1,0 +1,53 @@
+---
+title: "Jefe: el analizador de textos"
+description: "Cuenta líneas, palabras, letras y palabras distintas de un texto en español, con tildes y eñes, y saca las tres más frecuentes."
+sidebar:
+  order: 12
+duracion: 25
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/11-recorrer-colecciones"]
+tarjetas:
+  - p: "¿Cómo cuentas las letras de un texto con tildes y eñes?"
+    r: "texto.chars().filter(|c| c.is_alphabetic()).count(): por caracteres, no con len(), que cuenta bytes."
+  - p: "¿Cómo ordenas pares (palabra, veces) de más a menos veces y, en empate, alfabéticamente?"
+    r: "v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)))."
+---
+
+import { Reto, Pregunta } from '~/components';
+
+El jefe del mundo junta texto y colecciones. Vas a analizar el comienzo de un clásico de la literatura en español: con comas, tildes, eñes y mayúsculas, como el texto de verdad.
+
+## El reto
+
+<Reto
+  ej="m11/analizador"
+  enunciado={"Completa `normalizar` y `analizar`. Una palabra se normaliza quitando los signos de los extremos (`trim_matches(|c: char| !c.is_alphanumeric())`) y pasándola a minúsculas. `analizar` cuenta líneas, palabras, letras (con `is_alphabetic`, por caracteres) y palabras distintas, saca las 3 más frecuentes (en empate, por orden alfabético) y la palabra más larga (en caracteres). La solución imprime `palabras: 33`, `letras: 140`, `distintas: 27` y `top 3: [(\"de\", 4), (\"en\", 2), (\"no\", 2)]`."}
+/>
+
+## Repaso relámpago
+
+<Pregunta
+  pregunta="¿Por qué se cuentan las letras con `chars()` y no con `len()`?"
+  opciones={["Porque `len()` cuenta bytes, y «í» o «ñ» ocupan dos", "Porque `len()` cuenta palabras", "Porque `chars()` es más rápido", "Da igual"]}
+  correcta={0}
+  explicacion="En UTF-8, los caracteres fuera de ASCII ocupan más de un byte. `chars()` recorre caracteres."
+  porque={["", "`len()` cuenta bytes.", "Es más lento: tiene que decodificar UTF-8.", "Con tildes y eñes, los números no coinciden."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué colección usas para contar cuántas veces aparece cada palabra?"
+  opciones={["`HashMap<String, usize>` con `entry(…).or_insert(0)`", "`Vec<String>`", "`HashSet<String>`", "`VecDeque<String>`"]}
+  correcta={0}
+  explicacion="Un mapa de palabra a contador; `entry` busca una vez y crea el contador si no existía."
+  porque={["", "Habría que buscar en todo el vector cada vez.", "Un conjunto solo sabe si está, no cuántas veces.", "No sirve para buscar por clave."]}
+/>
+
+## Lo que te llevas del mundo 11
+
+- `Vec`, `String`, `&[T]` y `&str`: la base de casi todo.
+- UTF-8: bytes, caracteres y por qué `s[0]` no existe.
+- `HashMap` y la API `entry`; `BTreeMap` para el orden; conjuntos para «¿está?».
+- `VecDeque` para colas; `Vec` por defecto.
+- Recorrer presta (`&`, `&mut`) o consume (sin `&`).
+
+En el mundo 12 aprenderás a organizar programas grandes en módulos y crates.

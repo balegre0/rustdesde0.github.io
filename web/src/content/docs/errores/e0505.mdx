@@ -1,0 +1,92 @@
+---
+title: "E0505: mover un valor que está prestado"
+description: "Mueves un valor (a otra variable o a una función) mientras sigue vivo un préstamo de él."
+sidebar:
+  order: 42
+insignias: ["Préstamos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot move out of `nombre` because it is borrowed ``
+
+## Qué significa
+
+`r` toma prestado `nombre`. Luego `consumir(nombre)` **mueve** `nombre` a la función, que se convierte en su dueña y lo destruye al terminar. Pero `r` se usa después: apuntaría a un valor que ya no existe.
+
+## Qué error evita
+
+Es el caso típico de **uso tras liberar**: la función libera el `String` al acabar y la referencia `r` seguiría apuntando a esa memoria.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0505" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0505]: cannot move out of `nombre` because it is borrowed
+ --> E0505.rs:8:14
+  |
+6 |     let nombre = String::from("Ana");
+  |         ------ binding `nombre` declared here
+7 |     let r = &nombre;
+  |             ------- borrow of `nombre` occurs here
+8 |     consumir(nombre);
+  |              ^^^^^^ move out of `nombre` occurs here
+9 |     println!("{r}");
+  |                - borrow later used here
+  |
+help: consider cloning the value if the performance cost is acceptable
+  |
+7 |     let r = &nombre.clone();
+  |                    ++++++++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Pasar a una función por valor algo de lo que guardas una referencia.
+- Devolver o guardar en un struct un valor mientras un iterador o slice suyo sigue vivo.
+- Hacer `drop(x)` mientras existe un `&x`.
+
+## Cómo arreglarlo
+
+Usa la referencia **antes** de mover el valor, o haz que la función reciba un préstamo (`fn consumir(s: &str)`) si no necesita quedarse con él. Si necesitas las dos cosas, clona.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn consumir(s: String) {
+    println!("me quedo con {s}");
+}
+
+fn main() {
+    let nombre = String::from("Ana");
+    let r = &nombre;
+    println!("{r}"); // último uso del préstamo
+    consumir(nombre);
+}
+```
+
+**Salida:**
+
+```text
+Ana
+me quedo con Ana
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0505` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0382](/errores/e0382/): uso de un valor ya movido
+- [E0502](/errores/e0502/): préstamo exclusivo mientras hay uno compartido
+- [E0597](/errores/e0597/): un valor no vive lo suficiente
+
+## Aprende esto en
+
+- [Mundo 06 · Ownership](/curso/06-ownership/)
+- [Mundo 07 · Préstamos](/curso/07-prestamos/)

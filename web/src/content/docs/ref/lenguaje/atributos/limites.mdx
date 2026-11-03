@@ -1,0 +1,38 @@
+---
+title: "#![recursion_limit] y #![type_length_limit]"
+description: "Límites del compilador para la expansión recursiva de macros y la resolución de tipos, y para el tamaño de los tipos al monomorfizar."
+sidebar:
+  order: 15
+insignias: ["Desde 1.0", "Límites"]
+---
+import { Ejecutar } from '~/components';
+
+Son atributos del crate (`#![…]`, al principio de `main.rs` o `lib.rs`) que suben límites internos del compilador.
+
+## Sinopsis
+
+```text
+#![recursion_limit = "256"]       // por defecto, 128
+#![type_length_limit = "2000000"] // por defecto, 1 048 576
+```
+
+## Qué hace
+
+- **`recursion_limit`**: profundidad máxima de las operaciones recursivas del compilador: expansión de macros que se llaman a sí mismas, auto-deref, resolución de traits anidados. Si una macro recursiva de tipo «contar tokens» procesa muchos tokens, se alcanza el límite con el error *recursion limit reached while expanding*, y el mensaje sugiere el valor a poner.
+- **`type_length_limit`**: tamaño máximo (en número de componentes) de un tipo al monomorfizar. Se alcanza con cadenas enormes de iteradores o de closures anidadas.
+
+Subir el límite no cambia el programa; solo deja que el compilador siga trabajando.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-recursion-limit" />
+
+Con 10 tokens no haría falta subir el límite, pero con 200 sí.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[Macros](/ref/lenguaje/macros/) · [Repeticiones en macros](/curso/19-macros/04-repeticiones/)

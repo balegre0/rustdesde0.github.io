@@ -1,0 +1,97 @@
+---
+title: "Anotar funciones"
+description: "Cuando una función devuelve una referencia que puede salir de varias entradas, hay que decir con 'a cómo se relacionan. La anotación es un contrato que comprueban los dos lados."
+sidebar:
+  order: 3
+duracion: 13
+desde: "1.0"
+requiere: ["08-lifetimes/02-que-es-una-lifetime"]
+tarjetas:
+  - p: "¿Qué significa `fn mas_larga<'a>(a: &'a str, b: &'a str) -> &'a str`?"
+    r: "Que el resultado es válido mientras lo sean a la vez `a` y `b`: su lifetime es como mucho la más corta de las dos entradas."
+  - p: "¿Qué dice E0106?"
+    r: "Que falta un especificador de lifetime (*missing lifetime specifier*): devuelves una referencia y el compilador no sabe de qué entrada sale."
+  - p: "¿Dónde se declara una lifetime genérica como `'a`?"
+    r: "Entre `<>` después del nombre de la función (`fn f<'a>(…)`), igual que los tipos genéricos."
+  - p: "¿Quién comprueba la anotación `'a` de una función?"
+    r: "Dos sitios: el cuerpo de la función (que no devuelva algo que no cumpla `'a`) y cada llamada (que no use el resultado más allá de lo que duran sus argumentos)."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Hasta ahora el compilador ha calculado las lifetimes él solo. Hay un caso en que no puede: cuando una función **devuelve una referencia** y no está claro de qué entrada sale. Ahí tienes que decírselo tú, con tu primera anotación: `'a`.
+
+## Predice
+
+<NoCompila ej="m08/p-sin-especificador" explicacion={"El cuerpo es correcto. El problema es la **firma**: quien llame a `mas_larga` recibirá un `&str`. ¿Cuánto tiempo puede usarlo? ¿Lo que dure `a`, lo que dure `b`? Mirando solo la firma no se sabe."} />
+
+## La idea
+
+Una función se comprueba **por su firma**: quien la llama no mira el cuerpo. Si la firma dice `-> &str` y hay dos entradas `&str`, el que llama no sabe si el resultado depende de `a`, de `b` o de las dos. Así que no sabría cuánto puede usarlo. Error E0106.
+
+La solución es **ponerle nombre** a una lifetime y usarlo para relacionar entradas y salida:
+
+```rust
+fn mas_larga<'a>(a: &'a str, b: &'a str) -> &'a str
+```
+
+Se lee así:
+
+- `<'a>` declara una lifetime genérica llamada `'a` (el apóstrofo es parte del nombre; por costumbre, letras cortas: `'a`, `'b`).
+- `a: &'a str` y `b: &'a str`: las dos entradas son válidas **al menos** durante `'a`.
+- `-> &'a str`: el resultado es válido durante `'a`.
+
+En la práctica: **`'a` será la parte en que las dos entradas son válidas a la vez**, es decir, la más corta. El resultado no se podrá usar más allá.
+
+La anotación es un **contrato** que se comprueba en los dos lados:
+
+1. **El cuerpo** tiene que cumplirlo: no puede devolver una referencia que no dure `'a` (por ejemplo, una a una variable local).
+2. **Cada llamada** tiene que respetarlo: no puede usar el resultado cuando alguna de las entradas ya haya muerto.
+
+## Pruébalo
+
+Usando el resultado mientras las dos entradas viven:
+
+<Ejecutar ej="m08/p-mas-larga-ok" />
+
+Y rompiendo el contrato en la llamada:
+
+<NoCompila ej="m08/p-mas-larga-llamador" explicacion="Por la firma, `r` dura lo que la más corta de `a` y `b`. `b` muere al cerrar el bloque, y `r` se usa después. Da igual que, al ejecutar, `mas_larga` fuera a devolver `a` (que es más larga): el compilador solo mira la firma, y la firma dice que **podría** devolver `b`." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Las lifetimes son genéricos.** `fn mas_larga<'a>` es genérica en `'a` igual que `fn max<T>` lo es en `T`. En cada llamada, el compilador elige una región concreta para `'a` que cumpla todas las restricciones: tiene que estar dentro de la vida de cada argumento y contener todos los usos del resultado. Si no existe, error. A diferencia de `T`, las lifetimes **no** generan copias de la función (no hay monomorfización): la función compilada es una sola, porque en el ejecutable las lifetimes no existen.
+
+**Por qué no mira el cuerpo.** Si el compilador dedujera las lifetimes leyendo el cuerpo, cambiar una línea dentro de una función podría romper código en otro crate que la usa. Con las firmas como contrato, los errores de lifetime de una función son **locales**: o el cuerpo incumple la firma, o la llamada incumple la firma. Esto hace que el análisis sea rápido y los errores predecibles.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Pensar que 'a es la lifetime de algo concreto">
+
+❌ «`'a` es la lifetime de `a`», porque se llaman parecido.
+
+✅ `'a` es un **parámetro**: en cada llamada toma una región distinta, la que haga falta para que todo cuadre. Se podría llamar `'x` o `'texto` y significaría lo mismo. Lo que importa es **dónde se repite**: las referencias que llevan la misma letra quedan atadas entre sí.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Con `fn f<'a>(x: &'a str, y: &'a str) -> &'a str`, `x` vive todo `main` e `y` vive solo un bloque interior. ¿Hasta dónde puedes usar el resultado?"
+  opciones={["Hasta el final de `main`", "Hasta el final del bloque interior", "Solo en la línea de la llamada", "Depende de qué devuelva `f` al ejecutar"]}
+  correcta={1}
+  explicacion="`'a` tiene que caber dentro de la vida de las dos entradas, así que como mucho llega hasta donde muere `y`."
+  porque={["Para eso, `y` tendría que vivir también todo `main`.", "", "Puedes usarlo en varias líneas, mientras `y` viva.", "El compilador no sabe qué devolverá: solo mira la firma."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál de estas firmas da E0106?"
+  opciones={["`fn f(x: &str) -> &str`", "`fn f(x: &str, y: &str) -> &str`", "`fn f(x: &str, y: &str) -> String`", "`fn f<'a>(x: &'a str, y: &str) -> &'a str`"]}
+  correcta={1}
+  explicacion="Dos entradas por referencia y una salida por referencia, sin `self`: el compilador no puede saber de cuál sale. En la próxima lección verás por qué la primera sí compila."
+  porque={["Con una sola entrada, el compilador deduce que la salida viene de ella (elisión).", "", "Devolver un `String` propio no necesita lifetimes.", "Aquí ya dices que la salida sale de `x`."]}
+/>

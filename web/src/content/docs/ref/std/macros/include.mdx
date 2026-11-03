@@ -1,0 +1,50 @@
+---
+title: "include_str!, include_bytes! e include!"
+description: "Meter el contenido de un archivo dentro del programa al compilar: como texto, como bytes o como código Rust."
+sidebar:
+  order: 16
+insignias: ["Desde 1.0", "core"]
+---
+
+**Ruta:** `std::include_str`, `std::include_bytes`, `std::include`
+
+## Sinopsis
+
+```rust
+include_str!("ruta")    // &'static str con el contenido (tiene que ser UTF-8)
+include_bytes!("ruta")  // &'static [u8; N] con los bytes
+include!("ruta")        // inserta el archivo como si fuera código Rust
+```
+
+La ruta es **relativa al archivo** donde está la macro.
+
+## Qué hace
+
+Leen el archivo **al compilar** y meten su contenido en el ejecutable. No hace falta distribuir el archivo junto al programa, ni puede faltar al ejecutar.
+
+```rust
+// Una plantilla HTML, un diccionario o un archivo de prueba, dentro del binario:
+const PLANTILLA: &str = include_str!("plantilla.html");
+static ICONO: &[u8] = include_bytes!("../recursos/icono.png");
+
+// Código generado por build.rs:
+include!(concat!(env!("OUT_DIR"), "/generado.rs"));
+
+// La documentación del crate a partir del README:
+#![doc = include_str!("../README.md")]
+```
+
+Si el archivo cambia, Cargo recompila. Si no existe, es un error de compilación.
+
+## Errores típicos
+
+- Usarlo para archivos enormes: el ejecutable crece lo mismo que el archivo, y la compilación se ralentiza.
+- Esperar que lea el archivo al ejecutar: para eso, `std::fs::read_to_string`.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[`env!`](/ref/std/macros/env/) · [`build.rs`](/curso/12-modulos-crates-y-cargo/10-build-rs/)

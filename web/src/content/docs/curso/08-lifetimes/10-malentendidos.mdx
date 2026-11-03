@@ -1,0 +1,90 @@
+---
+title: "Lo que las lifetimes no son"
+description: "Los malentendidos más comunes sobre lifetimes, cada uno con un programa que lo desmiente: T incluye referencias, 'static no es «para siempre», las anotaciones no alargan nada…"
+sidebar:
+  order: 10
+duracion: 14
+desde: "1.0"
+requiere: ["08-lifetimes/09-temporales"]
+tarjetas:
+  - p: "¿Puede un genérico `T` ser una referencia?"
+    r: "Sí. `T` abarca cualquier tipo, también `&i32` o `&mut String`. `T` no significa «tipo propio»."
+  - p: "¿Pueden las anotaciones de lifetime alargar la vida de un valor?"
+    r: "No. Solo describen relaciones. Un valor vive hasta que se mueve o termina su ámbito, se anote lo que se anote."
+  - p: "¿Puede una lifetime «encogerse» o «crecer» mientras el programa se ejecuta?"
+    r: "No: las lifetimes son regiones calculadas al compilar. No existen al ejecutar."
+  - p: "Si tu código compila, ¿tus anotaciones de lifetime son correctas?"
+    r: "Son seguras, pero no necesariamente las mejores: pueden ser más restrictivas de lo necesario y hacer que el código de quien llama no compile."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo } from '~/components';
+
+Las lifetimes confunden tanto que la comunidad tiene listas de malentendidos frecuentes. Aquí van los más importantes. Para cada uno, una frase falsa, la verdad y, cuando se puede, un programa que lo demuestra.
+
+## Predice
+
+<Predice
+  ej="m08/p-t-puede-ser-ref"
+  opciones={["`5`, `5` y `6`", "No compila: `mostrar` pide `T`, no `&T`", "No compila: `&mut y` no es `Debug`", "`5` y luego un error"]}
+  correcta={0}
+  explicacion="`T` es **cualquier** tipo. En la segunda llamada `T = &i32` y en la tercera `T = &mut i32`. `Debug` está implementado para las referencias si lo está para lo de dentro, y muestra el valor."
+  porque={["", "`T` incluye las referencias.", "Las referencias son `Debug` si su contenido lo es.", "Las tres llamadas compilan."]}
+/>
+
+## Los malentendidos
+
+**1. «`T` es un tipo propio; las referencias son `&T`».** Falso. `T` abarca **todos** los tipos: `i32`, `String`, `&i32`, `&mut Vec<u8>`… Si quieres excluir los que llevan préstamos cortos, tienes que pedirlo: `T: 'static`.
+
+**2. «Si `T: 'static`, el valor vive todo el programa».** Falso. Un `String` cumple `T: 'static` y se libera cuando quieras. La cota habla de lo que el tipo **tiene prestado**, no de cuánto **vive** (lección 8).
+
+**3. «`&'static T` y `T: 'static` son lo mismo».** Falso. La primera es una referencia válida todo el programa. La segunda es una cota sobre un tipo, que cumplen muchísimos tipos sin ninguna referencia.
+
+**4. «Las anotaciones alargan la vida de los valores».** Falso. Las anotaciones **describen**; nunca cambian cuándo se libera nada:
+
+<NoCompila ej="m08/p-lifetimes-no-alargan" />
+
+**5. «Las lifetimes cambian mientras el programa se ejecuta».** Falso. Son regiones calculadas al compilar. En el ejecutable no existen. Por eso el compilador tiene que considerar **todos** los caminos (lección 2), aunque alguno no se recorra nunca.
+
+**6. «Si compila, mis anotaciones son correctas».** A medias. Si compila, es **seguro**. Pero una firma demasiado restrictiva (lección 5) pasa la compilación de la función y rompe la de quien la llama.
+
+**7. «Un `&mut T` que devuelvo como `&T` deja de ser exclusivo».** Falso. El resultado mantiene vivo el préstamo exclusivo original (lección 5).
+
+**8. «Las closures siguen las mismas reglas de elisión que las funciones».** Falso. Con tipos anotados, la salida de una closure no se ata a la entrada (lección 4).
+
+**9. «Las lifetimes son la vida de una variable».** Falso. Son la región en la que un **préstamo** tiene que ser válido. Una variable puede seguir existiendo cuando su préstamo ya terminó (NLL, mundo 07).
+
+**10. «Para arreglar un error de lifetimes hay que añadir lifetimes».** Casi nunca. Lo normal es **reordenar** (para que el uso caiga dentro de la vida), **dar un dueño con nombre** a un temporal o **devolver valores propios** en vez de referencias.
+
+## Pruébalo
+
+El malentendido 1 tiene una consecuencia práctica: como `T` puede ser una referencia, una función genérica puede acabar guardando préstamos sin que lo parezca. Mira cómo `mostrar` acepta los tres:
+
+<Ejecutar ej="m08/p-t-puede-ser-ref" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**De dónde sale esta lista.** Estos malentendidos los recopiló la comunidad a partir de preguntas repetidas en foros (la lista más conocida se titula *Common Rust Lifetime Misconceptions*, de *pretzelhammer*). Los estudios con estudiantes confirman que las lifetimes son el tema más difícil del lenguaje, por delante incluso del ownership.
+
+**Por qué cuesta tanto.** Las lifetimes mezclan tres ideas que se parecen: cuánto **vive un valor** (de su creación a su `drop`), cuánto **dura un préstamo** (de su creación a su último uso) y qué **región** exige una firma. Casi todos los malentendidos confunden dos de las tres. Cuando dudes, pregúntate de cuál de las tres estás hablando.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`fn guardar<T>(t: T)`. ¿Se puede llamar con `&x`, siendo `x` local?"
+  opciones={["No: `T` no puede ser una referencia", "Sí: `T` es `&i32` (o el tipo que sea)", "Solo si `x` es `'static`", "Solo si `T: Copy`"]}
+  correcta={1}
+  explicacion="Sin cotas, `T` acepta cualquier tipo, también referencias de cualquier lifetime."
+  porque={["Es el malentendido 1.", "", "Eso haría falta si la firma pidiera `T: 'static`.", "No hay ninguna cota `Copy`."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál es la forma más habitual de arreglar un error de lifetimes?"
+  opciones={["Añadir `'static`", "Añadir más `'a`", "Reordenar el código, dar un dueño con nombre o devolver un valor propio", "Usar `unsafe`"]}
+  correcta={2}
+  explicacion="La mayoría de los errores de lifetimes se deben a que un uso cae fuera de la vida de un valor. Se arreglan cambiando **dónde** está el uso o **quién** es el dueño."
+  porque={["Casi siempre restringe demasiado o no arregla nada.", "Más anotaciones son más restricciones.", "", "`unsafe` no desactiva el comprobador de préstamos, y usarlo así sería un error grave."]}
+/>

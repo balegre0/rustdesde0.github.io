@@ -1,0 +1,132 @@
+---
+title: "Texto en bytes: UTF-8"
+description: "Mira los bytes de un texto, entiende por qué la «ñ» ocupa dos y por qué en Rust no se puede pedir la letra s[0]."
+sidebar:
+  order: 10
+duracion: 12
+desde: "1.0"
+requiere: ["01-la-maquina/09-el-orden-de-los-bytes"]
+tarjetas:
+  - p: "¿Qué es un punto de código de Unicode?"
+    r: "El número que Unicode asigna a cada carácter. Por ejemplo, la A es el 65 y la ñ el 241. En Rust se ve con `c as u32`."
+  - p: "¿Cuántos bytes ocupa un carácter en UTF-8?"
+    r: "Entre 1 y 4. Las letras inglesas y los dígitos ocupan 1; la ñ y las vocales con tilde, 2; el €, 3."
+  - p: '¿Qué devuelve `"año".len()`?'
+    r: "4: `len()` cuenta bytes, no caracteres. Para contar caracteres se usa `.chars().count()`, que da 3."
+  - p: "¿Por qué no compila `s[0]` si `s` es un texto?"
+    r: "Porque en UTF-8 un carácter puede ocupar varios bytes, y el byte 0 podría ser solo medio carácter. Rust no lo permite (error E0277)."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a ver que el texto también son bytes, y que en español eso tiene una sorpresa.
+
+## Predice
+
+`len()` dice la longitud de un texto. ¿Qué imprime para `"año"`?
+
+<Predice
+  ej="m01/anio-predice"
+  opciones={["`4`", "`3`", "`6`", "`12`"]}
+  correcta={0}
+  explicacion="`len()` cuenta **bytes**. La `a` y la `o` ocupan 1 byte cada una, y la `ñ` ocupa 2: en total, 4."
+  porque={["Correcto.", "3 es el número de **caracteres**; `len()` cuenta bytes.", "No todos los caracteres ocupan 2 bytes: la `a` y la `o` ocupan 1.", "12 serían 3 caracteres de 4 bytes, que es lo que ocupa un `char` suelto, pero un texto no guarda `char`s: guarda UTF-8."]}
+/>
+
+## La idea
+
+Para guardar texto, a cada carácter se le asigna un número. El catálogo mundial se llama **Unicode** (*Unicode*): da un número a cada letra de cada alfabeto, a los símbolos y a los emojis. Ese número es su **punto de código** (*code point*). La A es el 65; la a, el 97; la ñ, el 241; el €, el 8364.
+
+Falta decidir cómo se guarda ese número en bytes. Rust usa siempre **UTF-8** (*UTF-8*): una codificación de **longitud variable**. Los caracteres con números pequeños (las letras inglesas, los dígitos, los signos básicos) ocupan **1 byte**. Los demás ocupan 2, 3 o 4.
+
+| Carácter | Punto de código | Bytes UTF-8 |
+|---|---|---|
+| `A` | 65 | `41` |
+| `ñ` | 241 | `c3 b1` |
+| `€` | 8364 | `e2 82 ac` |
+
+Por eso el tipo `char` mide 4 bytes (cabe cualquier punto de código), pero un texto no es una lista de `char`: es una lista de **bytes UTF-8**, y cada carácter ocupa lo justo.
+
+## Pruébalo
+
+`c as u32` da el punto de código de un `char`, y `as_bytes()` da los bytes de un texto:
+
+<Ejecutar ej="m01/utf8" />
+
+Salida real:
+
+```text
+A -> número 65 -> 0x41
+a -> número 97 -> 0x61
+ñ -> número 241 -> 0xf1
+€ -> número 8364 -> 0x20ac
+Hola  -> 4 bytes: 48 6f 6c 61
+año   -> 4 bytes: 61 c3 b1 6f
+€     -> 3 bytes: e2 82 ac
+11000011
+10110001
+bytes: 4, caracteres: 3
+```
+
+Fíjate en que la ñ es el número `0xf1`, pero sus bytes son `c3 b1`. UTF-8 no guarda el número tal cual: lo reparte entre varios bytes con unas marcas.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Las marcas son los primeros bits de cada byte:
+
+| Bytes | Patrón | Bits libres |
+|---|---|---|
+| 1 | `0xxxxxxx` | 7 |
+| 2 | `110xxxxx 10xxxxxx` | 11 |
+| 3 | `1110xxxx 10xxxxxx 10xxxxxx` | 16 |
+| 4 | `11110xxx 10xxxxxx 10xxxxxx 10xxxxxx` | 21 |
+
+Con la ñ: 241 en 11 bits es `00011 110001`. Los primeros 5 bits van en el primer byte detrás de `110`, y los 6 últimos en el segundo, detrás de `10`. Resultado: `11000011 10110001` = `c3 b1`. Es justo lo que imprimió el programa.
+
+Este diseño tiene ventajas: un byte que empieza por `0` es siempre un carácter completo de 1 byte, uno que empieza por `10` es siempre una continuación, y nunca se confunde el principio de un carácter con su mitad. Además, el texto UTF-8 es una secuencia de bytes sueltos, así que **no le afecta** el orden de los bytes de la lección 9.
+
+Rust **garantiza** que un texto (`str` o `String`) es siempre UTF-8 válido. Si intentas crear uno a partir de bytes que no lo son, te lo dice: lo verás en el jefe de este mundo.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Pedir «la letra número 0» de un texto con `s[0]` no compila:
+
+<NoCompila
+  ej="m01/indexar-texto"
+  explicacion="El byte 0 de «ñu» es `c3`, que es solo la primera mitad de la ñ. Si Rust te lo diera como carácter, te daría basura. Por eso el compilador lo prohíbe (E0277) y te sugiere decir qué quieres: el primer **carácter** (`.chars()`) o el primer **byte** (`.as_bytes()` o `.bytes()`)."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m01/utf8-reto"
+  enunciado="Cambia SOLO el texto entre comillas para que el programa imprima `3 caracteres en 5 bytes`. Pista: cada «ñ» ocupa 2 bytes."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta={'¿Cuántos bytes ocupa el texto `"€"` en UTF-8?'}
+  opciones={["3", "1", "4", "8364"]}
+  correcta={0}
+  explicacion="El € tiene el punto de código 8364, que necesita entre 12 y 16 bits: le toca el formato de 3 bytes (`e2 82 ac`)."
+  porque={["Correcto.", "Solo los caracteres con punto de código menor que 128 ocupan 1 byte.", "4 es lo que mide un `char`, pero dentro de un texto UTF-8 el € ocupa 3.", "8364 es su punto de código, no su tamaño."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué cuenta `texto.chars().count()`?"
+  opciones={["Los caracteres", "Los bytes", "Las palabras", "Los bits"]}
+  correcta={0}
+  porque={["Correcto: recorre el texto carácter a carácter.", "Eso lo hace `len()`.", "No sabe nada de espacios ni palabras.", "Nada en Rust cuenta los bits de un texto de esta forma."]}
+/>
+
+<Pregunta
+  pregunta="Un byte de un texto UTF-8 empieza por los bits `10`. ¿Qué es?"
+  opciones={["La continuación de un carácter de varios bytes", "Un carácter completo de 1 byte", "El principio de un carácter de 2 bytes", "Un error: no puede empezar así"]}
+  correcta={0}
+  porque={["Correcto.", "Los de 1 byte empiezan por `0`.", "El primer byte de un carácter de 2 bytes empieza por `110`.", "Es válido, siempre que vaya detrás del principio de un carácter."]}
+/>

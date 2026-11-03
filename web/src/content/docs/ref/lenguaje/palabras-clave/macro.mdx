@@ -1,0 +1,48 @@
+---
+title: "macro"
+description: "Palabra clave reservada: no se usa en Rust estable, pero no puede ser un nombre."
+sidebar:
+  order: 56
+desde: "1.0"
+categoria: "reservada"
+---
+
+import { NoCompila } from '~/components';
+
+`macro` es una palabra clave **reservada**: hoy no hace nada en Rust estable, pero está apartada para el futuro, así que no puedes usarla como nombre de variable, función, tipo, campo, módulo…
+
+## Sinopsis
+
+```text
+macro          // sin significado en Rust estable 1.99
+r#macro        // identificador crudo: «macro» usado como nombre normal
+```
+
+## Qué hace
+
+Reservada desde Rust 1.0. Está pensada para las **macros declarativas 2.0** (`macro nombre(…) { … }`), con higiene completa y visibilidad normal como cualquier otro elemento. Hoy las macros declarativas se escriben con [`macro_rules!`](/ref/lenguaje/palabras-clave/macro-rules/).
+
+Existe un experimento **inestable** que la usa, la *feature* `decl_macro`, disponible solo en el compilador *nightly*. En Rust estable 1.99 no se puede usar.
+
+Reservar palabras de antemano permite añadir sintaxis nueva **sin romper** programas existentes: como nadie ha podido llamar `macro` a nada, el día que la palabra tenga significado ningún programa dejará de compilar.
+
+Si necesitas ese nombre (por ejemplo, para hablar con otro sistema que usa un campo llamado así), escribe el **identificador crudo** `r#macro`: para el compilador es el nombre `macro` sin más.
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-macro" />
+
+`error: expected identifier, found reserved keyword macro`, con la ayuda `escape macro to use it as an identifier`. El arreglo usa `r#macro`.
+
+## Desde
+
+Reservada desde Rust 1.0, en todas las ediciones.
+
+## Ver también
+
+- [Palabras clave](/ref/lenguaje/palabras-clave/): las tres categorías y los identificadores crudos.
+- [Ediciones](/ref/ediciones/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)

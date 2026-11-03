@@ -1,0 +1,146 @@
+---
+title: "Evaluación en compilación"
+description: "Ejecuta código mientras compilas con `const fn`, entiende el intérprete de MIR que lo hace posible y lee el error E0080."
+sidebar:
+  order: 7
+duracion: 11
+desde: "1.31"
+requiere: ["21-el-compilador-por-dentro/04-leer-mir"]
+tarjetas:
+  - p: "¿Quién ejecuta una `const fn` cuando se usa en un `const`?"
+    r: "Un intérprete de MIR que hay dentro del compilador (`rustc_const_eval`): ejecuta el MIR de la función paso a paso y guarda el resultado en el binario."
+  - p: "¿Qué pasa si una constante entra en pánico o desborda al evaluarse?"
+    r: "La compilación falla con `error[E0080]`, señalando la constante y la línea dentro de la función donde ocurrió."
+  - p: "¿Qué hace un bloque `const { ... }` dentro de una función?"
+    r: "Obliga a evaluar su contenido al compilar, aunque esté en mitad de código normal."
+  - p: "¿Qué relación hay entre la evaluación de constantes y Miri?"
+    r: "Comparten el mismo motor de interpretación de MIR; Miri le añade la detección de comportamiento indefinido."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+El compilador de Rust lleva dentro un **intérprete**: puede ejecutar parte de tu código mientras compila y guardar el resultado como si fuera un número que tú hubieras escrito. Así se calculan las `const`, los `static` y el tamaño de los arrays.
+
+## Predice
+
+<Pregunta
+  pregunta="Compilas en modo debug (`cargo build`). Escribes `const F21: u64 = factorial(21);` y 21! no cabe en un `u64`. ¿Qué pasa?"
+  opciones={[
+    "Compila, y al ejecutar el programa entra en pánico por overflow",
+    "Compila, y el valor da la vuelta en silencio",
+    "No compila: el overflow ocurre al evaluar la constante, durante la compilación",
+    "El compilador cambia el tipo a `u128` por ti"
+  ]}
+  correcta={2}
+  explicacion="El valor de una `const` se calcula al compilar, ejecutando el MIR de `factorial`. En debug ese MIR lleva el `assert` de overflow (lo viste en la lección 4), el `assert` falla dentro del intérprete y el resultado es un error de compilación: E0080. (En release hay sorpresa: lo verás en «Bajo el capó».)"
+  porque={["El programa nunca llega a ejecutarse: la constante se calcula antes.", "Eso es justo lo que pasa en **release**, no en debug. Sigue leyendo.", "", "Rust nunca cambia los tipos que escribes."]}
+/>
+
+## La idea
+
+Una `const fn` es una función que **también** se puede ejecutar al compilar. Cuando la usas para dar valor a un `const`, un `static`, la longitud de un array o un bloque `const { … }`, el compilador:
+
+1. construye su MIR, como para cualquier función;
+2. lo ejecuta en su **intérprete de MIR** (el crate `rustc_const_eval`), con una memoria simulada;
+3. si todo va bien, guarda el resultado y lo usa como si fuera un literal.
+
+El intérprete es **estricto**: cualquier pánico, división por cero, acceso fuera de límites o `assert` fallido es un error de compilación. (Con el overflow hay un matiz importante que verás abajo.) Dentro de una `const fn` no puedes hacer cosas que dependan del mundo exterior (leer archivos, la hora, reservar memoria del heap para que sobreviva…), porque al compilar no hay mundo exterior.
+
+Ventaja práctica: lo que se calcula en compilación **no cuesta nada al ejecutar**. Una tabla precalculada, una comprobación de tamaños o un valor derivado de otras constantes se convierten en datos fijos del binario.
+
+## Pruébalo
+
+<Ejecutar ej="m21/const-factorial" />
+
+La misma `factorial` se usa dos veces: una evaluada por el compilador (`F10`, el bloque `const { … }`) y otra ejecutada normalmente (`factorial(n)` con `n` calculado en tiempo de ejecución).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El error real.** Con `const F21: u64 = factorial(21);`, rustc 1.99.1 dice:
+
+```text
+error[E0080]: attempt to compute `2432902008176640000_u64 * 21_u64`, which would overflow
+  --> const-desborda.rs:12:18
+   |
+12 | const F21: u64 = factorial(21);
+   |                  ^^^^^^^^^^^^^ evaluation of `F21` failed inside this call
+   |
+note: inside `factorial`
+  --> const-desborda.rs:5:9
+   |
+ 5 |         r *= i;
+   |         ^^^^^^ the failure occurred here
+```
+
+Fíjate en el detalle: el mensaje muestra los **valores concretos** de la multiplicación que desbordó (20! × 21). Solo un intérprete que está ejecutando de verdad el código puede saberlo. Y señala una **pila de llamadas** (`inside factorial`), como un pánico, pero en tiempo de compilación.
+
+**La sorpresa de release.** El intérprete ejecuta **el MIR tal como se construyó**. Compilando con `-O -C overflow-checks=off` (lo que hace `cargo build --release`), el MIR de `factorial` ya no tiene `MulWithOverflow` + `assert`, sino una multiplicación que da la vuelta. Lo comprobamos: el mismo archivo **compila** en release y el programa imprime `14197454024290336768`, que es 21! módulo 2⁶⁴. En cambio, una operación escrita directamente en la constante, como `const X: u8 = 255 + 1;`, sigue dando E0080 también con `overflow-checks=off` (`attempt to compute u8::MAX + 1_u8, which would overflow`). Moraleja: si una `const fn` puede desbordar, usa `checked_mul` o `strict_mul`, o pon tus constantes a prueba con un `assert!` dentro de la constante.
+
+**Comprobaciones de tamaño gratis.** El truco más útil para mirar por dentro del compilador sin ejecutar nada:
+
+```rust
+const _: () = assert!(std::mem::size_of::<Option<&u8>>() == 8);
+```
+
+Si la condición es falsa, la compilación falla con E0080. En la lección 10 (layout) verificamos así una tabla de tamaños de x86-64 entera, compilando solo con `--emit=metadata`.
+
+**El mismo motor que Miri.** El intérprete de `rustc_const_eval` está escrito de forma genérica sobre una «máquina» con ganchos. La evaluación de constantes usa una máquina estricta que solo permite lo que tiene sentido al compilar. **Miri** (la herramienta del mundo 20) usa el mismo intérprete con otra máquina que añade la detección de comportamiento indefinido: punteros colgantes, lecturas sin inicializar, violaciones del modelo de aliasing. Por eso Miri puede ejecutar tus tests «a cámara lenta» y avisarte de UB.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m21/const-desborda" explicacion="E0080 (perfil debug): el intérprete de MIR detecta el overflow al compilar. El «Ver arreglo» usa `u128`, donde 21! sí cabe." />
+
+<Trampa titulo="Confundir `const` con `let` inmutable">
+
+❌ «`const X: u32 = 5;` y `let x = 5;` son lo mismo.»
+
+✅ Un `let` se evalúa **al ejecutar**, cada vez que pasa por ahí, y puede depender de la entrada. Un `const` se evalúa **al compilar**, una vez, y su valor se copia en cada sitio donde se usa. Por eso un `const` no puede depender de nada que solo se sepa en tiempo de ejecución.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="¿Cuál de estas líneas **no** puede compilar como `const`?"
+  opciones={[
+    "`const A: usize = 3 * 7;`",
+    "`const B: [u8; 4] = [0; 4];`",
+    "`const C: usize = std::env::args().count();`",
+    "`const D: u64 = u64::MAX / 2;`"
+  ]}
+  correcta={2}
+  explicacion="Los argumentos del programa solo existen al ejecutarlo. `std::env::args` no es `const fn` y el compilador lo rechaza."
+  porque={["Aritmética con literales: perfecto para el intérprete.", "Un array de tamaño fijo con valor conocido: válido.", "", "Operaciones con constantes de `std`: válido."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué componente del compilador calcula el valor de un `const`?"
+  opciones={["LLVM", "El borrow checker", "Un intérprete de MIR dentro de rustc", "El enlazador"]}
+  correcta={2}
+  explicacion="`rustc_const_eval` interpreta el MIR. LLVM también pliega constantes al optimizar, pero las `const` de Rust se resuelven antes, con semántica de Rust."
+  porque={["LLVM optimiza más tarde; además, el resultado de un `const` debe conocerse antes de generar código.", "El borrow checker comprueba préstamos; no calcula valores.", "", "El enlazador une código ya generado."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué el mensaje de E0080 puede mostrar `2432902008176640000_u64 * 21_u64`?"
+  opciones={[
+    "Porque el compilador adivina los valores",
+    "Porque el intérprete de MIR está ejecutando de verdad el cálculo y conoce los valores en ese momento",
+    "Porque esos números están escritos en el código",
+    "Porque LLVM se los pasa a rustc"
+  ]}
+  correcta={1}
+  explicacion="Es una ejecución real, solo que dentro del compilador: conoce el valor de cada local en cada paso."
+  porque={["No adivina: ejecuta.", "", "En el código solo está `factorial(21)`; 20! se calculó durante la evaluación.", "La evaluación de constantes no usa LLVM."]}
+/>
+
+## Para saber más
+
+- Lección [Layout y nichos](/curso/21-el-compilador-por-dentro/10-layout-y-nichos/), donde usamos `const _: () = assert!(…)` como instrumento.
+- The Rust Reference, «Constant evaluation»: https://doc.rust-lang.org/reference/const_eval.html

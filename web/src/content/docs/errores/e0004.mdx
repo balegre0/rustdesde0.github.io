@@ -1,0 +1,98 @@
+---
+title: "E0004: patrones no exhaustivos"
+description: "Un match no cubre todos los valores posibles."
+sidebar:
+  order: 1
+insignias: ["Patrones"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` non-exhaustive patterns: `Semaforo::Ambar` not covered ``
+
+## Qué significa
+
+Un `match` debe ser **exhaustivo**: tener un brazo para cada valor que pueda llegar. Si falta `Semaforo::Ambar`, ¿qué haría el programa al recibirlo? En lugar de dejarlo al azar, el compilador te obliga a decidir. Esta comprobación es la razón de que añadir una variante nueva a un enum te avise en todos los `match` que la olvidan.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0004" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0004]: non-exhaustive patterns: `Semaforo::Ambar` not covered
+  --> E0004.rs:10:27
+   |
+10 |         let texto = match s {
+   |                           ^ pattern `Semaforo::Ambar` not covered
+   |
+note: `Semaforo` defined here
+  --> E0004.rs:2:6
+   |
+ 2 | enum Semaforo {
+   |      ^^^^^^^^
+ 3 |     Rojo,
+ 4 |     Ambar,
+   |     ----- not covered
+   = note: the matched value is of type `Semaforo`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+   |
+12 ~             Semaforo::Verde => "pasa",
+13 ~             Semaforo::Ambar => todo!(),
+   |
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Olvidar una variante de un enum.
+- Hacer `match` sobre números y no cubrir todos (falta `_`).
+- Cubrir `Some(x)` y olvidar `None`.
+
+## Cómo arreglarlo
+
+Añade los brazos que faltan (rustc los enumera) o un brazo comodín `_ => ...` si de verdad todos los demás casos se tratan igual.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+#[derive(Clone, Copy)]
+enum Semaforo {
+    Rojo,
+    Ambar,
+    Verde,
+}
+
+fn main() {
+    for s in [Semaforo::Rojo, Semaforo::Ambar, Semaforo::Verde] {
+        let texto = match s {
+            Semaforo::Rojo => "para",
+            Semaforo::Ambar => "cuidado",
+            Semaforo::Verde => "pasa",
+        };
+        println!("{texto}");
+    }
+}
+```
+
+**Salida:**
+
+```text
+para
+cuidado
+pasa
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0004` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0005](/errores/e0005/): patrón refutable en un let
+- [E0023](/errores/e0023/): número de campos incorrecto en un patrón
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

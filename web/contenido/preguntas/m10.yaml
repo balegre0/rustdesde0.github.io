@@ -1,0 +1,668 @@
+# Banco de preguntas del mundo 10 (CONTENIDO.md §7.1). Todo verificado con rustc 1.99.1, ed. 2024.
+- id: m10-indice-fuera
+  titulo: "El cuarto día de tres"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué ocurre al ejecutarlo?"
+  ej: m10/panic-predice
+  opciones:
+    - "Imprime `empiezo` y luego un pánico: `index out of bounds: the len is 3 but the index is 3`"
+    - "Imprime `empiezo`, una línea vacía y `termino`"
+    - "No compila"
+    - "Imprime `empiezo`, `miércoles` y `termino`"
+  correcta: 0
+  solucion: |
+    Los índices válidos son 0, 1 y 2. `dias[3]` provoca un pánico con la longitud y el índice. Rust nunca lee memoria fuera del array (eso sería comportamiento indefinido). El índice se calcula al ejecutar, así que compila.
+  etiquetas: ["pánico", "índices"]
+
+- id: m10-panic-vs-result
+  titulo: "¿Pánico o Result?"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál de estas situaciones debería tratarse con `Result` y no con un pánico?"
+  opciones:
+    - "El usuario escribe «doce» cuando se le pide su edad"
+    - "Una función interna recibe un índice que el propio programa calculó mal"
+    - "Una invariante de tu struct (`len <= capacidad`) deja de cumplirse"
+    - "Llamas a `todo!()` en código sin terminar"
+  correcta: 0
+  solucion: |
+    Una entrada incorrecta del usuario es parte normal de la vida del programa: se informa y se pide otra vez. Los otros tres indican fallos del programa, y lo honesto es detenerse.
+  etiquetas: ["diseño", "pánico", "Result"]
+
+- id: m10-drop-en-wasm
+  titulo: "El Drop que no se ve"
+  mundo: 10-errores
+  tema: errores
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En el ejemplo `m10/panic`, el `Drop` de `Ruidoso` no imprime nada en el navegador. ¿Por qué?"
+  ej: m10/panic
+  opciones:
+    - "El objetivo wasm32-wasip1 usa `panic = abort`: el pánico termina el proceso sin desenrollar ni ejecutar `Drop`"
+    - "Los `Drop` nunca se ejecutan cuando hay un pánico"
+    - "Porque `_a` empieza por guion bajo y se libera al instante"
+    - "Porque `println!` no funciona dentro de `drop`"
+  correcta: 0
+  solucion: |
+    `rustc --print cfg --target wasm32-wasip1` muestra `panic="abort"`. En un PC (estrategia `unwind` por defecto), el pánico desenrolla la pila y ejecuta los `Drop`. Un nombre `_a` sí mantiene el valor vivo hasta el final del ámbito (solo `_` a secas lo descarta al momento).
+  etiquetas: ["unwind", "abort", "Drop"]
+
+- id: m10-overflow-perfiles
+  titulo: "Vidas negativas"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: predice
+  enunciado: "Compilado en modo **release**, ¿qué imprime la tercera línea?"
+  ej: m10/overflow-panic
+  opciones: ["`vidas = 255`", "Un pánico: `attempt to subtract with overflow`", "`vidas = -1`", "`vidas = 0`"]
+  correcta: 0
+  solucion: |
+    En release no se comprueba el desbordamiento y el `u8` da la vuelta: 0 − 1 = 255. En debug, la misma línea es un pánico con `attempt to subtract with overflow`. Para no depender del perfil: `checked_sub`, `saturating_sub` o `wrapping_sub`.
+  etiquetas: ["overflow", "debug", "release"]
+
+- id: m10-todo
+  titulo: "Aún no decidido"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la tercera llamada, `nivel(5000)`?"
+  ej: m10/todo-y-unreachable
+  opciones:
+    - "Un pánico: `not yet implemented: aún no he decidido qué pasa con 1000 o más`"
+    - "`experto`"
+    - "No compila: `todo!` no devuelve un `&str`"
+    - "Nada"
+  correcta: 0
+  solucion: |
+    `todo!()` es un pánico con significado («falta por escribir»). Compila porque su tipo es `!` (nunca termina), que encaja con cualquier tipo, también con `&str`.
+  etiquetas: ["todo!", "!"]
+
+- id: m10-parse-casos
+  titulo: "¿Qué es un número?"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la línea de `\"3.5\"`?"
+  ej: m10/result-predice
+  opciones:
+    - "`\"3.5\" → error: invalid digit found in string`"
+    - "`\"3.5\" → número 3`"
+    - "`\"3.5\" → número 4`"
+    - "Un pánico"
+  correcta: 0
+  solucion: |
+    `parse::<i32>()` no redondea: el punto es un dígito inválido para un entero, y devuelve `Err`. La cadena vacía tiene su propio mensaje: `cannot parse integer from empty string`.
+  etiquetas: ["parse", "ParseIntError"]
+
+- id: m10-result-multiplicar
+  titulo: "Multiplicar un quizás"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m10/result-como-valor
+  opciones:
+    - "`parse` devuelve `Result<u32, ParseIntError>`, que no se puede multiplicar (E0369)"
+    - "Porque `121 / 100` no es entero"
+    - "Porque `precio` no es `mut`"
+    - "Porque falta `use std::num::ParseIntError`"
+  correcta: 0
+  solucion: |
+    `error[E0369]: cannot multiply Result<u32, ParseIntError> by {integer}`. Antes de operar hay que decidir qué pasa si el texto no es un número (`match`, `?`, `unwrap_or`…). La división entera es válida, y no hace falta importar el tipo para usarlo así.
+  etiquetas: ["E0369", "Result"]
+
+- id: m10-must-use-result
+  titulo: "Guardado (¿seguro?)"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué pasa con este programa?"
+  ej: m10/result-ignorado
+  opciones:
+    - "Compila con el aviso `unused Result that must be used` e imprime `guardado (¿seguro?)`"
+    - "No compila: hay que usar el `Result`"
+    - "Entra en pánico porque `guardar` devuelve `Err`"
+    - "Imprime `nombre vacío`"
+  correcta: 0
+  solucion: |
+    `Result` está marcado `#[must_use]`: ignorarlo es un **aviso**, no un error. El `Err` se pierde en silencio, por eso el mensaje miente. Si de verdad quieres ignorarlo, `let _ = guardar("");` lo deja claro.
+  etiquetas: ["must_use", "Result"]
+
+- id: m10-debug-display
+  titulo: "Dos caras del mismo error"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: opcion
+  enunciado: "`let e = \"300\".parse::<u8>().unwrap_err();` ¿Qué imprimen `{:?}` y `{}`?"
+  opciones:
+    - "`ParseIntError { kind: PosOverflow }` y `number too large to fit in target type`"
+    - "`number too large to fit in target type` las dos veces"
+    - "`PosOverflow` y `300`"
+    - "`Err(300)` y `300`"
+  correcta: 0
+  solucion: |
+    Debug es la vista para programadores (tipo y campos); Display, el mensaje para personas. Verificado en el ejemplo `m10/result`.
+  etiquetas: ["Debug", "Display", "ParseIntError"]
+
+- id: m10-option-o-result
+  titulo: "Buscar en una lista"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Una función busca la primera palabra que empieza por «ñ» en un texto. ¿Qué debería devolver?"
+  opciones: ["`Option<&str>`", "`Result<&str, String>`", "`&str`, y un pánico si no hay", "`&str`, vacío si no hay"]
+  correcta: 0
+  solucion: |
+    Que no haya ninguna es un resultado normal y no necesita explicación: `Option`. `Result` es para cuando algo **falló** y el motivo importa. Un texto vacío como «no hay» es un valor mágico indistinguible de un dato real.
+  etiquetas: ["Option", "Result", "diseño"]
+
+- id: m10-unwrap-mensaje
+  titulo: "unwrap sobre un -3"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué mensaje de pánico produce?"
+  ej: m10/unwrap-err
+  opciones:
+    - "``called `Result::unwrap()` on an `Err` value: ParseIntError { kind: InvalidDigit }``"
+    - "``called `Option::unwrap()` on a `None` value``"
+    - "`attempt to subtract with overflow`"
+    - "Ninguno: `edad` vale 0"
+  correcta: 0
+  solucion: |
+    Un `u8` no admite el signo menos, así que `parse` devuelve `Err(InvalidDigit)` y `unwrap` entra en pánico mostrando el error con Debug. Por eso `unwrap` exige que el error implemente `Debug`.
+  etiquetas: ["unwrap", "pánico"]
+
+- id: m10-expect-mejor
+  titulo: "Un pánico que se explica"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la segunda línea del pánico?"
+  ej: m10/unwrap-predice
+  opciones:
+    - "`la configuración debe traer un número: ParseIntError { kind: InvalidDigit }`"
+    - "`la configuración debe traer un número`"
+    - "``called `Result::unwrap()` on an `Err` value``"
+    - "`b = 0`"
+  correcta: 0
+  solucion: |
+    `expect` usa tu mensaje, seguido de `: ` y el Debug del error. Por eso es preferible a `unwrap`: dice qué suponías.
+  etiquetas: ["expect"]
+
+- id: m10-unwrap-or-default
+  titulo: "Por defecto"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Qué valor da `\"nada\".parse::<i32>().unwrap_or_default()`? Escribe solo el número."
+  respuestas: ["0"]
+  solucion: |
+    El valor por defecto (`Default`) de un entero es 0. Verificado en `m10/unwrap`: `unwrap_or_default: 0`.
+  etiquetas: ["unwrap_or_default"]
+
+- id: m10-unwrap-razonable
+  titulo: "El unwrap aceptable"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿En cuál de estos casos es razonable `expect`?"
+  opciones:
+    - "`\"2026\".parse::<u32>().expect(\"son cuatro dígitos escritos a mano\")`"
+    - "Convertir el texto que llega por la red"
+    - "Abrir el archivo que eligió el usuario"
+    - "Leer una variable de entorno que el usuario puede no haber definido"
+  correcta: 0
+  solucion: |
+    El texto está escrito en el propio código: no puede fallar. Las otras tres dependen del mundo exterior, donde fallar es normal.
+  etiquetas: ["expect", "diseño"]
+
+- id: m10-interrogacion-salida
+  titulo: "Donde se para"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: predice
+  enunciado: "En la segunda llamada, `sumar_textos(\"4\", \"cinco\")`, ¿qué se imprime?"
+  ej: m10/interrogacion-predice
+  opciones:
+    - "`  primero leído: 4` y luego `Err(ParseIntError { kind: InvalidDigit })`"
+    - "Los dos mensajes y `Err(…)`"
+    - "`Ok(4)`"
+    - "Un pánico"
+  correcta: 0
+  solucion: |
+    `?` devuelve el error en cuanto aparece: la función sale en la línea del segundo `parse`, así que `segundo leído` no se imprime.
+  etiquetas: ["?"]
+
+- id: m10-interrogacion-en-main
+  titulo: "? en un main normal"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m10/interrogacion-en-unit
+  opciones:
+    - "`main` devuelve `()`, y `?` necesita una función que devuelva `Result` u `Option` (E0277)"
+    - "`?` solo existe en modo release"
+    - "Falta `use std::num::ParseIntError`"
+    - "`parse` no devuelve `Result`"
+  correcta: 0
+  solucion: |
+    `error[E0277]: the ? operator can only be used in a function that returns Result or Option`. rustc propone `fn main() -> Result<(), Box<dyn std::error::Error>>` y `Ok(())` al final.
+  etiquetas: ["E0277", "?", "main"]
+
+- id: m10-interrogacion-option-result
+  titulo: "Un Result en una función Option"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `texto.parse()?` dentro de una función que devuelve `Option<u32>`?"
+  ej: m10/interrogacion-mezcla
+  opciones:
+    - "`?` sobre un `Result` no puede devolver su `Err` en un `Option`; hay que usar `.ok()?` (E0277)"
+    - "Porque `parse` no se puede usar con `u32`"
+    - "Porque `?` solo funciona con `Option`"
+    - "Porque falta un `match`"
+  correcta: 0
+  solucion: |
+    rustc: `the ? operator can only be used on Options, not Results, in a function that returns Option`, y sugiere `.ok()?`, que descarta la información del error.
+  etiquetas: ["E0277", "?", "ok"]
+
+- id: m10-expansion-interrogacion
+  titulo: "Lo que escribe ?"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿A qué equivale `expr?` cuando `expr` es un `Result`?"
+  opciones:
+    - "`match expr { Ok(v) => v, Err(e) => return Err(From::from(e)) }`"
+    - "`expr.unwrap()`"
+    - "`match expr { Ok(v) => v, Err(_) => panic!() }`"
+    - "`expr.unwrap_or_default()`"
+  correcta: 0
+  solucion: |
+    `?` es un retorno temprano con conversión del error mediante `From`. Nunca entra en pánico ni inventa valores.
+  etiquetas: ["?", "From"]
+
+- id: m10-collect-result
+  titulo: "Todo o nada"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la primera línea?"
+  ej: m10/combinadores-predice
+  opciones:
+    - "`Err(ParseIntError { kind: InvalidDigit })`"
+    - "`Ok([4, 6])`"
+    - "`[Ok(4), Err(ParseIntError { kind: InvalidDigit }), Ok(6)]`"
+    - "`Ok([4, 0, 6])`"
+  correcta: 0
+  solucion: |
+    `collect` hacia `Result<Vec<_>, _>` devuelve el primer `Err` que encuentra y deja de consumir el iterador. Para quedarte con los buenos y descartar los malos: `filter_map(|t| t.parse().ok())`, que da `[4, 6]`.
+  etiquetas: ["collect", "FromIterator"]
+
+- id: m10-map-anidado
+  titulo: "Un Result dentro de otro"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m10/map-devuelve-result
+  opciones:
+    - "La closure devuelve un `Result`, así que `map` produce `Result<Result<…>, …>`; hace falta `and_then` (E0308)"
+    - "`isqrt` no existe"
+    - "`map` no se puede usar sobre `Result`"
+    - "Falta `?` dentro de la closure"
+  correcta: 0
+  solucion: |
+    `expected Result<i32, String>, found Result<Result<i32, String>, String>`. `and_then` es el `map` para pasos que también pueden fallar: aplana los dos niveles.
+  etiquetas: ["map", "and_then", "E0308"]
+
+- id: m10-map-err
+  titulo: "Cambiar solo el error"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Tienes un `Result<u32, ParseIntError>` y tu función devuelve `Result<u32, String>`. ¿Qué combinador usas antes del `?`?"
+  opciones: ["`map_err`", "`map`", "`and_then`", "`ok`"]
+  correcta: 0
+  solucion: |
+    `map_err(|e| e.to_string())` transforma el error y deja pasar el `Ok`. `map` y `and_then` trabajan con el valor `Ok`; `ok` lo convierte en `Option`.
+  etiquetas: ["map_err"]
+
+- id: m10-ok-or
+  titulo: "De Option a Result"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué devuelve `[\"Ana\", \"Íker\"].get(5).ok_or(\"no hay quinto nombre\")`?"
+  opciones: ["`Err(\"no hay quinto nombre\")`", "`None`", "Un pánico", "`Ok(\"\")`"]
+  correcta: 0
+  solucion: |
+    `get(5)` da `None` y `ok_or` lo convierte en `Err` con el error que le pasas. Verificado en `m10/combinadores`.
+  etiquetas: ["ok_or", "Option"]
+
+- id: m10-display-necesario
+  titulo: "Un error sin palabras"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `impl std::error::Error for MiError {}`?"
+  ej: m10/error-sin-display
+  opciones:
+    - "El trait `Error` exige `Debug + Display`, y falta `Display` (E0277)"
+    - "Porque el bloque `impl` está vacío"
+    - "Porque los enums no pueden ser errores"
+    - "Porque falta `#[derive(Error)]`"
+  correcta: 0
+  solucion: |
+    `error[E0277]: MiError doesn't implement std::fmt::Display`, y la nota muestra la declaración `pub trait Error: Debug + Display`. Con `Display` implementado, el bloque vacío basta: los métodos de `Error` tienen valor por defecto. `#[derive(Error)]` no existe en la biblioteca estándar (lo aporta thiserror).
+  etiquetas: ["E0277", "Error", "Display"]
+
+- id: m10-display-vs-debug-propio
+  titulo: "Doscientos años"
+  mundo: 10-errores
+  tema: errores
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m10/error-propio-predice
+  opciones:
+    - "`nadie tiene 200 años` y `Imposible(200)`"
+    - "`Imposible(200)` y `Imposible(200)`"
+    - "`nadie tiene 200 años` dos veces"
+    - "`ErrorEdad::Imposible(200)` y `nadie tiene 200 años`"
+  correcta: 0
+  solucion: |
+    `{}` llama a nuestro `Display`; `{:?}` al `Debug` derivado, que escribe la variante sin el nombre del enum.
+  etiquetas: ["Display", "Debug"]
+
+- id: m10-enum-vs-string
+  titulo: "¿Por qué no un String?"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál es la ventaja principal de un enum de error frente a `Result<T, String>`?"
+  opciones:
+    - "Quien llama puede distinguir los casos con `match` y usar sus datos"
+    - "Ocupa menos memoria siempre"
+    - "Se imprime más bonito"
+    - "Evita los pánicos"
+  correcta: 0
+  solucion: |
+    Con un `String` solo puedes mostrar el error; con un enum puedes reaccionar distinto a cada caso (en `m10/error-propio`, `SinNumero` tiene un trato especial). El tamaño y el formato dependen de cómo lo escribas, y ninguno de los dos provoca pánicos.
+  etiquetas: ["diseño", "enum"]
+
+- id: m10-from-predice
+  titulo: "Pedidos de cero"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la tercera línea, `cantidad(\"tres\")`?"
+  ej: m10/from-predice
+  opciones:
+    - "`Err(Cantidad(ParseIntError { kind: InvalidDigit }))`"
+    - "`Err(Cero)`"
+    - "`Err(ParseIntError { kind: InvalidDigit })`"
+    - "Un pánico"
+  correcta: 0
+  solucion: |
+    `?` llama a `From::from` sobre el `ParseIntError`, y nuestro `impl From` lo envuelve en `ErrorPedido::Cantidad`. El error original queda dentro.
+  etiquetas: ["From", "?"]
+
+- id: m10-sin-from
+  titulo: "? sin puente"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila el `?`?"
+  ej: m10/sin-from
+  opciones:
+    - "No existe `From<ParseIntError> for ErrorPedido`, así que `?` no sabe convertir el error (E0277)"
+    - "`?` no se puede usar con `parse`"
+    - "`ErrorPedido` debería implementar `Copy`"
+    - "Porque falta `impl Error for ErrorPedido`"
+  correcta: 0
+  solucion: |
+    rustc: ``? couldn't convert the error to ErrorPedido`` y ``the trait From<ParseIntError> is not implemented for ErrorPedido``. Se arregla con un `impl From`, o convirtiendo a mano: `.map_err(ErrorPedido::Cantidad)?`. `Error` no es necesario para que `?` convierta.
+  etiquetas: ["E0277", "From", "map_err"]
+
+- id: m10-variante-funcion
+  titulo: "Una variante como función"
+  mundo: 10-errores
+  tema: errores
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Por qué compila `texto.parse::<u32>().map_err(ErrorPedido::Cantidad)?` si `Cantidad` es una variante y no una función?"
+  opciones:
+    - "Porque una variante con datos por posición también es una función que construye el enum: `fn(ParseIntError) -> ErrorPedido`"
+    - "Porque `map_err` acepta cualquier nombre"
+    - "Porque el compilador inventa una closure por cada variante del programa"
+    - "No compila"
+  correcta: 0
+  solucion: |
+    Las variantes tipo tupla (y los tuple structs) se pueden usar como funciones constructoras. Verificado en `m10/sin-from.arreglo`, que imprime `Ok(3)` y `Err(Cero)`.
+  etiquetas: ["map_err", "constructores"]
+
+- id: m10-from-identidad
+  titulo: "Convertir en sí mismo"
+  mundo: 10-errores
+  tema: errores
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "`?` siempre llama a `From::from(e)`. ¿Por qué funciona cuando el error ya es del tipo de la función, sin escribir ningún `impl`?"
+  opciones:
+    - "Porque la biblioteca estándar tiene `impl<T> From<T> for T`"
+    - "Porque en ese caso `?` no llama a `From`"
+    - "Porque el compilador ignora los tipos de error"
+    - "Porque todos los errores son `Box<dyn Error>`"
+  correcta: 0
+  solucion: |
+    La conversión de un tipo en sí mismo existe para todo `T` y no hace nada. Así `?` funciona igual en todos los casos.
+  etiquetas: ["From"]
+
+- id: m10-box-dyn-mezcla
+  titulo: "Tres errores en una caja"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la línea de `\"3/y\"`?"
+  ej: m10/box-dyn-predice
+  opciones:
+    - "`3/y: error: invalid float literal`"
+    - "`3/y: error: invalid digit found in string`"
+    - "`3/y: error: falta la barra`"
+    - "Un pánico"
+  correcta: 0
+  solucion: |
+    El numerador `3` se lee bien; el denominador se lee como `f64` y falla con `ParseFloatError`, cuyo mensaje es `invalid float literal`. `Box<dyn Error>` deja que `?` meta en la caja errores de tipos distintos.
+  etiquetas: ["Box<dyn Error>", "ParseFloatError"]
+
+- id: m10-box-tamano
+  titulo: "Una caja gorda"
+  mundo: 10-errores
+  tema: errores
+  dificultad: dificil
+  tipo: respuesta
+  enunciado: "En wasm32 (punteros de 4 bytes), ¿cuántos bytes ocupa `Box<dyn Error>`? Escribe solo el número."
+  respuestas: ["8"]
+  solucion: |
+    Es un puntero gordo: puntero al error + puntero a la vtable = 2 × 4. Medido en `m10/box-dyn`: `tamaño de Box<dyn Error>: 8 bytes`. En x86-64, 16.
+  etiquetas: ["dyn", "vtable", "fat pointer"]
+
+- id: m10-downcast
+  titulo: "¿Qué hay en la caja?"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: opcion
+  enunciado: "`e: Box<dyn Error>` contiene un `ParseFloatError`. ¿Qué devuelve `e.downcast_ref::<ParseIntError>()`?"
+  opciones: ["`None`", "`Some(&ParseIntError)` convertido", "Un pánico", "No compila"]
+  correcta: 0
+  solucion: |
+    `downcast_ref` solo pregunta si el error de dentro es exactamente de ese tipo; no convierte. Si no lo es, `None`.
+  etiquetas: ["downcast_ref"]
+
+- id: m10-source
+  titulo: "Causado por"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la segunda línea?"
+  ej: m10/cadena-source
+  opciones:
+    - "`  causado por: number too large to fit in target type`"
+    - "`  causado por: valor inválido para «puerto»`"
+    - "Nada: `source` siempre devuelve `None`"
+    - "`  causado por: invalid digit found in string`"
+  correcta: 0
+  solucion: |
+    `80800` no cabe en un `u16`: el `ParseIntError` es `PosOverflow`. `ErrorConfig::source()` devuelve esa causa y el bucle `while let` la imprime.
+  etiquetas: ["source", "cadena de errores"]
+
+- id: m10-main-err
+  titulo: "Cuando main falla"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué escribe Rust cuando `main` devuelve el error?"
+  ej: m10/main-result
+  opciones:
+    - "`Error: ParseIntError { kind: InvalidDigit }` (y el código de salida es 1)"
+    - "`Error: invalid digit found in string` (y el código es 1)"
+    - "Un pánico con el error"
+    - "Nada, y el código de salida es 0"
+  correcta: 0
+  solucion: |
+    El arranque de la biblioteca estándar imprime `Error: ` y el **Debug** del error en stderr, y devuelve el código 1. Para usar Display y elegir el código, se devuelve `ExitCode` y se trata el error a mano (`m10/main-display` termina con código 2).
+  etiquetas: ["main", "Termination", "ExitCode"]
+
+- id: m10-main-requisito
+  titulo: "Lo que pide main"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué tiene que implementar `E` para poder escribir `fn main() -> Result<(), E>`?"
+  opciones: ["`Debug`", "`Display`", "`Error`", "`Copy`"]
+  correcta: 0
+  solucion: |
+    La implementación de `Termination` para `Result<(), E>` imprime el error con `{:?}`, así que basta con `Debug`. Por eso `ParseIntError` sirve directamente.
+  etiquetas: ["main", "Debug"]
+
+- id: m10-thiserror-anyhow
+  titulo: "Biblioteca o aplicación"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál es la recomendación habitual del ecosistema?"
+  opciones:
+    - "Bibliotecas: enums de error concretos (thiserror o a mano). Aplicaciones: anyhow o `Box<dyn Error>`"
+    - "Bibliotecas: anyhow. Aplicaciones: thiserror"
+    - "Siempre `String`"
+    - "Siempre pánicos, y `catch_unwind` en `main`"
+  correcta: 0
+  solucion: |
+    Quien usa una biblioteca necesita distinguir casos (`match`), así que se le dan tipos concretos. En una aplicación, lo normal es mostrar el error con contexto y terminar.
+  etiquetas: ["thiserror", "anyhow", "diseño"]
+
+- id: m10-from-atributo
+  titulo: "Lo que hace #[from]"
+  mundo: 10-errores
+  tema: errores
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En thiserror, ¿qué genera `Puerto(#[from] ParseIntError)`?"
+  opciones:
+    - "`impl From<ParseIntError> for TuError` y que `source()` devuelva ese campo"
+    - "Un `Display` que copia el mensaje del `ParseIntError`"
+    - "Un `impl From<TuError> for ParseIntError`"
+    - "Nada al compilar: es documentación"
+  correcta: 0
+  solucion: |
+    Es exactamente lo que se escribe a mano en `m10/a-mano-como-thiserror`: un `From` para que `?` convierta, y la causa encadenada en `source()`. El mensaje lo decide el `#[error("…")]` de la variante.
+  etiquetas: ["thiserror", "From", "source"]
+
+- id: m10-must-use-propio
+  titulo: "Un ticket olvidado"
+  mundo: 10-errores
+  tema: errores
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué pasa al compilar?"
+  ej: m10/must-use
+  opciones:
+    - "Dos avisos: `unused return value of reservar that must be used` (con tu nota) y `unused Ticket that must be used`; el programa imprime `ticket 17`"
+    - "No compila por los valores ignorados"
+    - "Compila sin avisos"
+    - "Un aviso solo para `reservar`"
+  correcta: 0
+  solucion: |
+    `#[must_use]` sirve en funciones (con mensaje opcional) y en tipos. Son avisos, no errores. El tercer `sacar_ticket()` se guarda en `t`, así que no avisa.
+  etiquetas: ["must_use"]
+
+- id: m10-non-exhaustive
+  titulo: "Preparado para crecer"
+  mundo: 10-errores
+  tema: errores
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Qué efecto tiene `#[non_exhaustive]` en un enum de error público?"
+  opciones:
+    - "Los `match` sobre él en OTROS crates necesitan un brazo `_`, y así puedes añadir variantes sin romperles"
+    - "Prohíbe hacer `match` sobre el enum"
+    - "Obliga a tu propio crate a usar `_` en todos los `match`"
+    - "Hace que el enum ocupe menos memoria"
+  correcta: 0
+  solucion: |
+    Solo afecta fuera del crate que lo define. Sin él, añadir una variante rompe los `match` exhaustivos de tus usuarios con E0004 (como en `m10/variante-nueva`). Es estable desde Rust 1.40.
+  etiquetas: ["non_exhaustive", "semver", "E0004"]
+
+- id: m10-display-con-causa
+  titulo: "La causa repetida"
+  mundo: 10-errores
+  tema: errores
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Un error guarda su causa y la devuelve en `source()`. ¿Debe su `Display` incluir también el mensaje de la causa?"
+  opciones:
+    - "No: quien recorra la cadena con `source()` la vería dos veces"
+    - "Sí, siempre: si no, se pierde"
+    - "Sí, porque `source()` solo funciona en modo debug"
+    - "Da igual: `Display` no se usa nunca"
+  correcta: 0
+  solucion: |
+    Cada nivel de la cadena dice lo suyo. En el jefe (`m10/config`) el `Display` de `Numero` dice solo «número inválido» y la causa aparece una vez: `línea 1: número inválido — causa: invalid digit found in string`.
+  etiquetas: ["source", "Display", "diseño"]

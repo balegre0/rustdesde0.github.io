@@ -1,0 +1,127 @@
+---
+title: "Layout de tipos"
+description: "Cómo se colocan los valores en memoria: tamaño, alineación, relleno, representaciones repr y nichos."
+sidebar:
+  order: 101
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+El **layout** (disposición) de un tipo es cómo se colocan sus bytes en memoria: cuántos ocupa, en qué direcciones puede empezar y dónde va cada campo.
+
+## En una frase
+
+Cada tipo tiene un **tamaño** (`size_of`) y una **alineación** (`align_of`); el tamaño siempre es múltiplo de la alineación. Por defecto el compilador puede **reordenar** los campos para ahorrar espacio; con `#[repr(...)]` se fija una disposición concreta.
+
+## La regla, paso a paso
+
+### Tamaño y alineación
+
+- **Alineación**: un valor de alineación `n` solo puede empezar en direcciones múltiplo de `n`. Un `u32` tiene alineación 4.
+- **Tamaño**: los bytes entre un elemento y el siguiente dentro de un array. Incluye el **relleno** (*padding*) necesario para que el siguiente quede alineado.
+- Los primitivos tienen tamaño fijo (`u8` 1, `u32` 4, `char` 4, `bool` 1). `usize`, `isize` y los punteros miden lo que una dirección de la plataforma: 8 bytes en un PC de 64 bits, 4 en wasm32. La alineación de `u128` depende de la plataforma (16 en x86-64).
+- Tipos de **tamaño cero** (ZST): `()`, structs sin campos, `[T; 0]`, `PhantomData<T>`. No ocupan memoria.
+
+### `repr(Rust)` (por defecto)
+
+Solo garantiza que cada campo está alineado, que los campos no se solapan y que la alineación del tipo es al menos la del campo más exigente. **El orden en memoria no tiene por qué ser el de declaración**: el compilador reordena para reducir relleno. Dos structs con los mismos campos tampoco tienen por qué tener el mismo layout.
+
+### `repr(C)`
+
+Orden de declaración, con el relleno estándar de la plataforma. Es el layout que entiende el código externo (FFI) y el que permite razonar sobre desplazamientos. En un enum con datos, `repr(C)` da una etiqueta seguida de una unión de las variantes.
+
+### `repr(u8)`, `repr(i32)`… (primitivas)
+
+Fijan el tipo entero de la etiqueta de un enum. En un enum sin datos, el enum ocupa exactamente ese entero. Desde 1.89 se admiten `repr(u128)` e `repr(i128)`.
+
+### `repr(transparent)`
+
+Un struct (o enum de una variante) con **un solo** campo no trivial tiene exactamente el layout **y la ABI** de ese campo. Otros campos solo pueden ser de tamaño cero y alineación 1 (como `PhantomData`). Sirve para *newtypes* que cruzan una frontera FFI.
+
+### `repr(packed)` y `repr(align(N))`
+
+- `packed` (o `packed(N)`) elimina relleno bajando la alineación a 1 (o a `N`). Los campos pueden quedar **desalineados**: no se les puede tomar referencia (error E0793); hay que copiarlos o usar `&raw const` + `read_unaligned`.
+- `align(N)` sube la alineación a `N` (potencia de dos). Útil para separar datos que usan hilos distintos o para requisitos de hardware.
+- No se pueden combinar en el mismo tipo.
+
+### Nichos
+
+Si un tipo tiene **valores imposibles** (un `bool` nunca vale 2, una referencia nunca es nula, un `NonZeroU32` nunca es 0, un `char` nunca pasa de `0x10FFFF`), el compilador puede usarlos para guardar la etiqueta de un enum que lo contenga. Por eso `Option<&T>`, `Option<Box<T>>`, `Option<NonZeroU32>` y `Option<bool>` no ocupan más que el tipo de dentro. La biblioteca estándar **garantiza** este caso para `Option` de referencias, `Box`, `NonNull`, `NonZero` y punteros a función.
+
+Un puntero crudo puede ser nulo, así que no tiene nicho: `Option<*const u8>` ocupa el doble.
+
+### Punteros anchos
+
+`&[T]`, `&str`, `Box<[T]>` = (dirección, longitud). `&dyn Trait`, `Box<dyn Trait>` = (dirección de los datos, dirección de la vtable). La vtable contiene la función de destrucción, el tamaño, la alineación y un puntero por método; su formato **no es estable**.
+
+### Tabla en un PC de 64 bits (x86-64)
+
+Comprobada con aserciones evaluadas al compilar (`const _: () = assert!(size_of::<T>() == …)`) con rustc 1.99.1:
+
+| Tipo | Tamaño | Alineación |
+|---|---|---|
+| `&u8`, `Box<u8>`, `Option<&u8>`, `Option<Box<u8>>`, `Option<fn()>` | 8 | 8 |
+| `&[u8]`, `&str`, `&dyn Trait`, `Box<dyn Trait>` | 16 | 8 |
+| `Option<*const u8>` | 16 | 8 |
+| `Vec<u8>`, `String`, `Option<Vec<u8>>` | 24 | 8 |
+| `struct { a: u8, b: u32, c: u16 }` | 8 | 4 |
+| lo mismo con `#[repr(C)]` | 12 | 4 |
+| lo mismo con `#[repr(C, packed)]` | 7 | 1 |
+| `#[repr(C, align(16))] struct { a: u8 }` | 16 | 16 |
+| `(u8, u32, u8)` | 8 | 4 |
+| `Option<u8>` | 2 | 1 |
+| `Option<u32>` | 8 | 4 |
+| `Option<NonZeroU32>`, `Option<char>` | 4 | 4 |
+| `Option<bool>`, `Option<Option<bool>>` | 1 | 1 |
+| `enum { A(Box<u64>), B }` | 8 | 8 |
+| `enum { A(Box<u64>), B, C }` | 16 | 8 |
+| `#[repr(u8)] enum { A(u8), B(u64) }` | 16 | 8 |
+| `RefCell<u32>` | 16 | 8 |
+| `u128` | 16 | 16 |
+| `()`, `Infallible`, `Option<Infallible>` | 0 | 1 |
+
+Fíjate en `enum { A(Box<u64>), B, C }`: un puntero aporta **un solo** nicho (el valor nulo), que basta para una variante extra pero no para dos.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/layout-tamanos" />
+
+Salida (en el navegador; los punteros se cuentan en «número de punteros» porque su tamaño depende de la plataforma):
+
+```text
+bool                   tamaño  1  alineación 1
+char                   tamaño  4  alineación 4
+u8                     tamaño  1  alineación 1
+u32                    tamaño  4  alineación 4
+u64                    tamaño  8  alineación 8
+Rust                   tamaño  8  alineación 4
+C                      tamaño 12  alineación 4
+Empaquetado            tamaño  7  alineación 1
+Option<bool>           tamaño  1  alineación 1
+Option<u32>            tamaño  8  alineación 4
+Option<NonZeroU32>     tamaño  4  alineación 4
+Option<char>           tamaño  4  alineación 4
+&u8 = 1 punteros, &[u8] = 2, &str = 2, Box<u8> = 1, Option<&u8> = 1
+Option<*const u8> = 2 punteros (puede ser nulo: sin nicho)
+```
+
+## Errores típicos
+
+<NoCompila ej="ref-lenguaje/layout-error" />
+
+`error[E0690]: transparent struct needs at most one non-trivial field, but has 2`.
+
+Para el error de tomar una referencia a un campo empaquetado (E0793), ver [`raw`](/ref/lenguaje/palabras-clave/raw/).
+
+## Desde
+
+Rust 1.0. `repr(transparent)`: 1.28. `repr(u128/i128)`: 1.89. `size_of` y `align_of` están en el prelude desde 1.80.
+
+## Ver también
+
+- [Tipos](/ref/lenguaje/tipos/) · [`struct`](/ref/lenguaje/palabras-clave/struct/) · [`enum`](/ref/lenguaje/palabras-clave/enum/) · [`union`](/ref/lenguaje/palabras-clave/union/) · [Atributos](/ref/lenguaje/atributos/) (`repr`) · [Comportamiento indefinido](/ref/ub/): valores válidos.
+
+## Aprende esto en
+
+- [Mundo 01 · La máquina](/curso/01-la-maquina/) · [Mundo 21 · El compilador por dentro](/curso/21-el-compilador-por-dentro/)

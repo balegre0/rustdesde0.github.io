@@ -1,0 +1,142 @@
+---
+title: "Parámetros"
+description: "Dale datos a tus funciones con parámetros, entiende por qué Rust te obliga a escribir su tipo y qué recibe exactamente la función."
+sidebar:
+  order: 2
+duracion: 10
+desde: "1.0"
+requiere: ["05-funciones-y-la-pila/01-tu-primera-funcion"]
+tarjetas:
+  - p: "¿Diferencia entre parámetro y argumento?"
+    r: "El parámetro es la variable que declara la función (`edad: u32`). El argumento es el valor concreto que pasas al llamarla (`31`)."
+  - p: "¿Se puede omitir el tipo de un parámetro?"
+    r: "No. En la firma de una función los tipos son obligatorios; dentro del cuerpo, Rust los puede deducir."
+  - p: "Si una función cambia su parámetro entero (`mut nivel: u32`), ¿cambia la variable de quien la llamó?"
+    r: "No: la función recibe una copia del número. Lo que cambia es la copia."
+  - p: "¿Qué error da llamar con un argumento de menos?"
+    r: "E0061: «this function takes 2 arguments but 1 argument was supplied»."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo } from '~/components';
+
+Vas a pasarle **datos** a tus funciones para que hagan su trabajo con valores distintos cada vez.
+
+## Predice
+
+<Predice
+  ej="m05/copia-parametro"
+  opciones={[
+    "`dentro de subir: nivel = 11` y `en main: nivel = 11`",
+    "`dentro de subir: nivel = 11` y `en main: nivel = 1`",
+    "`dentro de subir: nivel = 10` y `en main: nivel = 1`",
+    "No compila: `nivel` en `main` no es `mut`"
+  ]}
+  correcta={1}
+  explicacion="`subir` recibe una copia del valor 1 en su propio parámetro `nivel`. Cambia esa copia a 11. La variable `nivel` de `main` es otra variable distinta, y sigue valiendo 1."
+  porque={[
+    "Se llaman igual, pero son dos variables diferentes: la de `main` no se toca.",
+    "",
+    "El parámetro empieza con el valor recibido, 1, y le suma 10: 11.",
+    "`main` no cambia su `nivel`, así que no necesita `mut`. Es el parámetro de `subir` el que lleva `mut`."
+  ]}
+/>
+
+## La idea
+
+Un **parámetro** (*parameter*) es una variable que la función declara entre los paréntesis, con su nombre y **su tipo**: `fn presentar(nombre: &str, edad: u32)`. Al llamar, escribes un **argumento** (*argument*) por cada parámetro, en el mismo orden: `presentar("Lucía", 31)`. Es como si, al empezar la función, se hiciera `let nombre = "Lucía"; let edad = 31;`.
+
+En el cuerpo de una función Rust deduce muchos tipos solo, pero en los **parámetros los tipos son obligatorios**. Es una decisión de diseño: la primera línea de una función, su **firma** (*signature*), es un contrato. Quien llama sabe qué debe dar, y la función sabe qué va a recibir, sin leer nada más. Además, así un error en una función no «se contagia» a las demás: el compilador comprueba cada llamada contra la firma.
+
+Fíjate en el ejemplo de la predicción: el parámetro es **una variable nueva**, aunque se llame igual que la de fuera. Con números, la función recibe **una copia** del valor. ¿Y con un `String`? Ahí la historia cambia y es tan importante que tiene un mundo entero: el 06.
+
+## Pruébalo
+
+<Ejecutar ej="m05/parametros" />
+
+1. `presentar` recibe un texto y un número. Cada llamada usa valores distintos.
+2. `dibujar_linea` recibe un `usize` (el tipo de los tamaños y posiciones) y un `char`. Funciona igual con `'='` que con `'ñ'`.
+3. El `_` de `for _ in 0..largo` significa «no necesito el número de vuelta»: solo quiero repetir.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Los argumentos viajan en registros o en la pila.** Al llamar, la máquina coloca cada argumento donde la función espera encontrarlo: los primeros suelen ir en **registros** (las pequeñas memorias ultrarrápidas de la CPU, mundo 01) y, si no caben, en la pila. La regla exacta de dónde va cada cosa se llama **convención de llamada** (*calling convention*). La de Rust no es pública ni fija: el compilador puede cambiarla para optimizar (mundo 22).
+
+**`mut` en un parámetro es asunto interno.** `fn subir(mut nivel: u32)` no cambia nada para quien llama: solo permite a la función modificar su propia variable. Por eso la firma pública, a efectos de quien llama, es `fn subir(nivel: u32)`.
+
+**`&str` es un tipo como otro.** En `nombre: &str` la función recibe una **vista** de un texto que vive en otro sitio (lo viste en el mundo 03). El `&` volverá a salir en la lección 7 y será la estrella del mundo 07.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Tres errores al usar parámetros. El primero, olvidar el tipo:
+
+<NoCompila
+  ej="m05/parametro-sin-tipo"
+  explicacion="Rust esperaba `:` y un tipo después de `x`. La pista lo dice: «if this is a parameter name, give it a type» (si es el nombre de un parámetro, dale un tipo)."
+/>
+
+El segundo, pasar argumentos de menos:
+
+<NoCompila
+  ej="m05/argumentos-de-mas"
+  explicacion="La función pide 2 argumentos y le diste 1. El error señala cuál falta: «argument #2 of type `u32` is missing»."
+/>
+
+El tercero, pasar un argumento del tipo equivocado:
+
+<NoCompila
+  ej="m05/tipo-de-argumento"
+  explicacion={"`\"31\"` es un texto (`&str`), y el parámetro `edad` es un número (`u32`). Para Rust, el texto «31» y el número 31 son cosas completamente distintas."}
+/>
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena el programa para que imprima `El área es 12` llamando a `area` con ancho 4 y alto 3."
+  lineas={[
+    "fn area(ancho: u32, alto: u32) {",
+    "    println!(\"El área es {}\", ancho * alto);",
+    "}",
+    "fn main() {",
+    "    area(4, 3);",
+    "}"
+  ]}
+  distractores={["fn area(ancho, alto) {", "    area(4);"]}
+  explicacion="Los parámetros llevan su tipo y la llamada da un argumento por parámetro."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Con `fn f(a: i32, b: bool)`, ¿cuál de estas llamadas compila?"
+  opciones={["`f(true, 3)`", "`f(3)`", "`f(3, true)`", "`f(a: 3, b: true)`"]}
+  correcta={2}
+  explicacion="Un argumento por parámetro, en el mismo orden y del mismo tipo."
+  porque={[
+    "El orden importa: el primer argumento debe ser un `i32`.",
+    "Falta el segundo argumento (E0061).",
+    "",
+    "Rust no tiene argumentos con nombre en las llamadas: se pasan por posición."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué Rust exige escribir los tipos de los parámetros?"
+  opciones={[
+    "Porque no sabe deducir tipos en ningún sitio",
+    "Porque la firma es un contrato: cada llamada se comprueba contra ella sin leer el cuerpo de la función",
+    "Para que el programa ocupe menos",
+    "Por compatibilidad con versiones antiguas"
+  ]}
+  correcta={1}
+  explicacion="Con la firma completa, el compilador (y tú) sabéis qué entra y qué sale de cada función sin mirar dentro. Los errores quedan localizados."
+  porque={[
+    "Dentro de los cuerpos deduce muchísimo; en las firmas, a propósito, no.",
+    "",
+    "Los tipos no ocupan nada en el programa final.",
+    "Es una decisión de diseño, no una herencia."
+  ]}
+/>

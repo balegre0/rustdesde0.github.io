@@ -1,0 +1,94 @@
+---
+title: "Iteradores de nivel experto"
+description: "Devuelve iteradores desde tus funciones, recoge errores con collect y usa windows, chunks y peekable."
+sidebar:
+  order: 11
+duracion: 14
+desde: "2024"
+requiere: ["14-closures-e-iteradores/10-tu-propio-iterador", "10-errores", "08-lifetimes"]
+tarjetas:
+  - p: "¿Cómo devuelves un iterador desde una función sin crear un `Vec`?"
+    r: "Con `-> impl Iterator<Item = T>`. Si la cadena tiene closures que usan parámetros, con `move`."
+  - p: "¿Qué da `collect::<Result<Vec<T>, E>>()` sobre un iterador de `Result<T, E>`?"
+    r: "`Ok(vec)` si todos son `Ok`; si alguno es `Err`, el primer `Err` (y deja de recorrer)."
+  - p: "¿Qué diferencia hay entre `windows(2)` y `chunks(2)`?"
+    r: "`windows` da ventanas solapadas (`[a,b]`, `[b,c]`…); `chunks` trozos sin solapar (`[a,b]`, `[c,d]`…, el último puede ser más corto). Son métodos de slices."
+  - p: "En edición 2024, ¿qué captura un `-> impl Iterator` de una función que recibe `&[i32]`?"
+    r: "Todos los parámetros genéricos en ámbito, también el tiempo de vida de la referencia: el iterador puede tomar prestado el slice sin escribir nada más. Se limita con `use<…>`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a usar las piezas que separan a quien usa iteradores de quien diseña con ellos: funciones que **devuelven** iteradores, `collect` que recoge **errores**, y recorridos por ventanas, por trozos o mirando el siguiente elemento sin consumirlo.
+
+## Predice
+
+<Predice
+  ej="m14/q-take-while"
+  opciones={["`[2, 4] [2, 4, 6, 8]`", "`[2, 4, 6, 8] [2, 4, 6, 8]`", "`[2, 4] [2, 4]`", "`[5] [2, 4, 6, 8]`"]}
+  correcta={0}
+  explicacion="`take_while` se para **para siempre** en el primer elemento que no cumple (el 5). `filter` sigue mirando hasta el final."
+  porque={["Correcto.", "`take_while` no salta el 5: se detiene en él.", "`filter` no se detiene: recorre todo.", "`take_while` entrega los que cumplen antes del primer fallo, no el fallo."]}
+/>
+
+## La idea
+
+**Devolver un iterador.** En vez de construir un `Vec` y devolverlo, devuelve la receta: `fn pares_hasta(n: u32) -> impl Iterator<Item = u32>`. Quien llame decidirá si la recoge, la suma o solo mira el primero. Te ahorras memoria y trabajo.
+
+**`collect` a `Result`.** Si cada elemento puede fallar (por ejemplo, `parse`), `collect::<Result<Vec<_>, _>>()` te da `Ok` con todo, o el **primer error**. Lo mismo con `Option`: `Option<Vec<_>>` es `None` si alguno era `None`. Encaja perfecto con `?` (mundo 10).
+
+**Métodos de slices** que devuelven iteradores: `windows(n)` (ventanas solapadas de `n`, ideal para comparar cada elemento con el siguiente) y `chunks(n)` (trozos de `n`). Y el adaptador **`peekable()`**, que añade `peek()`: mirar el siguiente elemento sin sacarlo.
+
+## Pruébalo
+
+<Ejecutar ej="m14/avanzados" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`-> impl Iterator<Item = u32>` es un **tipo opaco** (mundo 13): el tipo real es `Filter<RangeInclusive<u32>, {closure}>`, pero quien llama solo sabe que es «un iterador de `u32`». El compilador sí lo conoce, así que no hay `dyn` ni vtable: sigue siendo coste cero.
+
+En **edición 2024**, un `impl Trait` en el retorno **captura todos los parámetros genéricos en ámbito**, incluidos los tiempos de vida. Por eso esto compila tal cual:
+
+```rust
+fn dobles(v: &[i32]) -> impl Iterator<Item = i32> { v.iter().map(|x| x * 2) }
+```
+
+El iterador devuelto toma prestado `v`, y el compilador lo sabe sin que lo escribas. Lo comprobamos: en edición 2024 compila; con `--edition 2021` el mismo código da E0700 («hidden type … captures lifetime that does not appear in bounds»). Si quieres limitar lo que se captura, se escribe con `use<…>`, por ejemplo `impl Iterator<Item = i32> + use<'_>`.
+
+`collect` a `Result` funciona porque `Result<V, E>` implementa `FromIterator<Result<A, E>>` cuando `V: FromIterator<A>`: va recogiendo los `Ok` en un `V` y, al primer `Err`, se para y lo devuelve.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m14/devolver-iter-sin-move"
+  explicacion="El closure de `filter` toma prestado `n`, un parámetro que muere al salir de `multiplos`. Pero el iterador devuelto (con el closure dentro) sigue vivo fuera: sería un uso tras liberar. E0373 propone `move`, y es justo el arreglo: `n` es un `u32`, así que el closure se lleva una copia."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m14/devolver-iter"
+  enunciado="Haz que `multiplos(n, hasta)` devuelva un iterador con los múltiplos de `n` entre 1 y `hasta` (incluidos), sin crear ningún `Vec`. Salida esperada: `[3, 6, 9, 12, 15, 18]`, `14` y `None`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`[«1», «dos», «3»]` convertidos con `parse::<i32>()` y `collect::<Result<Vec<i32>, _>>()`: ¿qué sale?"
+  opciones={["Un `Err` con el error de `dos`", "`Ok([1, 3])`", "`Ok([1, 0, 3])`", "Un pánico"]}
+  correcta={0}
+  explicacion="Un solo `Err` basta para que el resultado sea ese `Err`. Lo ves en el ejemplo: `Err(ParseIntError { kind: InvalidDigit })`."
+  porque={["Correcto.", "Los errores no se saltan: para eso está `filter_map(|s| s.parse().ok())`.", "No se inventa ningún valor por defecto.", "`collect` a `Result` no entra en pánico: devuelve el error."]}
+/>
+
+<Pregunta
+  pregunta="Quieres saber cuánto cambió la temperatura de cada día al siguiente en `temps: [i32; 4]`. ¿Qué usas?"
+  opciones={["`temps.windows(2).map(|w| w[1] - w[0])`", "`temps.chunks(2).map(|w| w[1] - w[0])`", "`temps.iter().zip(temps.iter()).map(|(a, b)| b - a)`", "`temps.iter().peekable().map(|w| w[1] - w[0])`"]}
+  correcta={0}
+  explicacion="`windows(2)` da cada par de días consecutivos, solapados."
+  porque={["Correcto.", "`chunks` no solapa: compararía 1-2 y 3-4, y se saltaría 2-3.", "Empareja cada día consigo mismo: todo daría 0. Haría falta `temps.iter().zip(temps.iter().skip(1))`.", "`peekable` entrega elementos sueltos, no ventanas."]}
+/>

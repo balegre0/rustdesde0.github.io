@@ -1,0 +1,71 @@
+---
+title: "E0432: importación sin resolver"
+description: "Un use apunta a un módulo o elemento que no existe."
+sidebar:
+  order: 37
+insignias: ["Nombres, módulos y visibilidad"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` unresolved import `std::colecciones` ``
+
+## Qué significa
+
+La ruta de un `use` debe llevar a algo que existe. `std::colecciones` no existe: el módulo se llama `collections` (los nombres de la biblioteca estándar están en inglés).
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0432" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0432]: unresolved import `std::colecciones`
+ --> E0432.rs:1:10
+  |
+1 | use std::colecciones::HashMap;
+  |          ^^^^^^^^^^^ could not find `colecciones` in `std`
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Errata o traducción en el nombre de un módulo.
+- Importar un módulo propio que no está declarado con `mod`.
+- Importar de un crate que no está en las dependencias.
+
+## Cómo arreglarlo
+
+Corrige la ruta (`use std::collections::HashMap;`). Para módulos propios, comprueba que existe su `mod` y la visibilidad (`pub`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+use std::collections::HashMap;
+
+fn main() {
+    let mapa: HashMap<&str, i32> = HashMap::new();
+    println!("{}", mapa.len());
+}
+```
+
+**Salida:**
+
+```text
+0
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0432` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0433](/errores/e0433/): no se puede resolver la ruta
+- [E0425](/errores/e0425/): nombre no encontrado
+- [E0603](/errores/e0603/): elemento privado
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

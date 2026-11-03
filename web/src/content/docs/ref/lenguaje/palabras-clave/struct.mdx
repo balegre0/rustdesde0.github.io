@@ -1,0 +1,62 @@
+---
+title: "struct"
+description: "Palabra clave estricta: define un tipo que agrupa varios valores con nombre (o por posición)."
+sidebar:
+  order: 31
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Un `struct` (estructura) junta **varios valores** en un solo tipo nuevo. Cada valor es un **campo**.
+
+## Sinopsis
+
+```text
+struct Nombre<genéricos> where … { campo: Tipo, pub otro: Tipo }   // campos con nombre
+struct Nombre(Tipo1, pub Tipo2);                                   // struct tupla
+struct Nombre;                                                     // struct unidad
+Nombre { campo: valor, otro, ..base }                              // expresión
+```
+
+## Qué hace
+
+- **Campos con nombre**: se accede con `valor.campo`. Al construir, `Usuario { edad }` es un atajo de `edad: edad`.
+- **Struct tupla**: campos sin nombre, accedidos como `.0`, `.1`. Muy usado para *newtypes* (`struct Metros(f64)`), que crean un tipo **distinto** sin coste.
+- **Struct unidad**: sin campos; ocupa 0 bytes. Útil como marcador o para implementar traits.
+- **Actualización** `..base`: rellena los campos que faltan desde otro valor. Ojo: **mueve** los campos que no son `Copy`.
+- Hay que dar **todos** los campos al construir (salvo con `..base`).
+- La privacidad es **por campo**. La mutabilidad no: depende de la variable (`let mut u`).
+- El compilador puede **reordenar** los campos en memoria para ahorrar relleno; con `#[repr(C)]` se respeta el orden. Ver [Layout de tipos](/ref/lenguaje/layout-de-tipos/).
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-struct" />
+
+Salida:
+
+```text
+Eva 30 true
+Usuario { nombre: "Leo", edad: 30, activo: true }
+1.5 Metros(1.5) Marcador
+0 bytes
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-struct-error" />
+
+`error[E0063]: missing field y in initializer of Punto`.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+- [`enum`](/ref/lenguaje/palabras-clave/enum/) · [`union`](/ref/lenguaje/palabras-clave/union/) · [`impl`](/ref/lenguaje/palabras-clave/impl/) · [`pub`](/ref/lenguaje/palabras-clave/pub/) · [Patrones](/ref/lenguaje/patrones/) · [Layout de tipos](/ref/lenguaje/layout-de-tipos/)
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

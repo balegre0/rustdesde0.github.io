@@ -1,0 +1,71 @@
+---
+// Título + línea de metadatos: en lecciones ⏱ duración e insignia «Desde Rust x»; en la referencia, insignias.
+import Default from '@astrojs/starlight/components/PageTitle.astro';
+import { Icon } from '@astrojs/starlight/components';
+import Insignia from '../components/interno/Insignia.astro';
+import { esLeccionId, idLeccion, lecciones } from '../lib/lecciones';
+
+const { entry, id } = Astro.locals.starlightRoute;
+const d = entry.data as any;
+const esLeccion = esLeccionId(id);
+const esRef = id.startsWith('ref/') || id === 'ref';
+const tarjetas: number = d.tarjetas?.length ?? 0;
+
+let requiere: { href: string; titulo: string }[] = [];
+if (esLeccion && d.requiere?.length) {
+  const todas = await lecciones();
+  requiere = d.requiere.map((r: string) => {
+    const l = todas.find((x) => x.id === r.replace(/^\/?(curso\/)?|\/$/g, ''));
+    return l ? { href: l.href, titulo: l.titulo } : null;
+  }).filter(Boolean);
+}
+
+// Insignias de la referencia: cualquier texto. Las conocidas tienen color propio; el resto, neutro.
+const tipoInsignia = (s: string) => {
+  const t = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036F]/g, '');
+  if (t.includes('insegur')) return { tipo: 'inseguro', texto: 'Inseguro' } as const;
+  if (t.includes('critic')) return { tipo: 'inseguro', texto: 'Crítico' } as const;
+  if (t.includes('obsole')) return { tipo: 'obsolescente', texto: 'Obsolescente' } as const;
+  if (t.includes('no-estandar') || t.includes('no estandar')) return { tipo: 'obsolescente', texto: 'No estándar' } as const;
+  if (t.includes('nightly') || t.includes('inestable')) return { tipo: 'borrador', texto: 'Nightly · inestable' } as const;
+  if (t === 'unsafe' || t.includes('unsafe')) return { tipo: 'inseguro', texto: 'unsafe' } as const;
+  if (t.includes('deprecated') || t.includes('desaconsejad')) return { tipo: 'obsolescente', texto: 'Desaconsejado' } as const;
+  if (t.includes('opcional')) return { tipo: 'borrador', texto: 'Opcional' } as const;
+  return { tipo: 'otra', texto: s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ') } as const;
+};
+---
+<Default />
+{esLeccion && (d.duracion || d.desde || tarjetas > 0) && (
+  <div class="rdc-meta" data-leccion-meta data-id={idLeccion(id)} data-titulo={d.title}>
+    {d.duracion && <span class="rdc-meta-item"><Icon name="clock" /><span><span class="rdc-sr">Duración: </span>{d.duracion} min</span></span>}
+    {d.desde && <Insignia texto={`Rust ${d.desde}`} titulo={`Lo principal de esta lección existe desde Rust ${d.desde}`} />}
+    {tarjetas > 0 && <span class="rdc-meta-item rdc-meta-suave">{tarjetas} {tarjetas === 1 ? 'tarjeta' : 'tarjetas'} de repaso</span>}
+    <span class="rdc-meta-item rdc-meta-estado" data-estado-leccion hidden><Icon name="approve-check" /> Completada</span>
+  </div>
+)}
+{esLeccion && !(d.duracion || d.desde || tarjetas > 0) && <div hidden data-leccion-meta data-id={idLeccion(id)} data-titulo={d.title}></div>}
+{esLeccion && requiere.length > 0 && (
+  <p class="rdc-requiere">Conviene haber hecho antes: {requiere.map((r, i) => <>{i > 0 && ', '}<a href={r.href}>{r.titulo}</a></>)}</p>
+)}
+{esRef && (d.desde || d.insignias?.length) && (
+  <div class="rdc-meta rdc-meta-ref">
+    {d.desde && <Insignia texto={`Desde ${d.desde}`} titulo={`Estable desde Rust ${d.desde}`} />}
+    {(d.insignias ?? []).map((s: string) => { const x = tipoInsignia(s); return <Insignia tipo={x.tipo} texto={x.texto} />; })}
+  </div>
+)}
+
+<script>
+  import { leer, registrarVisita, restaurarDesdeIDB, EVENTO } from '../runtime/progreso';
+  restaurarDesdeIDB();
+  const meta = document.querySelector<HTMLElement>('[data-leccion-meta]');
+  if (meta) {
+    const id = meta.dataset.id!;
+    try { registrarVisita(id, location.pathname, meta.dataset.titulo ?? document.title); } catch { /* sin almacenamiento */ }
+    const pintar = () => {
+      const est = meta.querySelector<HTMLElement>('[data-estado-leccion]');
+      if (est) est.hidden = !leer().lecciones[id];
+    };
+    pintar();
+    window.addEventListener(EVENTO, pintar);
+  }
+</script>

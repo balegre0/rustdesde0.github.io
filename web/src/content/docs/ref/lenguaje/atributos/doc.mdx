@@ -1,0 +1,41 @@
+---
+title: "#[doc]"
+description: "El atributo de la documentación: /// y //! son azúcar de #[doc], y doc(hidden), doc(alias) o doc(inline) ajustan cómo aparece cada elemento en rustdoc."
+sidebar:
+  order: 11
+insignias: ["Desde 1.0", "Documentación"]
+---
+import { Ejecutar } from '~/components';
+
+`#[doc]` contiene la documentación de un elemento y ajusta cómo la muestra rustdoc.
+
+## Sinopsis
+
+```text
+#[doc = "texto en Markdown"]      // lo mismo que /// texto
+#![doc = "…"]                     // lo mismo que //! texto
+#[doc = include_str!("../README.md")]
+#[doc(hidden)]                    // no aparece en la documentación
+#[doc(alias = "add")]             // el buscador lo encuentra por otro nombre
+#[doc(inline)] / #[doc(no_inline)] // en pub use: mostrar el elemento ahí o solo un enlace
+#![doc(html_logo_url = "…")]      // opciones del crate
+#![doc(test(attr(deny(warnings))))] // atributos para los doctests
+```
+
+## Qué hace
+
+`///` y `//!` se convierten en `#[doc = "…"]` antes de compilar. El texto es Markdown y admite enlaces entre elementos (``[`Vec`]``). `doc(hidden)` se usa en elementos que tienen que ser públicos por motivos técnicos (los usa una macro, por ejemplo) pero no forman parte de la interfaz prometida.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-doc" />
+
+Los atributos `doc` no cambian el programa. Su efecto se ve con `cargo doc --open`.
+
+## Desde
+
+Rust 1.0. `doc(alias)`: 1.48.
+
+## Ver también
+
+[Documentar con rustdoc](/curso/12-modulos-crates-y-cargo/11-documentar/)

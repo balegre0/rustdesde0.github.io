@@ -1,0 +1,69 @@
+---
+title: "assert!, assert_eq! y assert_ne!"
+description: "Comprobar condiciones al ejecutar: si no se cumplen, pánico con un mensaje. La base de los tests."
+sidebar:
+  order: 4
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::assert y familia`
+
+## Sinopsis
+
+```rust
+macro_rules! assert {
+    ($cond:expr $(,)?) => { ... };
+    ($cond:expr, $($arg:tt)+) => { ... };
+}
+
+macro_rules! assert_eq {
+    ($left:expr, $right:expr $(,)?) => { ... };
+    ($left:expr, $right:expr, $($arg:tt)+) => { ... };
+}
+
+macro_rules! assert_ne {
+    ($left:expr, $right:expr $(,)?) => { ... };
+    ($left:expr, $right:expr, $($arg:tt)+) => { ... };
+}
+```
+
+## Qué hace
+
+`assert!(cond)` entra en pánico si la condición es falsa. `assert_eq!(a, b)` y `assert_ne!(a, b)` comparan dos valores y, si fallan, muestran los dos (necesitan `PartialEq` y `Debug`). Todas aceptan un mensaje con formato al final. Se comprueban **siempre**, también en *release*; `debug_assert!` y familia solo en *debug*.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-assert" />
+
+**Salida:**
+
+```text
+todas las comprobaciones pasaron
+```
+
+**Salida de error** (*stderr*):
+
+```text
+thread 'main' (1) panicked at macros-assert.rs:9:5:
+assertion `left == right` failed: suma mal hecha
+  left: 4
+ right: 5
+```
+
+## Pánicos
+
+Ese es su trabajo: el ejemplo muestra el mensaje de `assert_eq!` cuando falla.
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [panic!](/ref/std/macros/panic/)
+- [debug_assert!](/ref/std/macros/)
+
+## Aprende esto en
+
+- [Mundo 16 · Pruebas y herramientas](/curso/16-pruebas-y-herramientas/)

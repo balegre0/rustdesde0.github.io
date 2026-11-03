@@ -1,0 +1,59 @@
+---
+// Al final de cada lección: «Marcar como completada» + «Siguiente lección». Después, la paginación normal.
+import Default from '@astrojs/starlight/components/Pagination.astro';
+import { Icon } from '@astrojs/starlight/components';
+import { esLeccionId, idLeccion } from '../lib/lecciones';
+
+const { id, entry, pagination } = Astro.locals.starlightRoute;
+const esLeccion = esLeccionId(id);
+const next = pagination.next;
+const tarjetas: number = (entry.data as any).tarjetas?.length ?? 0;
+---
+{esLeccion && (
+  <section class="rdc-fin-leccion not-content" data-fin-leccion data-id={idLeccion(id)} aria-labelledby="rdc-fin-titulo">
+    <h2 id="rdc-fin-titulo" class="rdc-fin-titulo">Fin de la lección</h2>
+    <p class="rdc-fin-texto" data-texto-pendiente>
+      Cuando sientas que lo tienes, márcala como completada.{tarjetas > 0 && ` Sus ${tarjetas} tarjetas pasarán a tu repaso espaciado.`}
+    </p>
+    <p class="rdc-fin-texto" data-texto-hecho hidden>
+      <Icon name="approve-check" /> Lección completada.{tarjetas > 0 && ` Sus ${tarjetas} tarjetas ya están en tu repaso.`}
+    </p>
+    <div class="rdc-barra">
+      <button type="button" class="rdc-boton" data-marcar>
+        <Icon name="approve-check" /><span>Marcar como completada</span>
+      </button>
+      {next && (
+        <a class="rdc-boton secundario" data-siguiente href={next.href}>
+          <span>Siguiente lección<span class="rdc-sr">: {next.label}</span></span><Icon name="right-arrow" />
+        </a>
+      )}
+      <button type="button" class="rdc-boton sutil pequeno" data-desmarcar hidden>Desmarcar</button>
+    </div>
+    {next && <p class="rdc-fin-siguiente" aria-hidden="true">A continuación: {next.label}</p>}
+  </section>
+)}
+<Default />
+
+<script>
+  import { leer, marcarCompletada, EVENTO } from '../runtime/progreso';
+  for (const el of document.querySelectorAll<HTMLElement>('[data-fin-leccion]')) {
+    const id = el.dataset.id!;
+    const marcar = el.querySelector<HTMLButtonElement>('[data-marcar]')!;
+    const desmarcar = el.querySelector<HTMLButtonElement>('[data-desmarcar]')!;
+    const sig = el.querySelector<HTMLAnchorElement>('[data-siguiente]');
+    const pintar = () => {
+      const hecha = !!leer().lecciones[id];
+      el.dataset.hecha = String(hecha);
+      marcar.hidden = hecha;
+      desmarcar.hidden = !hecha;
+      el.querySelector<HTMLElement>('[data-texto-pendiente]')!.hidden = hecha;
+      el.querySelector<HTMLElement>('[data-texto-hecho]')!.hidden = !hecha;
+      // Una sola acción principal: tras completar, la principal pasa a ser «Siguiente lección»
+      sig?.classList.toggle('secundario', !hecha);
+    };
+    marcar.addEventListener('click', () => { marcarCompletada(id, true); pintar(); sig?.focus(); });
+    desmarcar.addEventListener('click', () => { marcarCompletada(id, false); pintar(); marcar.focus(); });
+    window.addEventListener(EVENTO, pintar);
+    pintar();
+  }
+</script>

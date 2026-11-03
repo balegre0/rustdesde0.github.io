@@ -1,0 +1,86 @@
+---
+title: "Devolver la propiedad"
+description: "Una función puede entregar la propiedad al devolver un valor. Funciona, pero pasar y recoger cada vez es incómodo: por eso existen los préstamos."
+sidebar:
+  order: 9
+duracion: 10
+desde: "1.0"
+requiere: ["06-ownership/08-mover-a-funciones"]
+tarjetas:
+  - p: "¿Qué pasa con la propiedad al hacer `return s;` (o terminar la función con `s`)?"
+    r: "Sale de la función hacia quien la llama: la variable que recoja el resultado pasa a ser la dueña."
+  - p: "¿Qué pasa si llamas a una función que devuelve un `String` y no guardas el resultado?"
+    r: "El valor devuelto es un temporal sin dueño con nombre: se libera al final de la sentencia."
+  - p: "¿Por qué el patrón «recibir y devolver» no es la solución habitual?"
+    r: "Porque obliga a escribir `let x = f(x);` en cada llamada y a devolver tuplas para cualquier resultado extra. Los préstamos resuelven lo mismo sin mover."
+---
+
+import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa, Reto } from '~/components';
+
+Si pasar un valor a una función lo mueve dentro, ¿puede la función **devolvérmelo**? Sí. Devolver es la otra dirección del mismo movimiento.
+
+## Predice
+
+<Predice
+  ej="m06/devolver-propiedad"
+  opciones={["`«recién hecho» mide 13 bytes`", "`«recién hecho» mide 12 bytes`", "No compila: `a` se movió a `medir`", "No compila: no se puede devolver un `String`"]}
+  correcta={0}
+  explicacion="`medir` recibe la propiedad, mide y la devuelve dentro de una tupla. `let (a, largo) = …` recoge las dos cosas. La «é» ocupa 2 bytes, así que son 13."
+  porque={["", "Cuenta la «é»: en UTF-8 son 2 bytes.", "Se movió, sí, pero `medir` la devuelve y la recogemos en un `a` nuevo.", "Devolver valores propios es lo más normal."]}
+/>
+
+## La idea
+
+Cuando una función **devuelve** un valor, la propiedad sale de ella hacia quien llama:
+
+- `crear()` construye un `String` y lo devuelve. La variable que recoge el resultado (`a`) es la nueva dueña.
+- `medir(s)` recibe la propiedad, hace su trabajo y la **devuelve** junto con el resultado.
+
+Así se puede usar un valor en una función sin perderlo: dándoselo y recogiéndolo. Funciona, pero mira lo que cuesta escribirlo:
+
+```rust
+let (a, largo) = medir(a);  // pasar, recoger, y una tupla para el resultado extra
+```
+
+Imagina eso en cada función que solo quiere **mirar** un texto. Es incómodo, y es exactamente el problema que resuelven los **préstamos** del mundo 07: usar sin mover.
+
+## Pruébalo
+
+<Ejecutar ej="m06/devolver-propiedad" />
+
+Tu turno. Hay casos en que recibir y devolver **sí** es lo natural: cuando la función **transforma** el valor.
+
+<Reto
+  ej="m06/exclamar"
+  enunciado="Completa `exclamar`: recibe la propiedad de un `String`, le añade `!` al final y devuelve la propiedad. `main` la llama dos veces y debe imprimir `hola!!`."
+/>
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Devolver no copia el heap.** Devolver un `String` mueve la ficha (12 o 24 bytes) al sitio donde la espera quien llama. A menudo ni eso: el compilador construye el valor directamente en su destino final (optimización del valor de retorno). El texto del heap nunca se toca.
+
+**Si no lo recoges, se libera.** `crear();` sin `let` crea un `String` que nadie recoge: es un **temporal** y se libera al final de esa sentencia. No hay fuga: alguien siempre es el dueño, aunque sea por un instante.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Olvidar recoger lo que te devuelven">
+
+❌ `medir(a); println!("{a}");`: pasaste `a` y tiraste lo que te devolvió. `a` ya se movió (E0382).
+
+✅ `let (a, largo) = medir(a);`. Usar el mismo nombre (`a`) es correcto: es un *shadowing* (mundo 03), una variable nueva que recoge la propiedad.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`fn f(s: String) -> String { s }`. ¿Qué hace `let t = f(s);`?"
+  opciones={["Copia el texto", "Mueve el texto a `f` y lo devuelve: `t` es la nueva dueña", "Libera el texto", "No compila"]}
+  correcta={1}
+  explicacion="El valor entra en `f` (movimiento) y sale (otro movimiento). Al final, `t` es la dueña y `s` no tiene permisos."
+  porque={["No hay ninguna copia del heap.", "", "Nadie lo libera: la propiedad termina en `t`.", "Es correcto."]}
+/>

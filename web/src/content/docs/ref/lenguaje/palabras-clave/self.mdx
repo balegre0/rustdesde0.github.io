@@ -1,0 +1,74 @@
+---
+title: "self"
+description: "Palabra clave estricta: el receptor de un método, y el módulo actual en rutas."
+sidebar:
+  order: 28
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`self` (en minúscula) tiene dos significados: **el valor sobre el que se llama un método** y **el módulo actual** dentro de una ruta. No confundir con [`Self`](/ref/lenguaje/palabras-clave/self-tipo/), en mayúscula, que es un tipo.
+
+## Sinopsis
+
+```text
+fn m(self)               // self: Self        (se queda con el valor)
+fn m(&self)              // self: &Self       (préstamo compartido)
+fn m(&mut self)          // self: &mut Self   (préstamo exclusivo)
+fn m(self: Box<Self>)    // también Rc<Self>, Arc<Self>, Pin<&mut Self>
+self::elemento           // ruta desde el módulo actual
+use a::b::{self, C};     // importar el propio módulo b además de C
+```
+
+## Qué hace
+
+### Uso 1 · Receptor de método
+
+Si el primer parámetro de una función en un `impl` o `trait` se llama `self`, la función es un **método** y se llama con punto: `valor.metodo()`. La forma del receptor decide qué le pasa al valor:
+
+| Receptor | Qué recibe | Después de la llamada |
+|---|---|---|
+| `&self` | un préstamo compartido | el valor sigue igual |
+| `&mut self` | un préstamo exclusivo | el valor puede haber cambiado |
+| `self` | el valor entero (se mueve) | el valor ya no existe, salvo que sea `Copy` |
+
+Al llamar con punto, el compilador añade `&`, `&mut` o `*` automáticamente (*autorref* y *autoderef*) para encajar con el receptor.
+
+### Uso 2 · Rutas
+
+`self::x` busca `x` en el módulo actual. En `use`, `{self, …}` importa también el módulo.
+
+`self` no puede usarse como nombre, ni con `r#self`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-self" />
+
+Salida:
+
+```text
+2
+20
+hijo
+raiz
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-self-error" />
+
+`error[E0382]: borrow of moved value: c`, con la nota `Contador::consumir takes ownership of the receiver self, which moves c`. Usar `c` después sería un **uso tras liberar**.
+
+## Desde
+
+Rust 1.0. Receptores `Rc<Self>`, `Arc<Self>`, `Pin<P>`: añadidos después (1.33 y siguientes).
+
+## Ver también
+
+- [`Self`](/ref/lenguaje/palabras-clave/self-tipo/) · [`impl`](/ref/lenguaje/palabras-clave/impl/) · [`super`](/ref/lenguaje/palabras-clave/super/) · [Visibilidad y rutas](/ref/lenguaje/visibilidad-y-rutas/)
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

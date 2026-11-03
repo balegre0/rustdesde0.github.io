@@ -1,0 +1,140 @@
+---
+title: "Arrays: N valores del mismo tipo"
+description: "Guarda una fila de valores del mismo tipo en un array [T; N], accede por índice y mira cómo Rust impide leer fuera de sus límites."
+sidebar:
+  order: 11
+duracion: 12
+desde: "1.0"
+requiere: ["03-valores-y-tipos/10-tuplas", "01-la-maquina/11-pila-y-heap"]
+tarjetas:
+  - p: "¿Qué significa el tipo `[i32; 4]`?"
+    r: "Un array de exactamente 4 valores `i32`, seguidos en memoria (16 bytes)."
+  - p: "¿Qué crea `[0u8; 5]`?"
+    r: "Un array de 5 `u8`, todos a 0: `[0, 0, 0, 0, 0]`."
+  - p: "¿Qué pasa al leer un índice fuera del array si el índice se calcula al ejecutar?"
+    r: "Pánico: «index out of bounds: the len is 3 but the index is 3». Nunca se lee memoria ajena."
+  - p: "¿Y si el índice fuera de rango es una constante, como `notas[3]`?"
+    r: "El compilador lo detecta y no compila: «this operation will panic at runtime»."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Una tupla agrupa unos pocos valores distintos. Cuando tienes **muchos** valores del **mismo** tipo (las notas de una clase, los píxeles de una fila), usas un **array**. Hoy vas a ver también la primera vez que Rust te protege de leer memoria que no es tuya.
+
+## Predice
+
+<Predice
+  ej="m03/fuera-ejecucion"
+  opciones={["Imprime las tres notas y luego se detiene con un pánico", "Imprime las tres notas y luego `nota 3: 0`", "Imprime las tres notas y luego un número cualquiera", "No compila"]}
+  correcta={0}
+  explicacion="El array tiene 3 elementos (índices 0, 1, 2). En la cuarta vuelta `i` vale 3: Rust comprueba el índice antes de leer y, como se sale, detiene el programa con un pánico."
+  porque={["", "Rust no se inventa ceros para los índices que no existen.", "Leer lo que haya en la memoria de al lado es justo lo que Rust impide.", "Compila: el índice se calcula al ejecutar, así que el compilador no puede saber que se saldrá."]}
+/>
+
+## La idea
+
+Un **array** es una fila de `N` valores del **mismo tipo**, uno detrás de otro. Su tipo se escribe `[T; N]`: `[i32; 4]` es «cuatro `i32`». Se crea de dos formas:
+
+```rust
+let notas = [7, 9, 5, 10];   // enumerando los valores
+let ceros = [0u8; 5];        // [valor; cuántos]
+```
+
+Los elementos se leen por **índice** (*index*), empezando en 0: `notas[0]` es el primero y `notas[notas.len() - 1]` el último. `len()` devuelve la longitud como `usize`.
+
+El tamaño `N` es **parte del tipo** y no puede cambiar: `[i32; 4]` y `[i32; 5]` son tipos distintos. Con `mut` puedes cambiar los elementos, pero no añadir ni quitar. Para filas que crecen está `Vec`, que verás en el Mundo 11.
+
+## Pruébalo
+
+<Ejecutar ej="m03/arrays" />
+
+Salida real:
+
+```text
+primer día: lun
+última nota: 10
+[0, 0, 0, 0, 0] tiene 5 elementos
+[0, 50, 0]
+[i32; 4] ocupa 16 bytes
+```
+
+Y el ejemplo del principio, que se sale del array (salida real):
+
+<Ejecutar ej="m03/fuera-ejecucion" />
+
+```text
+nota 0: 7
+nota 1: 9
+nota 2: 5
+
+thread 'main' (1) panicked at ejemplos/m03/fuera-ejecucion.rs:6:34:
+index out of bounds: the len is 3 but the index is 3
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+```
+
+«Índice fuera de límites: la longitud es 3 pero el índice es 3». El mensaje te da los dos números para que veas el fallo al instante.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Un array en la pila, y la comprobación de límites">
+Un array guarda sus elementos **contiguos**: `[i32; 4]` son 16 bytes seguidos, sin nada más (ni siquiera la longitud: la longitud está en el **tipo**, la conoce el compilador). Como una variable local, vive en la **pila**. El elemento `i` está en la dirección «inicio + i × 4».
+
+Esa fórmula funciona para cualquier `i`, también para 3, 1000 o un millón: la CPU calcularía una dirección fuera del array y leería lo que hubiera allí, quizá otra variable. Es el error de memoria más clásico, el **acceso fuera de límites** (*out-of-bounds*). Rust lo impide comprobando `i < len` antes de **cada** acceso con `[]`: si no se cumple, pánico. El coste es una comparación, y el optimizador la elimina cuando puede demostrar que el índice siempre es válido.
+
+Si el índice es una constante, ni siquiera hace falta ejecutar. Error real al compilar `let notas = [7, 9, 5]; println!("{}", notas[3]);`:
+
+```text
+error: this operation will panic at runtime
+ --> ejemplos/m03/fuera-constante.rs:3:20
+  |
+3 |     println!("{}", notas[3]);
+  |                    ^^^^^^^^ index out of bounds: the length is 3 but the index is 3
+  |
+  = note: `#[deny(unconditional_panic)]` on by default
+```
+</BajoElCapo>
+
+## Trampa típica
+
+Un array exige que todos sus elementos sean del mismo tipo:
+
+<NoCompila ej="m03/array-tipos" explicacion="E0308: el primer elemento, `1`, fija que el array es de enteros; `2.5` es un decimal. Escribe todos como decimales (`1.0`, `2.5`, `3.0`) o usa una tupla si de verdad quieres mezclar tipos." />
+
+<Trampa titulo="El último elemento no es notas[notas.len()]">
+❌ `notas[notas.len()]` para leer el último: con 3 elementos, eso es `notas[3]`, fuera del array.
+
+✅ `notas[notas.len() - 1]`. Los índices van de 0 a `len - 1`.
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m03/suma-array"
+  enunciado="Suma los cuatro elementos de `gastos` accediendo por índice e imprime `4 gastos, total 100`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántos bytes ocupa un `[u8; 10]`?"
+  opciones={["10", "40", "80", "10 más lo que ocupe la longitud"]}
+  correcta={0}
+  explicacion="10 elementos de 1 byte, seguidos. La longitud no se guarda: está en el tipo."
+  porque={["", "Serían 40 si fueran `u32` o `i32`.", "Serían 80 si fueran `u64`.", "Un array no guarda su longitud en memoria; la sabe el compilador."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué crea `[1; 3]`?"
+  opciones={["`[1, 2, 3]`", "`[1, 1, 1]`", "`[3]`", "`[0, 0, 0]`"]}
+  correcta={1}
+  explicacion="`[valor; N]` repite el valor N veces."
+  porque={["No es un rango: no cuenta del 1 al 3.", "", "El 3 es cuántas veces, no un elemento.", "El valor repetido es el 1."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué Rust comprueba los índices de un array al ejecutar?"
+  opciones={["Para que el programa vaya más lento", "Para no leer ni escribir nunca memoria fuera del array", "Porque los arrays guardan su longitud", "No los comprueba"]}
+  correcta={1}
+  explicacion="Un índice fuera de rango llevaría a otra zona de memoria. La comprobación lo convierte en un pánico controlado en lugar de un error silencioso."
+  porque={["Es una comparación barata, y el optimizador la quita cuando puede.", "", "La longitud de un array está en el tipo, no en memoria.", "Sí los comprueba: lo has visto en la salida."]}
+/>

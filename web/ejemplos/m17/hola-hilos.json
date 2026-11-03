@@ -1,0 +1,1 @@
+{ "plataforma": "playground", "nota": "Los hilos no existen en el navegador: este ejemplo se ejecuta en el Rust Playground. El orden de las tres líneas «trabajando» puede cambiar de una ejecución a otra; «total = 600» siempre sale la última." }

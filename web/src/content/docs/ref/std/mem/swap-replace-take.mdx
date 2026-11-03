@@ -1,0 +1,58 @@
+---
+title: "swap, replace y take"
+description: "Intercambiar dos valores, o sacar un valor de detrás de un &mut dejando otro en su lugar."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::mem::{swap, replace, take}`
+
+## Sinopsis
+
+```rust
+pub const fn swap<T>(x: &mut T, y: &mut T)
+
+pub const fn replace<T>(dest: &mut T, src: T) -> T
+
+pub fn take<T>(dest: &mut T) -> T
+where
+    T: Default,
+```
+
+## Qué hace
+
+Las tres trabajan a través de préstamos exclusivos y nunca dejan un hueco, así que son seguras:
+
+- `swap(&mut a, &mut b)`: intercambia los dos valores.
+- `replace(&mut sitio, nuevo)`: pone `nuevo` y te devuelve lo que había.
+- `take(&mut sitio)`: te devuelve lo que había y deja `T::default()` (necesita `Default`: texto vacío, `0`, `None`, vector vacío…).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/mem-swap-replace-take" />
+
+**Salida:**
+
+```text
+derecha izquierda
+Ana -> Jugador { nombre: "Eva", puntos: 10 }
+"Eva" -> Jugador { nombre: "", puntos: 10 }
+Jugador { nombre: "", puntos: 10 } Jugador { nombre: "", puntos: 0 } (10 puntos)
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [Option::take y replace](/ref/std/option/option/)
+- [E0507](/errores/e0507/)
+- [E0509](/errores/e0509/)
+
+## Aprende esto en
+
+- [Mundo 06 · Ownership](/curso/06-ownership/)
+- [Mundo 21 · El compilador por dentro](/curso/21-el-compilador-por-dentro/)

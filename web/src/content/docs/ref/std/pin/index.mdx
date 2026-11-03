@@ -1,0 +1,63 @@
+---
+title: "std::pin"
+description: "Pin: fijar un valor en memoria para que no se mueva. Necesario para los futures y los tipos autorreferenciales."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::pin`
+
+## Para qué sirve
+
+Mover un valor en Rust es copiar sus bytes a otro sitio. Eso rompe a los tipos que guardan **punteros a sí mismos** (*autorreferenciales*), como los futures que genera `async`. `Pin<P>` envuelve un puntero (`Pin<&mut T>`, `Pin<Box<T>>`) y **promete que el valor apuntado no se volverá a mover** hasta destruirse.
+
+Casi todos los tipos son `Unpin`: para ellos `Pin` no restringe nada. Solo importa para los que no lo son (los futures de `async` y los que contienen `PhantomPinned`).
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| `Pin` | Un puntero cuyo destino no se moverá. | 1.33 |
+| `pin!` | Fija un valor en la pila. | 1.68 |
+| `Unpin` | Tipos a los que no les afecta estar fijados (casi todos). | 1.33 |
+| `PhantomPinned` | Marca un tipo como no `Unpin`. | 1.33 |
+
+## Conceptos clave
+
+- **`Box::pin(x)`** fija en el montón; **`pin!(x)`** fija en la pila.
+- **`Future::poll`** recibe `self: Pin<&mut Self>`: así el future puede guardar referencias a sus propias variables entre un `.await` y otro.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/pin-basico" />
+
+**Salida:**
+
+```text
+7
+7
+9
+6
+```
+
+## Sinopsis
+
+```rust
+pub struct Pin<Ptr> { /* private fields */ }
+
+pub macro pin($value:expr $(,)?) {
+    ...
+}
+```
+
+## Ver también
+
+- [std::future](/ref/std/future/)
+- [Box](/ref/std/boxed/box/)
+
+## Aprende esto en
+
+- [Mundo 18 · Async](/curso/18-async/)
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

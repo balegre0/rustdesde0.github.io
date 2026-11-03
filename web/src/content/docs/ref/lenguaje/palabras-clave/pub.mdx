@@ -1,0 +1,59 @@
+---
+title: "pub"
+description: "Palabra clave estricta: hace visible un elemento fuera de su módulo, con alcance ajustable."
+sidebar:
+  order: 25
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`pub` (de *public*) hace que un elemento se vea **fuera** del módulo donde está definido.
+
+## Sinopsis
+
+```text
+pub elemento                // visible para cualquiera que vea el módulo padre
+pub(crate) elemento         // visible en todo el crate
+pub(super) elemento         // visible en el módulo padre
+pub(self) elemento          // igual que no poner nada
+pub(in ruta) elemento       // visible dentro de esa ruta (un antepasado)
+```
+
+## Qué hace
+
+- Por defecto, todo es **privado**: lo ve el módulo actual y sus descendientes.
+- `pub` se pone en cada cosa que quieras exponer: funciones, tipos, módulos, **campos** de structs, constantes, `use` (para reexportar).
+- Un struct `pub` con campos privados no se puede construir ni modificar desde fuera: solo a través de sus funciones públicas. Así se protegen **invariantes** (aquí, «el saldo nunca baja por un ingreso negativo»).
+- Las variantes de un `enum` público y los elementos de un `trait` público son siempre públicos.
+- La privacidad es la frontera de seguridad del código `unsafe`: si un campo privado guarda una promesa (como la longitud de un búfer), nadie de fuera puede romperla.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-pub" />
+
+Salida:
+
+```text
+Lin: 50
+v2
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-pub-error" />
+
+`error[E0616]: field saldo of struct Cuenta is private`.
+
+## Desde
+
+Rust 1.0. `pub(crate)`, `pub(super)`, `pub(in ruta)`: 1.18.
+
+## Ver también
+
+- [Visibilidad y rutas](/ref/lenguaje/visibilidad-y-rutas/) · [`mod`](/ref/lenguaje/palabras-clave/mod/) · [`crate`](/ref/lenguaje/palabras-clave/crate/) · [`in`](/ref/lenguaje/palabras-clave/in/) · [`use`](/ref/lenguaje/palabras-clave/use/)
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

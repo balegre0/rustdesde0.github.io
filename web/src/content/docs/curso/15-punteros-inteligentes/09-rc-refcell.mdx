@@ -1,0 +1,102 @@
+---
+title: "Rc con RefCell, y cuándo evitarlo"
+description: "Combinas Rc y RefCell para tener varios dueños que modifican, y aprendes la alternativa que suele ser mejor: un Vec y números."
+sidebar:
+  order: 9
+duracion: 13
+desde: "1.0"
+requiere: ["15-punteros-inteligentes/06-weak-y-ciclos", "15-punteros-inteligentes/08-cell-y-refcell"]
+tarjetas:
+  - p: "¿Qué aporta cada parte de `Rc<RefCell<T>>`?"
+    r: "`Rc` da varios dueños; `RefCell` permite modificar a través del préstamo compartido que da `Rc`."
+  - p: "¿Qué tres costes tiene `Rc<RefCell<T>>`?"
+    r: "Contadores en ejecución (más memoria y trabajo), posibles pánicos por préstamos que chocan y posibles fugas por ciclos."
+  - p: "¿Qué es una arena con índices?"
+    r: "Un `Vec` que es dueño de todos los nodos; los nodos se refieren unos a otros por su posición (`usize`) en lugar de con punteros."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a juntar `Rc` y `RefCell` para que varios dueños puedan modificar el mismo dato, y a conocer el diseño que muchas veces lo hace innecesario.
+
+## Predice
+
+<Predice
+  ej="m15/compartido"
+  pregunta="`ana` y `luis` son dos `Rc` de la misma lista con `RefCell`. Cada uno añade cosas. ¿Qué imprime la lista y cuántos dueños hay?"
+  opciones={["[\"pan\", \"café\"] y dueños = 2", "[\"pan\", \"leche\", \"café\"] y dueños = 3", "[\"pan\", \"leche\", \"café\"] y dueños = 1", "Entra en pánico: dos dueños escriben a la vez"]}
+  correcta={1}
+  explicacion="Las tres operaciones van a la misma lista. Hay tres `Rc`: `lista`, `ana` y `luis`. Cada `borrow_mut()` termina al final de su línea, así que nunca chocan."
+  porque={["`luis` también escribe en la MISMA lista.", "Correcto.", "Los tres `Rc` siguen vivos al imprimir.", "Escriben uno detrás de otro, no a la vez: cada préstamo muere al acabar su línea."]}
+/>
+
+## La idea
+
+`Rc<T>` da varios dueños pero solo lectura. `RefCell<T>` permite modificar a través de un `&`. Juntos, `Rc<RefCell<T>>`, dan exactamente lo que se pide en algunos problemas: **varios dueños que pueden modificar**. Cada dueño hace `dato.borrow_mut()` cuando quiere escribir, y el `RefCell` vigila en ejecución que nunca haya dos escritores ni un escritor con lectores.
+
+Funciona, pero tiene un **olor** (*code smell*): suele indicar que no se ha decidido quién es el dueño de qué. Paga tres precios: contadores y comprobaciones en ejecución, **pánicos** si dos partes del programa se pisan, y **fugas** si se forman ciclos. Además, el compilador ya no te ayuda: los errores aparecen al ejecutar, no al compilar.
+
+La alternativa que usan los programadores con experiencia para grafos y árboles es la **arena con índices**: un único `Vec` es el dueño de todos los nodos, y los nodos se refieren unos a otros por su **posición** (`usize`). Un índice es un número, no un préstamo, así que no hay ciclos de propiedad, ni contadores, ni `RefCell`. El borrow checker vuelve a protegerte, porque para modificar un nodo pides `&mut` al `Vec`.
+
+## Pruébalo
+
+<Ejecutar ej="m15/compartido" />
+
+El mismo tipo de problema (un árbol con padres e hijos), con una arena: sin `Rc`, sin `RefCell` y sin `Weak`.
+
+<Ejecutar ej="m15/arena" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Lo que cuesta cada diseño para un nodo con un padre y una lista de hijos (x86-64):
+
+| | `Rc<RefCell<Nodo>>` + `Weak` | arena con índices |
+|---|---|---|
+| Referencia a otro nodo | `Rc` / `Weak`: 8 bytes, más 16 de contadores en el bloque | `usize`: 8 bytes |
+| Reservas de memoria | una por nodo | una para todo el `Vec` (crece de vez en cuando) |
+| Modificar | `borrow_mut()`: comprobación en ejecución, posible pánico | `&mut arbol.nodos[i]`: comprobado al compilar |
+| Ciclos | posibles fugas | imposibles: el `Vec` es el único dueño |
+| Índice inválido | — | pánico de límites (`index out of bounds`), nunca UB |
+
+Hay un detalle sutil en la arena: si borras un nodo del `Vec`, los índices de los siguientes cambian, y un índice viejo apuntaría al nodo equivocado. No es comportamiento indefinido (sigue siendo memoria válida), pero es un error lógico. Las bibliotecas de arenas lo resuelven guardando una «generación» junto al índice. Para empezar, basta con no borrar, o marcar los nodos borrados.
+
+Los nodos de la arena están **contiguos** en memoria, así que recorrerlos aprovecha mucho mejor la caché del procesador que saltar de bloque en bloque por el heap (mundo 1).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Rc con RefCell como primera opción">
+
+❌ Empezar cualquier estructura con `Rc<RefCell<T>>` «para que el compilador no se queje». Acabas con pánicos de `BorrowMutError` en ejecución y ciclos difíciles de encontrar.
+
+✅ Pregúntate primero: ¿quién es el dueño? Si hay un dueño natural (un `Vec`, un struct padre), que lo sea, y los demás guardan índices o reciben préstamos temporales. Reserva `Rc<RefCell<T>>` para cuando el dato de verdad tenga varios dueños con vidas independientes.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m15/r-arena"
+  enunciado="Una red de amigos en una arena. Ana es la 0, Luis el 1 y Sara la 2. Haz que Ana y Luis sean amigos mutuos y que Luis también sea amigo de Sara, añadiendo índices a los `Vec` `amigos`. Salida esperada: `Ana: Luis`, `Luis: Ana, Sara` y `Sara: ` (vacío)."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En `Rc<RefCell<Vec<i32>>>`, ¿qué capa permite que haya varios dueños?"
+  opciones={["`Rc`", "`RefCell`", "`Vec`", "Hacen falta las tres"]}
+  correcta={0}
+  explicacion="`Rc` aporta los varios dueños; `RefCell` aporta la posibilidad de modificar."
+  porque={["Correcto.", "`RefCell` solo cambia cuándo se comprueban los préstamos; tiene un único dueño.", "El `Vec` es el dato compartido.", "Cada capa aporta una cosa distinta."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué ventaja tiene una arena con índices frente a `Rc<RefCell<T>>`?"
+  opciones={["Los índices nunca pueden ser incorrectos", "Los préstamos vuelven a comprobarse al compilar y no puede haber ciclos de propiedad", "No usa memoria del heap", "Es más corta de escribir siempre"]}
+  correcta={1}
+  explicacion="El `Vec` es el único dueño; los índices son números. Modificar exige `&mut` al Vec, que comprueba el compilador."
+  porque={["Un índice viejo puede apuntar al nodo equivocado (error lógico, no UB).", "Correcto.", "El `Vec` guarda sus elementos en el heap.", "A veces requiere más código para manejar índices."]}
+/>

@@ -1,0 +1,45 @@
+---
+title: "Biblioteca estándar"
+description: "Los módulos de std, con fichas de sus tipos, traits, funciones y macros más importantes. Cada ficha tiene su firma exacta y un ejemplo ejecutable."
+sidebar:
+  order: 0
+---
+
+La **biblioteca estándar** (`std`) es el código que viene con Rust. Se apoya en dos capas más pequeñas: `core` (lo que funciona sin sistema operativo ni memoria dinámica) y `alloc` (lo que necesita memoria dinámica, como `Vec` o `String`). La insignia de cada ficha indica de qué capa viene.
+
+| Módulo | Para qué sirve | Fichas |
+|---|---|---|
+| [`std::any`](/ref/std/any/) | Tipos en tiempo de ejecución: el trait Any, downcast_ref, TypeId y type_name. | — |
+| [`std::boxed`](/ref/std/boxed/) | Box&lt;T&gt;: el puntero inteligente más simple. Pone un valor en el montón y es su único dueño. | [`Box<T>`](/ref/std/boxed/box/) |
+| [`std::cell`](/ref/std/cell/) | Mutabilidad interior en un solo hilo: Cell, RefCell, OnceCell y LazyCell. | [`Cell<T>`](/ref/std/cell/cell/), [`OnceCell<T>`](/ref/std/cell/oncecell/), [`RefCell<T>`](/ref/std/cell/refcell/) |
+| [`char`](/ref/std/char/) | El tipo char: un carácter Unicode de 4 bytes. Clasificar, convertir mayúsculas, dígitos y UTF-8. | — |
+| [`std::cmp`](/ref/std/cmp/) | Comparar y ordenar: PartialEq, Eq, PartialOrd, Ord, Ordering, min, max y Reverse. | [`PartialEq, Eq, PartialOrd y Ord`](/ref/std/cmp/ord/) |
+| [`std::collections`](/ref/std/collections/) | Las colecciones de la biblioteca estándar: HashMap, HashSet, BTreeMap, BTreeSet, VecDeque, BinaryHeap y LinkedList. | [`BinaryHeap<T>`](/ref/std/collections/binaryheap/), [`BTreeMap<K, V>`](/ref/std/collections/btreemap/), [`HashMap<K, V>`](/ref/std/collections/hashmap/), [`HashSet<T>`](/ref/std/collections/hashset/), [`VecDeque<T>`](/ref/std/collections/vecdeque/) |
+| [`std::convert`](/ref/std/convert/) | Conversiones entre tipos: From/Into (no fallan), TryFrom/TryInto (pueden fallar) y AsRef/AsMut (préstamos baratos). | [`AsRef y AsMut`](/ref/std/convert/asref/), [`From e Into`](/ref/std/convert/from/), [`TryFrom y TryInto`](/ref/std/convert/tryfrom/) |
+| [`std::env`](/ref/std/env/) | El entorno del programa: argumentos de la línea de órdenes, variables de entorno y carpeta actual. | — |
+| [`std::error`](/ref/std/error/) | El trait Error: tipos de error propios, la cadena de causas (source) y Box&lt;dyn Error&gt;. | — |
+| [`std::fmt`](/ref/std/fmt/) | Formatear texto: la sintaxis de &#123;&#125; en println! y format!, y los traits Display y Debug. | [`Debug`](/ref/std/fmt/debug/), [`Display`](/ref/std/fmt/display/), [`Sintaxis de formato`](/ref/std/fmt/sintaxis/) |
+| [`std::fs`](/ref/std/fs/) | El sistema de archivos: leer y escribir archivos enteros, File, carpetas, copiar, renombrar y borrar. | [`File`](/ref/std/fs/file/) |
+| [`std::future (y std::task)`](/ref/std/future/) | El trait Future, Poll, Context y Waker: las piezas sobre las que funcionan async y .await. | — |
+| [`std::hash`](/ref/std/hash/) | Calcular hashes: el trait Hash (lo que necesita una clave de HashMap), Hasher y DefaultHasher. | — |
+| [`std::io`](/ref/std/io/) | Entrada y salida: los traits Read, Write y BufRead, la consola (stdin, stdout, stderr) y io::Error. | [`BufRead`](/ref/std/io/bufread/), [`Read`](/ref/std/io/read/), [`stdin`](/ref/std/io/stdin/), [`stdout y stderr`](/ref/std/io/stdout/), [`Write`](/ref/std/io/write/) |
+| [`std::iter`](/ref/std/iter/) | Iteradores: el trait Iterator, sus adaptadores (map, filter, zip…) y sus consumidores (sum, collect, fold…). | [`Adaptadores y consumidores`](/ref/std/iter/adaptadores/), [`Iterator`](/ref/std/iter/iterator/) |
+| [`Macros de la biblioteca estándar`](/ref/std/macros/) | Las macros de std que más usarás: println!, format!, vec!, assert!, panic!, dbg!, todo!, unreachable!, matches!, write!. | [`assert!, assert_eq! y assert_ne!`](/ref/std/macros/assert/), [`dbg!`](/ref/std/macros/dbg/), [`format!`](/ref/std/macros/format/), [`matches!`](/ref/std/macros/matches/), [`panic!`](/ref/std/macros/panic/), [`println!, print!, eprintln! y eprint!`](/ref/std/macros/println/), [`todo!`](/ref/std/macros/todo/), [`unreachable!`](/ref/std/macros/unreachable/), [`vec!`](/ref/std/macros/vec/), [`write! y writeln!`](/ref/std/macros/write/) |
+| [`std::marker`](/ref/std/marker/) | Traits marcador: Send, Sync, Copy, Sized, Unpin y el tipo PhantomData. | [`Copy`](/ref/std/marker/copy/), [`PhantomData<T>`](/ref/std/marker/phantomdata/), [`Send y Sync`](/ref/std/marker/send-sync/), [`Sized`](/ref/std/marker/sized/) |
+| [`std::mem`](/ref/std/mem/) | Funciones sobre la memoria de los valores: size_of, swap, replace, take, forget, drop, transmute. | [`forget`](/ref/std/mem/forget/), [`size_of`](/ref/std/mem/size_of/), [`swap, replace y take`](/ref/std/mem/swap-replace-take/) |
+| [`std::num (y los métodos de los enteros)`](/ref/std/num/) | Números: aritmética checked, wrapping, saturating y overflowing, NonZero, Wrapping y los errores de parse. | [`Aritmética checked, wrapping, saturating y overflowing`](/ref/std/num/aritmetica/) |
+| [`std::ops`](/ref/std/ops/) | Los traits de los operadores (+, -, *, ==, [], *x…), Deref, Drop, los Fn y los rangos. | [`Deref y DerefMut`](/ref/std/ops/deref/), [`Drop y drop`](/ref/std/ops/drop/), [`Fn, FnMut y FnOnce`](/ref/std/ops/fn/), [`Traits de operadores`](/ref/std/ops/operadores/) |
+| [`std::option`](/ref/std/option/) | Option&lt;T&gt;: valores opcionales sin nulos. Some(valor) o None. | [`Option<T>`](/ref/std/option/option/) |
+| [`std::pin`](/ref/std/pin/) | Pin: fijar un valor en memoria para que no se mueva. Necesario para los futures y los tipos autorreferenciales. | — |
+| [`std::prelude`](/ref/std/prelude/) | Lo que todo programa ve sin escribir use: Option, Result, Vec, String, Box, los traits básicos y más. | — |
+| [`std::process`](/ref/std/process/) | Procesos: terminar con un código de salida (exit, ExitCode) y lanzar otros programas (Command). | [`exit`](/ref/std/process/exit/) |
+| [`std::ptr`](/ref/std/ptr/) | Punteros crudos (*const T, *mut T): crearlos, compararlos, leer y escribir a través de ellos con unsafe, y NonNull. | — |
+| [`std::rc`](/ref/std/rc/) | Rc y Weak: propiedad compartida con contador de referencias, para un solo hilo. | [`Rc<T>`](/ref/std/rc/rc/), [`Weak<T>`](/ref/std/rc/weak/) |
+| [`std::result`](/ref/std/result/) | Result&lt;T, E&gt;: el resultado de una operación que puede fallar, con Ok(valor) o Err(error). | [`Result<T, E>`](/ref/std/result/result/) |
+| [`slices: [T] y &[T]`](/ref/std/slice/) | Trozos de memoria contigua: len, get, first, split_at, chunks, windows, sort, binary_search, reverse, swap. | — |
+| [`str (texto prestado)`](/ref/std/str/) | El tipo primitivo str y &str: trozos de texto UTF-8 prestados, y sus métodos para buscar, dividir y convertir. | [`str`](/ref/std/str/str/) |
+| [`std::string`](/ref/std/string/) | String: texto UTF-8 que crece y es dueño de sus bytes; ToString y los errores de conversión. | [`String`](/ref/std/string/string/) |
+| [`std::sync`](/ref/std/sync/) | Compartir datos entre hilos sin carreras: Arc, Mutex, RwLock, atómicos, canales mpsc, OnceLock y LazyLock. | [`Arc<T>`](/ref/std/sync/arc/), [`std::sync::atomic`](/ref/std/sync/atomic/), [`std::sync::mpsc`](/ref/std/sync/mpsc/), [`Mutex<T>`](/ref/std/sync/mutex/), [`RwLock<T>`](/ref/std/sync/rwlock/) |
+| [`std::thread`](/ref/std/thread/) | Hilos del sistema: spawn, scope, join, sleep y el hilo actual. | [`scope`](/ref/std/thread/scope/), [`spawn`](/ref/std/thread/spawn/) |
+| [`std::time`](/ref/std/time/) | Medir y representar tiempo: Duration (una cantidad), Instant (para medir) y SystemTime (la hora del sistema). | — |
+| [`std::vec`](/ref/std/vec/) | Vec&lt;T&gt;: la lista que crece. Añadir, quitar, indexar, recorrer y cómo gestiona su memoria. | [`Vec<T>`](/ref/std/vec/vec/) |

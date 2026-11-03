@@ -1,0 +1,74 @@
+---
+title: "E0282: hacen falta anotaciones de tipo"
+description: "El compilador no puede deducir un tipo genérico con la información que hay."
+sidebar:
+  order: 23
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` type annotations needed for `Vec<_>` ``
+
+## Qué significa
+
+Rust deduce casi todos los tipos, pero necesita pistas. `Vec::new()` crea un `Vec<T>`, y nada en el programa dice qué es `T` (nunca se mete nada en la lista). El compilador no adivina: pide que lo digas.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0282" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0282]: type annotations needed for `Vec<_>`
+ --> E0282.rs:2:9
+  |
+2 |     let lista = Vec::new();
+  |         ^^^^^   ---------- type must be known at this point
+  |
+help: consider giving `lista` an explicit type, where the type for type parameter `T` is specified
+  |
+2 |     let lista: Vec<T> = Vec::new();
+  |              ++++++++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Crear una colección vacía y no usarla de forma que fije el tipo.
+- Llamar a `parse()` o `collect()` sin decir a qué tipo.
+- Funciones genéricas cuyo tipo solo aparece en el retorno.
+
+## Cómo arreglarlo
+
+Anota el tipo de la variable (`let lista: Vec<String> = Vec::new();`) o usa la sintaxis *turbofish* en la llamada (`Vec::<String>::new()`, `parse::<i32>()`, `collect::<Vec<_>>()`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let lista: Vec<String> = Vec::new(); // decimos qué guardará
+    println!("{}", lista.len());
+}
+```
+
+**Salida:**
+
+```text
+0
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0282` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0283](/errores/e0283/): hacen falta anotaciones (tipo ambiguo)
+- [E0308](/errores/e0308/): tipos que no coinciden
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

@@ -1,0 +1,96 @@
+---
+title: "Varianza: cuándo largo sirve como corto"
+description: "Una &'static str se acepta donde se pide una &'a str: las referencias compartidas son covariantes. Detrás de &mut no: &mut T es invariante en T, y por buenas razones."
+sidebar:
+  order: 11
+duracion: 14
+desde: "1.0"
+requiere: ["08-lifetimes/10-malentendidos"]
+tarjetas:
+  - p: "¿Por qué puedes pasar un `&'static str` a una función que pide `&'a str`?"
+    r: "Porque `&'a T` es covariante en `'a`: una referencia válida más tiempo sirve donde se pide una válida menos tiempo."
+  - p: "¿Qué significa que `&mut T` sea invariante en `T`?"
+    r: "Que detrás de un `&mut` el tipo tiene que coincidir exactamente: no se puede usar un `&mut &'static str` donde se pide un `&mut &'a str` más corto (ni al revés)."
+  - p: "¿Qué fallo evitaría la invarianza de `&mut T`?"
+    r: "Escribir una referencia de vida corta en un sitio que otros creen `'static`: al morir el valor corto, ese sitio quedaría colgando."
+  - p: "Covariante, contravariante e invariante, en una línea:"
+    r: "Covariante: se acepta un subtipo (más largo). Contravariante: se acepta un supertipo (pasa con las entradas de `fn(T)`). Invariante: tiene que ser exactamente el mismo."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Esta lección es más teórica. Responde a una pregunta que quizá te hiciste en la lección 3: si `mas_larga` pide dos `&'a str` con la **misma** `'a`, ¿por qué se le puede pasar un literal (`'static`) y un `String` local a la vez?
+
+## Predice
+
+<Predice
+  ej="m08/p-covarianza"
+  opciones={["`alfa`", "No compila: `literal` es `'static` y `&local` no, así que no comparten `'a`", "`zeta`", "No compila: no se pueden comparar `&str`"]}
+  correcta={0}
+  explicacion={"El compilador elige `'a` = la vida de `local`. El literal, válido todo el programa, también es válido durante esa región más corta, así que encaja. `\"alfa\" < \"zeta\"` en orden alfabético."}
+  porque={["", "Una referencia más larga se puede usar como si fuera más corta: es la covarianza.", "`elige` devuelve el menor en orden alfabético: «alfa».", "`&str` se compara alfabéticamente con `<`."]}
+/>
+
+## La idea
+
+Piensa en las lifetimes como **promesas**: `&'static str` promete «válida todo el programa»; `&'a str` promete «válida durante `'a`». La promesa larga **incluye** a la corta. Por eso una `&'static str` se acepta donde se pide una `&'a str`. Se dice que `'static` es un **subtipo** de `'a` (porque «cumple más»).
+
+**Varianza** es cómo se propaga esa relación a través de otros tipos:
+
+| Tipo | Respecto a `'a` o `T` | Se puede usar uno «más largo» |
+|---|---|---|
+| `&'a T` | **covariante** en `'a` y en `T` | sí |
+| `Box<T>`, `Vec<T>`, `Option<T>` | covariante en `T` | sí |
+| `&'a mut T` | covariante en `'a`, **invariante** en `T` | solo en `'a`; en `T`, tiene que coincidir |
+| `Cell<T>`, `RefCell<T>` | invariante en `T` | no |
+| `fn(T)` | **contravariante** en `T` | al revés: acepta uno «más corto» |
+
+La fila importante es la de `&mut T`. Detrás de un `&mut`, el tipo tiene que ser **exactamente** el mismo. Mira por qué:
+
+<NoCompila ej="m08/p-varianza-mut" explicacion="`fijo` es `&'static str`. Si `&mut &'static str` pudiera usarse como `&mut &'a str` (con `'a` = la vida de `corta`), `asignar` podría guardar en `fijo` una referencia a `corta`. Al cerrar el bloque, `corta` muere y `fijo`, que todos creen válida para siempre, quedaría colgando. La invarianza lo impide." />
+
+## Pruébalo
+
+La covarianza de `&'a T` es lo que hace que las funciones con lifetimes sean cómodas: puedes mezclar literales con referencias a variables, y el compilador elige la región más corta que cumpla todo.
+
+<Ejecutar ej="m08/p-covarianza" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La regla general.** Un tipo es covariante en un parámetro cuando ese parámetro solo se **lee** a través de él, contravariante cuando solo se **escribe** (como las entradas de una función: `fn(&'a str)` acepta más cosas si `'a` es más corta) e invariante cuando se lee **y** se escribe. `&mut T` permite las dos cosas, y por eso es invariante en `T`.
+
+**Los structs heredan la varianza de sus campos.** `struct Extracto<'a> { parte: &'a str }` es covariante en `'a`, porque su campo lo es. Si un campo fuera `&'a mut T` o `Cell<&'a str>`, el struct sería invariante. Cuando escribas código `unsafe` con punteros crudos, tendrás que elegir la varianza a mano con `PhantomData` (mundo 20).
+
+**Es teoría de tipos de verdad.** La varianza viene de la teoría de subtipos, donde se estudia con diagramas de inclusión de conjuntos. En el mundo 24 la verás formalizada; también verás que un error histórico de varianza en el compilador sigue abierto (el agujero #25860).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Esperar que &mut se comporte como &">
+
+❌ «Si puedo pasar `&'static str` donde se pide `&'a str`, también podré pasar `&mut &'static str` donde se pide `&mut &'a str`».
+
+✅ No: detrás de `&mut`, el tipo de dentro tiene que coincidir. Si te encuentras este error con estructuras que guardan referencias, suele ser señal de que el tipo de dentro debería ser **dueño** (`String`) en vez de prestar.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Se puede pasar un `&'static str` a `fn f<'a>(s: &'a str)`?"
+  opciones={["Sí, por covarianza", "No, las lifetimes tienen que coincidir", "Solo si `'a` es `'static`", "Solo con `as`"]}
+  correcta={0}
+  explicacion="`&'a T` es covariante en `'a`: una referencia válida más tiempo sirve donde se pide una válida menos tiempo."
+  porque={["", "No tienen que coincidir: basta con que la larga cubra a la corta.", "`'a` puede ser cualquier región que el literal cubra.", "No hace falta ninguna conversión explícita."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `&mut T` es invariante en `T`?"
+  opciones={["Por eficiencia", "Porque a través de él se puede escribir: aceptar un `T` distinto permitiría guardar algo que no cumple lo que el dueño espera", "Porque `&mut` no tiene lifetime", "No lo es: es covariante"]}
+  correcta={1}
+  explicacion="Con escritura, aceptar «más largo» o «más corto» permitiría colar referencias de vida corta en sitios de vida larga. El ejemplo de `asignar` lo muestra."
+  porque={["No tiene que ver con el rendimiento.", "", "Sí la tiene: `&'a mut T`.", "Es covariante en `'a`, pero invariante en `T`."]}
+/>

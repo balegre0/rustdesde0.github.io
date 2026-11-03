@@ -1,0 +1,77 @@
+---
+title: "unsafe"
+description: "Palabra clave estricta: marca código cuyas reglas de seguridad comprueba el programador, no el compilador."
+sidebar:
+  order: 36
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`unsafe` marca los sitios donde **tú** garantizas algo que el compilador no puede comprobar. No apaga las comprobaciones normales: el sistema de tipos y el borrow checker siguen funcionando igual dentro de un bloque `unsafe`.
+
+## Sinopsis
+
+```text
+unsafe { … }                         // bloque: «aquí cumplo los requisitos»
+unsafe fn f(…) { … }                 // función con requisitos para quien la llama
+unsafe trait T { … }                 // trait con requisitos para quien lo implementa
+unsafe impl T for X { … }            // «cumplo los requisitos de T»
+unsafe extern "C" { … }              // declaraciones externas (edición 2024)
+#[unsafe(no_mangle)]                 // atributo con requisitos (edición 2024)
+```
+
+## Qué hace
+
+`unsafe` tiene dos papeles opuestos:
+
+1. **Declarar un contrato**: `unsafe fn` y `unsafe trait` dicen «usarme tiene requisitos que el compilador no comprueba». Se documentan en una sección `# Safety`.
+2. **Cumplir un contrato**: `unsafe { … }`, `unsafe impl`, `unsafe extern` y `#[unsafe(…)]` dicen «he comprobado los requisitos». Por convención, cada bloque lleva un comentario `// SAFETY:` que explica por qué.
+
+Dentro de código `unsafe` puedes hacer **cinco cosas** extra, y solo esas:
+
+1. desreferenciar un puntero crudo (`*const T`, `*mut T`);
+2. llamar a una función `unsafe` (incluidas las externas no marcadas `safe`);
+3. leer o escribir un `static mut` o un `static` externo;
+4. implementar un trait `unsafe`;
+5. leer campos de una `union`.
+
+## Seguridad
+
+- Si no cumples el contrato, el programa tiene **comportamiento indefinido** aunque parezca funcionar. Ver la [lista completa](/ref/ub/).
+- **Edición 2024**: el cuerpo de una `unsafe fn` ya no es un bloque `unsafe` implícito; cada operación insegura necesita su propio `unsafe { … }` (lint `unsafe_op_in_unsafe_fn`, aviso por defecto). Así queda marcado exactamente qué línea es delicada.
+- Una función **segura** que usa `unsafe` por dentro es **sólida** (*sound*) si ningún código seguro que la llame puede provocar comportamiento indefinido. Ese es el objetivo: encerrar el `unsafe` detrás de una API segura, como hace `split_at_mut`.
+- La unidad que hay que revisar es el **módulo**: código seguro del mismo módulo puede romper una invariante (un campo privado) de la que depende un bloque `unsafe`.
+- `#![forbid(unsafe_code)]` prohíbe todo `unsafe` en un crate.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-unsafe" />
+
+Salida:
+
+```text
+30
+20
+[4, 2, 3, 4]
+promesa cumplida
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-unsafe-error" />
+
+`error[E0133]: dereference of raw pointer is unsafe and requires unsafe block`. La nota recuerda por qué: un puntero crudo puede ser nulo, colgante o estar desalineado.
+
+## Desde
+
+Rust 1.0. `unsafe extern` y atributos `#[unsafe(…)]`: 1.82, obligatorios en la edición 2024. `unsafe_op_in_unsafe_fn` como aviso por defecto: edición 2024.
+
+## Ver también
+
+- [Comportamiento indefinido](/ref/ub/) · [`extern`](/ref/lenguaje/palabras-clave/extern/) · [`safe`](/ref/lenguaje/palabras-clave/safe/) · [`union`](/ref/lenguaje/palabras-clave/union/) · [`static`](/ref/lenguaje/palabras-clave/static/) · [Atributos](/ref/lenguaje/atributos/) · [Ediciones](/ref/ediciones/)
+
+## Aprende esto en
+
+- [Mundo 20 · Unsafe y UB](/curso/20-unsafe-y-ub/)

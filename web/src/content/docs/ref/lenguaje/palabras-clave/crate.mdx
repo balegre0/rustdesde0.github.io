@@ -1,0 +1,71 @@
+---
+title: "crate"
+description: "Palabra clave estricta: la raíz del crate actual en rutas y visibilidad, y la declaración extern crate."
+sidebar:
+  order: 8
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Un **crate** es la unidad que compila `rustc` de una vez: un programa o una biblioteca. La palabra clave `crate` nombra **el crate actual**.
+
+## Sinopsis
+
+```text
+crate::ruta::al::elemento      // ruta absoluta desde la raíz de este crate
+pub(crate) elemento            // visible en todo este crate, no fuera
+extern crate nombre;           // enlazar con otro crate (casi nunca hace falta)
+extern crate nombre as alias;
+$crate                         // dentro de macro_rules: el crate que define la macro
+```
+
+## Qué hace
+
+### Uso 1 · Rutas desde la raíz
+
+`crate::a::b` empieza a buscar en la raíz del crate (`main.rs` o `lib.rs`), sin importar desde qué módulo lo escribas. Es la forma más clara de nombrar algo lejano.
+
+### Uso 2 · Visibilidad `pub(crate)`
+
+Hace un elemento público **solo dentro del crate**. Es la visibilidad habitual para lo que comparten tus módulos pero no quieres exponer a quien use tu biblioteca.
+
+### Uso 3 · `extern crate`
+
+Declara que se usa otro crate. Desde la edición 2018, Cargo pasa las dependencias directamente y esta línea sobra casi siempre; sigue teniendo usos raros, como `extern crate alloc;` en programas `#![no_std]`.
+
+### Uso 4 · `$crate`
+
+Solo dentro de `macro_rules!`: se sustituye por la ruta al crate que **define** la macro, para que funcione aunque la use otro crate.
+
+`crate` no puede usarse como nombre, ni siquiera como identificador crudo `r#crate`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-crate" />
+
+Salida:
+
+```text
+La Tiendita
+121
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-crate-error" />
+
+`error: crate cannot be a raw identifier`. Lo mismo pasa con `self`, `super` y `Self`.
+
+## Desde
+
+Rust 1.0 (`extern crate`). `crate::` en rutas: 1.30. `pub(crate)`: 1.18.
+
+## Ver también
+
+- [Visibilidad y rutas](/ref/lenguaje/visibilidad-y-rutas/) · [`pub`](/ref/lenguaje/palabras-clave/pub/) · [`super`](/ref/lenguaje/palabras-clave/super/) · [`self`](/ref/lenguaje/palabras-clave/self/) · [`extern`](/ref/lenguaje/palabras-clave/extern/)
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

@@ -1,0 +1,91 @@
+---
+title: "Evaluación const"
+description: "Qué se puede calcular al compilar: contextos constantes, const fn, promoción y errores en tiempo de compilación."
+sidebar:
+  order: 123
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Parte de un programa de Rust se ejecuta **dentro del compilador**: los valores de `const`, `static`, longitudes de arrays y bloques `const { … }` se calculan al compilar y quedan grabados en el ejecutable.
+
+## En una frase
+
+En un **contexto constante** solo se pueden usar expresiones constantes: literales, operaciones, llamadas a `const fn` y otras constantes. Si la evaluación falla (pánico, división entre cero, desbordamiento, comportamiento indefinido), el programa **no compila**.
+
+## La regla, paso a paso
+
+### Contextos constantes
+
+- el valor de un `const` y de un `static`;
+- la longitud de un array: `[T; N]` y `[x; N]`;
+- los discriminantes explícitos de un `enum`;
+- los argumentos genéricos constantes: `f::<{ 2 + 2 }>()`;
+- los bloques `const { … }` (1.79).
+
+Fuera de ellos, una `const fn` es una función normal.
+
+### Qué se puede hacer en una `const fn`
+
+- aritmética, comparaciones, `if`, `match`, `loop`, `while` (bucles desde 1.46), `let`, variables mutables;
+- crear y usar `&mut` a datos locales (1.83);
+- aritmética de flotantes (1.82);
+- llamar a otras `const fn` y usar constantes asociadas;
+- `panic!` (1.57): se convierte en error de compilación;
+- `unsafe`, punteros crudos, `transmute` (con las reglas de UB comprobadas).
+
+### Qué **no** se puede (todavía)
+
+- llamar a funciones que no son `const fn`, ni a métodos de traits en general (los traits `const` son inestables);
+- reservar memoria en el montón que sobreviva a la evaluación (`Vec`, `String`, `Box`);
+- bucles `for` (usan `Iterator`, un trait);
+- leer un `static mut` o hacer entrada/salida.
+
+### `const` frente a `static`
+
+Un `const` es un valor que se **copia** en cada uso; no tiene dirección propia. Un `static` es **una** posición de memoria. Desde 1.90, un `const` puede contener referencias a memoria mutable, pero entonces no se puede usar como patrón.
+
+### Promoción
+
+En código normal, `&EXPR` donde `EXPR` se puede evaluar al compilar (sin llamadas a funciones, sin mutabilidad interior ni destructor) se **promueve** a una constante: el préstamo es `&'static`. Por eso `let r: &'static i32 = &5;` compila.
+
+### Errores y comportamiento indefinido
+
+El evaluador del compilador ejecuta cada operación con comprobaciones (es el mismo motor que Miri). Un desbordamiento, una división entre cero, un índice fuera de rango, un pánico o cualquier comportamiento indefinido detectado se convierten en `error[E0080]`. Ver ejemplos en [Comportamiento indefinido](/ref/ub/).
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/const-eval" />
+
+Salida:
+
+```text
+[0, 1, 4, 9, 16, 25]
+2432902008176640000 3628800
+5 hola
+24
+[None, None, None]
+```
+
+## Errores típicos
+
+<NoCompila ej="ref-lenguaje/const-eval-error" />
+
+`error[E0080]: attempt to divide 10_u32 by zero`, con la nota `inside dividir` que señala la división.
+
+<NoCompila ej="ref-lenguaje/const-eval-panic" />
+
+`error[E0080]: evaluation panicked: día fuera de rango`. El pánico ocurre **al compilar**, así que nunca llega a ejecutarse un programa con un día inválido.
+
+## Desde
+
+Constantes: 1.0. `const fn`: 1.31. `if`/`match`/bucles: 1.46. Pánicos en const: 1.57. Bloques `const`: 1.79. Flotantes: 1.82. `&mut`: 1.83.
+
+## Ver también
+
+- [`const`](/ref/lenguaje/palabras-clave/const/) · [`static`](/ref/lenguaje/palabras-clave/static/) · [Comportamiento indefinido](/ref/ub/) · [Expresiones](/ref/lenguaje/expresiones/)
+
+## Aprende esto en
+
+- [Mundo 21 · El compilador por dentro](/curso/21-el-compilador-por-dentro/)

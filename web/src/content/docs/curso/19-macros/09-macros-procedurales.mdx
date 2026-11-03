@@ -1,0 +1,168 @@
+---
+title: "Macros procedurales"
+description: "Entiende las macros derive, de atributo y tipo función: funciones Rust que reciben y devuelven TokenStream, con syn y quote."
+sidebar:
+  order: 9
+duracion: 15
+desde: "1.30"
+requiere: ["19-macros/08-macros-de-std"]
+tarjetas:
+  - p: "¿Qué es una macro procedural?"
+    r: "Una función Rust, compilada en una crate proc-macro aparte, que recibe un TokenStream y devuelve otro TokenStream durante la compilación."
+  - p: "¿Cuáles son los tres tipos de macros procedurales?"
+    r: "derive (#[derive(Nombre)], añade items), de atributo (#[nombre], reemplaza el item) y tipo función (nombre!(...))."
+  - p: "¿Para qué sirven syn y quote?"
+    r: "syn analiza un TokenStream y lo convierte en un árbol de sintaxis; quote! construye un TokenStream a partir de código con huecos #variable."
+  - p: "¿Por qué una dependencia con macros procedurales es un riesgo de seguridad?"
+    r: "Porque su código se ejecuta en tu máquina al compilar, con tus permisos, igual que build.rs."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a entender cómo funcionan las macros que hay detrás de `#[derive(Debug)]` y de muchos atributos de crates populares, y a leer el código de una sencilla.
+
+## Predice
+
+<Pregunta
+  pregunta="En `#[derive(Debug)] struct Punto { x: i32, y: i32 }`, ¿quién escribe la implementación de `Debug`?"
+  opciones={["Nadie: Debug funciona por reflexión al ejecutar", "Una macro derive, que genera un `impl Debug for Punto` en compilación", "El enlazador", "Tienes que escribirla tú en otro archivo"]}
+  correcta={1}
+  explicacion="`derive` invoca una macro que lee la definición del struct y genera el código del `impl`. Al ejecutar, ese impl es código normal, como si lo hubieras escrito tú."
+  porque={["Rust no inspecciona tipos al ejecutar; todo se genera al compilar.", "Correcto.", "El enlazador solo une código ya compilado.", "Para eso está derive: para no escribirla."]}
+/>
+
+## La idea
+
+Una **macro procedural** (*procedural macro*) es una **función Rust** que el compilador ejecuta mientras compila. Recibe el código como un `TokenStream` (una secuencia de árboles de tokens) y devuelve otro `TokenStream` con el código generado. A diferencia de `macro_rules!`, aquí no hay patrones: escribes el algoritmo que quieras.
+
+Hay tres tipos:
+
+| Tipo | Se usa así | Recibe | Efecto |
+|---|---|---|---|
+| **derive** | `#[derive(MiTrait)]` sobre un struct/enum | el item | **añade** items nuevos (normalmente un `impl`); el original se queda igual |
+| **de atributo** | `#[mi_atributo(args)]` sobre un item | los argumentos y el item | **sustituye** el item por lo que devuelva |
+| **tipo función** | `mi_macro!(...)` | lo de dentro | sustituye la invocación, como `macro_rules!` |
+
+Para escribirlas se usan casi siempre tres crates del ecosistema: **`proc-macro2`** (una versión de los tipos de tokens que funciona también fuera del compilador, por ejemplo en tests), **`syn`** (convierte tokens en un árbol con tipos como `DeriveInput` o `ItemFn`) y **`quote`** (la macro `quote!`, que construye tokens a partir de una plantilla con huecos `#nombre`).
+
+## Pruébalo
+
+Los derives de la biblioteca estándar son macros que ya tienes a mano:
+
+<Ejecutar ej="m19/derive-debug" />
+
+1. `Clone`, `PartialEq`, `Debug` y `Default` se generaron al compilar.
+2. `{:#?}` es el formato «bonito» que da el `Debug` generado.
+
+Y así sería una derive propia. **Este código necesita una crate aparte** con `proc-macro = true` en su `Cargo.toml` y las dependencias `syn` y `quote`; no se puede ejecutar en el navegador:
+
+```rust
+// Crate «hola_derive», Cargo.toml:
+//   [lib]
+//   proc-macro = true
+//   [dependencies]
+//   syn = "2"
+//   quote = "1"
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::{parse_macro_input, DeriveInput};
+
+#[proc_macro_derive(Hola)]
+pub fn derive_hola(entrada: TokenStream) -> TokenStream {
+    // 1. Tokens -> árbol de sintaxis
+    let ast = parse_macro_input!(entrada as DeriveInput);
+    let nombre = &ast.ident;
+    // 2. Árbol -> código nuevo con quote!: #nombre se sustituye
+    let generado = quote! {
+        impl #nombre {
+            pub fn hola() -> &'static str {
+                concat!("Hola, soy ", stringify!(#nombre))
+            }
+        }
+    };
+    // 3. Devolvemos los tokens al compilador
+    generado.into()
+}
+```
+
+Quien la use escribiría `#[derive(Hola)] struct Gato;` y podría llamar a `Gato::hola()`.
+
+Una macro de atributo tiene esta firma: el primer `TokenStream` son los argumentos del atributo y el segundo, el item entero.
+
+```rust
+#[proc_macro_attribute]
+pub fn cronometra(args: TokenStream, item: TokenStream) -> TokenStream {
+    let funcion = parse_macro_input!(item as syn::ItemFn);
+    // ... devolver una versión de la función que mide su tiempo ...
+    quote! { #funcion }.into()
+}
+```
+
+Y una tipo función, `#[proc_macro] pub fn mi_macro(entrada: TokenStream) -> TokenStream`.
+
+## Bajo el capó
+
+<BajoElCapo>
+**Una crate que se compila para tu máquina.** Una crate `proc-macro` se compila como biblioteca dinámica para el sistema **donde compilas** (no para donde se ejecutará el programa), y el compilador la carga y llama a sus funciones durante la expansión. Por eso necesita el enlazador de tu sistema incluso si tu programa va a otra plataforma.
+
+**Lo que genera un derive de verdad.** Esta es la expansión real (Rust 1.99.1, `-Zunpretty=expanded`) de `#[derive(Debug)] struct Punto { x: i32, y: i32 }`:
+
+```rust
+#[automatically_derived]
+impl ::core::fmt::Debug for Punto {
+    #[inline]
+    fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+        ::core::fmt::Formatter::debug_struct_field2_finish(f, "Punto", "x",
+            &self.x, "y", &&self.y)
+    }
+}
+```
+
+Fíjate en las rutas absolutas (`::core::fmt::…`): por higiene, el código generado no puede depender de lo que tengas importado. Y en `#[automatically_derived]`, una marca para lints y herramientas.
+
+**Atributos auxiliares.** Una derive puede declarar atributos propios que solo tienen sentido sobre los campos del item: `#[proc_macro_derive(Serialize, attributes(serde))]` permite escribir `#[serde(rename = "id")]` en un campo. La macro los lee y el compilador los ignora después.
+
+**Errores.** Una macro procedural bien hecha no entra en pánico: devuelve un error con `syn::Error::new(span, "mensaje").to_compile_error()`, que el compilador muestra señalando el token exacto.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Compilar una dependencia es ejecutarla">
+❌ Añadir a `Cargo.toml` cualquier crate con macros procedurales sin mirarla, pensando que «solo se ejecuta si la llamo».
+
+✅ Una macro procedural (igual que un `build.rs`) **se ejecuta en tu máquina al compilar**, con tus permisos: puede leer archivos o conectarse a la red. Elige crates conocidas, fija versiones con `Cargo.lock`, revisa las dependencias nuevas y usa herramientas de auditoría de la cadena de suministro (`cargo audit`, `cargo deny`, `cargo vet`).
+</Trampa>
+
+<Trampa titulo="Tiempo de compilación">
+`syn` con todas sus funciones (`features = ["full"]`) es grande y se compila antes que tu crate. Muchas derives en un proyecto alargan la compilación. Pregúntate si una función genérica o un `macro_rules!` resolvería lo mismo.
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m19/reto-default" enunciado="Escribe A MANO los dos impl que generaría #[derive(Default, PartialEq)] para Config y descomenta las dos líneas de main. Debe imprimir dos veces la configuración vacía y luego true." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué diferencia a una macro derive de una de atributo?"
+  opciones={["Ninguna, son sinónimos", "La derive añade items y deja el original intacto; la de atributo sustituye el item por lo que devuelva", "La derive se ejecuta al arrancar el programa", "La de atributo solo funciona en funciones"]}
+  correcta={1}
+  explicacion="Por eso una derive no puede modificar tu struct, mientras que una macro de atributo puede reescribir por completo una función."
+  porque={["Tienen firmas y efectos distintos.", "Correcto.", "Las dos se ejecutan al compilar.", "Se pueden poner sobre structs, módulos, funciones…"]}
+/>
+
+<Pregunta
+  pregunta="En `quote! { impl #nombre { } }`, ¿qué hace `#nombre`?"
+  opciones={["Es un comentario", "Inserta en ese punto los tokens de la variable `nombre`", "Convierte `nombre` en texto", "Declara un atributo"]}
+  correcta={1}
+  explicacion="Es la interpolación de quote!: equivale al `$nombre` de macro_rules!."
+  porque={["En Rust los comentarios son `//`.", "Correcto.", "Para eso harías `stringify!` o un literal.", "Los atributos son `#[...]`."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué una crate de macros procedurales necesita el enlazador de tu sistema aunque compiles para otra plataforma?"
+  opciones={["No lo necesita", "Porque se compila como biblioteca para tu máquina y el compilador la carga y la ejecuta allí", "Porque genera código máquina para el programa final", "Porque usa el heap"]}
+  correcta={1}
+  explicacion="La macro se ejecuta dentro del compilador, que corre en tu máquina."
+  porque={["Sí lo necesita, por eso no puede compilarse en el navegador de este curso.", "Correcto.", "Genera tokens, no código máquina.", "No tiene relación."]}
+/>

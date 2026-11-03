@@ -1,0 +1,1 @@
+{ "nota": "Tamaños de wasm32 (punteros de 4 bytes). En un PC de 64 bits, &[i32] ocupa 16 y &i32 ocupa 8." }

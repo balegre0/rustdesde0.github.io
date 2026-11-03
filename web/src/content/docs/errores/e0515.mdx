@@ -1,0 +1,78 @@
+---
+title: "E0515: devolver una referencia a una variable local"
+description: "Una función devuelve una referencia a algo que se crea dentro de ella y que muere al terminar."
+sidebar:
+  order: 47
+insignias: ["Tiempos de vida"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot return reference to local variable `s` ``
+
+## Qué significa
+
+`s` es una variable local: se destruye cuando `crear` termina. Devolver `&s` daría al que llama una referencia a un `String` que ya no existe.
+
+## Qué error evita
+
+Una **referencia colgante** (*dangling reference*): apuntar a memoria de la pila o del montón que ya se liberó. Leerla sería comportamiento indefinido; Rust lo rechaza al compilar.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0515" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0515]: cannot return reference to local variable `s`
+ --> E0515.rs:3:5
+  |
+3 |     &s
+  |     ^^ returns a reference to data owned by the current function
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Construir un `String` o un `Vec` en una función y devolver `&` o un slice suyo.
+- Devolver `&x` de un parámetro recibido por valor.
+- Intentar «arreglar» E0106 añadiendo `'a` o `'static` a una función que de verdad crea el dato.
+
+## Cómo arreglarlo
+
+Devuelve el valor **con su propiedad** (`-> String`, `-> Vec<T>`): moverlo al que llama es barato (solo se copian el puntero, la longitud y la capacidad). Las referencias solo se pueden devolver si apuntan a algo que el que llama ya tenía (un parámetro `&`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn crear() -> String {
+    let s = String::from("temporal");
+    s // devolvemos la propiedad, no una referencia
+}
+
+fn main() {
+    println!("{}", crear());
+}
+```
+
+**Salida:**
+
+```text
+temporal
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0515` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0106](/errores/e0106/): falta un especificador de tiempo de vida
+- [E0597](/errores/e0597/): un valor no vive lo suficiente
+- [E0716](/errores/e0716/): un temporal se destruye mientras está prestado
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/)
+- [Mundo 05 · Funciones y la pila](/curso/05-funciones-y-la-pila/)

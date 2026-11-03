@@ -1,0 +1,741 @@
+# Banco de preguntas del mundo 21 · El compilador por dentro
+# Todo código y toda salida citados se han verificado con rustc 1.99.1 (y nightly 1.101.0 donde se indica).
+
+- id: m21-etapa-e0425
+  titulo: "¿Quién encuentra a totl?"
+  mundo: 21-el-compilador-por-dentro
+  tema: compilador
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué etapa del compilador produce este error?"
+  ej: m21/nombre-desconocido
+  opciones: ["El lexer", "La resolución de nombres", "El borrow checker", "LLVM"]
+  correcta: 1
+  solucion: |
+    `error[E0425]: cannot find value totl in this scope` lo da la **resolución de nombres** (`rustc_resolve`), que une cada nombre con su definición.
+    - El lexer acepta `totl`: es un identificador válido; no sabe qué nombres existen.
+    - El borrow checker trabaja sobre MIR, que ni siquiera llega a construirse.
+    - LLVM no ve nombres de variables locales.
+  etiquetas: ["E0425", "pipeline"]
+
+- id: m21-cadena-sin-cerrar
+  titulo: "La comilla perdida"
+  mundo: 21-el-compilador-por-dentro
+  tema: compilador
+  dificultad: media
+  tipo: no-compila
+  enunciado: "La comilla que falta está en la línea 3. ¿Por qué el error E0765 señala la línea 4, columna 23?"
+  ej: m21/cadena-sin-cerrar
+  opciones:
+    - "Porque rustc numera desde 0"
+    - "Porque la cadena abierta en la línea 3 se cierra con la primera comilla de la línea 4, y la siguiente comilla abre una cadena nueva que nunca se cierra"
+    - "Porque el error lo da el parser, que va una línea por detrás"
+    - "Porque el punto y coma cierra la cadena"
+  correcta: 1
+  solucion: |
+    El **lexer** solo ve caracteres: desde `"hola;` todo es cadena hasta la siguiente comilla (en `println!("`). Ahí se cierra, y la comilla de la columna 23 abre otra cadena que llega al final del archivo. El error aparece donde el lexer se perdió.
+    - rustc numera líneas y columnas desde 1.
+    - El parser no llega a ejecutarse con este error de lexer.
+    - `;` dentro de una cadena es un carácter más.
+  etiquetas: ["E0765", "lexer"]
+
+- id: m21-orden-pipeline
+  titulo: "¿Qué va antes?"
+  mundo: 21-el-compilador-por-dentro
+  tema: compilador
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál de estos órdenes de etapas de rustc es el correcto?"
+  opciones:
+    - "Lexer → parser → HIR → MIR → LLVM IR"
+    - "Parser → lexer → MIR → HIR → LLVM IR"
+    - "Lexer → MIR → parser → HIR → LLVM IR"
+    - "LLVM IR → MIR → HIR → AST → tokens"
+  correcta: 0
+  solucion: |
+    Texto → tokens (lexer) → AST (parser) → (macros y nombres) → HIR → (tipos, THIR) → MIR → monomorfización → LLVM IR → código máquina. Cada etapa necesita el resultado de la anterior. Las demás opciones cambian el orden o lo invierten.
+  etiquetas: ["pipeline"]
+
+- id: m21-for-desaparece
+  titulo: "El for que no existe"
+  mundo: 21-el-compilador-por-dentro
+  tema: compilador
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Tras el lowering a HIR, ¿en qué se convierte `for x in v { … }`?"
+  opciones:
+    - "En un `while` con un índice"
+    - "En `match IntoIterator::into_iter(v)` con un `loop` que hace `match Iterator::next(&mut iter)`"
+    - "En una llamada a una función `for_each` de la biblioteca"
+    - "Se queda igual hasta el código máquina"
+  correcta: 1
+  solucion: |
+    Lo vimos con `rustc +nightly -Zunpretty=hir`: `match into_iter(v) { mut iter => loop { match next(&mut iter) { None {} => break, Some { 0: x } => { … } } } }`. Por eso sirve cualquier tipo con `IntoIterator`.
+    - No hay índices: el `for` usa el trait de iteración.
+    - `for_each` es un método de iteradores, no el desazucarado de `for`.
+    - El `for` desaparece en el HIR.
+  etiquetas: ["HIR", "for"]
+
+- id: m21-interrogacion
+  titulo: "¿Qué esconde el ?"
+  mundo: 21-el-compilador-por-dentro
+  tema: compilador
+  dificultad: media
+  tipo: opcion
+  enunciado: "En el HIR, `let n: i32 = s.parse()?;` aparece como `match branch(s.parse()) { … }`. ¿Qué hace la rama `Break { 0: residual }`?"
+  opciones:
+    - "`panic!` con el error"
+    - "`return from_residual(residual)`: devuelve el error convertido a quien llamó"
+    - "`continue` al siguiente valor"
+    - "Ignora el error y usa 0"
+  correcta: 1
+  solucion: |
+    Salida real de `-Zunpretty=hir`: `Break { 0: residual } => return from_residual(residual), Continue { 0: val } => val`. `?` propaga con `return`; nunca entra en pánico ni inventa valores.
+  etiquetas: ["HIR", "?", "Try"]
+
+- id: m21-predice-expansion
+  titulo: "Macros que no pegan texto"
+  mundo: 21-el-compilador-por-dentro
+  tema: macros
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la primera línea?"
+  ej: m21/expansion
+  opciones: ["cuadrado!(2 + 1) = 5", "cuadrado!(2 + 1) = 9", "cuadrado!(2 + 1) = 6", "No compila"]
+  correcta: 1
+  solucion: |
+    `$e:expr` es un nodo de expresión ya agrupado; la expansión real es `(2 + 1) * (2 + 1)` = 9. Si la macro pegara texto daría `2 + 1 * 2 + 1` = 5, pero las macros de Rust sustituyen árboles de tokens.
+  etiquetas: ["macro_rules", "expansión"]
+
+- id: m21-higiene
+  titulo: "Dos x distintas"
+  mundo: 21-el-compilador-por-dentro
+  tema: macros
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprimen la segunda y la tercera línea?"
+  ej: m21/expansion
+  opciones:
+    - "doble_de!(x) = 4 y x sigue valiendo 2"
+    - "doble_de!(x) = 20 y x sigue valiendo 10"
+    - "doble_de!(x) = 20 y x sigue valiendo 2"
+    - "No compila: la macro redeclara x"
+  correcta: 1
+  solucion: |
+    Por la **higiene**, la `x` declarada dentro de la macro (vale 2) y tu `x` (vale 10) son variables distintas: cada identificador lleva su contexto de sintaxis. `$e` es tu `x`, así que `2 * 10` = 20, y tu `x` no cambia.
+  etiquetas: ["higiene", "macro_rules"]
+
+- id: m21-pratt-asociatividad
+  titulo: "8 - 3 - 2"
+  mundo: 21-el-compilador-por-dentro
+  tema: compilador
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué árbol y resultado imprime el parser para `8 - 3 - 2`?"
+  ej: m21/pratt
+  opciones:
+    - "Bin('-', Num(8), Bin('-', Num(3), Num(2))) = 7"
+    - "Bin('-', Bin('-', Num(8), Num(3)), Num(2)) = 3"
+    - "Bin('-', Num(8), Num(3)) = 5"
+    - "Un pánico: dos operadores iguales seguidos"
+  correcta: 1
+  solucion: |
+    El bucle se para con `p <= minimo`: un `-` del mismo nivel no entra en el hijo derecho, así que la resta se asocia por la izquierda: `(8 - 3) - 2` = 3. Es la salida real del ejemplo.
+  etiquetas: ["parser", "precedencia"]
+
+- id: m21-thir-into
+  titulo: "Un método que ya no es método"
+  mundo: 21-el-compilador-por-dentro
+  tema: compilador
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En el THIR de `fn suma(a: u8, b: u8) -> u32 { (a + b).into() }`, ¿qué es `.into()`?"
+  opciones:
+    - "Una búsqueda dinámica del método"
+    - "Un nodo `Call` a `core::convert::Into::into` con argumentos de tipo `[u8, u32]`"
+    - "Un cast `as u32`"
+    - "Un acceso al campo `into`"
+  correcta: 1
+  solucion: |
+    Salida real de `-Zunpretty=thir-tree`: `Call { ty: FnDef(DefId(2:4071 ~ core[4712]::convert::Into::into), Binder { value: [u8, u32], … }) … }`. La resolución de métodos ya eligió la función concreta, `<u8 as Into<u32>>::into`. No es un cast ni un campo, y Rust resuelve los métodos al compilar.
+  etiquetas: ["THIR", "typeck"]
+
+- id: m21-e0308
+  titulo: "u8 no es u32"
+  mundo: 21-el-compilador-por-dentro
+  tema: tipos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m21/tipos-no-cuadran
+  opciones:
+    - "Porque `12` no cabe en un `u8`"
+    - "Porque `area` espera `u32` y recibe `u8`, y Rust no convierte enteros implícitamente"
+    - "Porque falta `mut`"
+    - "Porque `area` está declarada después de usarse"
+  correcta: 1
+  solucion: |
+    E0308 `expected u32, found u8`: la comprobación de tipos unifica el tipo del argumento con el de la firma y falla. El `help:` propone `lado.into()`, una conversión explícita sin pérdida.
+    - 12 cabe de sobra en un `u8`.
+    - Nada se modifica: `mut` no tiene que ver.
+    - En Rust el orden de las funciones en el archivo no importa.
+  etiquetas: ["E0308", "typeck"]
+
+- id: m21-mir-local-retorno
+  titulo: "El local cero"
+  mundo: 21-el-compilador-por-dentro
+  tema: mir
+  dificultad: facil
+  tipo: opcion
+  enunciado: "En MIR, ¿qué es `_0`?"
+  opciones: ["El primer argumento", "El valor de retorno", "Un temporal cualquiera", "El puntero a la pila"]
+  correcta: 1
+  solucion: "Por convenio `_0` es el lugar de retorno; `_1`, `_2`… son los argumentos y después vienen variables y temporales. `return` devuelve lo que haya en `_0`."
+  etiquetas: ["MIR"]
+
+- id: m21-mir-camino-none
+  titulo: "El camino del None"
+  mundo: 21-el-compilador-por-dentro
+  tema: mir
+  dificultad: media
+  tipo: opcion
+  enunciado: "En el MIR de `doble(x: Option<u32>)`, `bb0` termina en `switchInt(move _2) -> [0: bb2, 1: bb3, otherwise: bb1]`. `bb2` pone `_0 = const 0_u32` y salta a `bb5` (`return`). ¿Qué camino sigue `doble(None)`?"
+  opciones: ["bb0 → bb3 → bb4 → bb5", "bb0 → bb2 → bb5", "bb0 → bb1", "bb0 → bb5"]
+  correcta: 1
+  solucion: "`None` es la variante 0 de `Option`: `switchInt` salta a `bb2`. `bb3` es la rama `Some`, y `bb1` es `unreachable` (el discriminante solo puede ser 0 o 1)."
+  etiquetas: ["MIR", "switchInt"]
+
+- id: m21-mir-assert-overflow
+  titulo: "El assert escondido"
+  mundo: 21-el-compilador-por-dentro
+  tema: mir
+  dificultad: media
+  tipo: predice
+  enunciado: "En el perfil **debug**, ¿qué pasa en la tercera llamada, `doble(Some(3_000_000_000))`?"
+  ej: m21/mir-doble
+  opciones:
+    - "Imprime 6000000000"
+    - "Entra en pánico con `attempt to multiply with overflow`"
+    - "Imprime 1705032704"
+    - "No compila"
+  correcta: 1
+  solucion: |
+    El MIR de debug tiene `MulWithOverflow` seguido de un terminador `assert`; el `assert` falla y el programa entra en pánico (salida real: `attempt to multiply with overflow`). En **release** la comprobación no existe y el resultado da la vuelta: 1705032704, que es 6 000 000 000 − 2³². 6000000000 no cabe en un `u32`.
+  etiquetas: ["MIR", "overflow"]
+
+- id: m21-mir-sin-drop-1
+  titulo: "¿Dónde está el drop de _1?"
+  mundo: 21-el-compilador-por-dentro
+  tema: mir
+  dificultad: media
+  tipo: opcion
+  enunciado: "En el MIR de `fn saluda(nombre: String) -> usize { let s = nombre; s.len() }` hay `_2 = move _1;` y luego `drop(_2)`, pero ningún `drop(_1)`. ¿Por qué?"
+  opciones:
+    - "Porque los argumentos nunca se destruyen"
+    - "Porque `_1` se movió a `_2`; destruir los dos sería una doble liberación"
+    - "Porque `String` no necesita drop"
+    - "Porque el optimizador lo quitó"
+  correcta: 1
+  solucion: "Tras `move`, el origen ya no posee nada: el compilador solo inserta `drop` para el dueño final de cada camino. Un argumento que no se mueve sí se destruye. Y es MIR sin optimizar (`-C opt-level=0`)."
+  etiquetas: ["MIR", "drop", "move"]
+
+- id: m21-cleanup
+  titulo: "Bloques de limpieza"
+  mundo: 21-el-compilador-por-dentro
+  tema: mir
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuándo se ejecuta un bloque MIR marcado `(cleanup)`?"
+  opciones:
+    - "Al final de cada función"
+    - "Solo durante el unwinding de un pánico"
+    - "Al liberar la pila del hilo"
+    - "Nunca: es código muerto"
+  correcta: 1
+  solucion: "Los bloques `cleanup` son el camino del pánico con `panic = \"unwind\"`: hacen los `drop` pendientes y terminan en `resume` para seguir desenrollando. Con `-C panic=abort` desaparecen y las aristas dicen `unwind unreachable` (verificado)."
+  etiquetas: ["MIR", "unwind"]
+
+- id: m21-e0381
+  titulo: "Un camino sin valor"
+  mundo: 21-el-compilador-por-dentro
+  tema: mir
+  dificultad: media
+  tipo: no-compila
+  enunciado: "`llueve` vale `true`. ¿Por qué no compila?"
+  ej: m21/sin-inicializar
+  opciones:
+    - "Porque `x` debería ser `mut`"
+    - "Porque en el grafo de MIR existe un camino (`llueve == false`) que llega al uso de `x` sin asignarlo, y el análisis no evalúa condiciones"
+    - "Porque `println!` no acepta enteros"
+    - "Porque `let x: i32;` sin valor es ilegal"
+  correcta: 1
+  solucion: |
+    E0381 `used binding x is possibly-uninitialized`. El análisis razona sobre caminos, no sobre valores (la nota del error lo dice). Asignar una sola vez a una variable declarada sin valor no requiere `mut`, y `let x: i32;` es legal si **todos** los caminos asignan antes de leer.
+  etiquetas: ["E0381", "MIR"]
+
+- id: m21-nll-ultimo-uso
+  titulo: "¿Hasta cuándo dura el préstamo?"
+  mundo: 21-el-compilador-por-dentro
+  tema: prestamos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Con NLL, ¿hasta dónde vive el préstamo `let primero = &puntos[0];` si `primero` solo se usa en el `println!` siguiente?"
+  opciones:
+    - "Hasta el final del bloque `{}`"
+    - "Hasta su último uso, el `println!`"
+    - "Hasta que `puntos` se destruya"
+    - "Para siempre (`'static`)"
+  correcta: 1
+  solucion: "NLL define las regiones como conjuntos de puntos del MIR donde la referencia aún puede usarse. Por eso el ejemplo `m21/nll` puede hacer `puntos.push(40)` después: el préstamo ya terminó."
+  etiquetas: ["NLL"]
+
+- id: m21-two-phase
+  titulo: "v.push(v.len())"
+  mundo: 21-el-compilador-por-dentro
+  tema: prestamos
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué compila `puntos.push(puntos.len());` si `push` necesita `&mut puntos` y `len` necesita `&puntos`?"
+  opciones:
+    - "Porque `len` no toma prestado nada"
+    - "Por los two-phase borrows: el `&mut` de `push` se reserva, se evalúa `len()` y solo después se activa"
+    - "Porque el compilador copia el `Vec`"
+    - "No compila"
+  correcta: 1
+  solucion: "El préstamo exclusivo reservado todavía permite leer; se activa al hacer la llamada. Compila: lo verás en la salida de `m21/nll` (`[10, 20, 30, 40, 4]`). `len` sí toma `&self`, y nada se copia."
+  etiquetas: ["two-phase", "NLL"]
+
+- id: m21-problema-3
+  titulo: "El problema 3"
+  mundo: 21-el-compilador-por-dentro
+  tema: prestamos
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "Esta función es segura, pero Rust estable 1.99.1 la rechaza. ¿Por qué?"
+  ej: m21/problema-3
+  opciones:
+    - "Porque devuelve una referencia a una variable local"
+    - "Porque NLL extiende el préstamo de `mapa.get` a toda la lifetime del valor devuelto, que incluye el `insert`, sin distinguir que ese camino no devuelve `v`"
+    - "Porque `HashMap::insert` no existe para `&mut HashMap`"
+    - "Porque falta `mut` en `k`"
+  correcta: 1
+  solucion: |
+    E0502 con la nota `returning this value requires that *mapa is borrowed for '1`. NLL usa un solo conjunto de puntos por región. Polonius, sensible al flujo, acepta el programa: lo comprobamos con la nightly 1.101.0 (2026-11-01), que lo compila sin opciones porque Polonius alpha viene activado. No se devuelve ninguna local; `insert` existe con `&mut self`; `k` no se modifica.
+  etiquetas: ["E0502", "Polonius", "NLL"]
+
+- id: m21-polonius-estado
+  titulo: "¿Dónde está Polonius?"
+  mundo: 21-el-compilador-por-dentro
+  tema: prestamos
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué afirmación sobre Polonius es correcta en noviembre de 2026?"
+  opciones:
+    - "Es el borrow checker de Rust estable desde 2018"
+    - "Su versión alpha está activa en nightly; en estable 1.99.1 sigue NLL"
+    - "Es un crate que se añade a `Cargo.toml`"
+    - "Acepta cualquier programa"
+  correcta: 1
+  solucion: "Activado en nightly desde agosto de 2026, con objetivo de estabilizarse. En 2018 llegó NLL. Está dentro de rustc, y sigue rechazando todo lo inseguro: solo es más preciso."
+  etiquetas: ["Polonius"]
+
+- id: m21-solver-contar
+  titulo: "Pruebas encadenadas"
+  mundo: 21-el-compilador-por-dentro
+  tema: traits
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la última línea?"
+  ej: m21/contar-impls
+  opciones: ["0", "1", "3", "No compila: impl recursiva"]
+  correcta: 2
+  solucion: "El solver demuestra `Option<Option<Option<()>>>: Contar` aplicando la regla de `Option<T>` tres veces hasta el hecho `(): Contar`: 1 + 1 + 1 + 0 = 3. Una impl con condición sobre un tipo más pequeño es legal."
+  etiquetas: ["trait solver"]
+
+- id: m21-e0277-display
+  titulo: "La regla que falta"
+  mundo: 21-el-compilador-por-dentro
+  tema: traits
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué obligación no puede demostrar el solver?"
+  ej: m21/falta-display
+  opciones: ["`Vec<Punto>: Display`", "`Punto: Display`", "`&[Punto]: Debug`", "`i32: Display`"]
+  correcta: 1
+  solucion: "E0277 `Punto doesn't implement std::fmt::Display`, con `note: required by a bound in muestra`: el bound `T: Display` con `T = Punto`. `muestra` recibe `&[T]`, así que la obligación es sobre `Punto`, no sobre el `Vec`. `i32: Display` sí existe."
+  etiquetas: ["E0277", "trait solver"]
+
+- id: m21-coherencia
+  titulo: "Una sola prueba"
+  mundo: 21-el-compilador-por-dentro
+  tema: traits
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Para qué sirven la coherencia y la regla huérfana?"
+  opciones:
+    - "Para que el código compile más rápido"
+    - "Para que cada obligación `Tipo: Trait` tenga como mucho una impl aplicable, sea cual sea la combinación de crates"
+    - "Para impedir los genéricos"
+    - "Para que los traits no tengan métodos por defecto"
+  correcta: 1
+  solucion: "Si hubiera dos impls aplicables, el comportamiento dependería de cuál eligiera el compilador o de qué crates estuvieran enlazados. La regla huérfana impide implementar un trait ajeno para un tipo ajeno, que es donde dos crates podrían chocar."
+  etiquetas: ["coherencia", "orphan rule"]
+
+- id: m21-next-solver
+  titulo: "El solver nuevo"
+  mundo: 21-el-compilador-por-dentro
+  tema: traits
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál es el estado del solver de traits de nueva generación (`-Znext-solver`) en noviembre de 2026?"
+  opciones:
+    - "Estable y por defecto en 1.99.1 para todo"
+    - "Activado por defecto en nightly y usado en coherencia; pendiente de estabilizar para todo"
+    - "Abandonado en favor de chalk"
+    - "Solo existe en rust-analyzer"
+  correcta: 1
+  solucion: "Anuncio del 21 de agosto de 2026 en el blog de Rust. chalk es el proyecto anterior, ya archivado, cuyas ideas pasaron al nuevo solver."
+  etiquetas: ["next-solver"]
+
+- id: m21-const-desborda
+  titulo: "21! no cabe"
+  mundo: 21-el-compilador-por-dentro
+  tema: const
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Compilado en debug, ¿por qué falla?"
+  ej: m21/const-desborda
+  opciones:
+    - "Porque `const fn` no admite bucles"
+    - "Porque el intérprete de MIR evalúa `factorial(21)` al compilar y la multiplicación desborda"
+    - "Porque `u64` no existe en constantes"
+    - "Porque `main` no puede leer constantes"
+  correcta: 1
+  solucion: |
+    E0080: `attempt to compute 2432902008176640000_u64 * 21_u64, which would overflow`, con `note: inside factorial`. El mensaje conoce los valores porque el intérprete está ejecutando el cálculo. `const fn` admite `while` desde hace años.
+    Matiz verificado: en **release** (`overflow-checks=off`) este mismo archivo compila y la constante da la vuelta (`14197454024290336768`), porque el MIR de `factorial` ya no lleva el `assert`.
+  etiquetas: ["E0080", "const eval"]
+
+- id: m21-const-env
+  titulo: "Argumentos al compilar"
+  mundo: 21-el-compilador-por-dentro
+  tema: const
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Por qué no compila `const C: usize = std::env::args().count();`?"
+  opciones:
+    - "Porque `count` devuelve `u32`"
+    - "Porque `args` no es `const fn`: los argumentos del programa solo existen al ejecutarlo"
+    - "Porque las constantes deben ser `u8`"
+    - "Sí compila"
+  correcta: 1
+  solucion: "Error real: `error[E0015]: cannot call non-const function args in constants`. El intérprete de constantes no tiene «mundo exterior»."
+  etiquetas: ["E0015", "const eval"]
+
+- id: m21-miri-motor
+  titulo: "El mismo motor"
+  mundo: 21-el-compilador-por-dentro
+  tema: const
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué tienen en común la evaluación de `const` y Miri?"
+  opciones:
+    - "Nada"
+    - "Usan el mismo intérprete de MIR; Miri le añade la detección de comportamiento indefinido"
+    - "Los dos usan LLVM"
+    - "Los dos se ejecutan en el navegador"
+  correcta: 1
+  solucion: "`rustc_const_eval` está escrito sobre una «máquina» con ganchos: la de constantes es estricta, la de Miri comprueba aliasing, memoria sin inicializar, punteros colgantes…"
+  etiquetas: ["Miri", "const eval"]
+
+- id: m21-mono-copias
+  titulo: "¿Cuántas copias?"
+  mundo: 21-el-compilador-por-dentro
+  tema: genericos
+  dificultad: facil
+  tipo: predice
+  enunciado: "El programa llama a `describe` con `u8`, `&str` y `Vec<f64>`. ¿Qué imprime la tercera línea?"
+  ej: m21/monomorfizacion
+  opciones:
+    - "[1.5, 2.5] es un T"
+    - "[1.5, 2.5] es un alloc::vec::Vec<f64>"
+    - "[1.5, 2.5] es un Vec"
+    - "No compila"
+  correcta: 1
+  solucion: "Cada copia monomorfizada conoce su `T`: `type_name::<T>()` da la ruta completa, `alloc::vec::Vec<f64>` (salida real). Hay una copia por tipo."
+  etiquetas: ["monomorfización"]
+
+- id: m21-mono-asm
+  titulo: "maxsd y cmova"
+  mundo: 21-el-compilador-por-dentro
+  tema: genericos
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "El asm real de `mayor::<f64>` es `maxsd xmm0, xmm1` y el de `mayor::<u8>` usa `cmp` y `cmova`. ¿Qué demuestra?"
+  opciones:
+    - "Que una copia está optimizada y la otra no"
+    - "Que cada copia monomorfizada se compila con su tipo concreto y recibe instrucciones específicas"
+    - "Que `PartialOrd` está escrito en ensamblador"
+    - "Un error del compilador"
+  correcta: 1
+  solucion: "Es la esencia de la monomorfización: código especializado por tipo. En los símbolos v0 se ve el tipo: `…5mayordE…` (`d` = `f64`) y `…5mayorhE…` (`h` = `u8`)."
+  etiquetas: ["monomorfización", "asm"]
+
+- id: m21-noalias
+  titulo: "La promesa de &mut"
+  mundo: 21-el-compilador-por-dentro
+  tema: codegen
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime `con_crudos(p, p)`?"
+  ej: m21/noalias
+  opciones: ["1", "2", "0", "Comportamiento indefinido"]
+  correcta: 1
+  solucion: |
+    Con punteros crudos al mismo `i32`, escribir 2 por `b` cambia `*a`, y la función tiene que volver a leer: 2. La versión con `&mut` puede devolver 1 sin leer porque rustc marca los parámetros `noalias` en el LLVM IR (verificado: `ret i32 1`). Pasar dos punteros crudos iguales es legal.
+  etiquetas: ["noalias", "LLVM"]
+
+- id: m21-e0499-mismo
+  titulo: "Dos veces x"
+  mundo: 21-el-compilador-por-dentro
+  tema: prestamos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `con_refs(&mut x, &mut x)`?"
+  ej: m21/mismo-dos-veces
+  opciones:
+    - "Porque `x` no es `mut`"
+    - "Porque hay dos préstamos exclusivos del mismo valor vivos a la vez (E0499)"
+    - "Porque `con_refs` devuelve `i32`"
+    - "Porque falta `unsafe`"
+  correcta: 1
+  solucion: "E0499 `cannot borrow x as mutable more than once at a time`. Si se permitiera, la promesa `noalias` sería falsa y la versión optimizada devolvería 1 aunque `x` acabe valiendo 2. `x` sí es `mut`, y `unsafe` no autoriza a crear dos `&mut` al mismo sitio."
+  etiquetas: ["E0499", "noalias"]
+
+- id: m21-layout-option-ref
+  titulo: "El None invisible"
+  mundo: 21-el-compilador-por-dentro
+  tema: layout
+  dificultad: facil
+  tipo: opcion
+  enunciado: "En x86-64, ¿cuánto ocupa `Option<&u8>`?"
+  opciones: ["8", "9", "16", "1"]
+  correcta: 0
+  solucion: "Una referencia nunca es nula: el 0 es un nicho que guarda el `None`. Verificado con `const _: () = assert!(size_of::<Option<&u8>>() == 8)`. En el navegador (wasm32) mide 4."
+  etiquetas: ["nichos", "layout"]
+
+- id: m21-layout-raw
+  titulo: "Punteros sin nicho"
+  mundo: 21-el-compilador-por-dentro
+  tema: layout
+  dificultad: media
+  tipo: opcion
+  enunciado: "En x86-64, ¿cuánto ocupa `Option<*const u8>`?"
+  opciones: ["8", "9", "16", "24"]
+  correcta: 2
+  solucion: "Un puntero crudo puede ser nulo: no hay valor imposible, así que hace falta etiqueta, y con el alineamiento de 8 el total es 16 (verificado)."
+  etiquetas: ["nichos", "layout"]
+
+- id: m21-layout-tres-casos
+  titulo: "Un solo nicho"
+  mundo: 21-el-compilador-por-dentro
+  tema: layout
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En x86-64, `enum { A(Box<u64>), B }` ocupa 8 bytes. ¿Cuánto ocupa `enum { A(Box<u64>), B, C }`?"
+  opciones: ["8", "9", "16", "24"]
+  correcta: 2
+  solucion: "Un puntero aporta un solo nicho (el 0) aunque esté alineado: rustc no usa los bits bajos. Con dos variantes sin datos hace falta una etiqueta aparte: 16 bytes (verificado en x86-64; 8 en wasm32)."
+  etiquetas: ["nichos", "layout"]
+
+- id: m21-layout-reorden
+  titulo: "8 frente a 12"
+  mundo: 21-el-compilador-por-dentro
+  tema: layout
+  dificultad: media
+  tipo: opcion
+  enunciado: "`struct S { a: u8, b: u32, c: u16 }` ocupa 8 bytes; con `#[repr(C)]` ocupa 12. ¿Por qué?"
+  opciones:
+    - "Porque `repr(C)` añade una cabecera"
+    - "Porque `repr(Rust)` reordena los campos (b, c, a) para ahorrar relleno; `repr(C)` respeta el orden de declaración"
+    - "Porque `repr(C)` usa enteros de 64 bits"
+    - "Es aleatorio"
+  correcta: 1
+  solucion: "`-Zprint-type-sizes` (nightly) muestra el orden real: `.b` 4, `.c` 2, `.a` 1 y 1 byte de relleno final. Con `repr(C)` hay relleno tras `a` y al final. El orden de `repr(Rust)` no está garantizado."
+  etiquetas: ["repr(C)", "layout"]
+
+- id: m21-vtable-llamada
+  titulo: "Una instrucción"
+  mundo: 21-el-compilador-por-dentro
+  tema: dyn
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "El asm real de `fn llama_area(f: &dyn Forma) -> f64 { f.area() }` en x86-64 Windows es `rex64 jmp qword ptr [rdx + 24]`. ¿Por qué `+ 24`?"
+  opciones:
+    - "Porque `area` es el método número 24"
+    - "Porque la vtable empieza con 3 palabras de 8 bytes (drop, tamaño, alineamiento) y `area` es el primer método"
+    - "Porque el `f64` mide 24 bytes"
+    - "Porque `rdx` apunta a los datos"
+  correcta: 1
+  solucion: "El puntero gordo llega en `rcx` (datos) y `rdx` (vtable). 3 × 8 = 24 es el desplazamiento del primer método. Es `jmp` porque es una llamada de cola."
+  etiquetas: ["vtable", "dyn", "asm"]
+
+- id: m21-vtable-drop-cero
+  titulo: "Una casilla a cero"
+  mundo: 21-el-compilador-por-dentro
+  tema: dyn
+  dificultad: media
+  tipo: opcion
+  enunciado: "En la vtable real de `Circulo(f64)` para `Forma`, la primera palabra vale 0. ¿Qué significa?"
+  opciones:
+    - "Que `Circulo` mide 0 bytes"
+    - "Que no hay función `drop_in_place` porque `Circulo` no necesita nada al destruirse"
+    - "Que la vtable está vacía"
+    - "Que el primer método no existe"
+  correcta: 1
+  solucion: "Las siguientes palabras son 8 (tamaño) y 8 (alineamiento), y después van los punteros a `area` y `nombre`. Si `Circulo` tuviera un `String`, ahí habría un puntero a la función que lo destruye."
+  etiquetas: ["vtable"]
+
+- id: m21-async-tamano
+  titulo: "El array viajero"
+  mundo: 21-el-compilador-por-dentro
+  tema: async
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Cuántos bytes ocupa `con_array()`?"
+  ej: m21/future-a-mano
+  opciones: ["8", "24", "102", "4096"]
+  correcta: 2
+  solucion: "El array de 100 bytes vive a través del `.await`, así que va dentro del futuro: 100 + 1 (futuro de `paso`) + 1 (etiqueta) = 102. `-Zprint-type-sizes` muestra los estados `Unresumed`, `Suspend0` (con `.a` y `.__awaitee`), `Returned` y `Panicked`."
+  etiquetas: ["async", "corrutina"]
+
+- id: m21-async-no-ejecuta
+  titulo: "Llamar no es ejecutar"
+  mundo: 21-el-compilador-por-dentro
+  tema: async
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué hace `guardar();` (un `async fn`) dentro de otra función async, sin `.await`?"
+  opciones:
+    - "Lo ejecuta en segundo plano"
+    - "Solo construye el futuro en estado `Unresumed`; si nadie lo sondea, el cuerpo nunca se ejecuta"
+    - "Lo ejecuta en otro hilo"
+    - "Da error de compilación siempre"
+  correcta: 1
+  solucion: "Un `async fn` devuelve un enum sin ejecutar nada. El compilador avisa con `unused_must_use` porque los futuros son `#[must_use]`, pero es un aviso, no un error."
+  etiquetas: ["async"]
+
+- id: m21-panic-wasm
+  titulo: "Pánico en el navegador"
+  mundo: 21-el-compilador-por-dentro
+  tema: panicos
+  dificultad: media
+  tipo: predice
+  enunciado: "En el navegador, ¿se imprime `drop de a`?"
+  ej: m21/panico-en-wasm
+  opciones:
+    - "Sí, y luego `catch_unwind devolvió Err: true`"
+    - "No: el target del navegador usa `panic=\"abort\"` y el programa termina en el pánico"
+    - "Sí, pero no se imprime la línea de `catch_unwind`"
+    - "No compila"
+  correcta: 1
+  solucion: "`rustc --print cfg --target wasm32-wasip1` da `panic=\"abort\"` (y el host x86-64 Windows `panic=\"unwind\"`). Salida real en el navegador: `drop de x`, el mensaje del pánico, y nada más."
+  etiquetas: ["panic", "abort", "wasm"]
+
+- id: m21-panic-abort-mir
+  titulo: "unwind unreachable"
+  mundo: 21-el-compilador-por-dentro
+  tema: panicos
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Al compilar con `-C panic=abort`, el MIR de `saluda` cambia `unwind: bb3` por `unwind unreachable` y los bloques `cleanup` desaparecen. ¿Qué consecuencia tiene?"
+  opciones:
+    - "La función ya no puede entrar en pánico"
+    - "Si hay un pánico, el proceso termina sin ejecutar ningún `drop` pendiente"
+    - "Los pánicos se ignoran"
+    - "El programa es más lento"
+  correcta: 1
+  solucion: "La llamada puede seguir entrando en pánico; lo que no existe es el camino de vuelta. A cambio, el binario es más pequeño y no lleva tablas de desenrollado."
+  etiquetas: ["panic", "MIR"]
+
+- id: m21-queries-verde
+  titulo: "Verde y rojo"
+  mundo: 21-el-compilador-por-dentro
+  tema: compilador
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la última línea?"
+  ej: m21/mini-queries
+  opciones:
+    - "total = 5  (ejecuciones: 4)"
+    - "total = 5  (ejecuciones: 3)"
+    - "total = 4  (ejecuciones: 2)"
+    - "total = 5  (ejecuciones: 6)"
+  correcta: 1
+  solucion: "Primera vez: 2 ejecuciones. Segunda: 0 (todo verde). Tras editar `lib.rs` (ahora con 2 líneas): solo se recalcula esa: 3 ejecuciones y total 3 + 2 = 5."
+  etiquetas: ["queries", "incremental"]
+
+- id: m21-cargo-check
+  titulo: "¿Por qué check vuela?"
+  mundo: 21-el-compilador-por-dentro
+  tema: compilador
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Por qué `cargo check` es mucho más rápido que `cargo build`?"
+  opciones:
+    - "Porque no comprueba los préstamos"
+    - "Porque para tras el análisis y solo genera metadatos: sin monomorfización, sin LLVM, sin enlazado"
+    - "Porque usa otra versión de rustc"
+    - "Porque compila en paralelo y build no"
+  correcta: 1
+  solucion: "`check` ejecuta tipos y borrow checker (te da todos esos errores) y se ahorra lo más caro. Es lo mismo que `rustc --emit=metadata`."
+  etiquetas: ["cargo", "tiempos"]
+
+- id: m21-cranelift
+  titulo: "Otro backend"
+  mundo: 21-el-compilador-por-dentro
+  tema: codegen
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué es Cranelift en el contexto de rustc?"
+  opciones:
+    - "Un borrow checker alternativo"
+    - "Un backend de generación de código que compila más rápido que LLVM optimizando menos, pensado para debug"
+    - "Un nuevo frontend de Rust escrito en C++"
+    - "El enlazador de Windows"
+  correcta: 1
+  solucion: "En nightly se instala con el componente `rustc-codegen-cranelift` (comprobado en el manifiesto de noviembre de 2026). El frontend nuevo dentro de GCC es gccrs, otra cosa."
+  etiquetas: ["Cranelift", "backend"]
+
+- id: m21-codegen-pila
+  titulo: "Postorden"
+  mundo: 21-el-compilador-por-dentro
+  tema: compilador
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué código genera el mini-compilador para `x * (2 + 3) - 4 * 1`?"
+  ej: m21/mini-compilador
+  opciones:
+    - "código: [CargaX, Empuja(5), Opera('*'), Empuja(4), Opera('-')]"
+    - "código: [CargaX, Empuja(2), Empuja(3), Opera('+'), Opera('*'), Empuja(4), Empuja(1), Opera('*'), Opera('-')]"
+    - "código: [Opera('-'), Opera('*'), CargaX, Empuja(5), Empuja(4)]"
+    - "código: [Empuja(46)]"
+  correcta: 0
+  solucion: "El plegado de constantes deja `x * 5 - 4` antes de generar código, y el codegen recorre en postorden (hijos y luego operación). La segunda opción sería sin plegar; la última confunde el resultado para `x = 10` con el código."
+  etiquetas: ["codegen", "optimización"]
+
+- id: m21-test-ui
+  titulo: "Tu primer PR"
+  mundo: 21-el-compilador-por-dentro
+  tema: comunidad
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué tipo de primera contribución a rustc se suele recomendar?"
+  opciones:
+    - "Reescribir el borrow checker"
+    - "Mejorar un diagnóstico (issues `E-easy`, `E-mentor`, `A-diagnostics`) con su test UI"
+    - "Cambiar la sintaxis del lenguaje"
+    - "Sustituir LLVM"
+  correcta: 1
+  solucion: "Un diagnóstico mejor es un cambio acotado y fácil de revisar, y el test UI (un `.rs` con su `.stderr` esperado) lo protege. Cambiar la sintaxis requiere un RFC; las otras dos son proyectos de años."
+  etiquetas: ["contribuir", "rustc"]

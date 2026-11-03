@@ -1,0 +1,50 @@
+---
+title: "#[repr]"
+description: "Elige la representación en memoria de un tipo: repr(C), repr(transparent), repr(u8…), repr(packed) y repr(align). Imprescindible para FFI y para controlar el layout."
+sidebar:
+  order: 8
+insignias: ["Desde 1.0", "ABI y layout"]
+---
+import { Ejecutar } from '~/components';
+
+`#[repr(…)]` fija cómo se coloca un tipo en memoria. Sin él, Rust elige el layout que quiera (y lo puede cambiar entre versiones).
+
+## Sinopsis
+
+```text
+#[repr(Rust)]          // por defecto: el compilador decide
+#[repr(C)]             // orden escrito, reglas de alineación de C
+#[repr(transparent)]   // exactamente el layout de su único campo no nulo
+#[repr(u8)] … #[repr(i128)], #[repr(usize)]   // enums: tipo del discriminante
+#[repr(packed)], #[repr(packed(N))]           // sin relleno (alineación N)
+#[repr(align(N))]      // alineación mínima N (potencia de 2)
+#[repr(C, u8)]         // combinaciones válidas
+```
+
+## Qué hace
+
+- **`Rust`** (por defecto): el compilador puede **reordenar** los campos para reducir relleno y usar nichos. No hay garantías de layout.
+- **`C`**: los campos van en el orden escrito, con el relleno que pondría un compilador de C. Es la que se usa para **FFI** (mundo 22).
+- **`transparent`**: el tipo tiene el mismo layout y la misma ABI que su único campo (el resto deben ser de tamaño cero). Perfecto para newtypes que cruzan una frontera FFI.
+- **`u8`, `i32`…**: en un enum, fija el tipo y el tamaño del discriminante, y permite asignar valores (`Azul = 4`).
+- **`packed`**: sin relleno. Los campos pueden quedar **desalineados**: no se pueden tomar referencias a ellos (error E0793), solo copiarlos.
+- **`align(N)`**: alineación mínima; útil para evitar que dos datos compartan línea de caché (*false sharing*, mundo 17).
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-repr" />
+
+`Normal` ocupa 8 bytes porque Rust coloca `b` primero; `repr(C)` respeta el orden y necesita 12 por el relleno.
+
+## Errores típicos
+
+- Pasar a una función de otro lenguaje un struct sin `repr(C)`: el layout no está garantizado.
+- Tomar `&s.campo` en un struct `packed`: E0793. Copia el campo (`{ s.campo }`) o usa `ptr::addr_of!` y lecturas sin alinear.
+
+## Desde
+
+Rust 1.0. `transparent`: 1.28. `align`: 1.25. `packed(N)`: 1.33.
+
+## Ver también
+
+[Layout de tipos](/ref/lenguaje/layout-de-tipos/) · [Layout y nichos](/curso/21-el-compilador-por-dentro/10-layout-y-nichos/)

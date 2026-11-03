@@ -1,0 +1,58 @@
+---
+title: "size_of"
+description: "Cuántos bytes ocupa un tipo (size_of) o un valor concreto (size_of_val), y su alineación (align_of)."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::mem::size_of` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub const fn size_of<T>() -> usize
+
+pub const fn size_of_val<T>(val: &T) -> usize
+where
+    T: ?Sized,
+
+pub const fn align_of<T>() -> usize
+```
+
+## Qué hace
+
+`size_of::<T>()` da los bytes que ocupa un valor de tipo `T` **en la pila** (lo que hay en el montón no cuenta: un `String` mide lo mismo vacío que con un libro dentro). `size_of_val(&x)` sirve también para tipos sin tamaño fijo, como slices o `str`. `align_of` da la **alineación**: la dirección del valor debe ser múltiplo de ese número, y por eso a veces el compilador añade relleno. Rust puede reordenar los campos de un struct para ahorrar relleno (salvo con `#[repr(C)]`). `size_of`, `size_of_val` y `align_of` están en el preludio desde Rust 1.80.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/mem-size_of" />
+
+**Salida:**
+
+```text
+u8 1  u32 4  u64 8  f64 8
+bool 1  char 4  ()  0
+usize 4  &u8 4  Box<u8> 4
+&str 8  String 12
+Punto 8  Mezcla 8 (alineación 4)
+Option<&u8> 4  Option<u32> 8
+array 20
+```
+
+> En el navegador (wasm32) usize, punteros y referencias miden 4 bytes; en un PC de 64 bits, 8.
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [marker::Sized](/ref/std/marker/sized/)
+- [PhantomData (0 bytes)](/ref/std/marker/phantomdata/)
+
+## Aprende esto en
+
+- [Mundo 01 · La máquina](/curso/01-la-maquina/)
+- [Mundo 21 · El compilador por dentro](/curso/21-el-compilador-por-dentro/)

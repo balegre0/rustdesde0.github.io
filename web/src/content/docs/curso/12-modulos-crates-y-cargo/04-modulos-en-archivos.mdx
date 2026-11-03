@@ -1,0 +1,81 @@
+---
+title: "Módulos en archivos"
+description: "mod cocina; (con punto y coma) busca el código en cocina.rs o en cocina/mod.rs. El árbol de módulos se refleja en el árbol de carpetas."
+sidebar:
+  order: 4
+duracion: 10
+desde: "1.30"
+requiere: ["12-modulos-crates-y-cargo/03-use"]
+tarjetas:
+  - p: "¿Qué hace `mod cocina;` (con punto y coma) en `main.rs`?"
+    r: "Declara el módulo `cocina` y le dice al compilador que su código está en `src/cocina.rs` (o en `src/cocina/mod.rs`)."
+  - p: "¿Dónde va el código de `mod horno;` declarado dentro de `src/cocina.rs`?"
+    r: "En `src/cocina/horno.rs`."
+  - p: "¿Basta con crear un archivo `.rs` en `src` para que forme parte del programa?"
+    r: "No. Un archivo solo se compila si algún módulo lo declara con `mod nombre;`."
+---
+
+import { Pregunta, Trampa } from '~/components';
+
+Los módulos en línea (`mod x { … }`) están bien para ejemplos. En un proyecto real, cada módulo suele ir en su propio archivo. Las reglas son pocas y muy mecánicas.
+
+## La idea
+
+Si escribes `mod cocina;` **con punto y coma** (sin llaves), el compilador busca el contenido del módulo en un archivo:
+
+```text
+src/
+├── main.rs          mod cocina;       ← declara el módulo
+├── cocina.rs        pub fn preparar() …  mod horno;  pub mod salsas;
+└── cocina/
+    ├── horno.rs     pub fn hornear() …
+    └── salsas.rs    pub fn la_de_la_casa() …
+```
+
+Las reglas:
+
+1. `mod cocina;` en `main.rs` → busca `src/cocina.rs` **o** `src/cocina/mod.rs`.
+2. `mod horno;` dentro de `cocina.rs` → busca `src/cocina/horno.rs` (o `src/cocina/horno/mod.rs`).
+3. Un archivo que **nadie declara** con `mod` no forma parte del programa. El compilador ni lo mira.
+
+Es exactamente el mismo árbol de módulos de la lección 1, con el código de cada caja en su archivo. Las rutas (`crate::cocina::horno::hornear`) no cambian.
+
+Hay dos estilos para un módulo con hijos:
+
+| Estilo | Archivos |
+|---|---|
+| Moderno (desde Rust 1.30) | `cocina.rs` + carpeta `cocina/` con los hijos |
+| Clásico | `cocina/mod.rs` + los hijos en la misma carpeta |
+
+Los dos funcionan. El moderno evita tener veinte archivos llamados `mod.rs` abiertos en el editor. No mezcles los dos para el **mismo** módulo: si existen `cocina.rs` y `cocina/mod.rs` a la vez, es un error (E0761).
+
+## Pruébalo en tu PC
+
+```powershell
+cargo new restaurante
+cd restaurante
+```
+
+1. En `src/main.rs`, escribe `mod cocina;` al principio y llama a `cocina::preparar()` en `main`.
+2. Crea `src/cocina.rs` con `pub fn preparar() { println!("listo"); }`.
+3. `cargo run`.
+
+Después mueve `hornear` a `src/cocina/horno.rs`, declara `mod horno;` en `cocina.rs` y llama a `horno::hornear()` desde `preparar`.
+
+<Trampa titulo="Escribir mod en el archivo equivocado">
+
+❌ Crear `src/horno.rs` y escribir `mod horno;` dentro de `cocina.rs`. El compilador busca `src/cocina/horno.rs`, no lo encuentra y da E0583 (*file not found for module*).
+
+✅ La carpeta de los hijos lleva el nombre del padre. Si dudas, el mensaje de error te dice las dos rutas exactas que ha buscado.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En `src/main.rs` hay `mod red;` y en `src/red.rs` hay `mod tcp;`. ¿Dónde está el código de `tcp`?"
+  opciones={["`src/tcp.rs`", "`src/red/tcp.rs`", "`src/red.rs`, dentro", "`src/main/tcp.rs`"]}
+  correcta={1}
+  explicacion="Los hijos de `red` van en la carpeta `red/`. También valdría `src/red/tcp/mod.rs`."
+  porque={["Ahí iría un `tcp` hijo directo de la raíz.", "", "Estaría dentro si fuera `mod tcp { … }` con llaves.", "La raíz no usa carpeta."]}
+/>

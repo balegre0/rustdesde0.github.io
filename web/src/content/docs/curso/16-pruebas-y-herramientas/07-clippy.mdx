@@ -1,0 +1,197 @@
+---
+title: "Clippy: un revisor que no se cansa"
+description: "Deja que Clippy revise tu código, aprende a leer sus avisos y decide con criterio cuándo hacerle caso."
+sidebar:
+  order: 7
+duracion: 13
+desde: "1.74"
+requiere: ["16-pruebas-y-herramientas/06-documentar-con-rustdoc"]
+tarjetas:
+  - p: "¿Qué es Clippy?"
+    r: "Una colección de cientos de lints (comprobaciones) extra que se ejecutan sobre tu código con `cargo clippy`. Viene con Rust (componente `clippy` de rustup) y no necesita el enlazador."
+  - p: "¿Qué grupo de Clippy da **errores** por defecto en vez de avisos?"
+    r: "`clippy::correctness`: código que casi seguro está mal (por ejemplo `x == x`, el lint `eq_op`). Los grupos `style`, `complexity`, `perf` y `suspicious` avisan; `pedantic`, `restriction`, `nursery` y `cargo` están desactivados."
+  - p: "¿Qué diferencia hay entre `#[allow(lint)]` y `#[expect(lint)]`?"
+    r: "Los dos silencian el lint. `#[expect]` además **avisa si el lint deja de dispararse** (`unfulfilled_lint_expectations`), así no se acumulan silencios que ya no hacen falta."
+  - p: "¿Dónde configuras los lints de Clippy para todo un proyecto?"
+    r: "En la tabla `[lints.clippy]` de `Cargo.toml`, por ejemplo `unwrap_used = \"warn\"`."
+---
+
+import { Ejecutar, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+El compilador te dice si tu código es **correcto**. Clippy te dice si es **bueno**: más claro, más sencillo, más rápido o menos propenso a errores. Vas a aprender a usarlo como lo usan los proyectos profesionales.
+
+## Predice
+
+<Predice
+  ej="m16/clippy-antes"
+  opciones={["No compila: `&Vec<i32>` no se puede pasar a una función", "Compila y muestra `¿vacía? false` y `total: 21`", "Compila con 7 avisos del compilador", "Entra en pánico en el bucle"]}
+  correcta={1}
+  explicacion="El programa es correcto: compila sin avisos y funciona. Pero tiene siete cosas que se pueden escribir mejor, y el compilador no las comenta. Para eso está Clippy."
+  porque={["`&Vec<i32>` es un tipo válido para un parámetro; solo es poco práctico.", "Correcto.", "El compilador no avisa de nada: los 7 avisos son de Clippy.", "El índice nunca se sale: `i` va de `0` a `v.len() - 1`."]}
+/>
+
+## La idea
+
+Un **lint** es una comprobación que mira tu código buscando algo sospechoso o mejorable. El compilador ya trae algunos (por ejemplo, `unused_variables`). **Clippy** añade cientos más, organizados en **grupos**:
+
+| Grupo | Busca… | Por defecto |
+|---|---|---|
+| `correctness` | código que casi seguro está mal | **error** |
+| `suspicious` | código que probablemente está mal | aviso |
+| `style` | formas poco idiomáticas | aviso |
+| `complexity` | formas innecesariamente complicadas | aviso |
+| `perf` | formas innecesariamente lentas | aviso |
+| `pedantic` | detalles muy estrictos (con falsos positivos) | desactivado |
+| `restriction` | prohibiciones que solo tú puedes decidir (como `unwrap_used`) | desactivado |
+| `nursery` | lints nuevos, aún en pruebas | desactivado |
+| `cargo` | problemas en `Cargo.toml` | desactivado |
+
+Se ejecuta con **`cargo clippy`**. Como no genera código máquina, no necesita el enlazador: funciona aunque `cargo build` no lo haga. Cada aviso trae su **nombre** (`clippy::ptr_arg`), un enlace a su explicación y, casi siempre, la corrección sugerida.
+
+## Pruébalo
+
+Así responde `cargo clippy` a una biblioteca con las mismas funciones que el programa de arriba. Salida real; mostramos dos de los siete avisos y el resumen:
+
+```text title="cargo clippy (salida real, recortada)"
+warning: writing `&Vec` instead of `&[_]` involves a new object where a slice will do
+  --> src\lib.rs:10:20
+   |
+10 | pub fn es_vacia(v: &Vec<i32>) -> bool {
+   |                    ^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#ptr_arg
+   = note: `#[warn(clippy::ptr_arg)]` on by default
+help: change this to
+   |
+10 - pub fn es_vacia(v: &Vec<i32>) -> bool {
+10 + pub fn es_vacia(v: &[i32]) -> bool {
+   |
+
+warning: the loop variable `i` is only used to index `v`
+  --> src\lib.rs:16:14
+   |
+16 |     for i in 0..v.len() {
+   |              ^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_range_loop
+   = note: `#[warn(clippy::needless_range_loop)]` on by default
+help: consider using an iterator
+   |
+16 -     for i in 0..v.len() {
+16 +     for <item> in &v {
+   |
+
+warning: `calculo` (lib) generated 7 warnings (run `cargo clippy --fix --lib -p calculo -- ` to apply 5 suggestions)
+```
+
+Los otros cinco: `needless_return` (dos veces: `return` sobra al final de un bloque), `needless_bool` (`if cond { true } else { false }` es solo `cond`), `len_zero` (mejor `is_empty()`) y `assign_op_pattern` (mejor `t += v[i]`). Haciéndole caso, el código queda así:
+
+<Ejecutar ej="m16/clippy-despues" />
+
+Misma salida, la mitad de líneas, y `es_vacia` acepta ahora arrays y slices, no solo `Vec`.
+
+**Arreglos automáticos.** `cargo clippy --fix` aplica las sugerencias que Clippy considera seguras. En otro proyecto con esas dos funciones, aplicó 5 arreglos (`Fixed src\lib.rs (5 fixes)`) y dejó dos avisos para ti: cambiar el tipo de un parámetro (`ptr_arg`) o reescribir un bucle (`needless_range_loop`) puede afectar a quien llama a tu función, así que no lo hace solo. Necesita que tus cambios estén guardados en Git (o `--allow-dirty`), para que puedas deshacerlo.
+
+**El grupo que da errores.** Esto no es estilo, es un fallo lógico (salida real):
+
+```text
+error: equal expressions as operands to `==`
+ --> src\main.rs:3:8
+  |
+3 |     if edad == edad {
+  |        ^^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#eq_op
+  = note: `#[deny(clippy::eq_op)]` on by default
+```
+
+**Configurar el proyecto.** En `Cargo.toml` decides qué lints activar para todo el crate:
+
+```toml title="Cargo.toml"
+[lints.clippy]
+unwrap_used = "warn"     # de «restriction»: avisa de cada unwrap()
+```
+
+Con eso, `r.unwrap()` produce (real): `warning: used unwrap() on a Result value`, con la nota `if this value is an Err, it will panic`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`cargo clippy` no es un programa aparte que lee tu texto: ejecuta **`clippy-driver`**, que es el propio compilador `rustc` con los lints de Clippy registrados. Por eso Clippy entiende tu código tan bien como el compilador: conoce los tipos (sabe que `v` es un `&Vec<i32>`), resuelve los nombres y ve el código después de expandir las macros. Se detiene antes de generar código máquina, igual que `cargo check`.
+
+Cada lint tiene un **nivel**: `allow` (callado), `warn` (aviso), `deny` (error) o `forbid` (error que nadie puede rebajar más abajo en el código). Lo cambias en tres sitios, del más general al más concreto:
+
+1. `Cargo.toml`, tabla `[lints.clippy]` (o `[lints.rust]` para los del compilador).
+2. Al principio de `lib.rs` o `main.rs`: `#![warn(clippy::pedantic)]`.
+3. Encima de un elemento concreto: `#[allow(clippy::needless_range_loop)]`.
+
+Para silenciar un aviso en un sitio concreto es mejor **`#[expect(...)]`** que `#[allow(...)]`: si algún día el código cambia y el lint ya no se dispara, te avisa de que sobra (salida real):
+
+```text
+warning: this lint expectation is unfulfilled
+ --> ex.rs:1:10
+  |
+1 | #[expect(clippy::needless_range_loop, reason = "el índice se usa en el mensaje")]
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: el índice se usa en el mensaje
+  = note: `#[warn(unfulfilled_lint_expectations)]` on by default
+```
+
+El `reason = "…"` aparece en el aviso: deja escrito *por qué* decidiste no hacer caso.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Encender pedantic y obedecer a ciegas">
+
+❌ Activas `#![warn(clippy::pedantic)]` y cambias todo lo que diga. En la biblioteca de la lección (unas 20 líneas), pedantic añade cuatro avisos más; tres son `must_use_candidate` («esta función podría tener `#[must_use]`»). Algunos tienen razón y otros no aplican a tu caso. Obedecer sin pensar llena el código de cambios que no entiendes.
+
+✅ Los grupos por defecto (`correctness`, `suspicious`, `style`, `complexity`, `perf`) están pensados para hacerles caso casi siempre. Los estrictos se activan **uno a uno**, sabiendo qué buscan, o en bloque con excepciones razonadas:
+
+```toml title="Cargo.toml"
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+must_use_candidate = "allow"   # decidido en equipo: no lo queremos en todas partes
+```
+
+El `priority = -1` hace que el grupo se aplique primero y la excepción después.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["fn total(v: &[i32]) -> i32 {", "    v.iter().sum()", "}"]}
+  distractores={["fn total(v: &Vec<i32>) -> i32 {", "    let mut t = 0;", "    for i in 0..v.len() { t = t + v[i]; }", "    return t;"]}
+  explicacion="Es la versión que no provoca ningún aviso: recibe un slice (`ptr_arg`), recorre con un iterador (`needless_range_loop`) y no necesita acumulador ni `return` (`assign_op_pattern`, `needless_return`)."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`cargo build` falla en tu Windows porque falta `link.exe`. ¿Puedes usar `cargo clippy`?"
+  opciones={["No: Clippy necesita compilar el programa entero", "Sí: Clippy se detiene antes de generar código máquina y no enlaza", "Solo con la toolchain nightly", "Solo si instalas Clippy aparte desde internet"]}
+  correcta={1}
+  explicacion="Clippy, como `cargo check` y `cargo doc`, solo analiza. El enlazador solo hace falta para producir el ejecutable."
+  porque={["Analiza todo, pero no genera ni enlaza el ejecutable.", "Correcto.", "Clippy funciona en estable.", "Viene con rustup como componente `clippy`."]}
+/>
+
+<Pregunta
+  pregunta="Clippy da un **error** (no un aviso) con `eq_op` en `if edad == edad`. ¿Por qué ese lint es más severo?"
+  opciones={["Porque pertenece al grupo `correctness`: casi seguro es un fallo lógico", "Porque compara enteros", "Porque `edad` no es `mut`", "Porque es un lint del grupo `pedantic`"]}
+  correcta={0}
+  explicacion="`x == x` siempre es `true` (salvo con `NaN`), así que seguramente querías comparar otra cosa. Los lints de `correctness` vienen en nivel `deny`."
+  porque={["Correcto.", "Pasaría lo mismo con cualquier tipo.", "La mutabilidad no tiene nada que ver.", "`pedantic` está desactivado por defecto y nunca da errores sin que lo pidas."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `cargo clippy --fix` no cambió `&Vec<i32>` por `&[i32]` automáticamente?"
+  opciones={["Porque Clippy no sabe hacer ese cambio", "Porque cambiar la firma de una función pública puede afectar a quien la llama, y no lo considera seguro", "Porque `--fix` solo arregla errores, no avisos", "Porque necesita la toolchain nightly"]}
+  correcta={1}
+  explicacion="`--fix` solo aplica las sugerencias que está seguro de que no cambian el comportamiento ni rompen a nadie. Las demás te las deja como avisos para que decidas tú."
+  porque={["Sabe sugerirlo (lo muestra en el aviso); lo que no hace es aplicarlo solo.", "Correcto.", "Arregló 5 avisos.", "`--fix` funciona en estable."]}
+/>

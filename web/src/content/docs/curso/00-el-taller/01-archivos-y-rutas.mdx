@@ -1,0 +1,81 @@
+---
+title: "Archivos, carpetas y rutas"
+description: "Qué es un archivo, cómo se organizan las carpetas y cómo se escribe el camino hasta cada uno: rutas absolutas y relativas en Windows."
+sidebar:
+  order: 1
+duracion: 8
+tarjetas:
+  - p: "¿Qué es una ruta absoluta en Windows?"
+    r: "Un camino completo desde la raíz de una unidad, como `C:\\Users\\ana\\Documents\\rust\\hola`."
+  - p: "¿Qué es una ruta relativa?"
+    r: "Un camino que empieza en la carpeta donde estás ahora, como `src\\main.rs`. `.` es la carpeta actual y `..` la de arriba."
+  - p: "¿Qué indica la extensión `.rs`?"
+    r: "Que el archivo contiene código fuente de Rust."
+  - p: "¿Por qué no conviene guardar proyectos en OneDrive?"
+    r: "Porque la sincronización bloquea y copia miles de archivos de compilación (la carpeta `target`), lo que provoca errores y lentitud."
+---
+
+import { Ejecutar, Pregunta, Trampa } from '~/components';
+
+Programar es, en buena parte, crear y ordenar archivos. Antes de escribir una línea de Rust, vas a saber exactamente **dónde** está cada cosa y cómo nombrarla.
+
+## La idea
+
+Un **archivo** es un bloque de datos con nombre guardado en el disco: un texto, una foto, un programa. Un **directorio** o **carpeta** es un contenedor de archivos y de otras carpetas. Juntos forman un **árbol**: en Windows, cada unidad (`C:`) es la raíz y de ella cuelgan las carpetas.
+
+Una **ruta** (*path*) es el camino hasta un archivo, carpeta a carpeta, separadas por `\` en Windows:
+
+```text
+C:\Users\ana\Documents\rust\hola\src\main.rs
+└┬┘ └──────────────┬─────────────────┘ └─┬──┘
+unidad       carpetas, de fuera a dentro    archivo
+```
+
+- **Absoluta**: empieza en la unidad (`C:\…`). Funciona estés donde estés.
+- **Relativa**: empieza en la carpeta donde estás. Si estás en `C:\Users\ana\Documents\rust\hola`, la ruta `src\main.rs` lleva al mismo archivo. `.` significa «aquí» y `..`, «la carpeta de arriba».
+
+El final del nombre, tras el último punto, es la **extensión**: `.rs` es código Rust, `.toml` es configuración, `.exe` es un programa de Windows. El Explorador de archivos la oculta por defecto. Actívala en *Ver → Mostrar → Extensiones de nombre de archivo*: la vas a necesitar.
+
+## Pruébalo
+
+Rust trae herramientas para trabajar con rutas. Este programa parte una ruta en sus piezas (verás cómo funciona por dentro en el mundo 22):
+
+<Ejecutar ej="m00/partes-de-una-ruta" />
+
+Fíjate en que aquí la ruta usa `/`. Rust y casi todas las herramientas de Windows aceptan también `/` como separador, y es el que se usa dentro de los proyectos para que funcionen igual en cualquier sistema.
+
+## Dónde guardar tus proyectos
+
+Crea una carpeta solo para tus proyectos, **fuera de OneDrive**, con un nombre corto y sin espacios ni tildes. Por ejemplo:
+
+```text
+C:\Users\<tu-usuario>\Documents\rust
+```
+
+o, todavía más corto, `C:\dev`. Cada proyecto será una subcarpeta (`C:\dev\hola`, `C:\dev\adivina`…).
+
+<Trampa titulo="OneDrive y la carpeta target">
+
+❌ Guardar proyectos en una carpeta sincronizada con OneDrive (a menudo «Documentos» lo está sin que lo sepas). Al compilar, Rust crea miles de archivos temporales en `target\`. OneDrive intenta subirlos todos, los bloquea mientras tanto y la compilación falla con errores raros o va lentísima.
+
+✅ Comprueba si la carpeta tiene el icono de la nube de OneDrive en el Explorador. Si lo tiene, usa otra (`C:\dev`).
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Estás en `C:\\dev\\hola`. ¿Qué ruta relativa lleva a `C:\\dev\\otro\\src\\main.rs`?"
+  opciones={["`otro\\src\\main.rs`", "`..\\otro\\src\\main.rs`", "`\\otro\\src\\main.rs`", "`.\\otro\\src\\main.rs`"]}
+  correcta={1}
+  explicacion="`..` sube de `hola` a `dev`; desde ahí, `otro\\src\\main.rs`."
+  porque={["Eso buscaría `otro` dentro de `hola`.", "", "Empezar por `\\` es la raíz de la unidad: sería `C:\\otro\\…`.", "`.` es la carpeta actual, `hola`: buscaría `hola\\otro`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué contiene un archivo `main.rs`?"
+  opciones={["Un programa ya compilado", "Código fuente de Rust, en texto", "La configuración del proyecto", "Una biblioteca de Windows"]}
+  correcta={1}
+  explicacion="`.rs` es la extensión de los archivos de código Rust. Son texto: se pueden abrir con cualquier editor."
+  porque={["Los programas compilados en Windows son `.exe`.", "", "La configuración de un proyecto Rust está en `Cargo.toml`.", "Las bibliotecas de Windows son `.dll`."]}
+/>

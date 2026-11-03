@@ -1,0 +1,128 @@
+---
+title: "La lista del comportamiento indefinido"
+description: "Recorres la lista oficial de UB de la Reference y aprendes a reconocer un valor inválido."
+sidebar:
+  order: 3
+duracion: 14
+desde: "1.0"
+requiere: ["20-unsafe-y-ub/02-punteros-crudos"]
+tarjetas:
+  - p: "¿Qué significa que un programa tenga comportamiento indefinido?"
+    r: "Que el lenguaje no le da ningún significado: el compilador asume que nunca ocurre y puede producir cualquier resultado, también en código anterior."
+  - p: "Cita tres valores inválidos de la lista de UB."
+    r: "Un bool distinto de 0 o 1; un char en 0xD800..=0xDFFF o mayor que 0x10FFFF; una referencia nula o desalineada (también: enum con discriminante inválido, entero sin inicializar, fn nula, un valor de tipo !)."
+  - p: "¿Son UB un overflow de enteros, un deadlock o una fuga de memoria?"
+    r: "No. Son errores (o, el overflow, un pánico en debug), pero no UB. Rust seguro puede tenerlos."
+  - p: "¿Qué quiere decir «producir» un valor inválido?"
+    r: "Asignarlo, leerlo, pasarlo o devolverlo. Basta con producirlo para que haya UB, aunque luego no se use."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer **la lista** que define qué es comportamiento indefinido en Rust, y a distinguir lo que es UB de lo que solo es un error.
+
+## Predice
+
+<Predice
+  ej="m20/valores-validos"
+  pregunta="¿Qué devuelve `char::from_u32(0xD800)`?"
+  opciones={["`Some('\\u{d800}')`", "`None`", "Entra en pánico", "Un `char` cualquiera: es UB"]}
+  correcta={1}
+  explicacion="0xD800 está en el rango 0xD800..=0xDFFF, que no son valores Unicode escalares. Un `char` así sería inválido, así que la función segura devuelve `None`."
+  porque={["Ese `char` no puede existir: sería un valor inválido.", "Correcto: la API segura te protege del valor inválido.", "No hace falta un pánico: el tipo de retorno `Option` expresa el fallo.", "Las funciones seguras nunca producen UB: esa es la garantía."]}
+/>
+
+## La idea
+
+**Comportamiento indefinido** no es «el programa hace algo raro». Es que **el programa no tiene significado**. El compilador optimiza dando por hecho que el UB nunca ocurre; si ocurre, el resultado puede ser cualquier cosa: valores imposibles, ramas que se saltan, o efectos en líneas *anteriores* a la que tiene el fallo. Por eso «en mi máquina funciona» no prueba nada.
+
+La Reference de Rust mantiene una **lista** (que ella misma avisa de que no es exhaustiva) de lo que se considera UB. Resumida:
+
+| Grupo | Ejemplos de UB |
+|---|---|
+| Memoria | carreras de datos; leer o escribir por un puntero colgante o desalineado; proyecciones fuera de límites |
+| Aliasing | romper las reglas de `&T` (mutar lo que apunta, salvo con `UnsafeCell`) y de `&mut T` (accederlo por un camino no derivado de él) |
+| Inmutabilidad | mutar bytes inmutables (un `static` normal, algo alcanzado por `&T`, una constante) |
+| Llamadas | ABI incorrecta; desenrollar un pánico por donde no se permite; ejecutar código con *target features* que la CPU no tiene |
+| Intrínsecos | violar las precondiciones de `unreachable_unchecked`, `copy_nonoverlapping`, etc. |
+| **Valores inválidos** | producir un valor que su tipo no admite (tabla de abajo) |
+
+Y la otra mitad, igual de importante: **no son UB** el overflow de enteros (pánico en debug, vuelta en release), los *deadlocks*, las fugas de memoria, las condiciones de carrera lógicas o salir con `process::exit`. Son errores, pero el programa sigue teniendo significado. El Rust seguro puede tenerlos; lo que no puede tener es UB.
+
+## Pruébalo
+
+Cada tipo tiene un conjunto de patrones de bits permitidos. Las APIs seguras **comprueban** antes de producir el valor:
+
+<Ejecutar ej="m20/valores-validos" />
+
+Fíjate en `size_of Option<NonZeroU32> = 4` frente a `Option<u32> = 8`: como el 0 es un valor inválido para `NonZeroU32`, `Option` lo reutiliza para representar `None` (el *nicho*). Las reglas de validez no son solo prohibiciones: son las que permiten esa optimización.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La tabla de validez** (lo que nunca puede «existir»):
+
+| Tipo | Valores válidos | Por qué importa |
+|---|---|---|
+| `bool` | `0x00` o `0x01` | el compilador puede usar los otros 254 patrones como nicho |
+| `char` | `0..=0xD7FF` y `0xE000..=0x10FFFF` | por eso `Option<char>` mide 4 bytes |
+| `&T`, `&mut T`, `Box<T>` | no nulos, alineados, sin colgar | `Option<&T>` usa el nulo como `None` |
+| `fn(..)` | no nulo | `Option<fn()>` mide lo mismo que `fn()` |
+| `enum` | solo discriminantes declarados | un `match` no necesita rama para «otro valor» |
+| enteros, floats, punteros crudos | cualquier patrón… **inicializado** | memoria sin inicializar no es «basura»: es otra cosa (ver `MaybeUninit`) |
+| `!` | ninguno | por eso una función `-> !` nunca vuelve |
+| `str` | UTF-8 (invariante de **seguridad**, ver la lección 4) | |
+
+**«Producir» un valor** significa asignarlo, leerlo, pasarlo a una función o devolverlo. Con el `transmute` de abajo, el UB ocurre en el momento en que existe ese `bool`, no cuando se usa.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Mirar la salida de un programa con UB">
+
+❌ Este programa produce un `bool` con el byte `2`. Si lo ejecutas en una máquina normal puede imprimir «verdadero», «falso», o ambos en distintas compilaciones. **Ninguna de esas salidas significa nada**: no intentes razonar sobre ella.
+
+```rust
+let b: bool = unsafe { std::mem::transmute::<u8, bool>(2) }; // UB aquí mismo
+```
+
+✅ El ejemplo completo está en el Playground: ábrelo y elige *Tools → Miri*. Miri ejecuta el programa en una máquina abstracta que comprueba cada valor, y lo detiene en el `transmute` informando de que se ha construido un `bool` inválido. Y la versión correcta no necesita `unsafe`: un `match` sobre el byte, como `a_bool` en *Pruébalo*.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m20/char-seguro" enunciado="Implementa `a_char` sin unsafe: convierte el número con `char::from_u32` y, si no es válido, usa `'?'`. Debe imprimir `Rust?🦀?`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estos **no** es comportamiento indefinido?"
+  opciones={["Leer un `u32` sin inicializar", "Un overflow de `u8` en modo release", "Crear un `&i32` nulo", "Mutar un `static` que no está en `UnsafeCell`"]}
+  correcta={1}
+  explicacion="El overflow de enteros está definido: en debug es un pánico y en release da la vuelta (*wrapping*). Las otras tres aparecen en la lista de UB."
+  porque={["Los enteros deben estar inicializados: está en la lista.", "Correcto.", "Las referencias nunca son nulas: producir una es UB.", "Mutar bytes inmutables es UB."]}
+/>
+
+<Pregunta
+  pregunta="Un programa tiene UB en la línea 20, pero lo raro aparece en la línea 12. ¿Es posible?"
+  opciones={["No, el efecto siempre va después de la causa", "Sí: el compilador optimiza suponiendo que el UB nunca ocurre, y eso puede cambiar código anterior", "Solo si hay varios hilos", "Solo en modo debug"]}
+  correcta={1}
+  explicacion="Como el compilador da por hecho que la línea 20 nunca hace algo inválido, puede deducir cosas que afectan a cómo compila la 12. Por eso el UB «no tiene significado» en vez de «falla en un sitio»."
+  porque={["Con UB no hay garantía de orden: el programa entero pierde significado.", "Correcto.", "No hacen falta hilos para esto.", "Es al revés: con optimizaciones (release) estos efectos son más frecuentes."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `Option<&u8>` mide lo mismo que `&u8`?"
+  opciones={["Porque Option no ocupa memoria", "Porque una referencia nunca es nula, y Option usa el nulo para representar None", "Porque el compilador guarda el discriminante en el heap", "Solo ocurre en wasm"]}
+  correcta={1}
+  explicacion="La regla de validez «las referencias no son nulas» deja libre el patrón 0. `Option` lo usa como `None`: es la optimización de nicho. La salida real lo muestra: 4 = 4."
+  porque={["Option<u32> mide 8: sí ocupa cuando no hay nicho.", "Correcto.", "No hay ningún heap implicado.", "Pasa en cualquier plataforma (en un PC, 8 = 8)."]}
+/>
+
+## Para saber más
+
+- *The Rust Reference*, «Behavior considered undefined».
+- Ralf Jung, «Undefined Behavior deserves a better reputation» (blog, en inglés).

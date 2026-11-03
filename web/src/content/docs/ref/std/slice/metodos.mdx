@@ -1,0 +1,48 @@
+---
+title: "Métodos de las slices"
+description: "Los métodos de &[T] y &mut [T] que más se usan: ordenar, buscar, partir, trocear, ventanas, invertir, rotar y quitar repetidos."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** métodos de `[T]` (disponibles en `Vec<T>`, arrays y slices)
+
+## Sinopsis
+
+```rust
+fn sort(&mut self) where T: Ord;                   // estable, O(n log n)
+fn sort_unstable(&mut self) where T: Ord;          // más rápido, no estable
+fn sort_by_key<K: Ord>(&mut self, f: impl FnMut(&T) -> K);
+fn binary_search(&self, x: &T) -> Result<usize, usize> where T: Ord;
+fn contains(&self, x: &T) -> bool where T: PartialEq;
+fn chunks(&self, n: usize) -> Chunks<'_, T>;       // trozos de n (el último, más corto)
+fn windows(&self, n: usize) -> Windows<'_, T>;     // ventanas solapadas de n
+fn split_at(&self, i: usize) -> (&[T], &[T]);
+fn reverse(&mut self); fn rotate_left(&mut self, n: usize);
+fn first(&self) -> Option<&T>; fn last(&self) -> Option<&T>;
+fn iter(&self) -> Iter<'_, T>;
+```
+
+Y en `Vec`: `dedup` (quita repetidos **seguidos**), `retain`, `drain`.
+
+## Qué hace
+
+Todos estos métodos están definidos sobre `[T]`, así que funcionan igual con un `Vec`, un array o un trozo. Los que modifican piden `&mut self`; los que solo leen, `&self`.
+
+- `binary_search` exige que la slice esté **ordenada**. Devuelve `Ok(posición)` si lo encuentra y `Err(posición)` con el sitio donde habría que insertarlo para mantener el orden.
+- `sort` es **estable** (los iguales conservan su orden relativo); `sort_unstable` no, pero no reserva memoria y suele ser más rápido.
+- Para `f64`, que no es `Ord`, usa `sort_by(|a, b| a.total_cmp(b))`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/slice-metodos" />
+
+## Desde
+
+Rust 1.0 (la mayoría). `rotate_left`: 1.26.
+
+## Ver también
+
+[Slices en el curso](/curso/07-prestamos/09-slices/) · [`Vec`](/ref/std/vec/)

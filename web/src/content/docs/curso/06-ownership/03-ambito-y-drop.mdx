@@ -1,0 +1,140 @@
+---
+title: "Ámbito y drop"
+description: "Predice exactamente cuándo se libera cada valor: al final del ámbito, en orden inverso, al reasignar o cuando llamas a drop."
+sidebar:
+  order: 3
+duracion: 11
+desde: "1.0"
+requiere: ["06-ownership/02-un-solo-dueno"]
+tarjetas:
+  - p: "¿En qué orden se liberan las variables de un mismo bloque?"
+    r: "En orden inverso al de su declaración: la última creada es la primera liberada."
+  - p: "¿Qué hace `drop(x)`?"
+    r: "Es una función normal que toma la propiedad de x y no la devuelve; al terminar, x se libera. Después no puedes usar x (E0382)."
+  - p: "¿Qué le pasa al valor viejo cuando haces `x = nuevo;` con una variable `mut`?"
+    r: "Se libera en ese momento, porque se queda sin dueño."
+  - p: "¿Sombrear (`let x = ...;` otra vez) libera el valor anterior?"
+    r: "No. La variable vieja queda oculta pero sigue siendo dueña hasta el final de su ámbito."
+  - p: "¿Qué es RAII?"
+    r: "Atar un recurso a la vida de un valor: se adquiere al crearlo y se libera en su drop, al salir del ámbito."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Vas a predecir, línea a línea, el momento exacto en que se libera cada valor. Para verlo usaremos un tipo que **avisa** cuando lo liberan.
+
+## Predice
+
+<Predice
+  ej="m06/orden-drop"
+  pregunta="`Ruidoso` imprime «drop: …» cuando se libera. ¿En qué orden aparecen los avisos?"
+  opciones={[
+    "c, d, b, a",
+    "a, b, c, d",
+    "c, a, b, d",
+    "d, c, b, a"
+  ]}
+  correcta={0}
+  explicacion="`c` muere al cerrar su bloque (antes de «fin de main»). Al final de `main` mueren `d`, `b` y `a`: en orden **inverso** al de creación."
+  porque={[
+    "",
+    "Ese es el orden de creación; la liberación va al revés.",
+    "Al final de `main` el orden es inverso: primero el último creado (`d`).",
+    "`c` no espera al final de `main`: su ámbito es el bloque interior."
+  ]}
+/>
+
+## La idea
+
+Liberar un valor se llama **drop** en Rust (de *to drop*, soltar). Pasa en cuatro situaciones, y las cuatro las decide el compilador mirando tu código:
+
+1. **Al final del ámbito del dueño.** Si en un bloque hay varias dueñas, se liberan en **orden inverso** a su creación. Tiene sentido: algo creado después puede depender de algo creado antes, así que lo nuevo se va primero.
+2. **Al llamar a `drop(x)`.** Es una función corriente que **se queda con** `x` y no la devuelve; al terminar, `x` se libera. Útil para soltar algo grande antes de tiempo.
+3. **Al reasignar** una variable `mut`: `x = otro;` deja al valor viejo sin dueño, así que se libera **en ese momento**.
+4. **Cuando el dueño es a su vez liberado**: el árbol de la lección anterior.
+
+Esta idea tiene nombre: **RAII** (*Resource Acquisition Is Initialization*, «adquirir un recurso es inicializar un valor»). Un recurso (memoria, un archivo abierto, una conexión) se ata a un valor; se adquiere al crearlo y se suelta en su `drop`. En Rust no hay que recordar cerrar nada: cerrar es lo que pasa al terminar el ámbito.
+
+## Pruébalo
+
+Liberar antes de tiempo con `drop`:
+
+<Ejecutar ej="m06/drop-temprano" />
+
+Reasignar libera el valor viejo **en el momento**; y fíjate en el final: `otra` se declaró después que `r`, así que se libera antes.
+
+<Ejecutar ej="m06/reasignar" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`drop` no tiene nada de mágico.** Su definición en la biblioteca estándar es, literalmente, una función con el cuerpo vacío: `pub fn drop<T>(_x: T) {}`. Recibe el valor **por propiedad**; como no hace nada con él, el parámetro sale de su ámbito al terminar la función... y se aplica la regla 3. Toda la «magia» es la propiedad.
+
+**El trait `Drop`.** Los tipos que necesitan hacer algo al liberarse (devolver memoria, cerrar un archivo, imprimir «drop: …») implementan el trait `Drop`. El compilador llama a su método `drop` en los puntos de liberación. No puedes llamarlo tú directamente (para eso está la función `drop(x)`): si pudieras, podrías llamarlo dos veces sobre el mismo valor.
+
+**Sombrear no libera.** `let r = …; let r = …;` crea una **segunda** variable con el mismo nombre. La primera queda oculta, pero sigue siendo dueña hasta el final del bloque:
+
+<Ejecutar ej="m06/sombra" />
+
+«primero» se libera al final, no al sombrearlo. Comparado con reasignar (`r = …` sobre una variable `mut`), el resultado visible es parecido, pero el momento de la liberación no.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Si `drop(s)` libera `s`, usarla después sería leer memoria devuelta. Rust no lo permite:
+
+<NoCompila ej="m06/usar-tras-drop" explicacion="`drop(s)` **mueve** `s` a la función `drop` («value moved here»), que la libera. Leerla después sería un **uso tras liberar**. Observa que el error es E0382, el mismo que el de mover (lección 4): para el compilador, liberar con `drop` y entregar la propiedad son la misma cosa." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Dentro de un bloque creas `x`, luego `y`, luego `z` (los tres con `Drop`). Al cerrar el bloque, ¿en qué orden se liberan?"
+  opciones={["x, y, z", "z, y, x", "En un orden que decide el asignador", "Todos a la vez"]}
+  correcta={1}
+  explicacion="Las variables de un bloque se liberan en orden inverso a su declaración."
+  porque={[
+    "Ese es el orden de creación; la liberación va al revés.",
+    "",
+    "El orden está garantizado por el lenguaje y es fijo.",
+    "El programa ejecuta una liberación tras otra, en un orden concreto."
+  ]}
+/>
+
+<Pregunta
+  pregunta={"`let mut r = Ruidoso(\"a\"); r = Ruidoso(\"b\");` ¿Cuándo se libera «a»?"}
+
+  opciones={[
+    "Al final del ámbito de `r`",
+    "En la propia línea `r = Ruidoso(\"b\");`",
+    "Nunca: es una fuga",
+    "No compila: no se puede reasignar algo con `Drop`"
+  ]}
+  correcta={1}
+  explicacion="Al reasignar, el valor viejo se queda sin dueño y se libera en ese mismo momento. Al final del ámbito se liberará «b»."
+  porque={[
+    "Al final del ámbito se libera el valor que tenga `r` entonces: «b».",
+    "",
+    "Rust libera el valor viejo justo al reasignar.",
+    "Reasignar una variable `mut` siempre está permitido."
+  ]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `drop(x)` impide usar `x` después?"
+  opciones={[
+    "Porque `drop` borra el nombre `x` del programa",
+    "Porque `drop` toma la propiedad de `x` y la libera: usar `x` sería un uso tras liberar",
+    "Porque `drop` pone `x` a cero",
+    "Sí se puede usar `x` después; solo da un aviso"
+  ]}
+  correcta={1}
+  explicacion="`drop` es una función que recibe `x` por propiedad. Tras la llamada, `x` ya no es dueña de nada (E0382)."
+  porque={[
+    "El nombre sigue existiendo; lo que se pierde es el valor (y con él los permisos).",
+    "",
+    "No escribe ceros: libera la memoria, y la variable pierde todos sus permisos.",
+    "Es un error (E0382), no un aviso."
+  ]}
+/>

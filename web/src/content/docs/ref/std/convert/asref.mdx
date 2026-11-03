@@ -1,0 +1,62 @@
+---
+title: "AsRef y AsMut"
+description: "Préstamos baratos como otro tipo: aceptar &str, String o &String en la misma función."
+sidebar:
+  order: 3
+insignias: ["Desde 1.7", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::convert::AsRef, std::convert::AsMut` · está en el **preludio** (no necesita `use`)
+
+## Sinopsis
+
+```rust
+pub trait AsRef<T>
+where
+    T: ?Sized,
+{
+    // Required method
+    fn as_ref(&self) -> &T;
+}
+
+pub trait AsMut<T>
+where
+    T: ?Sized,
+{
+    // Required method
+    fn as_mut(&mut self) -> &mut T;
+}
+```
+
+## Qué hace
+
+`AsRef<U>` da un `&U` a partir de `&self` sin copiar nada. Sirve para escribir funciones flexibles: `fn f<S: AsRef<str>>(s: S)` acepta `&str`, `String`, `&String`… y `fs::read_to_string` usa `AsRef<Path>` para aceptar textos y rutas. `AsMut` es lo mismo con préstamos exclusivos.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/convert-asref" />
+
+**Salida:**
+
+```text
+4
+5
+5
+[2, 4, 6]
+[8, 10]
+```
+
+## Desde
+
+Rust 1.7 (estable).
+
+## Ver también
+
+- [Deref](/ref/std/ops/deref/)
+- [std::fs](/ref/std/fs/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)
+- [Mundo 10 · Errores](/curso/10-errores/)

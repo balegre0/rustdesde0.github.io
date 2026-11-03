@@ -1,0 +1,86 @@
+---
+title: "Traits de operadores"
+description: "Sobrecarga de operadores: implementar +, *, -x, += y [] para tus tipos."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::ops::{Add, Sub, Mul, Neg, AddAssign, Index…}`
+
+## Sinopsis
+
+```rust
+pub trait Add<Rhs = Self> {
+    type Output;
+
+    // Required method
+    fn add(self, rhs: Rhs) -> Self::Output;
+}
+
+pub trait AddAssign<Rhs = Self> {
+    // Required method
+    fn add_assign(&mut self, rhs: Rhs);
+}
+
+pub trait Neg {
+    type Output;
+
+    // Required method
+    fn neg(self) -> Self::Output;
+}
+
+pub trait Index<Idx>
+where
+    Idx: ?Sized,
+{
+    type Output: ?Sized;
+
+    // Required method
+    fn index(&self, index: Idx) -> &Self::Output;
+}
+```
+
+## Qué hace
+
+| Operador | Trait | Operador | Trait |
+|---|---|---|---|
+| `a + b` | `Add` | `a += b` | `AddAssign` |
+| `a - b` | `Sub` | `a -= b` | `SubAssign` |
+| `a * b` | `Mul` | `a *= b` | `MulAssign` |
+| `a / b` | `Div` | `a % b` | `Rem` |
+| `-a` | `Neg` | `!a` | `Not` |
+| `a & b`, `a \| b`, `a ^ b` | `BitAnd`, `BitOr`, `BitXor` | `a << b`, `a >> b` | `Shl`, `Shr` |
+| `v[i]` | `Index` | `v[i] = x` | `IndexMut` |
+
+Los binarios tienen un parámetro `Rhs` (el tipo de la derecha, por defecto `Self`) y un tipo asociado `Output` (el resultado). Así puedes definir, por ejemplo, `Vector * f64`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/ops-operadores" />
+
+**Salida:**
+
+```text
+Vector { x: 1.5, y: 1.0 }
+Vector { x: 3.0, y: 6.0 }
+Vector { x: -1.0, y: -2.0 }
+Vector { x: 1.5, y: 1.0 } 1.5 1
+true
+2..5 true 6
+```
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [E0369](/errores/e0369/)
+- [E0600](/errores/e0600/)
+- [std::cmp](/ref/std/cmp/ord/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

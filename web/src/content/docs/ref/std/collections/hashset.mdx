@@ -1,0 +1,133 @@
+---
+title: "HashSet<T>"
+description: "Conjunto de valores sin repetidos: insert, contains, remove y operaciones de conjuntos."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::collections::HashSet`
+
+## Sinopsis
+
+```rust
+pub struct HashSet<T, S = RandomState, A: Allocator = Global> { /* private fields */ }
+```
+
+## Qué hace
+
+Un `HashSet<T>` es, por dentro, un `HashMap<T, ()>`: guarda solo claves. Sirve para quitar repetidos y para preguntar «¿ya he visto esto?» en tiempo constante.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`insert`](#insert) | Añade un valor. | 1.0 |
+| [`contains`](#contains) | ¿Está el valor?. | 1.0 |
+| [`remove`](#remove) | Quita el valor; devuelve `true` si estaba. | 1.0 |
+| [`len`](#len) | Número de elementos. | 1.0 |
+| [`intersection`](#intersection) | Iterador de los elementos que están en los dos conjuntos. | 1.0 |
+| [`union`](#union) | Iterador de los elementos que están en alguno. | 1.0 |
+| [`difference`](#difference) | Iterador de los que están en este y no en el otro. | 1.0 |
+
+### `insert`
+
+```rust
+pub fn insert(&mut self, value: T) -> bool
+```
+
+Añade un valor. Devuelve `false` si ya estaba.
+
+### `contains`
+
+```rust
+pub fn contains<Q>(&self, value: &Q) -> bool
+where
+    T: Borrow<Q>,
+    Q: Hash + Eq + ?Sized,
+```
+
+¿Está el valor?
+
+### `remove`
+
+```rust
+pub fn remove<Q>(&mut self, value: &Q) -> bool
+where
+    T: Borrow<Q>,
+    Q: Hash + Eq + ?Sized,
+```
+
+Quita el valor; devuelve `true` si estaba.
+
+### `len`
+
+```rust
+pub fn len(&self) -> usize
+```
+
+Número de elementos.
+
+### `intersection`
+
+```rust
+pub fn intersection<'a>(
+    &'a self,
+    other: &'a HashSet<T, S, A>,
+) -> Intersection<'a, T, S, A>
+```
+
+Iterador de los elementos que están en los dos conjuntos.
+
+### `union`
+
+```rust
+pub fn union<'a>(&'a self, other: &'a HashSet<T, S, A>) -> Union<'a, T, S, A>
+```
+
+Iterador de los elementos que están en alguno.
+
+### `difference`
+
+```rust
+pub fn difference<'a>(
+    &'a self,
+    other: &'a HashSet<T, S, A>,
+) -> Difference<'a, T, S, A>
+```
+
+Iterador de los que están en este y no en el otro.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/collections-hashset" />
+
+**Salida:**
+
+```text
+3: nuevo = true
+1: nuevo = true
+3: nuevo = false
+2: nuevo = true
+1: nuevo = false
+3 true
+[2, 3] [1, 2, 3, 4] [1]
+```
+
+## Rendimiento
+
+`insert`, `contains` y `remove`: O(1) de media.
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [HashMap](/ref/std/collections/hashmap/)
+- [BTreeSet (ordenado)](/ref/std/collections/)
+
+## Aprende esto en
+
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

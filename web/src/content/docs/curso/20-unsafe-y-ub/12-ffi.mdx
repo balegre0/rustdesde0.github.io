@@ -1,0 +1,122 @@
+---
+title: "La frontera con C (FFI)"
+description: "Llamas a funciones de la biblioteca C del sistema con unsafe extern, usas repr(C) y evitas los errores clásicos de la frontera."
+sidebar:
+  order: 12
+duracion: 15
+desde: "2024"
+requiere: ["20-unsafe-y-ub/02-punteros-crudos"]
+tarjetas:
+  - p: "¿Cómo se declara en la edición 2024 una función externa con la ABI de C?"
+    r: "Dentro de `unsafe extern \"C\" { ... }`; cada item puede marcarse `safe fn` (se llama sin unsafe) o dejarse como `fn`/`unsafe fn` (exige unsafe al llamar)."
+  - p: "¿Por qué el bloque extern es unsafe?"
+    r: "Porque el compilador no puede comprobar que la firma que escribes coincide con la real: si no coincide, cualquier llamada es UB."
+  - p: "¿Para qué sirve `#[repr(C)]`?"
+    r: "Fija el orden y el relleno de los campos según las reglas de la ABI de C de la plataforma; repr(Rust) no garantiza ningún layout."
+  - p: "¿Qué pasa si un pánico intenta salir de una función `extern \"C\"`?"
+    r: "Desde Rust 1.81 el proceso aborta. Para propagarlo existe `extern \"C-unwind\"`; si no, usa catch_unwind y devuelve un código de error."
+  - p: "¿Qué tiene de malo `CString::new(s).unwrap().as_ptr()`?"
+    r: "El CString temporal se destruye al final de la sentencia y el puntero queda colgando (lint dangling_pointers_from_temporaries)."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a cruzar la frontera de tu programa: llamar a funciones de la **biblioteca C del sistema** usando su ABI (*Application Binary Interface*, el acuerdo sobre cómo se pasan argumentos y resultados entre funciones compiladas por separado). Es el uso más frecuente de `unsafe` en el mundo real.
+
+## Predice
+
+<NoCompila ej="m20/extern-sin-unsafe" explicacion="En la edición 2024 un bloque extern debe escribirse `unsafe extern`. Así queda visible que la declaración es una promesa tuya: el compilador no puede verificar que `abs` tenga de verdad esa firma." />
+
+## La idea
+
+Un programa no vive solo: el sistema operativo y muchísimas bibliotecas exponen funciones con la ABI de C, que es el «idioma común» entre binarios. Para llamarlas desde Rust, **declaras** su firma en un bloque `unsafe extern "C" { … }` y el enlazador conecta el nombre con el código real.
+
+El compilador no ve ese código. No sabe si la firma que escribiste es correcta, si la función acepta punteros nulos, ni si guarda el puntero que le pasas. Por eso el bloque se marca `unsafe`: **declarar mal una firma ya es UB** en cuanto se llama.
+
+Desde la edición 2024 puedes afinar por función: `safe fn` si **ningún** argumento puede causar UB (como `abs`, que recibe un entero), y `fn` sin más (equivale a `unsafe fn`) si hay condiciones (como `strlen`, que necesita un puntero válido a texto terminado en byte nulo).
+
+## Pruébalo
+
+<Ejecutar ej="m20/ffi-abs" />
+
+Tres detalles: (1) `abs` se llama sin `unsafe` gracias a `safe fn`; (2) `strlen` sí exige un bloque `unsafe` con su `// SAFETY:`; (3) `c"…"` crea un `&CStr`, texto que termina en un byte `0` como espera la ABI de C, y «ñandú» ocupa 13 bytes porque cada letra con tilde o ñ ocupa 2 en UTF-8.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Layout compartido: `#[repr(C)]`.** Para pasar un struct por la frontera, los dos lados deben ponerse de acuerdo en dónde está cada campo. `repr(Rust)` (el normal) puede reordenarlos para ahorrar relleno; `repr(C)` los pone en el orden escrito, con el relleno que exige la alineación:
+
+<Ejecutar ej="m20/repr-c" />
+
+`EnOrdenC` mide 12 bytes (1 + 3 de relleno + 4 + 2 + 2 de relleno); el mismo struct sin `repr(C)` mide 8 porque el compilador reordenó los campos. En la frontera, solo `repr(C)` es aceptable.
+
+**Tipos de la frontera:** `std::ffi::{c_int, c_long, c_char, c_void}` tienen el tamaño que dicta la plataforma (por ejemplo, `c_long` mide 32 bits en Windows y 64 en Linux de 64 bits: no asumas). Texto: `CString` (con dueño) y `CStr` (prestado). Punteros que pueden ser nulos: `Option<&T>`, `Option<Box<T>>` y `Option<extern "C" fn(..)>` tienen el mismo layout que un puntero nullable, gracias al nicho.
+
+**Exportar funciones Rust:** `#[unsafe(no_mangle)] pub extern "C" fn sumar(..)` mantiene el nombre del símbolo tal cual. El atributo es `unsafe` (edición 2024) porque dos símbolos con el mismo nombre en un programa son UB.
+
+<NoCompila ej="m20/no-mangle" explicacion="En la edición 2024, `no_mangle` es un atributo inseguro: hay que escribir `#[unsafe(no_mangle)]`. El compilador propone exactamente ese cambio." />
+
+**Pánicos en la frontera:** el desenrollado de un pánico de Rust no puede atravesar código que no lo espera. Desde Rust 1.81, si un pánico intenta salir de una función `extern "C"`, el proceso **aborta** (en vez de UB). Si quieres que el desenrollado cruce, usa la ABI `"C-unwind"`; si no, captura con `std::panic::catch_unwind` y devuelve un código de error.
+
+**Propiedad a través de la frontera:** lo que reserva Rust lo libera Rust. Para entregar un objeto se usa `Box::into_raw` y se exporta una función que lo recupere con `Box::from_raw` y lo destruya.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="El puntero de un CString temporal">
+
+❌ `CString::new("hola").unwrap().as_ptr()` en una sola sentencia: el `CString` es un temporal y se destruye al terminar la línea, dejando el puntero colgando. rustc 1.99.1 lo detecta en este caso:
+
+```text
+warning: this creates a dangling pointer because temporary `CString` is dropped at end of statement
+ --> cstring-colgante.rs:9:43
+  |
+9 |     let p = CString::new("hola").unwrap().as_ptr(); // ¡MAL! el CString muere aquí
+  |             ----------------------------- ^^^^^^ pointer created here
+  |             |
+  |             this `CString` is dropped at end of statement
+  |
+  = help: bind the `CString` to a variable such that it outlives the pointer returned by `as_ptr`
+  = note: a dangling pointer is safe, but dereferencing one is undefined behavior
+```
+
+✅ Guárdalo en una variable con nombre (`let texto = CString::new(..)?;`) y pasa `texto.as_ptr()` mientras `texto` siga vivo. Es exactamente lo que dice la ayuda del compilador.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m20/ffi-labs" enunciado={'Declara `labs` (valor absoluto de un `c_long`) en un bloque `unsafe extern "C"` como `safe fn` y úsala en `absoluto` sin ningún bloque unsafe. Debe imprimir `|-5| = 5`, `|0| = 0` y `|12| = 12`.'} />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuándo es correcto declarar una función externa como `safe fn`?"
+  opciones={["Siempre que compile", "Cuando ninguna combinación de argumentos puede causar UB (por ejemplo, solo recibe enteros y no tiene efectos peligrosos)", "Cuando la función es de la biblioteca estándar de C", "Nunca: todas las funciones externas son unsafe"]}
+  correcta={1}
+  explicacion="`safe fn` es una promesa: cualquier llamada desde código seguro está bien. Con punteros (como `strlen`) casi nunca se puede prometer."
+  porque={["Compilar no prueba nada: el compilador no ve la otra parte.", "Correcto.", "`strlen` es de la biblioteca de C y exige un puntero válido.", "La edición 2024 permite `safe fn` precisamente para estos casos."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `EnOrdenC` mide 12 bytes y el mismo struct sin `repr(C)` mide 8?"
+  opciones={["Porque repr(C) añade una cabecera", "Porque repr(C) respeta el orden escrito y necesita relleno para alinear; repr(Rust) puede reordenar los campos", "Porque repr(Rust) comprime los datos", "Es un error del ejemplo"]}
+  correcta={1}
+  explicacion="u8, u32, u16 en ese orden obligan a 3 bytes de relleno tras el u8 y 2 al final. Reordenados (u32, u16, u8 + 1 de relleno) caben en 8."
+  porque={["No hay cabecera: solo campos y relleno.", "Correcto.", "No hay compresión, solo otro orden.", "La salida real lo confirma."]}
+/>
+
+<Pregunta
+  pregunta={'Una función tuya `extern "C"` llamada desde una biblioteca externa entra en pánico. ¿Qué ocurre (Rust 1.81 o posterior)?'}
+  opciones={["El pánico se propaga al código de C", "El proceso aborta", "Se ignora", "Es UB"]}
+  correcta={1}
+  explicacion={'Antes era UB; desde 1.81 Rust aborta de forma definida. Si quieres propagar el desenrollado, usa `extern "C-unwind"`.'}
+  porque={["Para eso hace falta la ABI `C-unwind`.", "Correcto.", "Un pánico nunca se ignora.", "Dejó de serlo en 1.81."]}
+/>
+
+## Para saber más
+
+- *The Rustonomicon*, «Foreign Function Interface» (en inglés).
+- En este curso: [mundo 22, sistemas y FFI](../../22-sistemas-y-ffi/).

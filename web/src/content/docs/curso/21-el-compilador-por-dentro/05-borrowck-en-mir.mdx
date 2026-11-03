@@ -1,0 +1,177 @@
+---
+title: "El borrow checker trabaja sobre MIR"
+description: "Entiende NLL, los two-phase borrows y el famoso «problema 3», y comprueba con tus propios ojos que la nightly con Polonius acepta lo que el estable rechaza."
+sidebar:
+  order: 5
+duracion: 15
+desde: "2018"
+requiere: ["21-el-compilador-por-dentro/04-leer-mir", "07-prestamos"]
+tarjetas:
+  - p: "¿Qué significa NLL (*non-lexical lifetimes*)?"
+    r: "Que un préstamo vive el conjunto de puntos del MIR donde todavía se va a usar, no hasta el final del bloque `{}` donde se declaró la variable."
+  - p: "¿Por qué compila `v.push(v.len())`?"
+    r: "Por los two-phase borrows: el `&mut v` de `push` se crea «reservado», se evalúa `v.len()` con un préstamo compartido y solo después el `&mut` se activa."
+  - p: "¿Qué es el «problema 3» de NLL?"
+    r: "Devolver condicionalmente un préstamo (por ejemplo, el resultado de `mapa.get`) y, en el otro camino, mutar el mismo valor. NLL lo rechaza con E0502 aunque es seguro; Polonius lo acepta."
+  - p: "¿Qué es Polonius?"
+    r: "La siguiente versión del borrow checker: razona sobre de qué préstamos puede venir cada referencia en cada punto (sensible al flujo). Su versión «alpha» está activada en nightly desde agosto de 2026; en estable 1.99.1 sigue NLL."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa, Historia } from '~/components';
+
+En el mundo 7 aprendiste las reglas de los préstamos. Ahora vas a ver **dónde** y **cómo** se comprueban: sobre el grafo de MIR, punto por punto. Entender esto convierte los errores E0499 y E0502 de misterio en algo predecible.
+
+## Predice
+
+<Pregunta
+  pregunta={"¿Compila este código? `let mut v = vec![1]; let p = &v[0]; println!(\"{p}\"); v.push(2);`"}
+  opciones={[
+    "No: `p` sigue en ámbito hasta el final, así que `v` está prestado cuando hacemos `push`",
+    "Sí: el último uso de `p` es el `println!`; desde ahí el préstamo ya no está vivo",
+    "Solo en la edición 2015",
+    "Solo si `p` se declara con `mut`"
+  ]}
+  correcta={1}
+  explicacion={"Con NLL, un préstamo vive mientras se **use**, no mientras la variable exista. Después del `println!` nadie lee `p`, así que el `&mut` de `push` no choca con nada. Si añadieras otro `println!(\"{p}\")` después del `push`, sí fallaría: `push` puede mover el contenido del Vec a otra zona del heap y `p` quedaría colgando (uso tras liberar)."}
+  porque={[
+    "Así funcionaba el borrow checker léxico de antes de 2018. NLL mira usos, no ámbitos.",
+    "",
+    "NLL funciona en todas las ediciones desde Rust 1.63.",
+    "`mut` en `p` permitiría reasignar `p`, no cambia cuánto vive el préstamo."
+  ]}
+/>
+
+## La idea
+
+El borrow checker (`rustc_borrowck`) recibe el MIR de cada función y hace tres cosas:
+
+1. **Calcula qué préstamos están vivos en cada punto.** Cada `&x` o `&mut x` del MIR es un préstamo. Una **región** (lo que tú escribes como lifetime `'a`) es el conjunto de puntos del grafo donde una referencia todavía puede usarse. Las regiones se deducen con restricciones: «esta referencia se usa en el punto P, así que su región incluye P» (*liveness*) y «esta referencia se copió en esta otra, así que su región debe contener la otra» (*outlives*).
+2. **Recorre el grafo** marcando, en cada punto, los préstamos en ámbito.
+3. **Comprueba cada acceso**: si escribes en `x` (o lo mueves, o tomas `&mut x`) mientras un préstamo compartido de `x` sigue vivo, es un error (E0502, E0506…); si hay dos préstamos exclusivos vivos a la vez, E0499. Cada regla evita un fallo concreto: aliasing con mutación, uso tras liberar o carreras de datos.
+
+A esto se le llama **NLL** porque las lifetimes ya no son **léxicas** (ligadas a las llaves `{}`), sino conjuntos de puntos del grafo. Llegó con la edición 2018 y desde Rust 1.63 se aplica en todas las ediciones.
+
+Hay un refinamiento importante: los **two-phase borrows**. En `v.push(v.len())`, el compilador crea primero el `&mut v` de `push` como préstamo **reservado**, que todavía permite leer; evalúa los argumentos (`v.len()`), y solo al hacer la llamada activa el préstamo exclusivo. Sin esto, cualquier llamada de método que usa el propio valor en sus argumentos fallaría.
+
+## Pruébalo
+
+NLL y two-phase borrows en acción. Todo compila y todo es seguro:
+
+<Ejecutar ej="m21/nll" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Un análisis sobre caminos, no sobre valores.** Igual que la comprobación de inicialización (E0381) de la lección anterior, el borrow checker considera **todos** los caminos del grafo. Esto lo hace seguro (nunca acepta un programa con aliasing peligroso), pero también **conservador**: a veces rechaza programas correctos.
+
+**El caso famoso: «problema 3».** Esta función devuelve el valor si ya existe y, si no, lo inserta:
+
+```rust
+fn obtener_o_crear(mapa: &mut HashMap<u32, String>, k: u32) -> &String {
+    if let Some(v) = mapa.get(&k) {
+        return v;
+    }
+    mapa.insert(k, String::from("nuevo"));
+    mapa.get(&k).unwrap()
+}
+```
+
+Es segura: si entramos en el `if`, salimos con `return` y nunca llegamos al `insert`. Pero NLL razona así: «`v` se devuelve, así que el préstamo de `mapa.get` tiene que durar toda la lifetime `'1` del resultado; esa lifetime cubre la función entera, **incluido** el `insert`». Un solo conjunto de puntos para el préstamo, sin distinguir caminos.
+
+**Polonius** cambia la pregunta. En vez de «¿en qué puntos vive esta región?», pregunta «¿de qué **préstamos** puede venir esta referencia, en este punto concreto?». En el camino que llega al `insert`, `v` no se devolvió, así que el préstamo de `get` no está vivo ahí. Es un análisis **sensible al flujo**.
+
+Lo hemos comprobado en esta máquina:
+
+```bash
+rustc --edition 2024 --emit=metadata problema-3.rs           # stable 1.99.1: error E0502
+rustc +nightly --edition 2024 --emit=metadata problema-3.rs  # nightly 1.101.0 (2026-11-01): compila
+```
+
+La nightly acepta el programa sin ninguna opción, porque **Polonius alpha** viene activado en nightly desde agosto de 2026 (también se puede pedir explícitamente con `-Zpolonius=next`). El proyecto tiene como objetivo para 2026 estabilizarlo; hasta entonces, en estable, manda NLL. La versión alpha es un subconjunto del análisis completo original, que se escribió en Datalog: algunos programas que aquella versión aceptaba siguen sin compilar.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m21/problema-3" explicacion="E0502 en Rust estable: NLL extiende el préstamo de `mapa.get` a toda la lifetime `'1` del valor devuelto, y esa lifetime incluye el `insert`. El «Ver arreglo» evita devolver el préstamo condicionalmente: primero pregunta con `contains_key` (préstamo que muere enseguida) y luego hace un único `get` final. En código real se usa la API `entry`." />
+
+<Trampa titulo="«Arreglar» E0502 con `.clone()` sin entender el porqué">
+
+❌ Copiar el `String` para que el borrow checker se calle, aunque el programa fuera seguro.
+
+✅ Primero pregúntate: **¿hay de verdad un camino donde una referencia viva vea cómo cambia lo que apunta?** Si sí, el error te ha salvado de un uso tras liberar. Si no (como en el problema 3), reorganiza el flujo para que cada préstamo muera antes de mutar. Al borrow checker se le gana entendiéndolo, no peleando.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Tienes `let r = &mut v; r.push(1); v.push(2); r.push(3);`. ¿Qué dice el borrow checker y por qué?"
+  opciones={[
+    "Compila: NLL termina el préstamo de `r` tras su primer uso",
+    "E0499: `r` (préstamo exclusivo) se vuelve a usar después de `v.push(2)`, así que hay dos préstamos exclusivos de `v` vivos a la vez",
+    "E0502: `v` está prestado como compartido",
+    "Compila gracias a two-phase borrows"
+  ]}
+  correcta={1}
+  explicacion="El préstamo de `r` vive hasta su **último** uso (`r.push(3)`). El `v.push(2)` crea otro `&mut v` dentro de ese tramo: dos referencias exclusivas al mismo `Vec`. Si se permitiera, `v.push(2)` podría mover el buffer y `r` apuntaría a memoria liberada."
+  porque={[
+    "NLL termina el préstamo tras su **último** uso, y `r` se usa otra vez al final.",
+    "",
+    "Los dos préstamos son exclusivos (`&mut`), por eso el código es E0499, no E0502.",
+    "Two-phase borrows solo ayuda cuando el préstamo reservado aún no se ha activado, dentro de una misma llamada."
+  ]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Para NLL, ¿qué es una región (una lifetime)?"
+  opciones={[
+    "El bloque `{}` donde se declara la variable",
+    "El conjunto de puntos del MIR donde la referencia todavía puede usarse",
+    "El tiempo en milisegundos que vive un valor",
+    "La zona de memoria donde está el valor"
+  ]}
+  correcta={1}
+  explicacion="NLL define las regiones sobre el grafo de MIR. Por eso un préstamo puede terminar en mitad de un bloque."
+  porque={["Ese era el modelo léxico anterior a NLL.", "", "Las lifetimes no existen en tiempo de ejecución: son un concepto de compilación.", "La región habla de **cuándo** se puede usar una referencia, no de **dónde** está el dato."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué afirmación sobre Polonius es correcta a noviembre de 2026?"
+  opciones={[
+    "Es el borrow checker de Rust estable desde 2018",
+    "Su versión alpha está activa en nightly y acepta casos como el problema 3; en estable 1.99.1 sigue NLL",
+    "Es una herramienta externa que se instala con cargo",
+    "Hace que el borrow checker acepte cualquier programa"
+  ]}
+  correcta={1}
+  explicacion="Lo verificamos: la nightly 1.101.0 compila el problema 3; el estable 1.99.1 da E0502."
+  porque={["En 2018 llegó NLL, no Polonius.", "", "Está dentro de rustc; no es un crate.", "Polonius sigue rechazando todo lo inseguro; solo es más preciso."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué el borrow checker trabaja sobre MIR y no sobre el AST?"
+  opciones={[
+    "Porque el MIR es más corto de imprimir",
+    "Porque el MIR hace explícitos los caminos de ejecución, los movimientos, los préstamos y los `drop`, que es justo lo que hay que razonar",
+    "Porque el AST no existe en rustc",
+    "Por compatibilidad con otras herramientas"
+  ]}
+  correcta={1}
+  explicacion="En el AST, un `for`, un `?` o un `match` esconden saltos, préstamos automáticos y destrucciones. En MIR todo eso es una línea visible del grafo."
+  porque={["El MIR suele ser más largo que tu código, no más corto.", "", "El AST existe: es la salida del parser.", "La razón es técnica: el análisis necesita el grafo."]}
+/>
+
+<Historia titulo="De Datalog a rustc">
+
+La primera formulación de Polonius (2018) se escribió como reglas lógicas en Datalog: hechos como «el préstamo L se crea en el punto P» y reglas que deducen qué préstamos siguen vivos. Era elegante pero lenta. La versión alpha de 2026 reimplementa la idea principal dentro de rustc con un coste razonable.
+
+</Historia>
+
+## Para saber más
+
+- Mundo 8 (lifetimes) y la lección [Leer MIR](/curso/21-el-compilador-por-dentro/04-leer-mir/).
+- RFC 2094, *Non-lexical lifetimes*: https://rust-lang.github.io/rfcs/2094-nll.html

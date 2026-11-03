@@ -1,0 +1,59 @@
+---
+title: "Tu propio asignador"
+description: "Para tener Box, Vec y String en tu núcleo necesitas un heap y un asignador. El asignador bump, el de lista libre y el de bloques fijos, y cómo se registran con #[global_allocator]."
+sidebar:
+  order: 11
+duracion: 13
+requiere: ["23-embebido-y-tu-so/10-paginacion"]
+tarjetas:
+  - p: "¿Qué hace un asignador bump?"
+    r: "Reserva avanzando un puntero por una zona de memoria. Es rapidísimo, pero no puede liberar piezas sueltas: solo todo de golpe."
+  - p: "¿Qué necesitas para usar `Vec` en un núcleo `no_std`?"
+    r: "`extern crate alloc;`, una zona de memoria mapeada para el heap y un `#[global_allocator]` que implemente `GlobalAlloc`."
+  - p: "¿Qué es la alineación de una reserva y por qué importa?"
+    r: "La dirección tiene que ser múltiplo de un número (1, 2, 4, 8…) que pide el tipo. Una referencia desalineada es comportamiento indefinido."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+Con la paginación lista, puedes reservar una zona de memoria para el **heap**. Falta quien la reparta: el **asignador**. Cuando lo tengas, `Box`, `Vec`, `String` y `Rc` funcionarán en tu núcleo.
+
+## La idea
+
+Un asignador recibe peticiones del tipo «dame `tam` bytes alineados a `align`» y devuelve un puntero (o «no hay»). Al liberar, recibe el puntero y el mismo `Layout`. Los diseños clásicos, de más simple a más útil:
+
+| Diseño | Cómo funciona | Ventaja | Inconveniente |
+|---|---|---|---|
+| **Bump** (de avance) | un puntero que solo avanza | rapidísimo, trivial | no libera piezas sueltas |
+| **Lista libre** (*linked list*) | los huecos libres forman una lista enlazada guardada **dentro** de los propios huecos | libera cualquier cosa | lento: recorre la lista |
+| **Bloques fijos** (*fixed-size block*) | listas separadas para tamaños 8, 16, 32… | rápido y libera | desperdicia algo de memoria |
+
+## Pruébalo
+
+Un asignador bump sobre un array de 64 bytes:
+
+<Ejecutar ej="m23/asignador" />
+
+La reserva de 3 bytes ocupa 0–2; la siguiente pide alineación 8, así que salta al 8. La última no cabe y devuelve `None`. Al reiniciar, todo vuelve a estar libre.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Registrarlo.** En el núcleo, el asignador implementa el trait `GlobalAlloc` y se marca con [`#[global_allocator]`](/ref/lenguaje/atributos/global_allocator/). Como `alloc` recibe `&self` (no `&mut self`), el estado interno tiene que poder cambiar a través de una referencia compartida: mutabilidad interior, con un *spinlock* porque puede haber interrupciones (o, en el ejemplo, `Cell`).
+
+**La alineación no es opcional.** Si `Vec<u64>` recibiera una dirección que no es múltiplo de 8, crear referencias a sus elementos sería comportamiento indefinido. Por eso el `Layout` lleva siempre tamaño **y** alineación, y el asignador redondea hacia arriba (`next_multiple_of`).
+
+**Sin memoria.** Si el asignador devuelve un puntero nulo, `alloc` llama a `handle_alloc_error`, que en un núcleo normalmente acaba en un pánico. Rust estable no ofrece aún una forma general de que `Vec::push` devuelva un error en vez de abortar, aunque existen métodos como `Vec::try_reserve`.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué un asignador bump no puede liberar una reserva suelta del medio?"
+  opciones={["Porque Rust no lo permite", "Porque solo guarda un puntero al siguiente byte libre: no sabe qué huecos quedan detrás", "Porque los bump solo reservan un byte", "Sí puede"]}
+  correcta={1}
+  explicacion="Para liberar piezas sueltas hay que llevar la cuenta de los huecos (lista libre o bloques). El bump solo puede volver a empezar de cero."
+  porque={["Es una limitación del diseño, no del lenguaje.", "", "Reserva lo que se le pida.", "Solo puede reiniciar entero."]}
+/>

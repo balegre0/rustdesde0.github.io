@@ -1,0 +1,29 @@
+---
+import Practica from '../../components/paginas/Practica.astro';
+import { quizzes } from '../../lib/practica';
+const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+---
+<Practica titulo="Quizzes" descripcion="Quizzes cronometrados de Rust con puntuación y mejor marca personal.">
+  <p class="rdc-lead">Tandas cortas con reloj. Se corrigen al momento y guardan tu mejor marca (solo en este navegador).</p>
+  {quizzes.length === 0 ? <p>Todavía no hay quizzes publicados.</p> : (
+    <ul class="rdc-tarjetas" role="list">
+      {quizzes.map((q) => (
+        <li data-quiz-tarjeta={q.id} data-total={q.preguntas.length}>
+          <a href={`/quizzes/${q.id}/`} class="rdc-tarjeta-enlace">
+            <span class="rdc-tarjeta-titulo">{q.titulo}</span>
+            {q.descripcion && <span class="rdc-tarjeta-desc">{q.descripcion}</span>}
+            <span class="rdc-tarjeta-meta">{q.preguntas.length} preguntas · {mmss(q.tiempo)} min · <span data-mejor>sin marca</span></span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )}
+</Practica>
+<script>
+  import { leer } from '../../runtime/progreso';
+  const p = leer();
+  for (const li of document.querySelectorAll<HTMLElement>('[data-quiz-tarjeta]')) {
+    const m = p.marcas[`quiz:${li.dataset.quizTarjeta}`];
+    if (m) li.querySelector('[data-mejor]')!.textContent = `mejor marca ${m.mejor} de ${li.dataset.total}`;
+  }
+</script>

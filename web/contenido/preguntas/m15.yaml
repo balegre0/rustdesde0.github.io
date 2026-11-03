@@ -1,0 +1,846 @@
+# Banco de preguntas — Mundo 15: punteros inteligentes y mutabilidad interior
+# Todo código y toda salida/error citados se han verificado con rustc 1.99.1 (edición 2024):
+# ejecutables en wasm32-wasip1, errores con --emit=metadata, tamaños con const assert en x86_64-pc-windows-msvc.
+
+- id: m15-box-tamano-pila
+  titulo: "¿Cuánto mide una Box?"
+  mundo: 15-punteros-inteligentes
+  tema: box
+  dificultad: facil
+  tipo: predice
+  enunciado: "En el navegador (wasm32) un puntero mide 4 bytes. ¿Qué imprime la última línea?"
+  ej: m15/box-basico
+  opciones:
+    - "Box<[u8; 1000]> ocupa 1000 bytes"
+    - "Box<[u8; 1000]> ocupa 1004 bytes"
+    - "Box<[u8; 1000]> ocupa 4 bytes"
+    - "Box<[u8; 1000]> ocupa 8 bytes"
+  correcta: 2
+  solucion: |
+    Una `Box<T>` guarda en la pila solo la **dirección** del `T`, que vive en el heap. En wasm32 un puntero mide 4 bytes, así que `Box<i32>` y `Box<[u8; 1000]>` miden lo mismo: 4. En x86-64 medirían 8.
+    - 1000 es el tamaño del array, que está en el heap.
+    - 1004 supondría que la Box lleva el array dentro.
+    - 8 sería el tamaño en x86-64, no en el navegador.
+  etiquetas: ["Box", "size_of", "heap"]
+
+- id: m15-box-libera
+  titulo: "¿Quién libera la Box?"
+  mundo: 15-punteros-inteligentes
+  tema: box
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Tienes `let b = Box::new(5);` dentro de una función. ¿Qué pasa con la memoria del heap cuando la función termina?"
+  opciones:
+    - "Queda reservada hasta que acabe el programa"
+    - "La Box la libera automáticamente al salir de ámbito"
+    - "Hay que llamar a `b.free()`"
+    - "Se libera solo si llamas a `drop(b)`"
+  correcta: 1
+  solucion: |
+    La Box es la **única dueña** del valor del heap. Al salir de ámbito, su destructor libera esa memoria. No hay ninguna función que llamar a mano; `drop(b)` solo adelanta lo que pasaría igualmente.
+  etiquetas: ["Box", "Drop", "RAII"]
+
+- id: m15-option-box-nicho
+  titulo: "Option<Box> sin coste"
+  mundo: 15-punteros-inteligentes
+  tema: box
+  dificultad: media
+  tipo: opcion
+  enunciado: "En x86-64, `size_of::<Box<i32>>()` es 8. ¿Cuánto es `size_of::<Option<Box<i32>>>()`?"
+  opciones: ["8", "9", "12", "16"]
+  correcta: 0
+  solucion: |
+    Una Box nunca puede ser el puntero nulo, así que el compilador usa la dirección 0 para representar `None`. Es la optimización de **nicho**: no hace falta etiqueta extra. Comprobado con `const _: () = assert!(size_of::<Option<Box<i32>>>() == 8);`.
+    - 9 o 16 serían el tamaño con una etiqueta aparte (más relleno); no hace falta.
+  etiquetas: ["Box", "nicho", "Option", "layout"]
+
+- id: m15-box-slice-gordo
+  titulo: "La Box gorda"
+  mundo: 15-punteros-inteligentes
+  tema: box
+  dificultad: media
+  tipo: opcion
+  enunciado: "En x86-64, ¿cuánto mide `Box<[u8]>` (una Box de un slice de longitud variable)?"
+  opciones: ["8 bytes", "16 bytes", "24 bytes", "Depende de la longitud"]
+  correcta: 1
+  solucion: |
+    `[u8]` no tiene tamaño conocido al compilar, así que la Box es un **puntero gordo**: dirección + longitud, 8 + 8 = 16 bytes, igual que `&[u8]`. Comprobado con `size_of`. El tamaño de un tipo nunca depende de un valor concreto.
+  etiquetas: ["Box", "puntero gordo", "DST"]
+
+- id: m15-box-mover
+  titulo: "Mover 100 000 bytes"
+  mundo: 15-punteros-inteligentes
+  tema: box
+  dificultad: facil
+  tipo: opcion
+  enunciado: "`let grande = Box::new([7u8; 100_000]);` y luego `medir(grande)`, donde `medir` recibe la Box por valor. ¿Qué se copia al llamar?"
+  opciones:
+    - "Los 100 000 bytes"
+    - "Solo el puntero de la Box"
+    - "Nada: la llamada es un préstamo"
+    - "Los 100 000 bytes y el puntero"
+  correcta: 1
+  solucion: |
+    Mover una Box mueve **al dueño**, no los datos: se copia el puntero y el array se queda en el heap donde estaba. Después, `grande` queda movida y usarla da E0382.
+  etiquetas: ["Box", "mover"]
+
+- id: m15-e0072-lista
+  titulo: "La lista infinita"
+  mundo: 15-punteros-inteligentes
+  tema: box
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila esta definición de lista?"
+  ej: m15/lista-infinita
+  opciones:
+    - "Porque los enum no pueden tener datos"
+    - "Porque el tipo tendría tamaño infinito: hace falta una indirección como Box"
+    - "Porque falta derive(Debug)"
+    - "Porque Vacia tendría que ir primero"
+  correcta: 1
+  solucion: |
+    El error real es `error[E0072]: recursive type `Lista` has infinite size`. Una `Lista` contiene otra `Lista` completa, que contiene otra… El compilador no puede calcular su tamaño. La ayuda del propio error propone `Nodo(i32, Box<Lista>)`: una Box mide siempre lo mismo.
+  etiquetas: ["E0072", "Box", "tipos recursivos"]
+
+- id: m15-option-no-indirecta
+  titulo: "Option no es un puntero"
+  mundo: 15-punteros-inteligentes
+  tema: box
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál de estas definiciones compila?"
+  opciones:
+    - "`struct Nodo { sig: Nodo }`"
+    - "`struct Nodo { sig: Option<Nodo> }`"
+    - "`struct Nodo { sig: Option<Box<Nodo>> }`"
+    - "Ninguna"
+  correcta: 2
+  solucion: |
+    `Option<Nodo>` guarda el `Nodo` **dentro**, así que el tamaño sigue siendo infinito (E0072). Solo la versión con `Box` añade una indirección de tamaño fijo.
+  etiquetas: ["E0072", "Option", "Box"]
+
+- id: m15-vec-recursivo
+  titulo: "¿Box dentro de Vec?"
+  mundo: 15-punteros-inteligentes
+  tema: box
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Compila `struct Arbol { valor: i32, hijos: Vec<Arbol> }` sin ninguna `Box`?"
+  opciones:
+    - "No: todo tipo recursivo necesita Box (E0072)"
+    - "Sí: el Vec ya guarda sus elementos en el heap"
+    - "Solo si Arbol implementa Clone"
+    - "Solo con Vec<&Arbol>"
+  correcta: 1
+  solucion: |
+    Compila (verificado; `Arbol` mide 32 bytes en x86-64: 24 del Vec + 4 del i32 + relleno). Un `Vec` en la pila es solo puntero, capacidad y longitud; los elementos van al heap. Esa es la indirección que rompe la recursión.
+  etiquetas: ["Vec", "tipos recursivos"]
+
+- id: m15-e0614-deref
+  titulo: "No sabe qué hay dentro"
+  mundo: 15-punteros-inteligentes
+  tema: deref
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `*c` sobre `MiCaja`?"
+  ej: m15/deref-sin
+  opciones:
+    - "Porque MiCaja no implementa Deref"
+    - "Porque * solo funciona con Box"
+    - "Porque c no es mut"
+    - "Porque falta un préstamo &c"
+  correcta: 0
+  solucion: |
+    Error real: `error[E0614]: type `MiCaja<{integer}>` cannot be dereferenced`. El operador `*` funciona con referencias y con tipos que implementan `Deref`. Implementándolo (`type Target = T; fn deref(&self) -> &T { &self.0 }`), `*c` pasa a significar `*(c.deref())`.
+    - `*` no es exclusivo de Box: funciona con `String`, `Rc`, `Vec`…
+  etiquetas: ["E0614", "Deref"]
+
+- id: m15-deref-desazucar
+  titulo: "Lo que escribe el compilador"
+  mundo: 15-punteros-inteligentes
+  tema: deref
+  dificultad: media
+  tipo: opcion
+  enunciado: "Si `c: MiCaja<i32>` implementa `Deref<Target = i32>`, ¿en qué convierte el compilador `*c`?"
+  opciones: ["`c.0`", "`*(c.deref())`", "`c.clone()`", "`&c`"]
+  correcta: 1
+  solucion: |
+    `deref` devuelve una **referencia** `&i32`, y el `*` exterior la desreferencia. Por eso `deref` devuelve `&Target` y no `Target`: no puede sacar el valor de la caja (lo movería).
+  etiquetas: ["Deref"]
+
+- id: m15-coercion-cadena
+  titulo: "Dos saltos automáticos"
+  mundo: 15-punteros-inteligentes
+  tema: deref
+  dificultad: media
+  tipo: opcion
+  enunciado: "`fn saluda(n: &str)`. Con `let b = Box::new(String::from(\"Begoña\"));`, ¿compila `saluda(&b)`?"
+  opciones:
+    - "No: Box<String> no es str"
+    - "Sí: &Box<String> → &String → &str por coerción de desreferencia"
+    - "Solo con saluda(&*b)"
+    - "Solo con saluda(b.as_str())"
+  correcta: 1
+  solucion: |
+    Compila e imprime `¡Hola, Begoña!` (ejemplo `m15/coercion`). El compilador ve que el tipo no encaja y aplica `deref` tantas veces como haga falta. Las otras formas también compilarían, pero no son necesarias.
+  etiquetas: ["Deref", "coerción"]
+
+- id: m15-coercion-por-valor
+  titulo: "La coerción pide referencias"
+  mundo: 15-punteros-inteligentes
+  tema: deref
+  dificultad: facil
+  tipo: opcion
+  enunciado: "`fn f(x: &str)`. ¿Cuál de estas llamadas NO compila?"
+  opciones:
+    - "`f(&String::from(\"a\"))`"
+    - "`f(String::from(\"a\"))`"
+    - "`f(&Box::new(String::from(\"a\")))`"
+    - "`f(\"a\")`"
+  correcta: 1
+  solucion: |
+    La coerción de desreferencia convierte **referencias** (`&A` → `&B`). Un `String` por valor no es una referencia: error E0308 (*mismatched types*). Las demás compilan.
+  etiquetas: ["E0308", "coerción"]
+
+- id: m15-derefmut
+  titulo: "Leer sí, escribir no"
+  mundo: 15-punteros-inteligentes
+  tema: deref
+  dificultad: media
+  tipo: opcion
+  enunciado: "Tu tipo implementa `Deref` pero no `DerefMut`. ¿Qué puedes hacer a través de `*x`?"
+  opciones:
+    - "Leer y escribir"
+    - "Solo leer"
+    - "Solo escribir"
+    - "Nada sin unsafe"
+  correcta: 1
+  solucion: |
+    `Deref` da `&Target` (préstamo compartido). Para obtener `&mut Target` y modificar hace falta `DerefMut`. Así es `Rc`: implementa `Deref`, no `DerefMut`.
+  etiquetas: ["Deref", "DerefMut"]
+
+- id: m15-drop-orden-locales
+  titulo: "Pila de platos"
+  mundo: 15-punteros-inteligentes
+  tema: drop
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprimen las dos últimas líneas?"
+  ej: m15/drop-orden
+  opciones:
+    - "adiós, a / adiós, b"
+    - "adiós, b / adiós, a"
+    - "fin de main / adiós, a"
+    - "adiós, d / fin de main"
+  correcta: 1
+  solucion: |
+    La salida real termina con `fin de main`, `adiós, b`, `adiós, a`. Las variables locales se destruyen en **orden inverso** a su declaración. `c` ya se despidió al cerrar su bloque y `d` al llamar a `drop(d)`.
+  etiquetas: ["Drop", "orden"]
+
+- id: m15-drop-orden-campos
+  titulo: "¿Y los campos?"
+  mundo: 15-punteros-inteligentes
+  tema: drop
+  dificultad: dificil
+  tipo: predice
+  enunciado: "`Pareja` y sus dos campos imprimen al destruirse. El struct se construye escribiendo `segundo` antes que `primero`. ¿Qué se imprime tras `fin de main`?"
+  ej: m15/drop-campos
+  opciones:
+    - "adiós, pareja / adiós, primero / adiós, segundo"
+    - "adiós, pareja / adiós, segundo / adiós, primero"
+    - "adiós, primero / adiós, segundo / adiós, pareja"
+    - "adiós, segundo / adiós, primero / adiós, pareja"
+  correcta: 0
+  solucion: |
+    Primero se ejecuta el `Drop` del propio struct (`adiós, pareja`) y **después** se destruyen sus campos, en el orden en que están **declarados** en el struct (`primero`, `segundo`). El orden en que los escribiste al construirlo no importa. Salida real verificada.
+  etiquetas: ["Drop", "orden", "campos"]
+
+- id: m15-drop-movido
+  titulo: "El drop viaja con el valor"
+  mundo: 15-punteros-inteligentes
+  tema: drop
+  dificultad: media
+  tipo: predice
+  enunciado: "`x` se mueve a la función `quedarse`. ¿Dónde se despide `x`?"
+  ej: m15/drop-mover
+  opciones:
+    - "Al final de main, después de y"
+    - "Al final de quedarse, antes de fin de main"
+    - "Nunca: se perdió al moverla"
+    - "Dos veces: en quedarse y en main"
+  correcta: 1
+  solucion: |
+    Salida real: `me quedo con x`, `adiós, x`, `fin de main`, `adiós, y`. Al moverse, la responsabilidad de destruir `x` pasa al parámetro `r`, que muere al acabar `quedarse`. En `main` ya no hay nada que destruir: nunca hay doble liberación.
+  etiquetas: ["Drop", "mover"]
+
+- id: m15-e0040
+  titulo: "Destructor a mano"
+  mundo: 15-punteros-inteligentes
+  tema: drop
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `x.drop()`?"
+  ej: m15/drop-llamada
+  opciones:
+    - "Porque drop es privado"
+    - "Porque x se destruiría otra vez al final del ámbito: doble liberación"
+    - "Porque hay que escribir Drop::drop(x)"
+    - "Porque Ruidoso no implementa Drop"
+  correcta: 1
+  solucion: |
+    Error real: `error[E0040]: explicit use of destructor method`. Si se permitiera, el compilador volvería a llamar a `drop` al final de `main`. La ayuda propone `drop(x)`: la función `std::mem::drop` **mueve** `x`, así que se destruye una sola vez.
+  etiquetas: ["E0040", "Drop"]
+
+- id: m15-mem-drop-vacia
+  titulo: "La función más corta"
+  mundo: 15-punteros-inteligentes
+  tema: drop
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué hay dentro del cuerpo de `std::mem::drop`?"
+  opciones:
+    - "Una llamada a free"
+    - "Nada: pub fn drop<T>(_x: T) {}"
+    - "Una llamada a x.drop()"
+    - "Código unsafe que borra los bytes"
+  correcta: 1
+  solucion: |
+    Es una función vacía. Recibe el valor **por valor**; al terminar, su parámetro sale de ámbito y se destruye por la regla general. No hay magia.
+  etiquetas: ["Drop", "mem::drop"]
+
+- id: m15-e0184
+  titulo: "Copy y Drop"
+  mundo: 15-punteros-inteligentes
+  tema: drop
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué pasa si un tipo tiene `#[derive(Clone, Copy)]` e `impl Drop`?"
+  opciones:
+    - "Compila; Copy gana"
+    - "Error E0184: un tipo con destructor no puede ser Copy"
+    - "Compila con un aviso"
+    - "Pánico al copiarlo"
+  correcta: 1
+  solucion: |
+    Error real: `error[E0184]: the trait `Copy` cannot be implemented for this type; the type has a destructor`. Dos copias bit a bit liberarían el mismo recurso dos veces.
+  etiquetas: ["E0184", "Copy", "Drop"]
+
+- id: m15-rc-cuenta-bloque
+  titulo: "El contador tras el bloque"
+  mundo: 15-punteros-inteligentes
+  tema: rc
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la línea `tras el bloque`?"
+  ej: m15/rc-cuenta
+  opciones: ["tras el bloque: 1", "tras el bloque: 2", "tras el bloque: 3", "tras el bloque: 0"]
+  correcta: 1
+  solucion: |
+    Dentro del bloque hay 3 dueños (`a`, `b`, `c`). Al cerrarse muere `c` y el contador baja a 2. Salida real verificada.
+  etiquetas: ["Rc", "strong_count"]
+
+- id: m15-rc-clone-coste
+  titulo: "¿Qué copia Rc::clone?"
+  mundo: 15-punteros-inteligentes
+  tema: rc
+  dificultad: facil
+  tipo: opcion
+  enunciado: "`a: Rc<String>` con un texto de 1 MB. ¿Qué hace `Rc::clone(&a)`?"
+  opciones:
+    - "Copia el MB de texto"
+    - "Suma 1 al contador y devuelve otro puntero al mismo bloque"
+    - "Crea un bloque nuevo con su propio contador"
+    - "Mueve el texto desde a"
+  correcta: 1
+  solucion: |
+    `Rc::clone` es una suma al contador fuerte (y una comprobación de desbordamiento). El texto no se toca. Por eso se recomienda escribir `Rc::clone(&a)` en vez de `a.clone()`: deja claro que no es una copia profunda.
+  etiquetas: ["Rc", "clone"]
+
+- id: m15-e0596-rc
+  titulo: "Mutar lo compartido"
+  mundo: 15-punteros-inteligentes
+  tema: rc
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `lista.push(4)`?"
+  ej: m15/rc-mut
+  opciones:
+    - "Porque lista no está declarada con mut"
+    - "Porque Rc no implementa DerefMut: solo da acceso compartido"
+    - "Porque Vec no tiene push"
+    - "Porque otra ya se movió"
+  correcta: 1
+  solucion: |
+    Error real: `error[E0596]: cannot borrow data in an `Rc` as mutable`, con la ayuda *trait `DerefMut` is required to modify through a dereference, but it is not implemented for `Rc<Vec<i32>>`*. Con varios dueños, mutar sería aliasing con mutación: `push` podría reasignar el Vec mientras `otra` lo lee. Poner `mut` en `lista` no cambia nada.
+  etiquetas: ["E0596", "Rc", "DerefMut"]
+
+- id: m15-rc-ptr-eq
+  titulo: "¿Mismo texto o texto igual?"
+  mundo: 15-punteros-inteligentes
+  tema: rc
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué compara `Rc::ptr_eq(&a, &b)`?"
+  opciones:
+    - "Si los textos son iguales letra a letra"
+    - "Si a y b apuntan al mismo bloque de memoria"
+    - "Si tienen el mismo contador"
+    - "Si los dos son Rc"
+  correcta: 1
+  solucion: |
+    Compara **direcciones**. Dos `Rc` con textos iguales pero creados por separado darían `false`; `a == b` compararía contenidos.
+  etiquetas: ["Rc", "ptr_eq"]
+
+- id: m15-ciclo-fuga
+  titulo: "El ciclo silencioso"
+  mundo: 15-punteros-inteligentes
+  tema: weak
+  dificultad: media
+  tipo: predice
+  enunciado: "`a` y `b` se apuntan con `Rc`. ¿Qué se imprime después de `fin de main`?"
+  ej: m15/ciclo-fuga
+  opciones:
+    - "liberado b / liberado a"
+    - "liberado a / liberado b"
+    - "Nada"
+    - "Un pánico por ciclo"
+  correcta: 2
+  solucion: |
+    La salida real termina en `fin de main`. Al salir, cada contador baja de 2 a 1 y se queda ahí: ninguno llega a 0 y ningún `Drop` se ejecuta. Es una fuga. Rust no tiene un recolector que busque ciclos.
+  etiquetas: ["Rc", "ciclos", "fuga"]
+
+- id: m15-weak-upgrade
+  titulo: "¿Sigue vivo?"
+  mundo: 15-punteros-inteligentes
+  tema: weak
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la segunda línea?"
+  ej: m15/r-weak
+  opciones: ["¿vive? Some(\"Marta\")", "¿vive? None", "Pánico: uso tras liberar", "¿vive? Some(\"\")"]
+  correcta: 1
+  solucion: |
+    Tras `drop(jefe)` no queda ningún `Rc` fuerte: el valor se destruye. `upgrade()` lo detecta y devuelve `None`. Nunca puede devolver memoria liberada.
+  etiquetas: ["Weak", "upgrade"]
+
+- id: m15-weak-cuentas
+  titulo: "Fuertes y débiles"
+  mundo: 15-punteros-inteligentes
+  tema: weak
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime la línea que empieza por `dentro:`?"
+  ej: m15/weak-cuenta
+  opciones:
+    - "dentro: fuertes = 1, valor = 5"
+    - "dentro: fuertes = 2, valor = 5"
+    - "dentro: fuertes = 3, valor = 5"
+    - "dentro: fuertes = 1, valor = None"
+  correcta: 1
+  solucion: |
+    `upgrade()` con éxito devuelve un `Rc` **fuerte** nuevo (`r`), así que mientras vive el contador sube a 2. Al salir del `if let`, `r` muere y vuelve a 1. Salida real: `fuertes = 1, débiles = 2`, `dentro: fuertes = 2, valor = 5`, `fuera: fuertes = 1`, `débiles = 1`.
+  etiquetas: ["Weak", "upgrade", "strong_count"]
+
+- id: m15-arbol-padre
+  titulo: "¿Qué puntero va hacia arriba?"
+  mundo: 15-punteros-inteligentes
+  tema: weak
+  dificultad: media
+  tipo: opcion
+  enunciado: "En un árbol con punteros padre → hijos e hijo → padre, ¿cuál debe ser `Weak`?"
+  opciones:
+    - "Padre → hijos"
+    - "Hijo → padre"
+    - "Los dos"
+    - "Ninguno, si usas RefCell"
+  correcta: 1
+  solucion: |
+    Los padres son dueños de sus hijos (`Rc`) y los hijos solo recuerdan a su padre (`Weak`). Si los dos fueran `Rc`, cada arista sería un ciclo. Si los dos fueran `Weak`, nadie sería dueño de los hijos y se liberarían enseguida. `RefCell` no tiene nada que ver con los ciclos.
+  etiquetas: ["Weak", "árbol", "ciclos"]
+
+- id: m15-weak-bloque
+  titulo: "El bloque que sobrevive"
+  mundo: 15-punteros-inteligentes
+  tema: weak
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Cuando el contador fuerte de un `Rc` llega a 0 pero aún hay un `Weak`, ¿qué pasa?"
+  opciones:
+    - "No se libera nada hasta que muera el Weak"
+    - "Se destruye el valor, pero el bloque con los contadores sigue reservado"
+    - "Se libera todo y el Weak queda colgando"
+    - "Pánico"
+  correcta: 1
+  solucion: |
+    `strong = 0` → se ejecuta el `Drop` del valor. El bloque (con los dos contadores) solo se devuelve al asignador cuando `weak` también llega a 0. Así el `Weak` siempre puede leer `strong` y responder `None` a `upgrade()` sin tocar memoria liberada.
+  etiquetas: ["Weak", "Rc", "memoria"]
+
+- id: m15-forget-seguro
+  titulo: "Olvidar sin unsafe"
+  mundo: 15-punteros-inteligentes
+  tema: fugas
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué despedidas aparecen?"
+  ej: m15/fugas
+  opciones:
+    - "adiós, olvidado y adiós, normal"
+    - "Solo adiós, normal"
+    - "Ninguna"
+    - "No compila: mem::forget necesita unsafe"
+  correcta: 1
+  solucion: |
+    `mem::forget` no ejecuta el `Drop`, y es una función **segura**. La salida real: `config = modo=rápido;nivel=3`, `fin de main`, `adiós, normal`.
+  etiquetas: ["mem::forget", "fuga", "Box::leak"]
+
+- id: m15-fuga-no-ub
+  titulo: "¿Qué es UB?"
+  mundo: 15-punteros-inteligentes
+  tema: fugas
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál de estas cosas es comportamiento indefinido en Rust?"
+  opciones:
+    - "Un ciclo de Rc que nunca se libera"
+    - "Llamar a Box::leak"
+    - "Leer un valor ya liberado"
+    - "mem::forget de un Vec"
+  correcta: 2
+  solucion: |
+    Las fugas (ciclos, `Box::leak`, `mem::forget`) desperdician memoria pero no rompen ninguna garantía: son seguras. El uso tras liberar sí es UB, y Rust seguro lo impide.
+  etiquetas: ["UB", "fuga"]
+
+- id: m15-box-leak-tipo
+  titulo: "Para siempre"
+  mundo: 15-punteros-inteligentes
+  tema: fugas
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué tipo devuelve `Box::leak(Box::new(String::new()))`?"
+  opciones: ["`String`", "`Box<String>`", "`&'static mut String`", "`*mut String`"]
+  correcta: 2
+  solucion: |
+    Una referencia exclusiva con tiempo de vida `'static`: como esa memoria ya no se liberará nunca, la referencia vale durante todo el programa. Se puede modificar (es `&mut`), como hace el ejemplo `m15/fugas` con `push_str`.
+  etiquetas: ["Box::leak", "'static"]
+
+- id: m15-drop-no-garantizado
+  titulo: "No confíes en Drop"
+  mundo: 15-punteros-inteligentes
+  tema: fugas
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Diseñas un tipo con `unsafe` por dentro. ¿Puede su seguridad depender de que su `Drop` se ejecute siempre?"
+  opciones:
+    - "Sí: Rust garantiza que Drop siempre se ejecuta"
+    - "No: código seguro puede impedirlo con mem::forget, Box::leak o un ciclo de Rc"
+    - "Solo si el tipo no es Copy"
+    - "Solo en release"
+  correcta: 1
+  solucion: |
+    Desde la decisión de 2015 (la «leakpocalypse»), fugar es seguro. Por tanto, ninguna API segura puede necesitar que un destructor se ejecute para evitar UB.
+  etiquetas: ["Drop", "fuga", "diseño"]
+
+- id: m15-cell-get
+  titulo: "Cell sin préstamos"
+  mundo: 15-punteros-inteligentes
+  tema: mutabilidad-interior
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `c.get()` sobre un `Cell<String>`?"
+  ej: m15/cell-ref
+  opciones:
+    - "Porque Cell solo admite números"
+    - "Porque get devuelve una copia y String no es Copy"
+    - "Porque c no es mut"
+    - "Porque falta importar Cell"
+  correcta: 1
+  solucion: |
+    Error real: `error[E0599]: the method `get` exists for struct `Cell<String>`, but its trait bounds were not satisfied` (`String: Copy`). `Cell` nunca presta el interior: `get` copia. Para tipos no `Copy` están `take`, `replace` y `set`.
+  etiquetas: ["E0599", "Cell", "Copy"]
+
+- id: m15-cell-take
+  titulo: "Sacar de una Cell"
+  mundo: 15-punteros-inteligentes
+  tema: mutabilidad-interior
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la segunda línea?"
+  ej: m15/cell-take
+  opciones: ["queda = «Rut»", "queda = «»", "Pánico: la Cell está vacía", "No compila"]
+  correcta: 1
+  solucion: |
+    `take()` saca el valor y deja `Default::default()` en su lugar: para `String`, el texto vacío. El segundo `take` saca ese texto vacío. Salida real: `sacado = «Rut»`, `queda = «»`.
+  etiquetas: ["Cell", "take"]
+
+- id: m15-cell-contador
+  titulo: "Contador a través de &"
+  mundo: 15-punteros-inteligentes
+  tema: mutabilidad-interior
+  dificultad: facil
+  tipo: predice
+  enunciado: "`pulsar` recibe `&Boton` y hace `b.pulsaciones.set(b.pulsaciones.get() + 1)`. Se llama tres veces. ¿Qué imprime la primera línea?"
+  ej: m15/cell
+  opciones:
+    - "«Aceptar» pulsado 0 veces"
+    - "«Aceptar» pulsado 3 veces"
+    - "No compila: no se puede modificar a través de &"
+    - "«Aceptar» pulsado 1 veces"
+  correcta: 1
+  solucion: |
+    `Cell` permite modificar a través de un préstamo compartido (mutabilidad interior). Es seguro porque nunca hay referencias a su interior que pudieran ver el cambio a medias.
+  etiquetas: ["Cell", "mutabilidad interior"]
+
+- id: m15-refcell-panico
+  titulo: "Ya está prestado"
+  mundo: 15-punteros-inteligentes
+  tema: mutabilidad-interior
+  dificultad: media
+  tipo: predice
+  enunciado: "Hay un `borrow()` vivo en `lectura` y se pide `borrow_mut()`. ¿Qué pasa?"
+  ej: m15/refcell-panico
+  opciones:
+    - "No compila: E0502"
+    - "Imprime «primera nota: 7» y entra en pánico con «RefCell already borrowed»"
+    - "Imprime las dos líneas"
+    - "Imprime basura"
+  correcta: 1
+  solucion: |
+    `borrow()` y `borrow_mut()` reciben `&self`, así que el compilador no ve conflicto. En ejecución, `borrow_mut()` encuentra una lectura activa y entra en pánico. Salida real: `primera nota: 7` y luego `thread 'main' (1) panicked at refcell-panico.rs:9:11:` / `RefCell already borrowed`.
+  etiquetas: ["RefCell", "pánico", "BorrowMutError"]
+
+- id: m15-refcell-dos-lecturas
+  titulo: "Dos lectores"
+  mundo: 15-punteros-inteligentes
+  tema: mutabilidad-interior
+  dificultad: media
+  tipo: predice
+  enunciado: "Con dos `borrow()` vivos, ¿qué imprime la última línea?"
+  ej: m15/refcell-lecturas
+  opciones:
+    - "Pánico en el segundo borrow()"
+    - "¿escritura posible? true"
+    - "¿escritura posible? false"
+    - "No compila"
+  correcta: 2
+  solucion: |
+    Varias lecturas a la vez están permitidas (la regla es «muchos lectores o un escritor»). `try_borrow_mut` no entra en pánico: devuelve `Err` porque hay lectores, e `is_ok()` da `false`. Salida real: `hola hola` y `¿escritura posible? false`.
+  etiquetas: ["RefCell", "try_borrow_mut"]
+
+- id: m15-refcell-malentendido
+  titulo: "¿Adiós al borrow checker?"
+  mundo: 15-punteros-inteligentes
+  tema: mutabilidad-interior
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué hace `RefCell` con las reglas de préstamo?"
+  opciones:
+    - "Las desactiva"
+    - "Las comprueba en ejecución en vez de al compilar"
+    - "Las comprueba dos veces"
+    - "Solo las comprueba en debug"
+  correcta: 1
+  solucion: |
+    Las reglas son las mismas; solo cambia **cuándo** se comprueban. Romperlas da un pánico en ejecución, en cualquier perfil (debug o release).
+  etiquetas: ["RefCell"]
+
+- id: m15-refcell-tamano
+  titulo: "El precio del contador"
+  mundo: 15-punteros-inteligentes
+  tema: mutabilidad-interior
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En x86-64, `Cell<i32>` mide 4 bytes. ¿Cuánto mide `RefCell<i32>`?"
+  opciones: ["4", "8", "12", "16"]
+  correcta: 3
+  solucion: |
+    `RefCell` añade un contador de préstamos de 8 bytes (`isize`); con el `i32` y la alineación a 8, quedan 16. Comprobado con `size_of`. `Cell` no añade nada: no necesita contar.
+  etiquetas: ["RefCell", "Cell", "layout"]
+
+- id: m15-unsafecell
+  titulo: "La única puerta"
+  mundo: 15-punteros-inteligentes
+  tema: mutabilidad-interior
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Sobre qué tipo están construidos `Cell`, `RefCell`, `Mutex` y los atómicos?"
+  opciones: ["`Box`", "`UnsafeCell`", "`Rc`", "`ManuallyDrop`"]
+  correcta: 1
+  solucion: |
+    `UnsafeCell<T>` es el único tipo que el compilador trata de forma especial para permitir mutación a través de `&`. Mutar a través de un `&T` sin pasar por `UnsafeCell` es comportamiento indefinido incluso con `unsafe`.
+  etiquetas: ["UnsafeCell", "mutabilidad interior"]
+
+- id: m15-rc-refcell-capas
+  titulo: "¿Qué capa hace qué?"
+  mundo: 15-punteros-inteligentes
+  tema: rc-refcell
+  dificultad: facil
+  tipo: opcion
+  enunciado: "En `Rc<RefCell<Vec<&str>>>`, ¿qué aporta `RefCell`?"
+  opciones:
+    - "Varios dueños"
+    - "Poder modificar el Vec aunque Rc solo dé acceso compartido"
+    - "Seguridad entre hilos"
+    - "Liberar los ciclos"
+  correcta: 1
+  solucion: |
+    `Rc` da los varios dueños; `RefCell` da la mutabilidad interior. Ninguno de los dos sirve entre hilos ni rompe ciclos.
+  etiquetas: ["Rc", "RefCell"]
+
+- id: m15-compartido-salida
+  titulo: "La lista de la compra"
+  mundo: 15-punteros-inteligentes
+  tema: rc-refcell
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la última línea?"
+  ej: m15/compartido
+  opciones: ["dueños = 1", "dueños = 2", "dueños = 3", "dueños = 0"]
+  correcta: 2
+  solucion: |
+    `lista`, `ana` y `luis` son tres `Rc` del mismo bloque. Salida real: `lista = ["pan", "leche", "café"]` y `dueños = 3`.
+  etiquetas: ["Rc", "RefCell", "strong_count"]
+
+- id: m15-arena-ventaja
+  titulo: "Números en vez de punteros"
+  mundo: 15-punteros-inteligentes
+  tema: rc-refcell
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué ventaja tiene una arena (un `Vec` dueño de todos los nodos, con índices `usize`) frente a `Rc<RefCell<Nodo>>`?"
+  opciones:
+    - "Los índices nunca pueden apuntar al nodo equivocado"
+    - "Los préstamos se comprueban al compilar y no puede haber ciclos de propiedad"
+    - "No usa el heap"
+    - "Permite compartir entre hilos sin nada más"
+  correcta: 1
+  solucion: |
+    El `Vec` es el único dueño; modificar un nodo exige `&mut` al Vec, que comprueba el compilador. Un índice viejo sí puede apuntar al nodo equivocado (error lógico, no UB), y el Vec guarda los nodos en el heap.
+  etiquetas: ["arena", "índices", "diseño"]
+
+- id: m15-e0277-rc-hilos
+  titulo: "Rc no viaja"
+  mundo: 15-punteros-inteligentes
+  tema: arc
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este `thread::spawn`?"
+  ej: m15/rc-hilos
+  opciones:
+    - "Porque la closure no es move"
+    - "Porque Rc no es Send: su contador no es atómico"
+    - "Porque falta h.join()"
+    - "Porque println! no funciona en hilos"
+  correcta: 1
+  solucion: |
+    Error real: ``error[E0277]: `Rc<i32>` cannot be sent between threads safely``, con *the trait `Send` is not implemented for `Rc<i32>`*. Dos hilos actualizando el contador a la vez podrían perder una suma (carrera de datos) y liberar antes de tiempo. La solución es `Arc`.
+  etiquetas: ["E0277", "Send", "Rc", "Arc"]
+
+- id: m15-arc-lock
+  titulo: "Una palabra de diferencia"
+  mundo: 15-punteros-inteligentes
+  tema: arc
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En x86-64 con `-O`, `Rc::clone` compila a `inc qword ptr [rax]`. ¿Qué cambia en `Arc::clone`?"
+  opciones:
+    - "Nada"
+    - "Lleva el prefijo lock: lock inc qword ptr [rax]"
+    - "Llama a una función del sistema operativo"
+    - "Copia el valor de dentro"
+  correcta: 1
+  solucion: |
+    Verificado en el ensamblador de rustc 1.99.1: la única diferencia es `lock`, que hace la suma indivisible entre núcleos. Ese es el coste de la «A» de Arc.
+  etiquetas: ["Arc", "atómico", "asm"]
+
+- id: m15-arc-mutex
+  titulo: "Modificar entre hilos"
+  mundo: 15-punteros-inteligentes
+  tema: arc
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál es el equivalente para varios hilos de `Rc<RefCell<T>>`?"
+  opciones: ["`Arc<RefCell<T>>`", "`Arc<Mutex<T>>`", "`Rc<Mutex<T>>`", "`Box<RefCell<T>>`"]
+  correcta: 1
+  solucion: |
+    `Arc` da varios dueños entre hilos y `Mutex` da mutabilidad interior segura entre hilos. `Arc<RefCell<T>>` no es `Send` porque `RefCell` no es `Sync`; `Rc<Mutex<T>>` sigue sin poder cruzar hilos por culpa de `Rc`.
+  etiquetas: ["Arc", "Mutex", "Sync"]
+
+- id: m15-cow-prestado
+  titulo: "¿Prestado o propio?"
+  mundo: 15-punteros-inteligentes
+  tema: cow
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la línea de «año_nuevo»?"
+  ej: m15/cow
+  opciones:
+    - "año_nuevo -> año_nuevo (propio, 9 letras)"
+    - "año_nuevo -> año_nuevo (prestado, 9 letras)"
+    - "año_nuevo -> año_nuevo (prestado, 10 letras)"
+    - "año_nuevo -> año__nuevo (propio, 10 letras)"
+  correcta: 1
+  solucion: |
+    No tiene espacios: se devuelve `Cow::Borrowed`, sin reservar memoria. `chars().count()` cuenta caracteres: 9 (la «ñ» ocupa 2 bytes pero es un carácter; en bytes serían 10).
+  etiquetas: ["Cow", "UTF-8"]
+
+- id: m15-cow-cuando
+  titulo: "Elegir el retorno"
+  mundo: 15-punteros-inteligentes
+  tema: cow
+  dificultad: media
+  tipo: opcion
+  enunciado: "Una función escapa caracteres especiales y el 99 % de las entradas no tienen ninguno. ¿Qué retorno evita más reservas de memoria?"
+  opciones: ["`String`", "`&str`", "`Cow<'_, str>`", "`Box<str>`"]
+  correcta: 2
+  solucion: |
+    Con `Cow`, el 99 % de las veces devuelves el préstamo gratis y solo el 1 % reserva un `String`. `&str` no puede devolver un texto nuevo; `String` y `Box<str>` reservarían siempre.
+  etiquetas: ["Cow", "rendimiento"]
+
+- id: m15-pin-unpin
+  titulo: "Pin::new y PhantomPinned"
+  mundo: 15-punteros-inteligentes
+  tema: pin
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `Pin::new(&mut f)`?"
+  ej: m15/pin-no-unpin
+  opciones:
+    - "Porque Pin solo funciona con Box"
+    - "Porque Fijo no es Unpin y Pin::new solo acepta tipos Unpin"
+    - "Porque f no es mut"
+    - "Porque PhantomPinned no implementa Debug"
+  correcta: 1
+  solucion: |
+    Error real: ``error[E0277]: `PhantomPinned` cannot be unpinned``. Con un `&mut` a la pila, `Pin::new` no podría garantizar que el valor no se mueva después, así que solo se permite para tipos `Unpin`. La nota del error sugiere `pin!` o `Box::pin`.
+  etiquetas: ["E0277", "Pin", "Unpin"]
+
+- id: m15-pin-tamano
+  titulo: "¿Cuánto pesa la promesa?"
+  mundo: 15-punteros-inteligentes
+  tema: pin
+  dificultad: media
+  tipo: opcion
+  enunciado: "En x86-64, `Box<i32>` mide 8 bytes. ¿Cuánto mide `Pin<Box<i32>>`?"
+  opciones: ["8", "16", "9", "0"]
+  correcta: 0
+  solucion: |
+    `Pin` no añade datos: su garantía vive en el sistema de tipos y se comprueba al compilar. Verificado con `size_of`.
+  etiquetas: ["Pin", "layout"]
+
+- id: m15-jefe-ciclo
+  titulo: "Las carpetas inmortales"
+  mundo: 15-punteros-inteligentes
+  tema: weak
+  dificultad: dificil
+  tipo: predice
+  enunciado: "La carpeta hija guarda a su madre con un `Rc` fuerte. Se sueltan las dos variables. ¿Qué se imprime?"
+  ej: m15/jefe-ciclo
+  opciones:
+    - "borrada fotos / borrada inicio / fin (fotos)"
+    - "borrada inicio / borrada fotos / fin (fotos)"
+    - "fin (fotos)"
+    - "No compila"
+  correcta: 2
+  solucion: |
+    Madre e hija se mantienen vivas mutuamente: los contadores bajan a 1, nunca a 0. Salida real: solo `fin (fotos)`. Con `Weak` hacia la madre, todo se liberaría.
+  etiquetas: ["Rc", "Weak", "ciclos"]

@@ -1,0 +1,113 @@
+---
+title: "Higiene y $crate"
+description: "Descubre por qué las variables de una macro no chocan con las tuyas, por qué sus funciones sí se ven y para qué sirve $crate."
+sidebar:
+  order: 5
+duracion: 13
+desde: "1.0"
+requiere: ["19-macros/04-repeticiones"]
+tarjetas:
+  - p: "¿Qué es la higiene de una macro?"
+    r: "Que los nombres de variables locales creados por la macro no se mezclan con los del sitio donde se invoca (ni al revés)."
+  - p: "¿Son higiénicos los items (fn, struct) que define una macro_rules!?"
+    r: "No: la higiene de macro_rules! es mixta; las variables locales, etiquetas y $crate son higiénicas, los items no."
+  - p: "¿Cómo puede una macro usar una variable del llamante?"
+    r: "Recibiendo su nombre como argumento, por ejemplo con $v:ident."
+  - p: "¿Para qué sirve $crate?"
+    r: "Es una ruta a la crate donde se definió la macro, para que sus rutas funcionen aunque se invoque desde otra crate o módulo."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a entender una propiedad que hace que las macros de Rust sean seguras de usar: la **higiene**. Sin ella, una macro podría pisar tus variables sin que te dieras cuenta.
+
+## Predice
+
+<Predice
+  ej="m19/higiene"
+  opciones={["r = 15, x sigue valiendo 2", "r = 30, x sigue valiendo 5", "r = 30, x sigue valiendo 2", "No compila: hay dos `x`"]}
+  correcta={0}
+  explicacion="La `x` que declara la macro y la `x` de `main` son variables distintas aunque se escriban igual. `$e` es `x + 1` con la `x` de main (2), así que `5 * 3 = 15`, y la `x` de main no cambia."
+  porque={["Correcto.", "Eso pasaría si la `x` de la macro tapase a la de main. La higiene lo impide.", "El argumento usa la `x` de main (2), no la de la macro.", "Son dos variables distintas: no hay conflicto."]}
+/>
+
+## La idea
+
+Cada identificador que aparece en el código lleva, además de su texto, una marca invisible de **dónde se escribió**: en la definición de la macro o en el sitio de la llamada. Dos `x` con marcas distintas son **variables distintas**. A esto se le llama **higiene** (*hygiene*).
+
+En `macro_rules!` la higiene es **mixta** (*mixed-site*):
+
+- **Variables locales, etiquetas de bucles y `$crate`**: higiénicas. Se buscan donde se escribió el nombre. La macro no ve tus variables y tú no ves las suyas.
+- **Todo lo demás** (funciones, structs, módulos, macros…): se busca en el sitio de la llamada, como si hubieras escrito el código ahí. Si la macro define `fn ayuda()`, tú puedes llamarla.
+
+Si una macro **necesita** tocar una variable tuya, la forma correcta es que tú le pases el nombre: `mas_uno!(y)` con `$v:ident`.
+
+## Pruébalo
+
+<Ejecutar ej="m19/items-visibles" titulo="Los items no son higiénicos" />
+
+1. La macro define una función y un struct.
+2. `main` los usa sin problema: los items se resuelven en el sitio de la llamada.
+
+<Ejecutar ej="m19/dolar-crate" titulo="$crate" />
+
+1. Dentro de la macro, `$crate::util::doble` es una ruta absoluta a la crate donde se definió.
+2. Aunque `otro` tenga su propia función `doble`, la macro llama a la correcta. Cuando una macro se exporta a otras crates, `$crate` es **la única manera fiable** de nombrar tus propias funciones: el usuario puede haber renombrado tu crate o tener items con el mismo nombre.
+
+## Bajo el capó
+
+<BajoElCapo>
+Internamente, cada identificador lleva un *contexto de sintaxis* (*syntax context*) que registra de qué expansión salió. Cuando el compilador busca una variable local, compara el texto **y** el contexto. Por eso, en `higiene.rs`, la expansión contiene dos `x` que el impresor muestra igual pero que el compilador distingue.
+
+Ese contexto viaja con el *span* del token (la posición en el código fuente). En las macros procedurales (lección 9) eliges tú el comportamiento al crear identificadores: `Span::call_site()` (como si los hubiera escrito el llamante, sin higiene), `Span::mixed_site()` (la higiene de `macro_rules!`) y `Span::def_site()` (higiene total, todavía inestable).
+
+**`crate::` frente a `$crate::`.** Comprobado con dos crates: una biblioteca `bib` exporta `con_dolar!` (usa `$crate::util::f()`) y `con_crate!` (usa `crate::util::f()`). Desde otra crate, la primera funciona y la segunda falla, porque `crate` se resolvió en la crate del llamante (error real):
+
+```text
+error[E0433]: cannot find `util` in the crate root
+  |     let b = bib::con_crate!();
+  |             ^^^^^^^^^^^^^^^^^ could not find `util` in the crate root
+```
+
+¿Por qué no es todo higiénico? Porque muchas macros existen precisamente para **generar items que tú vas a usar**: `struct`, `impl`, funciones de prueba… Hacerlos invisibles las inutilizaría.
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m19/higiene-local" explicacion="La `y` del cuerpo de la macro se escribió en la definición, así que se busca allí, y allí no hay ninguna `y`. El propio compilador te avisa: existe una `y` con ese nombre, pero no es accesible por la higiene. Arreglo: pasa la variable como argumento (`mas_uno!(y)` con `$v:ident`)." />
+
+<Trampa titulo="Confiar en nombres «de fuera» dentro de una macro exportada">
+❌ Escribir `HashMap::new()` en la plantilla de una macro que van a usar otras crates: si el usuario no ha importado `HashMap`, no compila; si tiene otro `HashMap`, usa el suyo.
+
+✅ Usar rutas absolutas: `::std::collections::HashMap::new()` para la biblioteca estándar y `$crate::…` para lo tuyo.
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m19/reto-intercambia" enunciado="Escribe `intercambia!(a, b)` usando una variable temporal llamada `tmp` dentro de la macro. Aunque el usuario tenga su propia `tmp`, la higiene evitará el choque. Debe imprimir `tmp = 2, otro = 1`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una macro hace `let total = 0;` en su plantilla y tú tienes una variable `total`. ¿Qué pasa?"
+  opciones={["Tu `total` se pone a 0", "Nada: son variables distintas por la higiene", "Error de compilación por nombre repetido", "Depende del orden de declaración"]}
+  correcta={1}
+  explicacion="Las variables locales de `macro_rules!` son higiénicas: la de la macro y la tuya no se pisan."
+  porque={["La higiene evita justo eso.", "Correcto.", "Repetir nombres está permitido incluso sin macros (shadowing), y aquí ni siquiera chocan.", "El orden no importa: tienen contextos distintos."]}
+/>
+
+<Pregunta
+  pregunta="Una macro define `fn ayuda() {}`. ¿Puedes llamar a `ayuda()` después de invocarla?"
+  opciones={["No, los items de una macro son privados", "Sí: en macro_rules! los items no son higiénicos", "Solo si la macro tiene #[macro_export]", "Solo dentro de la propia macro"]}
+  correcta={1}
+  explicacion="La higiene mixta solo protege variables locales, etiquetas y `$crate`. Los items se resuelven en el sitio de la llamada."
+  porque={["No existe esa regla de privacidad para macros.", "Correcto.", "`#[macro_export]` cambia dónde vive la macro, no la visibilidad de lo que genera.", "Se ven desde el código que rodea la invocación."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué escribirías en una macro exportada para llamar a la función `util::f` de tu propia crate?"
+  opciones={["`util::f()`", "`crate::util::f()`", "`$crate::util::f()`", "`self::util::f()`"]}
+  correcta={2}
+  explicacion="`$crate` se resuelve siempre a la crate que define la macro. `crate::` se resolvería a la crate del **usuario** que la invoca."
+  porque={["Dependería de lo que haya importado el usuario.", "`crate` en la expansión es la crate de quien invoca, no la tuya.", "Correcto.", "`self` depende del módulo donde se expande."]}
+/>

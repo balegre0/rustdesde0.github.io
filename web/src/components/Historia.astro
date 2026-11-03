@@ -1,0 +1,10 @@
+---
+// <Historia titulo="…">…</Historia> — historia real breve
+import { Icon } from '@astrojs/starlight/components';
+interface Props { titulo?: string }
+const { titulo } = Astro.props;
+---
+<aside class="rdc-historia" aria-label={`Historia${titulo ? ': ' + titulo : ''}`}>
+  <p class="rdc-caja-titulo"><Icon name="open-book" /><span>Historia{titulo && <>: {titulo}</>}</span></p>
+  <div class="rdc-caja-cuerpo"><slot /></div>
+</aside>

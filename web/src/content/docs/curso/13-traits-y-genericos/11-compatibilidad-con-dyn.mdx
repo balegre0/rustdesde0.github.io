@@ -1,0 +1,73 @@
+---
+title: "Compatibilidad con dyn"
+description: "No todo trait se puede usar como dyn Trait: los métodos genéricos y los que devuelven Self no caben en una vtable (E0038). Cómo arreglarlo con where Self: Sized, y el upcasting entre traits."
+sidebar:
+  order: 11
+duracion: 13
+desde: "1.0"
+requiere: ["13-traits-y-genericos/10-operadores"]
+tarjetas:
+  - p: "¿Qué impide que un trait sea compatible con dyn (E0038)?"
+    r: "Tener métodos genéricos, métodos que devuelven Self o lo reciben por valor sin `where Self: Sized`, funciones asociadas sin self, o exigir Self: Sized (por ejemplo, con el supertrait Clone)."
+  - p: "¿Cómo excluyes un método de la vtable para que el trait siga siendo compatible con dyn?"
+    r: "Añadiéndole `where Self: Sized`: el método sigue existiendo para los tipos concretos, pero no se puede llamar a través de dyn."
+  - p: "¿Qué es el upcasting de trait objects?"
+    r: "Convertir un &dyn Sub en &dyn Super cuando Super es supertrait de Sub. Estable desde Rust 1.86."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo } from '~/components';
+
+En la lección 5 viste que `dyn Trait` llama a los métodos a través de una **vtable**. No todos los métodos caben en una vtable, y por eso no todos los traits se pueden usar con `dyn`. A esa propiedad se la llama **compatibilidad con dyn** (*dyn compatibility*; antes, *object safety*).
+
+## Predice
+
+<NoCompila ej="m13/no-dyn" explicacion={"El método `guardar` es genérico en `T`. Piensa en la vtable: es una tabla con **un** puntero por método. ¿Cuántas versiones de `guardar` habría que meter en ella?"} />
+
+## La idea
+
+Una vtable tiene un puntero a función **por cada método**, y se construye al compilar para cada tipo concreto. Un método no cabe si:
+
+- **Es genérico** (`fn guardar<T>(…)`): habría una versión por cada `T` posible, infinitas.
+- **Devuelve `Self` o lo recibe por valor** (`fn clonar(&self) -> Self`): quien llama a través de `dyn` no sabe el tamaño de `Self`.
+- **No tiene `self`** (`fn nuevo() -> Self`): no hay ningún valor del que sacar la vtable.
+
+Y un trait no es compatible si exige `Self: Sized`, por ejemplo al tener `Clone` como supertrait:
+
+<NoCompila ej="m13/clonar-dyn" explicacion="`Clone::clone` devuelve `Self` por valor, así que `Clone` exige `Sized`, y un `dyn Figura` no tiene tamaño conocido. La solución habitual es un método propio: `fn clonar_caja(&self) -> Box<dyn Figura>`." />
+
+**El arreglo más común**: marcar los métodos problemáticos con `where Self: Sized`. Siguen existiendo para los tipos concretos, pero no forman parte de la vtable:
+
+```rust
+trait Guardar {
+    fn guardar_texto(&self, texto: &str);                 // cabe en la vtable
+    fn guardar<T: Debug>(&self, cosa: T) where Self: Sized { // excluido de dyn
+        self.guardar_texto(&format!("{cosa:?}"));
+    }
+}
+```
+
+## Pruébalo
+
+Un caso que sí funciona: **supertraits** y **upcasting**. Un `&dyn Mascota` se puede convertir en `&dyn Ser`, porque `Ser` es supertrait de `Mascota`:
+
+<Ejecutar ej="m13/supertraits" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La vtable de un supertrait.** La vtable de `dyn Mascota` contiene también los métodos de `Ser` y de `Debug`. El upcasting (estable desde Rust 1.86) consiste en encontrar, dentro de ella, la parte que corresponde a `Ser`: el compilador organiza las vtables para que eso sea un simple desplazamiento o un puntero guardado en la propia vtable.
+
+**`dyn Trait` implementa `Trait`.** Para cada trait compatible, el compilador genera automáticamente `impl Trait for dyn Trait`. Por eso puedes pasar un `&dyn Forma` a una función genérica `fn f<T: Forma + ?Sized>(x: &T)`.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estos traits se puede usar como `dyn`?"
+  opciones={["`trait A { fn nombre(&self) -> String; }`", "`trait B { fn hacer<T>(&self, t: T); }`", "`trait C: Clone { fn x(&self); }`", "`trait D { fn nuevo() -> Self; }`"]}
+  correcta={0}
+  explicacion="Un método normal con `&self` y un tipo de retorno conocido cabe sin problema en la vtable."
+  porque={["", "Método genérico: no cabe.", "`Clone` exige `Sized`.", "Sin `self` ni `where Self: Sized`: no cabe."]}
+/>

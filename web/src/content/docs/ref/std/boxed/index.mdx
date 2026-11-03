@@ -1,0 +1,32 @@
+---
+title: "std::boxed"
+description: "Box<T>: el puntero inteligente más simple. Pone un valor en el montón y es su único dueño."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "alloc"]
+---
+**Ruta:** `std::boxed`
+
+## Para qué sirve
+
+`Box<T>` guarda un valor en el **montón** (*heap*) y deja en la pila solo un puntero. Es dueño único del valor: al destruirse la `Box`, se destruye el valor y se libera su memoria.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Box`](/ref/std/boxed/box/) | Un valor en el montón con un único dueño. | 1.0 |
+
+## Conceptos clave
+
+- **Cuándo usarla**: tipos recursivos ([E0072](/errores/e0072/)), objetos de trait (`Box<dyn Trait>`), mover valores grandes sin copiarlos y tipos cuyo tamaño no se conoce al compilar.
+- **Coste**: una reserva de memoria al crearla y un puntero de tamaño fijo. Leer a través de ella es una indirección.
+
+## Ver también
+
+- [Rc (varios dueños)](/ref/std/rc/rc/)
+- [Deref](/ref/std/ops/deref/)
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

@@ -1,0 +1,111 @@
+---
+title: "Layout de enums y nichos"
+description: "Mide cuánto ocupa cada enum en memoria y descubre por qué Option<&T> sale gratis."
+sidebar:
+  order: 10
+duracion: 13
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones/05-enums-con-datos", "09-structs-enums-y-patrones/06-option-sin-null"]
+tarjetas:
+  - p: "¿Qué es un nicho (niche) en el layout de un tipo?"
+    r: "Un patrón de bits que ese tipo nunca puede tener (por ejemplo, el 0 en una referencia, o el 2 en un `bool`). El compilador lo usa para guardar la etiqueta de un enum sin gastar bytes extra."
+  - p: "¿Cuánto ocupan `Option<&u8>` y `Option<u32>` en wasm32?"
+    r: "`Option<&u8>`: 4 bytes, como `&u8` (nicho del 0). `Option<u32>`: 8 bytes, porque un `u32` no tiene valores libres y hace falta una etiqueta aparte."
+  - p: "¿Por qué no compila `enum Lista { Nodo(i32, Lista), Fin }`?"
+    r: "Porque su tamaño sería infinito (E0072): una `Lista` contendría otra `Lista` entera. Se rompe el ciclo con un puntero, por ejemplo `Box<Lista>`."
+  - p: "¿Qué hacer si una variante de un enum es mucho más grande que las demás?"
+    r: "Meter sus datos en un `Box`: el enum guarda solo un puntero y todas las variantes dejan de pagar el tamaño de la grande."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a medir, byte a byte, cuánto ocupan tus enums, y a entender la optimización de nicho, una de las razones por las que la seguridad de Rust no cuesta memoria.
+
+## Predice
+
+<Predice
+  ej="m09/nichos-predice"
+  opciones={["`Option<u32>: 8` y `Option<&u32>: 4`", "`Option<u32>: 5` y `Option<&u32>: 5`", "`Option<u32>: 8` y `Option<&u32>: 8`", "`Option<u32>: 4` y `Option<&u32>: 4`"]}
+  correcta={0}
+  explicacion="Un `u32` puede valer cualquier cosa: hace falta una etiqueta, y con el relleno de alineamiento quedan 8 bytes. Una referencia nunca vale 0, así que el 0 significa `None`: 4 bytes. (En el navegador, wasm32, una referencia mide 4 bytes.)"
+  porque={["Correcto.", "El tamaño tiene que ser múltiplo del alineamiento (4): 5 se redondea a 8. Y la referencia no necesita etiqueta.", "La referencia no necesita etiqueta aparte: usa el nicho del 0.", "Para el `u32` no hay ningún valor libre que pueda significar `None`."]}
+/>
+
+## La idea
+
+Ya sabes que un enum guarda una **etiqueta** y el espacio de su variante más grande. Pero a veces la etiqueta **no ocupa nada**. El truco: muchos tipos tienen **valores imposibles**.
+
+- Una referencia `&T` o un `Box<T>` **nunca** valen 0 (siempre apuntan a algo).
+- Un `bool` solo puede ser 0 o 1: los valores 2 a 255 de su byte están libres.
+- Un `char` solo llega hasta `0x10FFFF`: sobran millones de valores.
+
+Un valor imposible se llama **nicho** (*niche*). El compilador lo aprovecha para codificar las variantes sin datos: en `Option<&T>`, el 0 significa `None`. Resultado: `Option<&T>` ocupa **lo mismo que `&T`**. Pero solo hay **un** 0 por puntero: si el enum necesita dos casos sin datos (`TresCasos` abajo), ya no basta y vuelve la etiqueta.
+
+## Pruébalo
+
+<Ejecutar ej="m09/nichos" />
+
+Los números son de **wasm32** (el navegador), donde un puntero mide 4 bytes. En un PC x86-64 los que llevan punteros se duplican: `&u8` y `Option<&u8>` = 8, `TresCasos` = 16, `String` y `Option<String>` = 24, `Option<*const u8>` = 16; los demás no cambian (comprobado con `size_of` en rustc 1.99.1 para `x86_64-pc-windows-msvc`).
+
+## Bajo el capó
+
+<BajoElCapo>
+
+La regla general para un enum con datos en `repr(Rust)`:
+
+1. Si alguna variante tiene un campo con nichos suficientes para las demás, la etiqueta se **esconde** en ese campo (`Option<&u8>`, `Option<bool>`, `Option<String>`).
+2. Si no, se añade una etiqueta (normalmente 1 byte) y luego se redondea el tamaño al **alineamiento** más exigente. Por eso `Option<u8>` = 2 pero `Option<u32>` = 8 (4 de datos + 1 de etiqueta + 3 de relleno).
+
+La documentación de `Option` **garantiza** el caso de las referencias, `Box`, `NonNull` y los `NonZero*`: `Option<&T>` tiene el mismo tamaño y representación que un puntero que puede ser nulo. Para el resto de enums, el layout de `repr(Rust)` **no está garantizado** (el compilador puede cambiarlo entre versiones); si necesitas una forma fija, existen `#[repr(u8)]` y `#[repr(C)]` (mundo 22). Para ver el layout real hay una herramienta de nightly: `-Zprint-type-sizes`.
+
+`Option<String>` ocupa lo mismo que `String` porque el puntero interno de un `String` es `NonNull` (nunca nulo). Y los punteros crudos `*const T` **sí** pueden ser nulos: no tienen nicho y `Option<*const u8>` necesita etiqueta.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Una variante enorme hace pagar a todas">
+
+❌ `Mensaje::Ping` no lleva datos… pero ocupa **1001 bytes**, porque tiene que caber `Datos([u8; 1000])`. ✅ Con `Box`, los datos grandes van al heap y el enum guarda solo un puntero:
+
+<Ejecutar ej="m09/variante-grande" />
+
+Clippy (la herramienta de avisos de Rust, mundo 16) avisa de esto con el lint `large_enum_variant`.
+
+</Trampa>
+
+<NoCompila
+  ej="m09/lista-infinita"
+  explicacion="Para saber cuánto ocupa una `Lista`, el compilador necesita saber cuánto ocupa una `Lista`… que contiene otra `Lista`: tamaño infinito (E0072). Un `Box` rompe el ciclo: es un puntero de tamaño fijo (4 bytes en wasm32) hacia el siguiente nodo, que vive en el heap."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m09/tamanos"
+  enunciado="Imprime con `size_of` el tamaño de `Option<u16>` (formato `Option<u16>: N bytes`) y si `Option<&u16>` mide lo mismo que `&u16` (formato `Option<&u16> mide lo mismo que &u16: true` o `false`). Antes de ejecutar, predice las dos respuestas. Se compara en vez de imprimir el número porque una referencia mide 4 bytes en el navegador y 8 en un PC de 64 bits, como el del Playground."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuánto ocupa `Option<Option<bool>>`?"
+  opciones={["1 byte", "3 bytes", "2 bytes", "4 bytes"]}
+  correcta={0}
+  explicacion="`bool` usa 0 y 1; el `None` interior usa el 2 y el `None` exterior el 3. Todo cabe en el mismo byte."
+  porque={["Correcto: el `bool` tiene 254 nichos.", "No hace falta una etiqueta por nivel: los nichos alcanzan.", "Tampoco hace falta una etiqueta aparte.", "Nada aquí necesita 4 bytes."]}
+/>
+
+<Pregunta
+  pregunta="En wasm32, `enum A { X(Box<u64>), Y }` ocupa 4 bytes y `enum B { X(Box<u64>), Y, Z }` ocupa 8. ¿Por qué?"
+  opciones={["Un puntero solo tiene un nicho (el 0): sirve para `Y`, pero no para `Y` y `Z` a la vez", "Porque `B` tiene más variantes y cada una suma 2 bytes", "Porque `Z` también lleva un `Box` escondido", "Por un fallo del compilador"]}
+  correcta={0}
+  porque={["Correcto: con dos casos sin datos hace falta una etiqueta.", "El tamaño no crece por variante; crece al necesitar etiqueta y relleno.", "`Z` no lleva datos.", "Es el comportamiento esperado, y medido."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué está garantizado por la documentación de Rust?"
+  opciones={["Que `Option<&T>` ocupa lo mismo que `&T`", "Que en `repr(Rust)` la etiqueta de un enum va siempre en el primer byte", "Que `Option<u32>` ocupa 8 bytes en todas las plataformas y versiones", "Que los campos de un struct están en el orden escrito"]}
+  correcta={0}
+  porque={["Correcto: viene en la sección «Representation» de `Option`.", "El layout de `repr(Rust)` no está especificado.", "Es lo que medimos hoy, pero no es una promesa.", "Solo con `#[repr(C)]`."]}
+/>

@@ -1,0 +1,428 @@
+# Banco de preguntas del mundo 24 — Teoría y diseño del lenguaje (CONTENIDO.md §7.1).
+# Código citado: ejemplos/m24/*.rs, compilado y ejecutado con rustc 1.99.1, edición 2024.
+
+- id: m24-cardinalidad-tupla
+  titulo: "Contar valores de una tupla"
+  mundo: 24-teoria-y-diseno
+  tema: tipos
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuántos valores distintos tiene el tipo `(bool, u8)`? (Solo el número.)"
+  respuestas: ["512"]
+  solucion: |
+    Es un producto: 2 × 256 = 512.
+  etiquetas: ["cardinalidad", "producto"]
+
+- id: m24-cardinalidad-suma
+  titulo: "Contar valores de un Result"
+  mundo: 24-teoria-y-diseno
+  tema: tipos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuántos valores tiene `Result<bool, Option<bool>>`?"
+  opciones: ["5", "6", "4", "3"]
+  correcta: 0
+  solucion: |
+    Es una suma: |bool| + |Option<bool>| = 2 + 3 = 5.
+  etiquetas: ["cardinalidad", "suma"]
+
+- id: m24-option-bool
+  titulo: "El tamaño de Option<bool>"
+  mundo: 24-teoria-y-diseno
+  tema: tipos
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la última línea?"
+  ej: m24/cardinalidad
+  opciones:
+    - "`bytes: bool=1 (bool,bool)=2 Option<bool>=1 ()=0`"
+    - "`bytes: bool=1 (bool,bool)=2 Option<bool>=2 ()=0`"
+    - "`bytes: bool=1 (bool,bool)=1 Option<bool>=1 ()=1`"
+    - "`bytes: bool=8 (bool,bool)=16 Option<bool>=16 ()=0`"
+  correcta: 0
+  solucion: |
+    `Option<bool>` tiene 3 valores y cabe en un byte: el compilador usa uno de los valores que `bool` no usa para `None` (optimización de nicho). `()` tiene un solo valor: 0 bytes.
+  etiquetas: ["nicho", "layout"]
+
+- id: m24-isomorfos
+  titulo: "Tipos isomorfos"
+  mundo: 24-teoria-y-diseno
+  tema: tipos
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué tipo es isomorfo a `Option<()>`?"
+  opciones: ["`bool`", "`()`", "`u8`", "`Option<bool>`"]
+  correcta: 0
+  solucion: |
+    Los dos tienen 2 valores: `None` ↔ `false`, `Some(())` ↔ `true`.
+  etiquetas: ["isomorfismo"]
+
+- id: m24-infallible
+  titulo: "Un error imposible"
+  mundo: 24-teoria-y-diseno
+  tema: tipos
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Cuántos bytes ocupa `Result<u32, Infallible>` según el ejemplo?"
+  ej: m24/vacio
+  opciones: ["4, lo mismo que `u32`", "8", "5", "0"]
+  correcta: 0
+  solucion: |
+    `Infallible` no tiene valores, así que la variante `Err` no puede existir y no hace falta guardar cuál de las dos es.
+  etiquetas: ["Infallible", "tipo vacío"]
+
+- id: m24-match-vacio
+  titulo: "Un match sin brazos"
+  mundo: 24-teoria-y-diseno
+  tema: tipos
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Por qué compila `fn absurdo<T>(x: Infallible) -> T { match x {} }`?"
+  opciones:
+    - "Porque un tipo sin valores ya queda cubierto por un `match` sin brazos, y nadie puede llamar a la función, así que puede «devolver» cualquier tipo"
+    - "Porque `T` es `()` por defecto"
+    - "Porque `match` siempre devuelve `!`"
+    - "No compila"
+  correcta: 0
+  solucion: |
+    Leído con Curry–Howard: «de lo falso se deduce cualquier cosa».
+  etiquetas: ["Infallible", "Curry–Howard"]
+
+- id: m24-curry-howard
+  titulo: "Programas como demostraciones"
+  mundo: 24-teoria-y-diseno
+  tema: logica
+  dificultad: media
+  tipo: opcion
+  enunciado: "Según Curry–Howard, ¿qué proposición «demuestra» `fn f<A, B>(r: Result<A, B>) -> Result<B, A>`?"
+  opciones: ["«A o B» implica «B o A»", "«A y B» implica A", "A implica B", "Nada"]
+  correcta: 0
+  solucion: |
+    `Result` es la disyunción («o»), la tupla la conjunción («y») y una función la implicación. El ejemplo `m24/curry-howard` la llama `conmutar`.
+  etiquetas: ["Curry–Howard"]
+
+- id: m24-never
+  titulo: "El tipo de panic!"
+  mundo: 24-teoria-y-diseno
+  tema: tipos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué tipo tiene la expresión `panic!(\"…\")`?"
+  opciones: ["`!`", "`()`", "`String`", "`Result<(), String>`"]
+  correcta: 0
+  solucion: |
+    No termina normalmente, así que nunca produce un valor. `!` se convierte en el tipo que haga falta, por eso un `panic!` encaja en cualquier rama.
+  etiquetas: ["never"]
+
+- id: m24-parametricidad
+  titulo: "Lo que dice una firma"
+  mundo: 24-teoria-y-diseno
+  tema: polimorfismo
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué puede hacer, como mucho, una función `fn f<T>(x: T, y: T) -> (T, T)` sin cotas?"
+  opciones: ["Devolver `(x, y)` o `(y, x)`", "Devolver `(x, x)`", "Sumar `x` e `y`", "Crear un `T` nuevo"]
+  correcta: 0
+  solucion: |
+    Sin `Clone` no puede duplicar, sin `Default` no puede crear y sin `Add` no puede sumar. Es un «teorema gratis».
+  etiquetas: ["parametricidad"]
+
+- id: m24-teorema-gratis
+  titulo: "Un teorema gratis"
+  mundo: 24-teoria-y-diseno
+  tema: polimorfismo
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime la última línea?"
+  ej: m24/parametricidad
+  opciones:
+    - "`[30, 20, 10] == [30, 20, 10]: true`"
+    - "`[30, 20, 10] == [10, 20, 30]: false`"
+    - "`[10, 20, 30] == [10, 20, 30]: true`"
+    - "Depende de la función `f`"
+  correcta: 0
+  solucion: |
+    `invertir<T>` no puede mirar los elementos, así que da igual aplicar `map(f)` antes o después: el resultado es el mismo para **cualquier** `f`.
+  etiquetas: ["parametricidad", "teoremas gratis"]
+
+- id: m24-tres-polimorfismos
+  titulo: "Tres polimorfismos"
+  mundo: 24-teoria-y-diseno
+  tema: polimorfismo
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Dónde aparece el polimorfismo de subtipos en Rust?"
+  opciones:
+    - "Solo entre lifetimes: una `&'static str` sirve donde se pide una `&'a str`"
+    - "En la herencia entre structs"
+    - "En los traits"
+    - "En los genéricos"
+  correcta: 0
+  solucion: |
+    Rust no tiene herencia. Los genéricos son polimorfismo paramétrico y los traits, ad hoc.
+  etiquetas: ["subtipos", "lifetimes"]
+
+- id: m24-coherencia
+  titulo: "Por qué la regla huérfana"
+  mundo: 24-teoria-y-diseno
+  tema: traits
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué problema evita la coherencia de traits?"
+  opciones:
+    - "Que haya dos implementaciones del mismo trait para el mismo tipo y el programa dependa de cuál se elija"
+    - "Que los traits sean lentos"
+    - "Que un tipo implemente demasiados traits"
+    - "Que haya métodos sin implementar"
+  correcta: 0
+  solucion: |
+    Viene de las clases de tipos (Wadler y Blott, 1989): para que el compilador elija siempre la misma implementación, solo puede haber una.
+  etiquetas: ["coherencia", "clases de tipos"]
+
+- id: m24-impl-existencial
+  titulo: "impl Trait como existencial"
+  mundo: 24-teoria-y-diseno
+  tema: traits
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En teoría de tipos, ¿qué es `fn f() -> impl Iterator<Item = u8>`?"
+  opciones:
+    - "Un tipo existencial: «existe un tipo concreto que es `Iterator<Item = u8>`, pero no te digo cuál»"
+    - "Un tipo genérico que elige quien llama"
+    - "Un tipo vacío"
+    - "Una suma de todos los iteradores"
+  correcta: 0
+  solucion: |
+    Con un genérico `<T>` elige **quien llama**; con `impl Trait` en el retorno elige **la función**, y lo oculta.
+  etiquetas: ["existenciales", "impl Trait"]
+
+- id: m24-afin
+  titulo: "Afín o lineal"
+  mundo: 24-teoria-y-diseno
+  tema: logica
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué se dice que el sistema de ownership de Rust es afín y no lineal?"
+  opciones:
+    - "Porque un valor se puede usar como mucho una vez, pero también se puede descartar sin usarlo"
+    - "Porque los valores se usan exactamente una vez"
+    - "Porque todos los valores se pueden copiar"
+    - "Porque no hay destructores"
+  correcta: 0
+  solucion: |
+    En un sistema lineal habría que usar cada valor exactamente una vez. En Rust puedes dejarlo sin usar (y el compilador lo libera) o incluso olvidarlo con `mem::forget`.
+  etiquetas: ["tipos afines", "lógica lineal"]
+
+- id: m24-forget
+  titulo: "mem::forget es seguro"
+  mundo: 24-teoria-y-diseno
+  tema: logica
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Por qué `std::mem::forget` no es `unsafe`?"
+  opciones:
+    - "Porque no ejecutar un destructor no puede causar un uso tras liberar; desde 2015, Rust no garantiza que los destructores se ejecuten"
+    - "Porque no hace nada"
+    - "Porque libera la memoria igualmente"
+    - "Es `unsafe`"
+  correcta: 0
+  solucion: |
+    Se decidió en la «leakpocalypse» de 2015: con `Rc` y ciclos ya se podía evitar un destructor en código seguro. Por eso el código `unsafe` nunca puede depender de que un `drop` se ejecute.
+  etiquetas: ["mem::forget", "leakpocalypse"]
+
+- id: m24-regiones
+  titulo: "El antepasado de las lifetimes"
+  mundo: 24-teoria-y-diseno
+  tema: historia
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿De qué idea de investigación descienden las lifetimes de Rust?"
+  opciones:
+    - "De la gestión de memoria por regiones (Tofte y Talpin, 1994), llevada a un lenguaje de sistemas por Cyclone (2002)"
+    - "De la recolección de basura"
+    - "Del recuento de referencias"
+    - "De la programación orientada a objetos"
+  correcta: 0
+  solucion: |
+    `&'a T` es «un puntero a algo que vive en la región `'a`». El tipo comprueba que ningún puntero sobreviva a su región.
+  etiquetas: ["regiones", "historia"]
+
+- id: m24-rustbelt
+  titulo: "Qué demostró RustBelt"
+  mundo: 24-teoria-y-diseno
+  tema: semantica
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Cuál fue la aportación clave de RustBelt (POPL 2018)?"
+  opciones:
+    - "Un método para demostrar que una biblioteca con `unsafe` dentro (Rc, Mutex, Arc…) es segura para cualquier uso desde código seguro"
+    - "Un compilador de Rust nuevo"
+    - "Que Rust no tiene errores"
+    - "Una herramienta para buscar fallos al ejecutar"
+  correcta: 0
+  solucion: |
+    Se basa en la lógica de separación Iris y está mecanizado en Rocq (antes Coq). Encontró un fallo real en `MutexGuard`.
+  etiquetas: ["RustBelt", "Iris"]
+
+- id: m24-validez-seguridad
+  titulo: "Dos invariantes"
+  mundo: 24-teoria-y-diseno
+  tema: semantica
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Crear (con `unsafe`) un `bool` cuyo byte vale 3, ¿qué invariante rompe?"
+  opciones:
+    - "El de validez: es comportamiento indefinido en el acto, aunque nunca se lea"
+    - "El de seguridad: es correcto si se arregla antes de devolverlo"
+    - "Ninguno"
+    - "Solo es un aviso"
+  correcta: 0
+  solucion: |
+    El invariante de validez lo exige el lenguaje en todo momento (de él dependen optimizaciones como los nichos). El de seguridad (por ejemplo, que un `String` sea UTF-8) se puede romper temporalmente dentro de un `unsafe`.
+  etiquetas: ["validez", "UB"]
+
+- id: m24-tree-borrows
+  titulo: "Modelos de aliasing"
+  mundo: 24-teoria-y-diseno
+  tema: semantica
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Qué cambió Tree Borrows (PLDI 2025) respecto a Stacked Borrows?"
+  opciones:
+    - "Sustituyó la pila de permisos por un árbol con una máquina de estados por préstamo, y acepta más código `unsafe` real"
+    - "Eliminó el comprobador de préstamos"
+    - "Hace que el código `unsafe` sea seguro"
+    - "Nada: es otro nombre"
+  correcta: 0
+  solucion: |
+    Miri puede comprobar los dos (`-Zmiri-tree-borrows`). Ninguno es todavía la regla oficial del lenguaje.
+  etiquetas: ["Tree Borrows", "Miri"]
+
+- id: m24-kani
+  titulo: "kani::any"
+  mundo: 24-teoria-y-diseno
+  tema: verificacion
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué representa `kani::any::<u32>()` en una prueba de Kani?"
+  opciones: ["Todos los valores posibles de `u32` a la vez", "Un número aleatorio", "El valor 0", "Un valor que elige el usuario"]
+  correcta: 0
+  solucion: |
+    Kani razona simbólicamente (comprobación de modelos acotada): si algún valor rompe el `assert!`, lo encuentra y lo muestra.
+  etiquetas: ["Kani", "verificación"]
+
+- id: m24-verificar-aliasing
+  titulo: "Por qué Rust es fácil de verificar"
+  mundo: 24-teoria-y-diseno
+  tema: verificacion
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Qué propiedad de Rust aprovechan herramientas como Prusti o Creusot para simplificar las demostraciones?"
+  opciones:
+    - "Que un `&mut` es el único camino a su valor: no hay aliasing con mutación"
+    - "Que no hay punteros"
+    - "Que todo es inmutable"
+    - "Que no hay bucles"
+  correcta: 0
+  solucion: |
+    El aliasing es el gran problema al verificar código de sistemas. En Rust seguro, el comprobador de préstamos ya lo ha descartado.
+  etiquetas: ["verificación", "aliasing"]
+
+- id: m24-fls
+  titulo: "La especificación"
+  mundo: 24-teoria-y-diseno
+  tema: especificacion
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué escribió Ferrous Systems la FLS?"
+  opciones:
+    - "Para cualificar su compilador Ferrocene para normas de seguridad funcional, que exigen una especificación contra la que comprobarlo"
+    - "Para enseñar Rust"
+    - "Para cambiar el lenguaje"
+    - "Para sustituir a la Reference"
+  correcta: 0
+  solucion: |
+    La donaron al proyecto Rust, que la adoptó en 2025; la mantiene el equipo de especificación junto con la Reference.
+  etiquetas: ["FLS", "Ferrocene"]
+
+- id: m24-ediciones
+  titulo: "Cambios incompatibles"
+  mundo: 24-teoria-y-diseno
+  tema: evolucion
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cómo introduce Rust un cambio que rompería código existente, como una palabra reservada nueva?"
+  opciones:
+    - "Con una edición nueva, que cada paquete adopta cuando quiere; los paquetes de ediciones distintas se combinan sin problema"
+    - "En cualquier versión estable"
+    - "Solo en nightly"
+    - "No puede hacerlo"
+  correcta: 0
+  solucion: |
+    La promesa de estabilidad garantiza que lo que compila en una versión estable compila en las siguientes. Antes de cada versión, *crater* compila todo crates.io para comprobarlo.
+  etiquetas: ["ediciones", "estabilidad"]
+
+- id: m24-rfc
+  titulo: "El camino de una idea"
+  mundo: 24-teoria-y-diseno
+  tema: evolucion
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál es el orden habitual para que una característica grande llegue a Rust estable?"
+  opciones:
+    - "RFC → aceptación por el equipo → implementación detrás de una feature inestable → pruebas en nightly → estabilización"
+    - "Implementación directa en stable"
+    - "Votación en crates.io"
+    - "Decisión de la Rust Foundation"
+  correcta: 0
+  solucion: |
+    La Rust Foundation da apoyo económico y legal, pero el diseño lo deciden los equipos del proyecto.
+  etiquetas: ["RFC", "nightly"]
+
+- id: m24-typestate
+  titulo: "Pasar por una puerta cerrada"
+  mundo: 24-teoria-y-diseno
+  tema: diseno
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Qué error da y por qué es bueno?"
+  ej: m24/typestate-mal
+  opciones:
+    - "E0599: `pasar` no existe para `Puerta<Cerrada>`. Un error de lógica se convierte en un error de compilación"
+    - "E0382: la puerta se movió"
+    - "Pánico al ejecutar"
+    - "Ninguno"
+  correcta: 0
+  solucion: |
+    Es el patrón typestate: el estado forma parte del tipo, y cada estado solo tiene sus operaciones. Con `PhantomData`, no cuesta ni un byte.
+  etiquetas: ["typestate", "E0599"]
+
+- id: m24-estados-sobrantes
+  titulo: "Estados que sobran"
+  mundo: 24-teoria-y-diseno
+  tema: diseno
+  dificultad: media
+  tipo: opcion
+  enunciado: "Un struct tiene `cargando: bool`, `datos: Option<Vec<u8>>` y `error: Option<String>`. ¿Cuántas combinaciones de forma tiene y cuántas tienen sentido?"
+  opciones: ["8 y 3", "3 y 3", "4 y 2", "6 y 3"]
+  correcta: 0
+  solucion: |
+    2 × 2 × 2 = 8, pero solo «cargando», «con datos» y «con error» tienen sentido. Un `enum Estado { Cargando, Listo(Vec<u8>), Fallo(String) }` tiene exactamente 3.
+  etiquetas: ["diseño", "enum"]
+
+- id: m24-no-vacio
+  titulo: "Validar una vez"
+  mundo: 24-teoria-y-diseno
+  tema: diseno
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué `NoVacio<T>::primero()` puede devolver `&T` y no `Option<&T>`?"
+  opciones:
+    - "Porque el tipo guarda el primer elemento en un campo propio: es imposible construir un `NoVacio` sin elementos"
+    - "Porque usa `unwrap` por dentro"
+    - "Porque `T: PartialOrd`"
+    - "Por casualidad"
+  correcta: 0
+  solucion: |
+    «Parse, don't validate»: la comprobación ocurre una vez, en `desde_vec`, y a partir de ahí el tipo es la prueba.
+  etiquetas: ["diseño", "parse don't validate"]

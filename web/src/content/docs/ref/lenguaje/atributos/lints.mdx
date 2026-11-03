@@ -1,0 +1,70 @@
+---
+title: "allow, warn, deny, forbid y expect"
+description: "Los atributos de nivel de lint: permiten, avisan, prohíben o esperan un aviso concreto en un elemento o en todo el crate."
+sidebar:
+  order: 7
+insignias: ["Desde 1.0", "Diagnósticos"]
+---
+import { Ejecutar, NoCompila } from '~/components';
+
+Un **lint** es una comprobación con nombre que produce avisos (`unused_variables`, `dead_code`, `clippy::needless_return`…). Estos cinco atributos cambian su **nivel**.
+
+## Sinopsis
+
+```text
+#[allow(lint, otro_lint)]
+#[warn(lint)]
+#[deny(lint)]
+#[forbid(lint)]
+#[expect(lint, reason = "por qué")]
+#![deny(warnings)]          // interno: para todo el crate
+```
+
+## Qué hace
+
+| Atributo | Si el lint aparece… |
+|---|---|
+| `allow` | no dice nada |
+| `warn` | aviso (la compilación sigue) |
+| `deny` | **error** |
+| `forbid` | error, y **nadie más abajo puede relajarlo** con `allow` (E0453) |
+| `expect` | no dice nada, pero **avisa si el lint NO aparece** (lint `unfulfilled_lint_expectations`) |
+
+Se aplican al elemento que anotan y a todo lo que contiene; un atributo más interior gana a uno exterior (salvo `forbid`). Todos admiten `reason = "…"` para documentar la decisión.
+
+`expect` (1.81) es mejor que `allow` cuando silencias algo **temporalmente**: si un día el aviso desaparece, `expect` te lo dice y puedes quitarlo.
+
+Los grupos agrupan lints: `warnings` (todos los avisos), `unused`, `rust_2024_compatibility`, `clippy::pedantic`…
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-lints" />
+
+`forbid` no se puede revertir:
+
+<NoCompila ej="ref-lenguaje/at-forbid" />
+
+Y `expect` avisa si su aviso no llega a aparecer:
+
+<NoCompila ej="ref-lenguaje/at-expect-incumplido" />
+
+## Bajo el capó
+
+Los niveles también se pueden fijar desde fuera: `rustc -D warnings`, `RUSTFLAGS`, o la sección `[lints]` de `Cargo.toml` (1.74), que es la forma recomendada para un proyecto:
+
+```toml
+[lints.rust]
+unsafe_code = "forbid"
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+```
+
+`--cap-lints` (que Cargo usa con las dependencias) limita el nivel máximo: por eso los avisos de tus dependencias no te rompen la compilación.
+
+## Desde
+
+Rust 1.0. `expect` y `reason`: 1.81.
+
+## Ver también
+
+[`#[deprecated]`](/ref/lenguaje/atributos/deprecated/) · [`#[must_use]`](/ref/lenguaje/atributos/must_use/) · [Avisos no son errores](/curso/02-tu-primer-programa/08-avisos-no-son-errores/)

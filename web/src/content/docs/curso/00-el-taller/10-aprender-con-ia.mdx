@@ -1,0 +1,63 @@
+---
+title: "Aprender con IA sin que piense por ti"
+description: "Un asistente de IA puede ser un tutor excelente o una muleta que te impide aprender. Reglas concretas para usarlo bien mientras aprendes Rust."
+sidebar:
+  order: 10
+duracion: 8
+requiere: ["00-el-taller/09-git"]
+tarjetas:
+  - p: "¿Por qué no conviene pedirle a una IA el código de un ejercicio?"
+    r: "Porque se aprende al recordar y al equivocarse. Si otro escribe la solución, tu cerebro no hace el esfuerzo que fija lo aprendido."
+  - p: "Una forma útil de pedir ayuda a una IA ante un error del compilador:"
+    r: "Pegar el error y pedir que te explique qué significa y qué regla protege, sin darte el código arreglado."
+  - p: "¿Qué haces si una IA te da una explicación sobre Rust?"
+    r: "Comprobarla: compilando un ejemplo pequeño o en la documentación oficial. Las IA a veces se equivocan con seguridad."
+---
+
+import { Pregunta } from '~/components';
+
+Hoy puedes pedirle a un asistente de IA que te escriba casi cualquier programa. Eso es una herramienta estupenda para quien **ya sabe** programar, y una trampa para quien está aprendiendo. Esta lección es corta y va de hábitos.
+
+## La idea
+
+Aprender no es ver la respuesta: es **construirla**. La investigación sobre memoria lo repite una y otra vez: lo que recuerdas con esfuerzo (intentar, equivocarte, corregir) se queda; lo que lees ya hecho se olvida. Si una IA resuelve tus ejercicios, el que aprende es el chat.
+
+La regla de este curso:
+
+> **Usa la IA para entender, no para hacer.**
+
+## Cómo pedir ayuda
+
+✅ **Para entender un error**: «Este es el error del compilador. Explícame qué significa y qué regla de Rust protege. No me des el código arreglado.»
+
+✅ **Para un concepto**: «Explícame la diferencia entre `&str` y `String` con un ejemplo de memoria. Luego hazme tres preguntas para comprobar si lo he entendido.»
+
+✅ **Para revisar tu solución** (después de que funcione): «¿Qué haría distinto alguien con experiencia en Rust? Dime qué, no lo reescribas.»
+
+✅ **Para practicar**: «Ponme un ejercicio corto sobre préstamos, de dificultad media, sin la solución.»
+
+❌ «Hazme el ejercicio del jefe del mundo 06.»
+
+❌ Pegar el código con un error y copiar lo que devuelva sin leerlo.
+
+## Desconfía (un poco)
+
+Los asistentes de IA a veces se equivocan **con mucha seguridad**, sobre todo con detalles de versiones recientes de Rust. Por eso, todo lo que te expliquen, **compruébalo**: compilando un ejemplo pequeño (en este curso tienes el botón ▶ y el editor) o en la documentación oficial (`rustup doc`). Comprobar también es aprender.
+
+## Un orden que funciona
+
+1. Inténtalo tú solo **diez minutos**.
+2. Lee el error del compilador **entero**, con calma.
+3. Mira la lección y la ficha del error en este curso.
+4. Si sigues atascado, pide una **pista** (a la IA o a una persona), no la solución.
+5. Cuando funcione, haz commit. Y después, si quieres, pide una revisión.
+
+## Comprueba
+
+<Pregunta
+  pregunta="Llevas cinco minutos con un error de préstamos que no entiendes. ¿Qué es lo más útil para aprender?"
+  opciones={["Pedirle a una IA el código arreglado", "Pedirle que te explique el error y qué regla protege, sin el arreglo", "Añadir `.clone()` hasta que compile", "Saltarte el ejercicio"]}
+  correcta={1}
+  explicacion="Entender la regla te sirve para este error y para los cien siguientes. El código arreglado solo te sirve para este."
+  porque={["Lo resolverías hoy, pero no aprenderías a resolverlo.", "", "Compila, pero no aprendes por qué fallaba (y quizá cambies lo que hace el programa).", "Los errores son justo donde más se aprende."]}
+/>

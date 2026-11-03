@@ -1,0 +1,61 @@
+---
+title: "Excepciones e interrupciones de la CPU"
+description: "Qué hace la CPU cuando algo va mal (división entre cero, fallo de página) o llega una señal del hardware: la tabla IDT, el fallo doble, el temporizador y el teclado."
+sidebar:
+  order: 9
+duracion: 12
+requiere: ["23-embebido-y-tu-so/08-texto-en-pantalla"]
+tarjetas:
+  - p: "¿Qué es la IDT?"
+    r: "*Interrupt Descriptor Table*: la tabla que le dice a la CPU x86_64 qué función ejecutar para cada excepción o interrupción."
+  - p: "¿Qué es un fallo doble (*double fault*)?"
+    r: "La excepción que lanza la CPU cuando falla al atender otra excepción. Si tampoco se atiende, se produce un triple fallo y la máquina se reinicia."
+  - p: "¿Qué ABI usan las rutinas de excepción en Rust?"
+    r: "`extern \"x86-interrupt\"`, que guarda todos los registros y vuelve con `iretq`. Hoy es inestable (nightly)."
+---
+
+import { Pregunta, BajoElCapo } from '~/components';
+
+Un núcleo tiene que saber qué hacer cuando la CPU encuentra un problema o cuando el hardware pide atención. En x86_64 eso se configura con una tabla.
+
+## La idea
+
+Hay dos tipos de eventos:
+
+- **Excepciones**: las provoca la propia CPU al ejecutar algo imposible: dividir entre cero, una instrucción que no existe, acceder a memoria no mapeada (*page fault*, fallo de página), un punto de ruptura (`int3`).
+- **Interrupciones de hardware**: llegan de fuera: el temporizador, el teclado, el disco.
+
+Para cada una, la CPU mira la **IDT** (*Interrupt Descriptor Table*): una tabla con la dirección de la función que la atiende. Tu núcleo crea la tabla, rellena las entradas y le dice a la CPU dónde está (instrucción `lidt`). El crate `x86_64` da tipos seguros para todo esto:
+
+```rust
+extern "x86-interrupt" fn punto_de_ruptura(marco: InterruptStackFrame) {
+    println!("EXCEPCIÓN: punto de ruptura\n{marco:#?}");
+}
+
+idt.breakpoint.set_handler_fn(punto_de_ruptura);
+idt.load();
+```
+
+**El fallo doble.** Si al atender una excepción ocurre otra (por ejemplo, porque la pila se ha desbordado y no hay sitio para guardar el estado), la CPU lanza un **fallo doble**. Si tampoco hay rutina para él, se produce un **triple fallo** y la máquina se **reinicia**. blog_os enseña a darle al fallo doble una **pila propia** (con la tabla TSS), para poder atenderlo aunque la pila normal esté rota.
+
+**El hardware.** El temporizador y el teclado llegan a través de un controlador de interrupciones (el clásico 8259 PIC o el APIC). Con el temporizador tienes un «latido» periódico; con el teclado, códigos de tecla que traduces a caracteres.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La ABI `x86-interrupt`.** Una rutina de excepción no se llama como una función normal: la CPU apila un marco especial (y a veces un código de error) y vuelve con `iretq`. Además, hay que guardar **todos** los registros, porque el código interrumpido no sabía que iba a ser interrumpido. Rust tiene la ABI `extern "x86-interrupt"` que genera ese prólogo y ese epílogo; hoy solo está en nightly. Sin ella, se usa una función [`#[unsafe(naked)]`](/ref/lenguaje/atributos/naked/) con ensamblador.
+
+**Por qué el núcleo es concurrente.** Un manejador de interrupciones puede ejecutarse en mitad de cualquier código del núcleo. Si ambos usan el escritor de pantalla y el núcleo tenía el *spinlock* cogido, el manejador esperaría para siempre: un **interbloqueo**. blog_os lo resuelve desactivando las interrupciones mientras se tiene el cerrojo, la misma idea de las secciones críticas de la lección 4.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué pasa en x86_64 si ocurre una excepción mientras se atiende un fallo doble y no hay forma de manejarla?"
+  opciones={["La CPU la ignora", "Un triple fallo: la máquina se reinicia", "Se ejecuta el panic_handler", "Se apaga la pantalla"]}
+  correcta={1}
+  explicacion="El triple fallo no se puede atender: la CPU se reinicia. Por eso conviene que el fallo doble tenga una pila propia."
+  porque={["No se puede ignorar.", "", "La CPU no sabe nada de Rust ni de su `panic_handler`.", "No es algo de la pantalla."]}
+/>

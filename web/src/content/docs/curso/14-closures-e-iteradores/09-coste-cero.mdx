@@ -1,0 +1,187 @@
+---
+title: "Coste cero: el mismo ensamblador que un bucle"
+description: "Comprueba con el ensamblador real que una cadena de iteradores y closures compila a lo mismo que un bucle escrito a mano."
+sidebar:
+  order: 9
+duracion: 14
+desde: "1.0"
+requiere: ["14-closures-e-iteradores/08-consumidores-y-collect", "13-traits-y-genericos"]
+tarjetas:
+  - p: "¿Qué significa «abstracción de coste cero»?"
+    r: "Que usarla no cuesta más que el código que habrías escrito a mano: lo que no usas no lo pagas, y lo que usas no podrías hacerlo mejor tú."
+  - p: "¿Por qué una cadena `iter().fold(…)` puede compilar al mismo asm que un `while` con índices?"
+    r: "Porque cada adaptador y cada closure es un tipo concreto (genéricos, monomorfización) y el optimizador lo inlinea todo hasta dejar un solo bucle."
+  - p: "En el experimento, ¿tenía comprobación de límites el `v[i]` del bucle `while i < v.len()`?"
+    r: "No: el optimizador demostró que `i < v.len()` y la quitó. Un `v[i]` sin esa garantía conserva una comparación y un salto a `panic_bounds_check`."
+  - p: "¿Garantiza «coste cero» que el bucle siempre se vectorice?"
+    r: "No. Garantiza que no pierdes frente al bucle equivalente; algunos adaptadores (`chain`, `flat_map`, `step_by`) pueden dar peor código. Hay que medir."
+---
+
+import { Ejecutar, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Vas a comprobar con tus propios ojos una promesa de Rust: las cadenas de iteradores con closures **no son más lentas** que un bucle hecho a mano. Lo veremos en el código máquina que genera el compilador.
+
+## Predice
+
+<Pregunta
+  pregunta="Compilamos con optimizaciones `suma_bucle` (un `while` con `v[i]`) y `suma_iter` (`v.iter().fold(…)`). ¿Qué crees que sale?"
+  opciones={["El mismo código máquina, instrucción por instrucción", "`suma_iter` es más largo: tiene que llamar al closure en cada vuelta", "`suma_bucle` es más largo: comprueba los límites de `v[i]` en cada vuelta", "`suma_iter` reserva memoria para el iterador en el montón"]}
+  correcta={0}
+  explicacion="Es lo que vamos a mirar en el ensamblador: salen idénticos salvo el orden de una instrucción. Ni hay llamadas al closure ni comprobaciones de límites."
+  porque={["Correcto.", "El closure se inlinea: desaparece.", "El optimizador demuestra que `i < v.len()` y quita la comprobación.", "Un `slice::Iter` son dos punteros en registros: nada en el montón."]}
+/>
+
+## La idea
+
+Una **abstracción de coste cero** (*zero-cost abstraction*) es una herramienta de alto nivel que, una vez compilada, cuesta lo mismo que la versión a mano. No significa «gratis»: significa «no podrías escribirlo mejor tú».
+
+Los iteradores lo consiguen gracias a dos cosas que ya conoces. Cada closure es un **tipo propio** con un `impl Fn*` (lección 1). Cada adaptador es un **struct genérico** (lección 7). Al compilar, la **monomorfización** (mundo 13) genera código concreto para tu cadena exacta, y el optimizador (LLVM) mete todas esas funciones pequeñas unas dentro de otras (*inlining*) hasta que solo queda un bucle.
+
+Así que la elección entre `for` con índices y cadena de iteradores es de **claridad**, no de velocidad. Y la cadena tiene una ventaja extra: no puedes equivocarte con un índice fuera de rango.
+
+## Pruébalo
+
+Estas son las funciones exactas del experimento. Aquí se ejecutan para comprobar que calculan lo mismo:
+
+<Ejecutar ej="m14/suma-dos-formas" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Compilamos las tres funciones como biblioteca, optimizadas, y pedimos el ensamblador (x86-64, Windows, rustc 1.99.1):
+
+```text
+rustc --edition 2024 --crate-type=lib -O --emit=asm -C llvm-args=-x86-asm-syntax=intel
+```
+
+**1. `suma_bucle`**, el `while` con `v[i]`. El slice llega en dos registros: `rcx` (puntero a los datos) y `rdx` (longitud).
+
+```text
+suma_bucle:
+	test	rdx, rdx            ; ¿longitud 0? → devuelve 0
+	je	.LBB5_1
+	cmp	rdx, 8              ; menos de 8 elementos → bucle sencillo
+	jae	.LBB5_5
+	xor	eax, eax
+	xor	r8d, r8d
+	jmp	.LBB5_4
+.LBB5_1:
+	xor	eax, eax
+	ret
+.LBB5_5:
+	movabs	r8, 2305843009213693944
+	and	r8, rdx
+	lea	rax, [4*rdx]
+	and	rax, -32
+	pxor	xmm0, xmm0
+	xor	r9d, r9d
+	pxor	xmm1, xmm1
+.LBB5_6:                            ; bucle principal: 8 u32 por vuelta
+	movdqu	xmm2, xmmword ptr [rcx + r9]
+	paddd	xmm1, xmm2          ; suma 4 u32 a la vez
+	movdqu	xmm2, xmmword ptr [rcx + r9 + 16]
+	paddd	xmm0, xmm2          ; y otros 4
+	add	r9, 32
+	cmp	rax, r9
+	jne	.LBB5_6
+	paddd	xmm0, xmm1          ; junta los dos acumuladores…
+	pshufd	xmm1, xmm0, 238
+	paddd	xmm1, xmm0
+	pshufd	xmm0, xmm1, 85
+	paddd	xmm0, xmm1          ; …y suma sus 4 casillas
+	movd	eax, xmm0
+	jmp	.LBB5_8
+.LBB5_4:                            ; cola: los que sobran, de uno en uno
+	add	eax, dword ptr [rcx + 4*r8]
+	inc	r8
+.LBB5_8:
+	cmp	rdx, r8
+	jne	.LBB5_4
+	ret
+```
+
+(Los comentarios tras `;` son nuestros.) El compilador ha **vectorizado** el bucle: con instrucciones SSE2 (`movdqu` carga 16 bytes, `paddd` suma cuatro `u32` de golpe) procesa 8 números por vuelta usando dos acumuladores. Y no hay ninguna llamada a `panic_bounds_check`: el `v[i]` perdió su comprobación de límites porque el optimizador demostró que `i < v.len()`.
+
+**2. `suma_iter`**, la versión con `v.iter().fold(…)`. Comparamos los dos cuerpos con `diff` (tras normalizar los nombres de las etiquetas):
+
+```text
+1c1
+< suma_bucle:
+---
+> suma_iter:
+6d5
+< 	xor	eax, eax
+7a7
+> 	xor	eax, eax
+```
+
+La única diferencia, aparte del nombre, es que un `xor eax, eax` (poner a cero el resultado) está una línea más arriba o más abajo. **Es el mismo programa.** El closure `|a, &x| a.wrapping_add(x)` no aparece por ningún lado: se ha disuelto.
+
+**3. `pares_cuadrados`**, `(0..n).filter(|x| x % 2 == 0).map(|x| x * x).sum()`:
+
+```text
+.LBB4_5:                            ; bucle desenrollado: 4 números por vuelta
+	mov	r9, r8
+	imul	r9, r8              ; r8² (el par)
+	mov	r10, rax
+	add	r10, r9
+	lea	rax, [r8 + 2]
+	imul	rax, rax            ; (r8+2)² (el siguiente par)
+	add	rax, r10
+	add	r8, 4
+	cmp	rcx, r8
+	jne	.LBB4_5
+	…
+.LBB4_8:                            ; cola
+	lea	r9, [r8 + 1]
+	mov	r10d, r8d
+	imul	r8, r8
+	test	r10b, 1             ; ¿impar?
+	cmovne	r8, rcx             ; si es impar, suma 0 en vez del cuadrado
+	add	rax, r8
+	…
+```
+
+Ni rastro de `filter` ni de `map` ni de los dos closures. El optimizador entendió que, en cada grupo de 4, los pares son el primero y el tercero, y solo eleva esos al cuadrado. En la cola, el `filter` se ha convertido en un `cmovne`: una «copia condicional» que evita saltar.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Coste cero no es lo mismo que «siempre lo más rápido»">
+
+La garantía es que la cadena **no pierde** frente al bucle equivalente. No dice que todo se vectorice. Algunos adaptadores, como `chain`, `flat_map` o `step_by`, pueden generar peor código que un bucle pensado a mano, porque al optimizador le cuesta más ver a través de ellos. Y un `Box<dyn Fn>` dentro de la cadena sí cuesta una llamada indirecta por elemento. Si el rendimiento importa, **mide** (mundo 16) o mira el asm, no lo supongas.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["fn suma_pares(v: &[u32]) -> u32 {", "    v.iter()", "        .filter(|&&x| x % 2 == 0)", "        .sum()", "}"]}
+  distractores={["        .filter(|x| x % 2 == 0)", "        .collect()"]}
+  explicacion="`filter` recibe `&&u32`: se desmonta con `|&&x|`. Y para sumar se usa `sum`, que aquí deduce `u32` por el tipo de retorno de la función; `collect` construiría una colección."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué el closure de `suma_iter` no aparece en el ensamblador?"
+  opciones={["Porque su tipo es concreto y el optimizador lo inlineó dentro del bucle", "Porque los closures se ejecutan al compilar", "Porque `fold` es una instrucción del procesador", "Porque Rust convierte los closures en macros"]}
+  correcta={0}
+  explicacion="Monomorfización + inlining: el compilador sabe exactamente qué closure es y copia su cuerpo en el sitio de la llamada."
+  porque={["Correcto.", "Se ejecuta en tiempo de ejecución; simplemente ya no es una función aparte.", "`fold` es un método normal de `Iterator`.", "Un closure es un struct con un `impl Fn*`, no una macro."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace `paddd xmm1, xmm2` en el bucle vectorizado?"
+  opciones={["Suma cuatro `u32` a la vez (un registro de 128 bits)", "Suma dos números de 64 bits", "Comprueba los límites del slice", "Llama al closure"]}
+  correcta={0}
+  explicacion="SSE2 trabaja con registros de 128 bits: caben cuatro `u32`. Con dos de estas sumas por vuelta, el bucle procesa 8 números."
+  porque={["Correcto.", "La `d` final es de *doubleword*: 32 bits.", "No hay comprobación de límites en este bucle.", "No queda ninguna llamada: todo se ha inlineado."]}
+/>
+
+## Para saber más
+
+- Mundo 21 (el compilador por dentro): MIR, monomorfización y LLVM con detalle.
+- Compiler Explorer (godbolt.org): pega estas funciones y míralo tú, con `-O`.

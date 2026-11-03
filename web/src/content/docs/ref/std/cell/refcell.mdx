@@ -1,0 +1,134 @@
+---
+title: "RefCell<T>"
+description: "Préstamos comprobados al ejecutar: borrow y borrow_mut a través de &self, con pánico si se viola la regla."
+sidebar:
+  order: 2
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::cell::RefCell`
+
+## Sinopsis
+
+```rust
+pub struct RefCell<T>
+where
+    T: ?Sized,
+{ /* private fields */ }
+```
+
+## Qué hace
+
+`RefCell<T>` lleva un contador de préstamos activos. `borrow()` da un `Ref<T>` (como `&T`); `borrow_mut()` da un `RefMut<T>` (como `&mut T`). La regla es la de siempre (varios `borrow` **o** un `borrow_mut`), pero se comprueba **al ejecutar**: si la incumples, el programa entra en pánico en lugar de no compilar. Los préstamos terminan cuando el `Ref`/`RefMut` se destruye.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`new`](#new) | Crea la celda. | 1.0 |
+| [`borrow`](#borrow) | Préstamo compartido. | 1.0 |
+| [`borrow_mut`](#borrow_mut) | Préstamo exclusivo. | 1.0 |
+| [`try_borrow`](#try_borrow) | Como `borrow`, pero devuelve `Err` en lugar de entrar en pánico. | 1.13 |
+| [`try_borrow_mut`](#try_borrow_mut) | Como `borrow_mut`, pero devuelve `Err`. | 1.13 |
+| [`replace`](#replace) | Pone un valor y devuelve el anterior. | 1.24 |
+| [`into_inner`](#into_inner) | Consume la celda y devuelve el valor. | 1.0 |
+
+### `new`
+
+```rust
+pub const fn new(value: T) -> RefCell<T>
+```
+
+Crea la celda.
+
+### `borrow`
+
+```rust
+pub fn borrow(&self) -> Ref<'_, T>
+```
+
+Préstamo compartido. Pánico si hay un préstamo exclusivo activo.
+
+### `borrow_mut`
+
+```rust
+pub fn borrow_mut(&self) -> RefMut<'_, T>
+```
+
+Préstamo exclusivo. Pánico si hay cualquier otro préstamo activo.
+
+### `try_borrow`
+
+```rust
+pub fn try_borrow(&self) -> Result<Ref<'_, T>, BorrowError>
+```
+
+Como `borrow`, pero devuelve `Err` en lugar de entrar en pánico.
+
+### `try_borrow_mut`
+
+```rust
+pub fn try_borrow_mut(&self) -> Result<RefMut<'_, T>, BorrowMutError>
+```
+
+Como `borrow_mut`, pero devuelve `Err`.
+
+### `replace`
+
+```rust
+pub fn replace(&self, t: T) -> T
+```
+
+Pone un valor y devuelve el anterior.
+
+### `into_inner`
+
+```rust
+pub const fn into_inner(self) -> T
+```
+
+Consume la celda y devuelve el valor.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/cell-refcell" />
+
+**Salida:**
+
+```text
+[1, 2, 3] 3
+true
+[1, 2, 3]
+```
+
+## Pánicos
+
+Pedir `borrow_mut` mientras sigue vivo otro préstamo entra en pánico:
+
+<Ejecutar ej="ref-std/cell-refcell-panico" />
+
+**Salida de error** (*stderr*):
+
+```text
+thread 'main' (1) panicked at cell-refcell-panico.rs:6:29:
+RefCell already borrowed
+```
+
+## Rendimiento
+
+Cada préstamo suma y resta en un contador: un coste pequeño, pero que `&`/`&mut` normales no tienen. Úsalo solo cuando el borrow checker no pueda demostrar que tu código es correcto.
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `try_borrow` (1.13), `try_borrow_mut` (1.13), `replace` (1.24).
+
+## Ver también
+
+- [Cell](/ref/std/cell/cell/)
+- [Rc](/ref/std/rc/rc/)
+- [RwLock (entre hilos)](/ref/std/sync/rwlock/)
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

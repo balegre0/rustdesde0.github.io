@@ -1,0 +1,103 @@
+---
+title: "Async en traits y el debate de los colores"
+description: "Usar async fn en traits, saber qué falta todavía (dyn, RTN, async drop) y entender la discusión sobre las funciones «de colores»."
+sidebar:
+  order: 10
+duracion: 13
+desde: "1.75"
+requiere: ["18-async/08-ejecutores-y-tokio", "18-async/07-pin"]
+tarjetas:
+  - p: "¿Desde qué versión se puede escribir async fn dentro de un trait?"
+    r: "Desde Rust 1.75 (diciembre de 2023)."
+  - p: "¿Por qué un trait con async fn no es compatible con dyn?"
+    r: "Cada implementación devuelve un future de tipo y tamaño distintos, y una vtable necesita un único tipo de retorno conocido."
+  - p: "¿Qué dos piezas de async siguen sin estabilizar en Rust 1.99.1?"
+    r: "La notación de tipo de retorno (RTN, para exigir Send al future de un método) y async drop."
+  - p: "¿Qué es el «coloreado de funciones»?"
+    r: "La idea de que las funciones async y las normales forman dos mundos: una función normal no puede hacer .await, así que lo async se contagia hacia arriba."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a usar `async fn` dentro de traits, a chocar con su límite principal y a entender por qué hay quien dice que async «colorea» tu código.
+
+## Predice
+
+<Pregunta
+  pregunta="Tienes `trait Almacen { async fn leer(&self) -> u32; }` y dos tipos que lo implementan. ¿Puedes guardar los dos en un `Vec<Box<dyn Almacen>>`?"
+  opciones={["Sí, como cualquier trait", "No: el trait no es compatible con dyn porque su método es async", "Sí, pero solo con Tokio", "Solo si los dos tipos tienen el mismo tamaño"]}
+  correcta={1}
+  explicacion="Cada implementación de `leer` devuelve **su propio** tipo de future, de tamaño distinto. Una vtable no puede describir eso. Lo verás con el error real abajo."
+  porque={["Los traits con métodos async son la excepción.", "Correcto.", "El runtime no influye en el sistema de tipos.", "El problema es el tipo del future devuelto, no el de quien implementa."]}
+/>
+
+## La idea
+
+Desde Rust 1.75 puedes escribir `async fn` dentro de un trait y en sus `impl`, igual que fuera. Por dentro, `async fn leer(&self) -> u32` en un trait significa `fn leer(&self) -> impl Future<Output = u32>`: cada implementación devuelve un tipo de future **anónimo y diferente**. Con genéricos (`fn f<A: Almacen>(a: &A)`) no hay problema: el compilador genera una copia por tipo (monomorfización, mundo 13) y conoce cada future exacto. Es despacho estático, sin cajas ni coste extra.
+
+Con `dyn Almacen` sí hay problema: la vtable necesita un único tipo de retorno. La solución habitual es devolver el future **en una caja**, `Pin<Box<dyn Future<Output = u32> + '_>>`, que tiene un solo tipo y tamaño (un puntero gordo). Es lo que genera, por ejemplo, el crate `async-trait`.
+
+Queda una pieza: si quieres lanzar el future de un método con `tokio::spawn`, necesitas que sea `Send`, pero en un trait genérico no puedes nombrar ese tipo para exigirlo. La **notación de tipo de retorno** (*return type notation*, RTN: `A::leer(..): Send`) lo resolverá, pero en Rust 1.99.1 **sigue sin estabilizar**, igual que **async drop** (un `Drop` que pueda hacer `.await`). Mientras, el crate `trait-variant` genera una versión del trait con `Send` ya incluido.
+
+## Pruébalo
+
+<Ejecutar ej="m18/trait-async" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El error real** de intentar `dyn` con un método async (rustc 1.99.1):
+
+<NoCompila ej="m18/trait-dyn" explicacion="E0038: el trait no es compatible con `dyn` («dyn compatible», antes llamado «object safe») porque el método `leer` es async. El arreglo cambia la firma para devolver `Pin<Box<dyn Future<Output = u32> + '_>>`: un único tipo para todas las implementaciones, a cambio de una asignación en el heap por llamada." />
+
+**El debate de los colores.** Hay una idea famosa en el diseño de lenguajes: las funciones async y las normales son de dos «colores». Una función normal no puede hacer `.await`; para usar una función async desde ella necesitas un ejecutor (`block_on`). Y una función async que llama a algo bloqueante congela el ejecutor (lección 8). Resultado: lo async tiende a **contagiarse** hacia arriba por la cadena de llamadas, y las bibliotecas acaban ofreciendo dos versiones de lo mismo.
+
+Hay dos lecturas en la comunidad de Rust:
+
+- **Es un coste real.** Duplicar APIs (una versión bloqueante y otra async), elegir runtime, traits que no funcionan con `dyn`… El proyecto Rust lo reconoce: tiene como objetivo para 2026 que async sea «solo añadir async» (*just add async*), y existe una iniciativa de *keyword generics* (o «efectos») para escribir funciones genéricas sobre si son async o no.
+- **Es información útil.** En Rust, que una función sea async está en su **tipo**: sabes dónde se puede suspender (en cada `.await` visible) y dónde se puede cancelar. Esa visibilidad es lo que permite razonar sobre la cancelación (lección 9) y sobre qué viaja entre hilos (`Send`).
+
+Ninguna de las dos es «la correcta». Un diseñador las tiene en cuenta las dos.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Hacer async todo «por si acaso»">
+
+❌ Marcar como `async` funciones que nunca esperan nada (validar un formulario, sumar precios). No ganan nada, obligan a quien las llama a estar en contexto async y añaden una máquina de estados.
+
+✅ Haz async solo lo que **espera** (red, disco, temporizadores, canales async) y deja normal la lógica pura. Las funciones normales se pueden llamar desde las async sin ningún problema; al revés es lo que cuesta.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m18/reto-trait" enunciado="Implementa `medir` para `Doble<S>`: debe esperar la medida del sensor de dentro y devolverla multiplicada por 2. Con un termómetro a 5 grados envuelto dos veces debe dar 20." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué coste tiene llamar a `a.leer().await` cuando `a: &A` con `A: Almacen` (genérico)?"
+  opciones={["Una asignación en el heap por llamada", "Ninguno extra: despacho estático, el future se guarda en línea", "Una llamada por vtable", "Crear un hilo"]}
+  correcta={1}
+  explicacion="Con genéricos el compilador conoce el tipo exacto del future de cada implementación y lo incrusta en el future de quien llama."
+  porque={["Eso pasa con la versión `Pin<Box<dyn Future>>`.", "Correcto.", "Las vtables aparecen con `dyn`.", "async no crea hilos."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál de estas cosas **no** es estable en Rust 1.99.1?"
+  opciones={["`async fn` en traits", "Closures async (`async ||`)", "Notación de tipo de retorno (RTN)", "`std::pin::pin!`"]}
+  correcta={2}
+  explicacion="`async fn` en traits llegó en 1.75, las closures async en 1.85 y `pin!` en 1.68. RTN y async drop siguen en desarrollo."
+  porque={["Estable desde 1.75.", "Estables desde 1.85.", "Correcto.", "Estable desde 1.68."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué quiere decir que async «se contagia hacia arriba»?"
+  opciones={["Que los futures consumen cada vez más memoria", "Que para hacer `.await` tienes que estar en una función async, así que quien te llama también tiende a serlo", "Que async solo funciona en `main`", "Que async infecta los tipos con `'static`"]}
+  correcta={1}
+  explicacion="Es el núcleo del debate de los colores. La frontera se cruza con un ejecutor (`block_on`) en un punto concreto, normalmente `main`."
+  porque={["El tamaño es otro asunto (lección 5).", "Correcto.", "Se puede usar en cualquier función async.", "`'static` lo exige `spawn`, no async en sí."]}
+/>

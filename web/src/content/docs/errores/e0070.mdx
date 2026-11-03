@@ -1,0 +1,71 @@
+---
+title: "E0070: lado izquierdo de asignación inválido"
+description: "A la izquierda de = pones algo que no es un lugar donde se pueda guardar un valor."
+sidebar:
+  order: 12
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` invalid left-hand side of assignment ``
+
+## Qué significa
+
+La parte izquierda de `=` debe ser un **lugar** (*place*): una variable, un campo (`p.x`), un elemento (`v[0]`) o algo apuntado (`*r`). Un literal como `1` o el resultado de una llamada no son lugares.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0070" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0070]: invalid left-hand side of assignment
+ --> E0070.rs:3:7
+  |
+3 |     1 = x;
+  |     - ^
+  |     |
+  |     cannot assign to this expression
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Escribir la asignación al revés (`1 = x`).
+- Confundir `=` con `==` en una comparación fuera de `if`.
+- Asignar al resultado de una función.
+
+## Cómo arreglarlo
+
+Pon a la izquierda el lugar que quieres cambiar (`x = 1`). Si querías comparar, usa `==`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let mut x = 1;
+    x = x + 1; // a la izquierda del `=` va un lugar (una variable)
+    println!("{x}");
+}
+```
+
+**Salida:**
+
+```text
+2
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0070` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0384](/errores/e0384/): asignar dos veces a una variable inmutable
+- [E0308](/errores/e0308/): tipos que no coinciden
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)

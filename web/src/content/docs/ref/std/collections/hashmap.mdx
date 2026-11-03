@@ -1,0 +1,169 @@
+---
+title: "HashMap<K, V>"
+description: "Diccionario clave → valor con búsqueda rápida: insert, get, entry, remove y recorrer."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::collections::HashMap`
+
+## Sinopsis
+
+```rust
+pub struct HashMap<K, V, S = RandomState, A: Allocator = Global> { /* private fields */ }
+```
+
+## Qué hace
+
+Un `HashMap` guarda pares clave → valor. Para encontrar una clave calcula su **hash** (un número que resume la clave) y va directo al hueco donde debería estar. Por defecto usa SipHash con una semilla aleatoria, que resiste ataques de quien intente provocar colisiones a propósito.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`new`](#new) | Crea un mapa vacío. | 1.0 |
+| [`insert`](#insert) | Inserta o reemplaza; devuelve el valor anterior (`Some`) si la clave ya existía. | 1.0 |
+| [`get`](#get) | Busca una clave y devuelve `Option<&V>`. | 1.0 |
+| [`get_mut`](#get_mut) | Como `get`, pero devuelve `Option<&mut V>` para modificar el valor. | 1.0 |
+| [`contains_key`](#contains_key) | ¿Existe la clave?. | 1.0 |
+| [`remove`](#remove) | Quita la clave y devuelve su valor, si estaba. | 1.0 |
+| [`entry`](#entry) | Da acceso al hueco de una clave, exista o no. | 1.0 |
+| [`len`](#len) | Número de pares. | 1.0 |
+| [`iter`](#iter) | Recorre los pares `(&K, &V)` en un orden no especificado. | 1.0 |
+| [`keys`](#keys) | Recorre las claves. | 1.0 |
+| [`values`](#values) | Recorre los valores. | 1.0 |
+
+### `new`
+
+```rust
+pub fn new() -> HashMap<K, V, RandomState>
+```
+
+Crea un mapa vacío.
+
+### `insert`
+
+```rust
+pub fn insert(&mut self, k: K, v: V) -> Option<V>
+```
+
+Inserta o reemplaza; devuelve el valor anterior (`Some`) si la clave ya existía.
+
+### `get`
+
+```rust
+pub fn get<Q>(&self, k: &Q) -> Option<&V>
+where
+    K: Borrow<Q>,
+    Q: Hash + Eq + ?Sized,
+```
+
+Busca una clave y devuelve `Option<&V>`. Acepta formas prestadas de la clave: con claves `String` puedes buscar con un `&str`.
+
+### `get_mut`
+
+```rust
+pub fn get_mut<Q>(&mut self, k: &Q) -> Option<&mut V>
+where
+    K: Borrow<Q>,
+    Q: Hash + Eq + ?Sized,
+```
+
+Como `get`, pero devuelve `Option<&mut V>` para modificar el valor.
+
+### `contains_key`
+
+```rust
+pub fn contains_key<Q>(&self, k: &Q) -> bool
+where
+    K: Borrow<Q>,
+    Q: Hash + Eq + ?Sized,
+```
+
+¿Existe la clave?
+
+### `remove`
+
+```rust
+pub fn remove<Q>(&mut self, k: &Q) -> Option<V>
+where
+    K: Borrow<Q>,
+    Q: Hash + Eq + ?Sized,
+```
+
+Quita la clave y devuelve su valor, si estaba.
+
+### `entry`
+
+```rust
+pub fn entry(&mut self, key: K) -> Entry<'_, K, V, A>
+```
+
+Da acceso al hueco de una clave, exista o no. Con `.or_insert(v)` insertas si falta y obtienes `&mut V` en un solo paso: la forma idiomática de contar o agrupar.
+
+### `len`
+
+```rust
+pub fn len(&self) -> usize
+```
+
+Número de pares.
+
+### `iter`
+
+```rust
+pub fn iter(&self) -> Iter<'_, K, V>
+```
+
+Recorre los pares `(&K, &V)` en un orden no especificado.
+
+### `keys`
+
+```rust
+pub fn keys(&self) -> Keys<'_, K, V>
+```
+
+Recorre las claves.
+
+### `values`
+
+```rust
+pub fn values(&self) -> Values<'_, K, V>
+```
+
+Recorre los valores.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/collections-hashmap" />
+
+**Salida:**
+
+```text
+Some(3)
+Some(5) None
+true
+[("a", 3), ("b", 2), ("c", 1)]
+Some(2) 1
+```
+
+## Rendimiento
+
+`insert`, `get` y `remove` son O(1) de media. Recorrer es O(capacidad). Si conoces el tamaño, `HashMap::with_capacity` evita reorganizaciones.
+
+## Desde
+
+Rust 1.0 (estable).
+
+## Ver también
+
+- [BTreeMap (ordenado)](/ref/std/collections/btreemap/)
+- [HashSet](/ref/std/collections/hashset/)
+- [std::hash](/ref/std/hash/)
+- [E0433 (falta el use)](/errores/e0433/)
+
+## Aprende esto en
+
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

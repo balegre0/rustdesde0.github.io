@@ -1,0 +1,75 @@
+---
+title: "match"
+description: "Palabra clave estricta: compara un valor con una lista de patrones y ejecuta la primera rama que encaja."
+sidebar:
+  order: 21
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`match` compara un valor con una serie de **patrones**, en orden, y ejecuta la primera rama cuyo patrón encaja. El compilador comprueba que no se te olvida ningún caso.
+
+## Sinopsis
+
+```text
+match expresión {
+    patrón => expresión,
+    patrón | patrón => expresión,          // alternativas
+    patrón if condición => expresión,      // guarda
+    patrón if let P = e => expresión,      // guarda if let (1.95)
+    nombre @ patrón => expresión,          // enlazar y a la vez comprobar
+    _ => expresión,                        // todo lo demás
+}
+```
+
+## Qué hace
+
+1. Evalúa la expresión (el **escrutinio**, *scrutinee*) una vez.
+2. Prueba los patrones **de arriba abajo**. El primero que encaja (y cuya guarda, si la hay, es verdadera) gana.
+3. Las variables del patrón quedan disponibles solo dentro de esa rama.
+4. `match` es una expresión: vale lo que valga la rama elegida, y todas las ramas deben tener el mismo tipo (o `!`).
+
+Reglas clave:
+
+- **Exhaustividad**: entre todas las ramas tienen que cubrirse **todos** los valores posibles del tipo. Si no, error E0004. Con enteros, el compilador calcula qué rangos faltan.
+- Las guardas no cuentan para la exhaustividad: el compilador no razona sobre condiciones.
+- Si haces `match` sobre una referencia con patrones normales, las variables salen como referencias (*match ergonomics*). Ver [Patrones](/ref/lenguaje/patrones/).
+- Un patrón que nunca puede elegirse (porque otro anterior ya lo cubre) produce el aviso `unreachable_patterns`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-match" />
+
+Salida:
+
+```text
+200
+500
+1
+0 -> cero
+3 -> pequeño
+7 -> 7: impar de un dígito
+15 -> grande
+42 -> grande
+abajo
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-match-error" />
+
+`error[E0004]: non-exhaustive patterns: 201_u8..=u8::MAX not covered`. El compilador calcula exactamente el hueco: de 201 a 255.
+
+## Desde
+
+Rust 1.0. Alternativas `|` anidadas dentro de patrones: 1.53. Guardas `if let`: 1.95.
+
+## Ver también
+
+- [Patrones](/ref/lenguaje/patrones/) · [`if`](/ref/lenguaje/palabras-clave/if/) · [`enum`](/ref/lenguaje/palabras-clave/enum/) · [`ref`](/ref/lenguaje/palabras-clave/ref/) · [`_`](/ref/lenguaje/palabras-clave/guion-bajo/)
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

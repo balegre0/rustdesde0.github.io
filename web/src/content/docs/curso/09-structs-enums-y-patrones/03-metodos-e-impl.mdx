@@ -1,0 +1,104 @@
+---
+title: "Métodos e impl"
+description: "Pega funciones a tus tipos y elige si cada una lee, modifica o se queda con el valor."
+sidebar:
+  order: 3
+duracion: 12
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones/01-structs", "07-prestamos"]
+tarjetas:
+  - p: "¿Qué significa `&self` en un método?"
+    r: "Que el método recibe un préstamo compartido del valor: puede leerlo, no cambiarlo. Es la abreviatura de `self: &Self`."
+  - p: "¿Qué significa `&mut self`?"
+    r: "Que el método recibe un préstamo exclusivo: puede cambiar campos. Solo se puede llamar sobre una variable `mut` (si no, E0596)."
+  - p: "¿Qué pasa con la variable después de llamar a un método que recibe `self` (sin `&`)?"
+    r: "El método se queda con el valor (lo mueve). Si el tipo no es `Copy`, usar la variable después da E0382."
+  - p: "¿A qué equivale `r.area()`?"
+    r: "A `Rectangulo::area(&r)`. El punto añade el `&` o `&mut` que pide el método (auto-referencia)."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir **métodos**: funciones que pertenecen a un tipo y se llaman con un punto, como `rect.area()`.
+
+## Predice
+
+<Predice
+  ej="m09/metodos-predice"
+  opciones={["`12`", "`10`", "`11`", "No compila: `sumar` no devuelve nada"]}
+  correcta={0}
+  explicacion="`sumar` recibe `&mut self`, así que cambia el contador de verdad. Dos llamadas: 10 → 11 → 12."
+  porque={["Correcto.", "`&mut self` es un préstamo exclusivo del contador original: el cambio no se pierde.", "Se llama dos veces.", "Un método no tiene por qué devolver nada; entonces devuelve `()`."]}
+/>
+
+## La idea
+
+Un bloque **`impl`** (*implementation*) junta las funciones de un tipo:
+
+```rust
+impl Rectangulo {
+    fn area(&self) -> u32 { self.ancho * self.alto }
+}
+```
+
+El primer parámetro, `self`, es el valor sobre el que llamas al método. Tiene **tres formas**, y son las mismas tres formas de acceso que ya conoces del mundo de préstamos:
+
+| Escribes | Equivale a | Significa | Permisos sobre el valor |
+|---|---|---|---|
+| `&self` | `self: &Self` | préstamo compartido | leer |
+| `&mut self` | `self: &mut Self` | préstamo exclusivo | leer y escribir |
+| `self` | `self: Self` | lo mueve | se lo queda (propiedad) |
+
+`Self` (con mayúscula) es un alias: dentro de `impl Rectangulo`, `Self` es `Rectangulo`. Elige siempre la forma **más débil** que te sirva: `&self` si solo lees; `&mut self` si cambias; `self` solo si el método «consume» el valor (por ejemplo, para convertirlo en otra cosa).
+
+## Pruébalo
+
+<Ejecutar ej="m09/metodos" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un método es **una función normal** con un primer parámetro especial. `r.area()` se traduce a `Rectangulo::area(&r)` (lo ves en el paso 6). El operador punto hace **auto-referencia** (*auto-ref*): mira qué pide el método (`&self`, `&mut self` o `self`) y pone el `&` o `&mut` por ti. Por eso no escribes `(&mut r).duplicar()`.
+
+En memoria, `&self` es un puntero al struct (4 bytes en wasm32, 8 en un PC de 64 bits): el método no copia el rectángulo, trabaja sobre el original. Las reglas del borrow checker son las de siempre: mientras `duplicar` tiene el préstamo exclusivo, nadie más puede leer `r`. Así no hay **aliasing con mutación** (dos caminos hacia el mismo dato mientras uno lo cambia).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m09/metodo-sin-mut"
+  explicacion="`sumar` pide `&mut self`, y no se puede sacar un préstamo exclusivo de una variable que no es `mut` (E0596). Fíjate en que el error señala `c` en la llamada `c.sumar()`: ahí es donde el punto intenta crear el `&mut c`."
+/>
+
+<Trampa titulo="Un método con self se come el valor">
+
+`canjear(self)` mueve el ticket dentro del método. La segunda llamada usa un valor que ya no está:
+
+<NoCompila ej="m09/usar-tras-self" explicacion="E0382 (uso tras mover). La nota de rustc lo dice: `Ticket::canjear` toma la propiedad del receptor `self`. Si querías poder usarlo otra vez, el método debería recibir `&self`. Rust lo prohíbe porque, al acabar `canjear`, el `String` del ticket ya se ha liberado: usarlo sería un uso tras liberar." />
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m09/circulo"
+  enunciado="Completa `perimetro` (2 · π · radio, con `std::f64::consts::PI`) y escribe el método `escalar(&mut self, factor: f64)`, que multiplica el radio. Descomenta la llamada. Debe imprimir `6.28` y `18.85`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Un método `fn nombre(…) -> &str` devuelve el nombre de un usuario. ¿Qué forma de `self` es la adecuada?"
+  opciones={["`&self`: solo lee", "`&mut self`: por si acaso", "`self`: así el método es dueño", "Da igual, el compilador lo cambia"]}
+  correcta={0}
+  porque={["Correcto: la forma más débil que sirve.", "Pedir `&mut` sin necesidad impide llamarlo sobre variables no `mut` y bloquea otros préstamos.", "Con `self` el usuario se destruiría al terminar el método, y no podrías devolver una referencia a su nombre.", "El compilador respeta lo que escribes."]}
+/>
+
+<Pregunta
+  pregunta="¿A qué equivale `v.duplicar()` si `duplicar` recibe `&mut self`?"
+  opciones={["`Tipo::duplicar(&mut v)`", "`Tipo::duplicar(v)`", "`Tipo::duplicar(&v)`", "`v = Tipo::duplicar(v)`"]}
+  correcta={0}
+  porque={["Correcto: el punto añade `&mut`.", "Eso movería `v`.", "Eso sería un préstamo compartido: no basta para modificar.", "El método no devuelve un valor nuevo; modifica el existente."]}
+/>

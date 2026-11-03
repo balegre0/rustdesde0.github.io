@@ -1,0 +1,42 @@
+---
+title: "no_mangle, export_name, link_section y used"
+description: "Atributos que controlan los símbolos que ve el enlazador. Los tres primeros son inseguros y en la edición 2024 se escriben dentro de unsafe(...)."
+sidebar:
+  order: 21
+insignias: ["Desde 1.0", "ABI y enlazado"]
+---
+import { Ejecutar, NoCompila } from '~/components';
+
+Estos atributos afectan al **nombre** o al **lugar** de una función o un `static` en el archivo objeto. Sirven para FFI, para embebido y para trucos de bajo nivel.
+
+## Sinopsis
+
+```text
+#[unsafe(no_mangle)]                 // símbolo con el nombre tal cual
+#[unsafe(export_name = "nombre")]    // símbolo con otro nombre
+#[unsafe(link_section = ".datos")]   // en una sección concreta
+#[used]                              // conservar un static aunque no se use
+```
+
+## Qué hace
+
+- **`no_mangle`**: el compilador normalmente codifica los nombres (`_ZN4main5sumar17h…E`) para que no choquen. Con `no_mangle`, el símbolo se llama exactamente como la función: así otro lenguaje puede encontrarla. Implica que la función se exporta.
+- **`export_name = "…"`**: como `no_mangle`, pero con el nombre que elijas.
+- **`link_section = "…"`**: coloca la función o el `static` en una sección concreta del objeto (por ejemplo, la tabla de vectores de interrupción de un microcontrolador).
+- **`used`**: obliga a conservar un `static` en el objeto aunque nada lo use (el enlazador puede descartarlo igualmente salvo que la sección también se conserve).
+
+**Por qué son inseguros.** Dos símbolos con el mismo nombre en un programa son comportamiento indefinido, y un nombre como `malloc` o `memcpy` sustituiría al del sistema. El compilador no puede comprobarlo, así que desde la edición 2024 se escriben dentro de `unsafe(…)`:
+
+<NoCompila ej="ref-lenguaje/at-unsafe-attr" />
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-simbolos" />
+
+## Desde
+
+Rust 1.0. `used`: 1.30. Sintaxis `unsafe(…)`: 1.82, obligatoria en la edición 2024.
+
+## Ver también
+
+[`#[link]`](/ref/lenguaje/atributos/link/) · [Que te llamen a ti](/curso/22-sistemas-y-ffi/09-que-te-llamen-a-ti/)

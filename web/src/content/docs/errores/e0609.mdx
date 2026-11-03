@@ -1,0 +1,80 @@
+---
+title: "E0609: el tipo no tiene ese campo"
+description: "Accedes a un campo que no existe en el tipo (o el valor es de otro tipo del que crees)."
+sidebar:
+  order: 61
+insignias: ["Tipos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` no field `z` on type `Punto` ``
+
+## Qué significa
+
+`p.z` busca un campo `z` en `Punto`, que solo tiene `x` e `y`. También pasa cuando el valor es una referencia a algo distinto, un `Option<Punto>` en lugar de un `Punto`, o un tipo sin campos como `i32`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0609" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0609]: no field `z` on type `Punto`
+ --> E0609.rs:8:22
+  |
+8 |     println!("{}", p.z);
+  |                      ^ unknown field
+  |
+help: a field with a similar name exists
+  |
+8 -     println!("{}", p.z);
+8 +     println!("{}", p.x);
+  |
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Errata en el nombre del campo.
+- Acceder a un campo de un `Option<T>` o `Result<T, E>` sin sacar antes el valor.
+- Confundir un campo con un método (falta `()`).
+
+## Cómo arreglarlo
+
+Comprueba el tipo real del valor (el mensaje lo dice) y el nombre del campo. Si es un `Option`, extrae el valor primero.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+struct Punto {
+    x: i32,
+    y: i32,
+}
+
+fn main() {
+    let p = Punto { x: 1, y: 2 };
+    println!("{} {}", p.x, p.y);
+}
+```
+
+**Salida:**
+
+```text
+1 2
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0609` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0560](/errores/e0560/): el struct no tiene ese campo
+- [E0599](/errores/e0599/): no existe ese método para el tipo
+- [E0616](/errores/e0616/): campo privado
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

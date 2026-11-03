@@ -1,0 +1,34 @@
+---
+title: "Mundo 04 · Expresiones y control"
+description: "Decide, repite y elige: if, loop, while, for, etiquetas y tu primer match. Y la idea que lo une todo: en Rust casi todo es una expresión que produce un valor."
+sidebar:
+  order: 0
+---
+
+Hasta ahora tus programas iban en línea recta: una instrucción detrás de otra. En este mundo aprendes a **decidir** (`if`, `match`) y a **repetir** (`loop`, `while`, `for`).
+
+Por el camino descubrirás una idea muy de Rust: casi todo lo que escribes es una **expresión**, es decir, algo que **produce un valor**. Un bloque `{ }` vale algo. Un `if` vale algo. Un `loop` puede valer algo. Cuando lo interiorices, leerás código Rust mucho más deprisa.
+
+## Lecciones
+
+1. [Los bloques son expresiones](/curso/04-expresiones-y-control/01-bloques-son-expresiones/) — `{ }` produce un valor; el `;` lo cambia todo.
+2. [`if` es una expresión](/curso/04-expresiones-y-control/02-if-es-una-expresion/) — decidir y, a la vez, producir un valor.
+3. [`loop` y `break` con valor](/curso/04-expresiones-y-control/03-loop-y-break-con-valor/) — repetir hasta encontrar algo.
+4. [`while`](/curso/04-expresiones-y-control/04-while/) — repetir mientras se cumpla una condición.
+5. [`for` y los rangos](/curso/04-expresiones-y-control/05-for-y-rangos/) — recorrer sin salirse nunca.
+6. [Etiquetas](/curso/04-expresiones-y-control/06-etiquetas/) — salir de varios bucles a la vez.
+7. [Tu primer `match`](/curso/04-expresiones-y-control/07-primer-match/) — elegir entre muchos casos sin olvidarte ninguno.
+8. [Operadores y precedencia](/curso/04-expresiones-y-control/08-operadores-y-precedencia/) — aritméticos, lógicos, de bits y en qué orden van.
+9. [Patrones de bucle](/curso/04-expresiones-y-control/09-patrones-de-bucle/) — contar, acumular, el mejor y buscar.
+10. [Jefe: el árbitro](/curso/04-expresiones-y-control/10-jefe/) — todo junto.
+
+## Lo que el compilador vigila en este mundo
+
+| Error | Qué evita |
+|---|---|
+| [E0308](/errores/e0308/) | Que una rama produzca un número y la otra un texto: el valor tendría un tipo imposible de saber. |
+| [E0317](/errores/e0317/) | Un `if` sin `else` del que esperas un valor: ¿qué valdría si la condición es falsa? |
+| [E0004](/errores/e0004/) | Un `match` que olvida un caso: el programa no sabría qué hacer con ese valor. |
+| [E0571](/errores/e0571/) | `break valor` en un `while`: si el bucle termina por la condición, no habría valor. |
+
+Fíjate en el patrón: cada error evita una situación en la que **el programa no sabría qué valor tiene algo**. Rust prefiere preguntártelo ahora a adivinarlo después.

@@ -1,0 +1,71 @@
+---
+title: "spawn"
+description: "Crea un hilo nuevo que ejecuta una closure; devuelve un JoinHandle para esperarlo."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::thread::spawn`
+
+## Sinopsis
+
+```rust
+pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+```
+
+## Qué hace
+
+`spawn` lanza la closure en un hilo nuevo y vuelve enseguida con un `JoinHandle<T>`. `handle.join()` espera a que termine y devuelve `Ok(resultado)`, o `Err` si el hilo entró en pánico. Los límites `F: Send + 'static` significan: lo que la closure lleva dentro se puede mandar a otro hilo y no toma prestado nada que pueda desaparecer.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`join`](#join) | Espera a que el hilo termine y devuelve su resultado. | 1.0 |
+| [`is_finished`](#is_finished) | ¿Ha terminado ya? (no espera). | 1.61 |
+
+### `join`
+
+```rust
+pub fn join(self) -> Result<T>
+```
+
+Espera a que el hilo termine y devuelve su resultado.
+
+### `is_finished`
+
+```rust
+pub fn is_finished(&self) -> bool
+```
+
+¿Ha terminado ya? (no espera)
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/thread-spawn-hilos" />
+
+Este ejemplo crea **hilos**, y el navegador no puede ejecutarlos: el botón lo envía al Playground de Rust (play.rust-lang.org). Aquí se ha comprobado que compila; su salida no se reproduce en esta página porque solo la da una ejecución real.
+
+## Pánicos
+
+`spawn` entra en pánico si el sistema no puede crear el hilo (en el navegador siempre: ver el ejemplo de [std::thread](/ref/std/thread/)). `thread::Builder::spawn` devuelve el error en lugar de entrar en pánico.
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `is_finished` (1.61).
+
+## Ver también
+
+- [scope](/ref/std/thread/scope/)
+- [Arc](/ref/std/sync/arc/)
+- [mpsc](/ref/std/sync/mpsc/)
+- [E0373](/errores/e0373/)
+
+## Aprende esto en
+
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

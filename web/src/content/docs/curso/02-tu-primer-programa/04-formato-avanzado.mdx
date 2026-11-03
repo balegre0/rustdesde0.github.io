@@ -1,0 +1,194 @@
+---
+title: "Formato avanzado: ancho, decimales, bases y escapes"
+description: "Alinea columnas, fija decimales, muestra números en binario y hexadecimal, y escribe comillas, tabuladores y barras dentro del texto."
+sidebar:
+  order: 4
+duracion: 14
+desde: "1.0"
+requiere: ["02-tu-primer-programa/03-cadenas-de-formato"]
+tarjetas:
+  - p: "¿Qué imprime `println!(\"[{:>6}]\", \"pan\")`?"
+    r: "`[   pan]`: ancho 6, alineado a la derecha."
+  - p: "¿Cómo se imprime 5 en binario con 8 cifras?"
+    r: "`{:08b}` → `00000101`."
+  - p: "¿Qué imprime `println!(\"{:.0}\", 2.5)`?"
+    r: "`2`: cuando el valor está justo en la mitad, el formato redondea al par más cercano."
+  - p: "¿Cómo se escribe una barra invertida dentro de un texto entre comillas?"
+    r: "Duplicándola: `\\\\`. Una barra sola empieza un escape como `\\n` o `\\t`."
+  - p: "¿En qué se diferencian `println!` y `eprintln!`?"
+    r: "`println!` escribe en la salida estándar (stdout); `eprintln!`, en la salida de errores (stderr)."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Con lo que ya sabes puedes meter cualquier valor en un texto. Hoy aprendes a **colocarlo**: en columnas, con los decimales justos, en binario o en hexadecimal, y con caracteres especiales como comillas o tabuladores. Es lo que separa una salida desordenada de una tabla que se lee de un vistazo.
+
+## Predice
+
+Las dos primeras líneas del programa son `println!("[{:8}]", 42);` y `println!("[{:8}]", "pan");`. ¿Qué imprime la primera?
+
+<Predice
+  ej="m02/alineacion"
+  opciones={["`[42      ]`", "`[      42]`", "`[   42   ]`", "`[00000042]`"]}
+  correcta={1}
+  explicacion="`{:8}` reserva 8 columnas. Si no dices hacia dónde alinear, los **números** van a la derecha y los **textos** a la izquierda (la segunda línea es `[pan     ]`)."
+  porque={["Esa es la alineación por defecto de los **textos**, no de los números.", "", "Para centrar hay que pedirlo con `^`.", "Para rellenar con ceros hay que pedirlo con `0`: `{:08}`."]}
+/>
+
+## La idea
+
+Después de los dos puntos de un hueco puedes escribir una pequeña **especificación de formato** (*format spec*). Sus piezas, siempre en este orden y todas opcionales:
+
+| Pieza | Ejemplo | Qué hace |
+|---|---|---|
+| relleno + alineación | `*^` | `<` izquierda, `^` centro, `>` derecha; el carácter de delante es el relleno |
+| signo | `+` | muestra el signo también en los positivos |
+| `#` | `#x` | forma «alternativa»: añade prefijos como `0x` o `0b`, o el modo bonito de `{:#?}` |
+| `0` | `08` | rellena con ceros por la izquierda, después del signo |
+| ancho | `8` | columnas mínimas que ocupa el valor |
+| precisión | `.2` | decimales de un número con decimales (en un texto: caracteres como máximo) |
+| tipo | `b` `o` `x` `X` `?` | binario, octal, hexadecimal, HEXADECIMAL, depuración |
+
+Así, `{:>8.2}` es «ancho 8, a la derecha, 2 decimales», y `{:#010b}` es «binario con prefijo, relleno de ceros hasta 10 columnas». No hace falta memorizarlo: basta con saber que existe y en qué orden van las piezas.
+
+Además del formato, el **texto** tiene sus propias reglas. La barra invertida `\` empieza una **secuencia de escape** (*escape sequence*): `\n` es un salto de línea, `\t` un tabulador, `\"` unas comillas que no cierran el texto y `\\` una barra invertida de verdad.
+
+## Pruébalo
+
+Alineación y relleno:
+
+<Ejecutar ej="m02/alineacion" />
+
+```text
+[      42]
+[pan     ]
+[pan     ]
+[  pan   ]
+[     pan]
+[**pan***]
+[00000042]
+```
+
+Fíjate en `[**pan***]`: al centrar, si sobra una columna, va a la derecha. Ahora decimales y bases:
+
+<Ejecutar ej="m02/precision-y-bases" />
+
+```text
+3.14
+2
+   3.142|
+11001010 312 ca CA
+0b11001010 0xca
+00000101
++7 -7
+```
+
+`202` es `11001010` en binario, `312` en octal y `ca` en hexadecimal: lo mismo que calculaste a mano en el mundo de la máquina. El modo bonito de depuración, `{:#?}`, reparte un valor compuesto en varias líneas:
+
+<Ejecutar ej="m02/debug-bonito" />
+
+```text
+(1, "dos", [3, 4])
+(
+    1,
+    "dos",
+    [
+        3,
+        4,
+    ],
+)
+```
+
+Escapes y `print!`, que es como `println!` pero **sin** el salto de línea final:
+
+<Ejecutar ej="m02/escapes" />
+
+```text
+uno
+dos
+a	b	c
+Dijo "hola" y se fue
+C:\dev\hola
+sin salto
+```
+
+Por último, hay **dos** salidas de texto. `println!` escribe en la **salida estándar** (*standard output*, stdout), que es para los resultados. `eprintln!` escribe en la **salida de errores** (*standard error*, stderr), que es para avisos y fallos:
+
+<Ejecutar ej="m02/stderr" />
+
+En la terminal ves las dos líneas, `Resultado: 42` y `Aviso: esto va por stderr`, pero van por canales distintos.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Qué cuenta el ancho, y para qué sirven dos salidas">
+**El ancho cuenta caracteres, no bytes.** En UTF-8 la `í` ocupa 2 bytes, pero `{:^24}` centra `"Ana Martínez"` como 12 caracteres, que es lo que ves. Rust cuenta lo que llama `char`: un **valor escalar Unicode**. Lo comprobarás en el jefe de este mundo. Ojo: hay símbolos (algunos emojis, letras con acentos combinados) que el ojo ve como uno y son varios `char`; con ellos las columnas pueden descuadrarse.
+
+**Por qué dos salidas.** El sistema operativo da a cada programa dos canales de texto separados. Si en PowerShell ejecutas `cargo run > salida.txt`, solo la salida estándar va al archivo; los mensajes de `eprintln!` siguen apareciendo en pantalla. Así un programa puede producir datos limpios y, a la vez, avisarte de problemas. Fíjate en que Cargo también lo hace: sus líneas `Compiling…` y `Finished…` van por stderr.
+
+**Los escapes se resuelven al leer el código.** `"\n"` no son dos caracteres en tu programa compilado: es **un** byte, el 10 (`0x0A`). La traducción ocurre al leer el texto del código fuente, antes incluso que el formato.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Una ruta de Windows con barras simples">
+❌ `println!("Guárdalo en C:\dev\hola");` no compila: para Rust, `\d` y `\h` son escapes que no existen.
+
+✅ Duplica cada barra: `"C:\\dev\\hola"`. El compilador te propone otra salida, el **literal crudo** (*raw string*) `r"C:\dev\hola"`, en el que las barras no escapan nada.
+</Trampa>
+
+<NoCompila ej="m02/barra-invertida" explicacion='El error real es «unknown character escape: `d`» (escape de carácter desconocido), con la marca `^` justo en la `d`. El `help:` sugiere el literal crudo `r"…"`.' />
+
+<Trampa titulo="El redondeo de {:.0}">
+❌ Creer que `{:.0}` de `2.5` da `3`. Ejecuta esto:
+
+<Ejecutar ej="m02/redondeo" />
+
+```text
+2
+2
+4
+0.12
+```
+
+✅ Cuando el valor está **exactamente** en la mitad, el formato redondea hacia la cifra **par**: 1,5 → 2, 2,5 → 2, 3,5 → 4. Y `0.125` (que en binario es exacto) con dos decimales da `0.12`. Si necesitas otra regla de redondeo, aplícala tú antes de imprimir; la verás con los números con decimales en el mundo 3.
+</Trampa>
+
+## Tu turno
+
+<Respuesta
+  pregunta='¿Qué escribes en el hueco para que `println!("{…}", 255)` imprima `0xff`?'
+  respuestas={["{:#x}", ":#x", "#x"]}
+  explicacion="`#` añade el prefijo y `x` pide hexadecimal en minúsculas: `{:#x}`. Con `{:#X}` saldría `0xFF`."
+/>
+
+<Respuesta
+  pregunta='¿Y para que `println!("{…}|", 3.14159)` imprima `  3.14|` (dos espacios delante)?'
+  respuestas={["{:6.2}", "{:>6.2}", ":6.2", ":>6.2"]}
+  explicacion="Ancho 6 y precisión 2. `3.14` ocupa 4 columnas, así que se rellenan 2 espacios a la izquierda (los números se alinean a la derecha por defecto)."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta='¿Qué imprime `println!("{:-^9}", "ok")`?'
+  opciones={["`ok-------`", "`---ok----`", "`-------ok`", "`----ok---`"]}
+  correcta={1}
+  explicacion="`-` es el relleno, `^` centra y 9 es el ancho. Sobran 7 columnas: 3 a la izquierda y 4 a la derecha (la que sobra va a la derecha)."
+  porque={["Eso sería `{:-<9}`, alineado a la izquierda.", "", "Eso sería `{:->9}`, a la derecha.", "Al centrar, la columna sobrante va a la **derecha**, no a la izquierda."]}
+/>
+
+<Pregunta
+  pregunta='¿Qué diferencia hay entre `print!("a")` y `println!("a")`?'
+  opciones={["`print!` no compila sin argumentos", "`println!` añade un salto de línea al final; `print!` no", "`print!` escribe en stderr", "Ninguna"]}
+  correcta={1}
+  explicacion="El `ln` es de *line*: `println!` termina la línea. Con `print!` el siguiente texto sigue en la misma línea."
+  porque={["Los dos aceptan una cadena sin huecos ni argumentos.", "", "La salida de errores es la de `eprint!` y `eprintln!`.", "La diferencia es el salto de línea final."]}
+/>
+
+<Pregunta
+  pregunta='El texto `"a\tb"` dentro de tu código, ¿cuántos caracteres tiene una vez compilado?'
+  opciones={["4: a, \\, t, b", "3: a, un tabulador, b", "2: a y b", "Depende de la terminal"]}
+  correcta={1}
+  explicacion='`\t` es **una** secuencia de escape que representa **un** carácter, el tabulador. Cómo de ancho se dibuja depende de la terminal, pero en memoria es un solo byte.'
+  porque={["La barra y la `t` juntas forman un solo carácter: el escape se traduce al compilar.", "", "El tabulador es un carácter más, aunque no se vea.", "La terminal decide cómo se **dibuja**, no cuántos caracteres hay."]}
+/>

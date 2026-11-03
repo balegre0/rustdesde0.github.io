@@ -1,0 +1,35 @@
+---
+title: "Atributos de herramientas"
+description: "Atributos con espacio de nombres (rustfmt::skip, clippy::…) que el compilador acepta sin interpretarlos, para que los lean otras herramientas."
+sidebar:
+  order: 31
+insignias: ["Desde 1.30", "Herramientas"]
+---
+
+Un atributo con ruta `herramienta::nombre` va dirigido a una herramienta, no al compilador. `rustc` comprueba que la herramienta exista y lo deja pasar.
+
+## Sinopsis
+
+```rust
+#[rustfmt::skip]                       // rustfmt no toca este elemento
+const MATRIZ: [[u8; 3]; 3] = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+];
+
+#[allow(clippy::needless_range_loop)]  // nivel de un lint de Clippy
+fn f() { … }
+```
+
+## Qué hace
+
+Las herramientas registradas son `rustfmt`, `clippy`, `rustdoc` (por ejemplo `#[allow(rustdoc::broken_intra_doc_links)]`) y el espacio especial [`diagnostic`](/ref/lenguaje/atributos/diagnostic/). Para Clippy, sus lints se ajustan con los mismos [niveles](/ref/lenguaje/atributos/lints/) que los del compilador: `#[warn(clippy::pedantic)]`.
+
+## Desde
+
+Rust 1.30.
+
+## Ver también
+
+[Mundo 16 · Pruebas y herramientas](/curso/16-pruebas-y-herramientas/)

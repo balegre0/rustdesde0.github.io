@@ -1,0 +1,116 @@
+---
+title: "Tuplas: varios valores en uno"
+description: "Agrupa valores de tipos distintos en una tupla, accede a ellos con .0, .1…, desestructúralos y conoce la tupla vacía ()."
+sidebar:
+  order: 10
+duracion: 10
+desde: "1.0"
+requiere: ["03-valores-y-tipos/09-bool-y-char"]
+tarjetas:
+  - p: "¿Cómo se accede al segundo elemento de una tupla `t`?"
+    r: "`t.1`: los índices empiezan en 0."
+  - p: "¿Qué es desestructurar una tupla?"
+    r: "Sacar sus partes en variables con un patrón: `let (a, b) = t;`."
+  - p: "¿Qué es `()` y cuánto ocupa?"
+    r: "La tupla vacía, llamada unit: no lleva datos y ocupa 0 bytes."
+  - p: "¿Cómo se escribe una tupla de un solo elemento?"
+    r: "Con coma final: `(7,)`. Sin coma, `(7)` es solo el número 7 entre paréntesis."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+A veces varios valores van juntos: un nombre y una edad, una coordenada x e y. Hoy vas a agruparlos en un solo valor, la **tupla**, y a separarlos otra vez.
+
+## Predice
+
+<Predice
+  ej="m03/tuplas"
+  opciones={["`edad: 34`", "`edad: Lucía`", "`edad: 1.68`", "No compila: los elementos tienen tipos distintos"]}
+  correcta={0}
+  explicacion="`persona.1` es el **segundo** elemento, porque se empieza a contar desde 0: `.0` es el nombre, `.1` la edad y `.2` la altura."
+  porque={["", "`.0` sería el nombre; `.1` es el siguiente.", "La altura es `.2`.", "Una tupla puede mezclar tipos: es justo para lo que sirve."]}
+/>
+
+## La idea
+
+Una **tupla** (*tuple*) es un grupo de valores, **cada uno de su propio tipo**, con un número fijo de elementos. Se escribe entre paréntesis y separada por comas:
+
+```rust
+let persona: (&str, u8, f64) = ("Lucía", 34, 1.68);
+```
+
+El tipo de la tupla es la lista de los tipos de sus partes: `(&str, u8, f64)`. Para leer una parte se usa un punto y la posición, empezando en 0: `persona.0`, `persona.1`, `persona.2`.
+
+También puedes **desestructurar** (*destructure*) la tupla: escribir un patrón con la misma forma para sacar todas sus partes de golpe, `let (nombre, edad, altura) = persona;`. Si alguna parte no te interesa, la ignoras con `_`.
+
+Hay una tupla especial: `()`, la tupla vacía, que se llama **unit**. No tiene datos y significa «nada útil que devolver». Te la encontrarás constantemente: es lo que devuelve `main` o `println!`.
+
+## Pruébalo
+
+<Ejecutar ej="m03/tuplas" />
+
+Salida real:
+
+```text
+nombre: Lucía
+edad: 34
+("Lucía", 34, 1.68)
+Lucía tiene 34 años y mide 1.68
+unit: ()
+```
+
+Con `mut`, las partes se pueden cambiar una a una (pero no su tipo ni el número de elementos):
+
+<Ejecutar ej="m03/tupla-mut" />
+
+```text
+(5, 2) x=5
+(7,)
+```
+
+## Bajo el capó
+
+<BajoElCapo titulo="Una tupla en memoria">
+Una tupla guarda sus partes **seguidas en memoria**, sin flechas ni indirecciones: una tupla `(i32, i32)` ocupa 8 bytes, igual que dos `i32` sueltos. Pero ojo: con tipos de tamaños distintos, el compilador puede **reordenar** las partes y añadir **relleno** (*padding*) para que cada una quede alineada (un `u32` debe empezar en una dirección múltiplo de 4). El orden en memoria de una tupla no está garantizado; solo el acceso por `.0`, `.1`… lo está.
+
+`()` ocupa **0 bytes**: es un tipo de tamaño cero (*zero-sized type*). No hay nada que guardar, porque solo hay un valor posible. Puedes comprobarlo con `std::mem::size_of::<()>()`.
+
+La tupla de un elemento necesita la coma, `(7,)`, porque `(7)` ya significa «el número 7 entre paréntesis» (como en matemáticas). De hecho, si escribes `(7)`, el compilador te avisa de que los paréntesis sobran.
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m03/tupla-indice" explicacion="E0609: la tupla tiene 3 elementos, que son `.0`, `.1` y `.2`. No existe `.3`. El compilador lo comprueba al compilar y te lista los campos disponibles." />
+
+Pasa lo mismo que con todo lo que se cuenta en programación: el tercer elemento es el `.2`. La nota del error lo deja claro: «los campos disponibles son `0`, `1`, `2`».
+
+## Tu turno
+
+<Reto
+  ej="m03/intercambio"
+  enunciado="Desestructura `par = (3, 8)` en dos variables, crea `al_reves` con los elementos intercambiados e imprime `(3, 8) -> (8, 3)` usando `{:?}`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál es el tipo de `(true, 'x', 10u8)`?"
+  opciones={["`(bool, char, u8)`", "`(bool, &str, i32)`", "`[bool; 3]`", "Una tupla no tiene tipo"]}
+  correcta={0}
+  explicacion="El tipo de una tupla es la lista de los tipos de sus partes, en orden."
+  porque={["", "`'x'` con comillas simples es `char`, y el sufijo `u8` fija el tipo del 10.", "Un array exige el mismo tipo en todos los elementos.", "Todo valor en Rust tiene un tipo."]}
+/>
+
+<Pregunta
+  pregunta="`let (a, _, c) = (1, 2, 3);` ¿Cuánto vale `a + c`?"
+  opciones={["3", "4", "6", "No compila: falta una variable"]}
+  correcta={1}
+  explicacion="El patrón asigna 1 a `a`, ignora el 2 con `_` y asigna 3 a `c`: 1 + 3 = 4."
+  porque={["Eso sería `a + _`, que no existe.", "", "El 2 se ha ignorado.", "`_` es un comodín válido en un patrón."]}
+/>
+
+<Respuesta
+  pregunta="¿Cómo se llama la tupla vacía `()`?"
+  respuestas={["unit", "Unit", "unidad"]}
+  explicacion="Se llama *unit*: un tipo con un solo valor posible y tamaño 0."
+/>

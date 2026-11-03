@@ -1,0 +1,181 @@
+---
+title: "Tokens, AST y macros"
+description: "Construye un lexer y un parser de juguete y descubre cómo rustc convierte texto en árbol, expande macros y resuelve nombres."
+sidebar:
+  order: 2
+duracion: 15
+desde: "1.0"
+requiere: ["21-el-compilador-por-dentro/01-el-viaje"]
+tarjetas:
+  - p: "¿Qué produce un lexer y qué produce un parser?"
+    r: "El lexer produce una secuencia de tokens (palabras con tipo y posición). El parser produce un árbol (AST) que refleja la estructura: qué operación contiene a cuál."
+  - p: "¿Cómo decide el parser que `1 + 2 * 3` es `1 + (2 * 3)`?"
+    r: "Con precedencias: `*` se «pega» más fuerte que `+`. El parser de rustc está escrito a mano (descenso recursivo) y resuelve los operadores con una tabla de precedencias."
+  - p: "¿Por qué `cuadrado!(2 + 1)` con `$e * $e` da 9 y no 5?"
+    r: "Porque las macros sustituyen árboles, no texto: `$e` es una expresión ya agrupada, así que el resultado es `(2 + 1) * (2 + 1)`."
+  - p: "¿Qué es la higiene de macros?"
+    r: "Que los nombres creados dentro de una macro no chocan con los de quien la usa: cada identificador lleva su contexto de sintaxis."
+  - p: "¿Por qué la expansión de macros y la resolución de nombres se hacen intercaladas?"
+    r: "Porque una macro puede crear nombres nuevos y un nombre puede ser una macro: hay que repetir expandir y resolver hasta que no quede nada por expandir."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Las dos primeras etapas del compilador convierten una tira de caracteres en un **árbol**. En esta lección escribes un lexer y un parser de juguete que hacen lo mismo que los de `rustc` en pequeño, y luego ves cómo el compilador expande macros y resuelve nombres sobre ese árbol.
+
+## Predice
+
+<Predice
+  ej="m21/expansion"
+  opciones={[
+    "cuadrado!(2 + 1) = 5, doble_de!(x) = 4, x sigue valiendo 2",
+    "cuadrado!(2 + 1) = 9, doble_de!(x) = 20, x sigue valiendo 10",
+    "cuadrado!(2 + 1) = 9, doble_de!(x) = 4, x sigue valiendo 10",
+    "No compila: la macro redefine `x`"
+  ]}
+  correcta={1}
+  explicacion="La macro recibe `2 + 1` como **una** expresión ya agrupada, así que `$e * $e` es `(2 + 1) * (2 + 1)` = 9. Y por la higiene, la `x` que crea `doble_de!` es otra variable distinta de tu `x`: `2 * 10` = 20, y tu `x` no cambia."
+  porque={[
+    "Eso pasaría si la macro pegara texto (`2 + 1 * 2 + 1` = 5). Rust sustituye árboles.",
+    "",
+    "El `$e` de `doble_de!(x)` es TU `x` (10), no la de la macro: la higiene las distingue.",
+    "Crear una variable dentro de una macro es legal; la higiene evita el choque."
+  ]}
+/>
+
+## La idea
+
+**El lexer** (*analizador léxico*) recorre los caracteres y los agrupa en **tokens**: un identificador (`total`), un literal (`12`, `"hola"`), un signo (`+`, `=>`, `::`), un delimitador (`(`, `{`). No sabe nada de significado: `totl` es un identificador perfectamente válido para él. En rustc vive en el crate `rustc_lexer`, que es pequeño y no depende del resto del compilador.
+
+**El parser** (*analizador sintáctico*) lee los tokens y construye el **AST**. Su trabajo principal es decidir **quién contiene a quién**. En `1 + 2 * 3` el árbol es un `+` cuyo hijo derecho es un `*`, porque la multiplicación tiene más **precedencia**. El parser de rustc está escrito a mano (no lo genera ninguna herramienta) en `rustc_parse`, y usa descenso recursivo: una función por cada tipo de construcción, que se llaman entre sí.
+
+Después vienen dos tareas que se hacen **juntas y en bucle**: la **expansión de macros** (cada `println!`, `vec!` o `#[derive(Debug)]` se sustituye por el código que genera) y la **resolución de nombres** (cada `x`, `Vec`, `std::io` se une a su definición). Van juntas porque se necesitan mutuamente: para expandir `mi_macro!` hay que saber qué es `mi_macro`, y la expansión puede crear funciones, structs o incluso otras macros. Se repite hasta que no queda nada sin expandir.
+
+## Pruébalo
+
+Un lexer de juguete. Fíjate en que el error lleva **la posición**, igual que los de rustc:
+
+<Ejecutar ej="m21/mini-lexer" />
+
+Y un parser con precedencias (el método se llama *Pratt* o *precedence climbing*). Mira cómo `8 - 3 - 2` se agrupa por la izquierda:
+
+<Ejecutar ej="m21/pratt" />
+
+La clave está en `expr(minimo)`: solo se queda con un operador si «pega» más fuerte que `minimo`. Al leer el `*` de `1 + 2 * 3` estamos dentro de la llamada del `+` (mínimo 1) y `*` tiene 2, así que el `*` se mete **dentro** del hijo derecho del `+`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El AST real.** Con nightly puedes volcar el árbol de rustc. Para `fn f() -> i32 { 1 + 2 * 3 }`, un fragmento real de `rustc +nightly --crate-type lib -Zunpretty=ast-tree` (147 líneas en total):
+
+```text
+kind: Binary(
+    Spanned {
+        node: Add,
+        span: expr.rs:1:19: 1:20 (#0),
+    },
+    Expr {
+        kind: Lit(
+            Lit {
+                kind: Integer,
+                symbol: "1",
+                suffix: None,
+            },
+        ),
+        span: expr.rs:1:17: 1:18 (#0),
+    },
+    Expr {
+        kind: Binary(
+            Spanned {
+                node: Mul,
+                span: expr.rs:1:23: 1:24 (#0),
+            },
+            ...
+```
+
+Cada nodo guarda su **span**: archivo, línea y columna de inicio y fin. Así es como un error puede subrayar exactamente `^^^^` el trozo culpable aunque ocurra diez etapas más tarde. El `(#0)` es el **contexto de sintaxis** del span, la pieza que hace funcionar la higiene: los tokens creados por una macro llevan otro número.
+
+**La expansión real.** Con `-Zunpretty=expanded` (lo mismo que hace la herramienta `cargo expand`) se ve el resultado. Para `cuadrado!(2 + 1)` y un `#[derive(Debug, Clone)]` sobre `struct P { x: i32 }`, salida real:
+
+```text
+#[automatically_derived]
+impl ::core::clone::Clone for P {
+    #[inline]
+    fn clone(&self) -> Self { P { x: ::core::clone::Clone::clone(&self.x) } }
+}
+fn main() {
+    ...
+    let c = (2 + 1) * (2 + 1);
+```
+
+El paréntesis de `(2 + 1)` lo pone el impresor para mostrar que el nodo ya estaba agrupado. Y el código derivado usa rutas absolutas (`::core::clone::Clone`) para no depender de lo que tengas importado: otra forma de higiene.
+
+**Macros procedurales.** Un `#[derive]` propio, un atributo o una macro tipo función de un crate `proc-macro` se compila como una biblioteca aparte que rustc **carga y ejecuta** durante la expansión, pasándole los tokens por un puente (`proc_macro::bridge`). Por eso las macros procedurales cuestan tiempo de compilación: son programas que corren dentro del compilador.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m21/nombre-desconocido" explicacion="E0425 lo da la resolución de nombres. El lexer aceptó `totl` sin problema: para él es un identificador como cualquier otro. Fíjate en el `help:`: el compilador busca nombres parecidos que sí existen." />
+
+<Trampa titulo="Pensar que una macro es «buscar y reemplazar» texto">
+
+❌ «`cuadrado!(2 + 1)` se convierte en `2 + 1 * 2 + 1`.»
+
+✅ Las macros reciben y producen **árboles de tokens**. Un fragmento `$e:expr` es un nodo completo y se inserta como tal. Por eso las macros de Rust no necesitan llenar todo de paréntesis por precaución.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m21/lexer-menos"
+  enunciado="Amplía el lexer para que reconozca el signo menos: añade la variante `Menos` al enum y la rama `'-'` en el `match`. La salida esperada es `Ok([Numero(10), Menos, Numero(4), Por, Numero(2)])`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace el lexer con `let totl = 3;` si `totl` no está declarado en ningún sitio?"
+  opciones={[
+    "Da el error E0425",
+    "Lo acepta: produce un token identificador `totl`, sin saber si existe",
+    "Lo corrige automáticamente a `total`",
+    "Lo convierte en una cadena"
+  ]}
+  correcta={1}
+  explicacion="El lexer solo clasifica caracteres. Saber si un nombre existe es trabajo de la resolución de nombres, mucho después. (Además, en `let totl = 3;` `totl` se está **declarando**, así que es correcto.)"
+  porque={["E0425 aparece al **usar** un nombre que no existe, y lo detecta la resolución de nombres.", "", "El compilador puede **sugerir** un nombre parecido en un `help:`, nunca cambia tu código.", "Un identificador y una cadena son tokens distintos."]}
+/>
+
+<Pregunta
+  pregunta="En el parser de juguete, ¿por qué `8 - 3 - 2` da `(8 - 3) - 2` y no `8 - (3 - 2)`?"
+  opciones={[
+    "Porque `-` tiene más precedencia que `+`",
+    "Porque la llamada recursiva usa `p` como mínimo y el bucle se detiene con `p <= minimo`, así que un `-` del mismo nivel no se mete dentro: se agrupa por la izquierda",
+    "Porque el lexer invierte el orden de los tokens",
+    "Por casualidad: el resultado sería el mismo"
+  ]}
+  correcta={1}
+  explicacion="La condición `p <= minimo` hace que los operadores del mismo nivel se asocien por la izquierda. El resultado no es el mismo: `(8 - 3) - 2` = 3 y `8 - (3 - 2)` = 7."
+  porque={["`+` y `-` tienen la misma precedencia en el parser.", "", "El lexer conserva el orden del texto.", "3 y 7 no son el mismo número: la asociatividad importa."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué rustc no puede expandir todas las macros primero y resolver todos los nombres después, en dos pasadas separadas?"
+  opciones={[
+    "Porque sería más lento",
+    "Porque una macro puede definir nombres (incluso otras macros) y para expandir una macro hay que saber a qué nombre se refiere",
+    "Porque las macros se ejecutan en tiempo de ejecución",
+    "Sí puede; lo hace así"
+  ]}
+  correcta={1}
+  explicacion="Expandir necesita resolver (qué macro es esta) y resolver necesita expandir (qué nombres crea esta macro). Por eso se hace en un bucle hasta llegar a un punto fijo."
+  porque={["El motivo no es la velocidad, sino la dependencia mutua.", "", "Todas las macros se expanden al compilar; en el binario no queda ninguna.", "No puede: se haría con información incompleta."]}
+/>
+
+## Para saber más
+
+- Mundo 19 (macros) para escribir las tuyas, y la lección siguiente: [HIR y THIR](/curso/21-el-compilador-por-dentro/03-hir-y-thir/).
+- *rustc-dev-guide*, capítulos «Lexing and parsing» y «Macro expansion»: https://rustc-dev-guide.rust-lang.org/

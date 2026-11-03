@@ -1,0 +1,42 @@
+---
+title: "std::iter"
+description: "Iteradores: el trait Iterator, sus adaptadores (map, filter, zip…) y sus consumidores (sum, collect, fold…)."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+**Ruta:** `std::iter`
+
+## Para qué sirve
+
+Un **iterador** es cualquier cosa que puede darte valores **de uno en uno**: los elementos de un `Vec`, las letras de un texto, los números de un rango, las líneas de un archivo… Todos implementan el mismo trait, `Iterator`, y por eso comparten decenas de métodos para transformarlos, filtrarlos y combinarlos. El bucle `for` funciona con cualquier iterador.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Iterator`](/ref/std/iter/iterator/) | El trait: un método obligatorio (`next`) y decenas gratis. | 1.0 |
+| [`Adaptadores y consumidores`](/ref/std/iter/adaptadores/) | `map`, `filter`, `zip`, `sum`, `collect`, `fold`… | 1.0 |
+| `IntoIterator` | Lo que se puede recorrer con `for`. | 1.80 |
+| `FromIterator` | Lo que se puede construir con `collect`. | 1.0 |
+| `DoubleEndedIterator` | Iteradores que también avanzan desde el final (`rev`). | 1.12 |
+| `ExactSizeIterator` | Iteradores que saben cuántos elementos quedan (`len`). | 1.0 |
+| `repeat, once, empty, from_fn, successors` | Funciones que crean iteradores. | 1.0 |
+
+**Catálogo completo:** [Iterator: todos los métodos](/ref/std/iter/catalogo/)
+
+## Conceptos clave
+
+- **Perezosos** (*lazy*): un adaptador como `map` no hace nada hasta que alguien pide valores (un `for`, `collect`, `sum`…). El compilador avisa si creas uno y no lo usas.
+- **Sin coste**: una cadena de adaptadores se compila a un bucle tan rápido como el escrito a mano.
+- **Tres formas de recorrer un `Vec`**: `v.iter()` presta (`&T`), `v.iter_mut()` presta en exclusiva (`&mut T`) y `v.into_iter()` (o `for x in v`) **mueve** los elementos y consume el `Vec`.
+
+## Ver también
+
+- [Fn, FnMut, FnOnce](/ref/std/ops/fn/)
+- [Vec](/ref/std/vec/vec/)
+- [slice](/ref/std/slice/)
+
+## Aprende esto en
+
+- [Mundo 14 · Closures e iteradores](/curso/14-closures-e-iteradores/)

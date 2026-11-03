@@ -1,0 +1,1194 @@
+# Banco de preguntas del mundo 02 — Tu primer programa (CONTENIDO.md §7.1).
+# Todo código citado está en ejemplos/m02/*.rs y se ha compilado/ejecutado con rustc 1.99.1, edición 2024
+# (wasm32-wasip1 para las salidas; --emit=metadata para los errores).
+
+# ───────────── fn main y estructura ─────────────
+
+- id: m02-sin-main
+  titulo: "¿Quién empieza?"
+  mundo: 02-tu-primer-programa
+  tema: fn-main
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m02/sin-main
+  opciones:
+    - "Falta una función llamada `main`, el punto de entrada (E0601)"
+    - "`principal` no es un nombre válido para una función"
+    - "Las funciones no pueden contener `println!`"
+    - "Falta un `;` después de la llave final"
+  correcta: 0
+  solucion: |
+    rustc dice: ``error[E0601]: `main` function not found in crate `sin_main` ``. El programa empieza **siempre** en `main`; Rust no adivina cuál de tus funciones es la principal.
+    - `principal` es un nombre perfectamente válido: el problema es que nadie la llama y no hay `main`.
+    - Cualquier función puede usar `println!`.
+    - Después de la `}` de una función no va `;`.
+  etiquetas: ["E0601", "main"]
+
+- id: m02-main-mayuscula
+  titulo: "Main no es main"
+  mundo: 02-tu-primer-programa
+  tema: fn-main
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "La función se llama `Main`. ¿Qué pasa?"
+  ej: m02/p-main-mayuscula
+  opciones:
+    - "Compila: Rust no distingue mayúsculas de minúsculas en los nombres"
+    - "No compila: `Main` y `main` son nombres distintos, así que no hay punto de entrada (E0601)"
+    - "Compila, pero no imprime nada"
+    - "No compila porque las funciones no pueden empezar por mayúscula"
+  correcta: 1
+  solucion: |
+    El error real es el mismo que si no hubiera función: ``error[E0601]: `main` function not found in crate `p_main_mayuscula` ``.
+    - Rust **sí** distingue mayúsculas: `Main`, `main` y `MAIN` son tres nombres distintos.
+    - No llega a compilar, así que no hay programa que «no imprima».
+    - Una función puede llamarse con mayúscula (el compilador solo avisa de que no es el estilo habitual); lo que falla es que falta `main`.
+  etiquetas: ["E0601", "main", "nombres"]
+
+- id: m02-orden-lineas
+  titulo: "De arriba abajo"
+  mundo: 02-tu-primer-programa
+  tema: fn-main
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa? (Fíjate en el `println!()` vacío.)"
+  ej: m02/orden
+  opciones:
+    - "`Primero`, `Segundo`, `Tercero` (tres líneas seguidas)"
+    - "`Primero`, `Segundo`, una línea en blanco y `Tercero`"
+    - "`Tercero`, `Segundo`, `Primero`"
+    - "No compila: `println!()` necesita un texto"
+  correcta: 1
+  solucion: |
+    Salida real: `Primero`, `Segundo`, una línea vacía y `Tercero`. Las instrucciones de `main` se ejecutan en orden, de arriba abajo.
+    - `println!()` sin argumentos sí imprime algo: el salto de línea.
+    - El orden de ejecución es el del texto, no al revés.
+    - `println!()` vacío es válido.
+  etiquetas: ["main", "println!"]
+
+- id: m02-falta-punto-y-coma
+  titulo: "El punto y coma perdido"
+  mundo: 02-tu-primer-programa
+  tema: fn-main
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m02/p-falta-punto-y-coma
+  opciones:
+    - "Dos `println!` no pueden ir seguidos"
+    - "Falta el `;` que separa la primera instrucción de la segunda"
+    - "`\"uno\"` necesita huecos `{}`"
+    - "Falta `mut`"
+  correcta: 1
+  solucion: |
+    rustc: ``error: expected `;`, found `println` ``, con `help: add ; here` justo detrás del `)` de la línea 2. Sin el `;`, el compilador no sabe dónde termina una instrucción y empieza la otra.
+    - Puedes poner tantos `println!` seguidos como quieras, cada uno con su `;`.
+    - Un texto sin huecos es una cadena de formato válida.
+    - `mut` tiene que ver con variables que cambian, no con la sintaxis.
+  etiquetas: ["sintaxis", "punto y coma"]
+
+- id: m02-parentesis-sin-cerrar
+  titulo: "El paréntesis abierto"
+  mundo: 02-tu-primer-programa
+  tema: fn-main
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Qué ha detectado el compilador en este programa?"
+  ej: m02/p-parentesis-sin-cerrar
+  opciones:
+    - "Que falta el `)` de `println!(`, y por eso la `}` final no encaja con nada"
+    - "Que `\"Hola\"` está mal escrito"
+    - "Que falta `fn main`"
+    - "Que el `;` sobra"
+  correcta: 0
+  solucion: |
+    El error real: ``error: mismatched closing delimiter: `}` ``, con la marca `unclosed delimiter` bajo el `(` de `println!(`. El compilador empareja cada `(` con su `)` y cada `{` con su `}`; al llegar a `}` todavía tenía un `(` abierto.
+    - El texto `"Hola"` está bien: tiene sus dos comillas.
+    - `fn main()` está en la línea 1.
+    - El `;` está bien; lo que falta es el `)` antes de él.
+    Este error lo da una fase muy temprana del compilador, antes incluso de expandir las macros.
+  etiquetas: ["sintaxis", "delimitadores"]
+
+# ───────────── println! y macros ─────────────
+
+- id: m02-sin-exclamacion
+  titulo: "Sin exclamación"
+  mundo: 02-tu-primer-programa
+  tema: macros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `println(\"Hola\");`?"
+  ej: m02/sin-exclamacion
+  opciones:
+    - "Porque no existe ninguna función `println`: `println!` es una macro y se llama con `!` (E0423)"
+    - "Porque los textos se escriben entre comillas simples"
+    - "Porque falta un hueco `{}`"
+    - "Porque `println` solo funciona en modo release"
+  correcta: 0
+  solucion: |
+    rustc: ``error[E0423]: cannot find function `println` in this scope``, con la nota «a macro named `println` exists in another namespace» y un `help:` que marca con `+` dónde poner el `!`.
+    - Las comillas simples son para un único carácter; un texto va entre comillas dobles.
+    - Una cadena sin huecos es válida.
+    - Los modos de compilación no cambian qué nombres existen.
+  etiquetas: ["E0423", "macros", "println!"]
+
+- id: m02-macro-mal-escrita
+  titulo: "printline!"
+  mundo: 02-tu-primer-programa
+  tema: macros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué te propone el compilador para este programa?"
+  ej: m02/p-macro-mal-escrita
+  opciones:
+    - "Quitar el `!`"
+    - "Cambiar `printline!` por `println!`, la macro de nombre parecido que sí existe"
+    - "Añadir `use printline;`"
+    - "Nada: compila con un aviso"
+  correcta: 1
+  solucion: |
+    El error real es ``error: cannot find macro `printline` in this scope`` y el `help:` dice «a macro with a similar name exists», mostrando la línea corregida con `println!`. Incluso señala dónde está definida `println` dentro de la biblioteca estándar.
+    - Sin `!` buscaría una función `printline`, que tampoco existe.
+    - No hay ningún `printline` que importar.
+    - Un nombre que no existe es un error, no un aviso.
+  etiquetas: ["macros", "nombres"]
+
+- id: m02-expansion
+  titulo: "La palabra exacta"
+  mundo: 02-tu-primer-programa
+  tema: macros
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cómo se llama el proceso en el que el compilador sustituye una llamada a una macro por el código que genera?"
+  respuestas: ["expansión", "expansion", "expandir", "expansión de macros", "macro expansion"]
+  solucion: |
+    **Expansión de macros** (*macro expansion*). Ocurre en una fase temprana de `rustc`, junto con la resolución de nombres y antes de comprobar los tipos.
+  etiquetas: ["macros", "rustc"]
+
+- id: m02-en-que-se-convierte
+  titulo: "Lo que queda de println!"
+  mundo: 02-tu-primer-programa
+  tema: macros
+  dificultad: media
+  tipo: opcion
+  enunciado: "En el MIR de un programa con `println!(\"{}\", 2 + 3)`, ¿en qué llamada termina la macro?"
+  opciones:
+    - "`std::io::_print(...)`"
+    - "`println(...)`, una función oculta con el mismo nombre"
+    - "Ninguna: el MIR ya contiene el texto `5` impreso"
+    - "`main(...)`"
+  correcta: 0
+  solucion: |
+    En el MIR real (rustc 1.99.1) aparece `_1 = std::io::_print(move _2) -> [return: bb4, unwind unreachable];`. La macro prepara los argumentos con `format_args!` y llama a esa función interna de `std`.
+    - No existe una función `println`: por eso olvidar el `!` da E0423.
+    - El MIR describe instrucciones, no la salida; la impresión ocurre al ejecutar.
+    - `main` es la función que contiene la llamada, no la llamada.
+  etiquetas: ["macros", "MIR"]
+
+# ───────────── Huecos y cadenas de formato ─────────────
+
+- id: m02-huecos-orden
+  titulo: "Rellenar en orden"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la **primera** línea?"
+  ej: m02/huecos
+  opciones:
+    - "`{} + {} = {}`"
+    - "`2 + 3 = 5`"
+    - "`2 + 3 = 2 + 3`"
+    - "`5 + 5 = 5`"
+  correcta: 1
+  solucion: |
+    Salida real: `2 + 3 = 5`. Cada `{}` toma el siguiente argumento; el tercero es el **resultado** de `2 + 3`, que se calcula antes de imprimir.
+    - Las llaves son huecos, no texto literal.
+    - Fuera de las comillas, `2 + 3` es un cálculo, no un texto.
+    - Cada hueco toma un argumento distinto, en orden.
+  etiquetas: ["println!", "huecos"]
+
+- id: m02-faltan-argumentos
+  titulo: "Dos huecos, un valor"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m02/faltan-argumentos
+  opciones:
+    - "La cadena tiene 2 huecos y solo hay 1 argumento"
+    - "`años` lleva ñ y no se permite"
+    - "No se pueden poner números como argumentos"
+    - "Compila, pero imprime `{}` en el segundo hueco"
+  correcta: 0
+  solucion: |
+    Error real: `error: 2 positional arguments in format string, but there is 1 argument`. La macro cuenta huecos y argumentos **al compilar**; las marcas `^^` señalan los dos huecos y `--` el único argumento.
+    - El texto de Rust es UTF-8: la ñ está permitida.
+    - Los números son argumentos válidos.
+    - Rust no deja huecos sin rellenar: es un error de compilación, no una sorpresa al ejecutar.
+  etiquetas: ["println!", "huecos", "formato"]
+
+- id: m02-sobra-argumento
+  titulo: "Un valor de más"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "Dos huecos y tres valores. ¿Qué pasa?"
+  ej: m02/p-sobra-argumento
+  opciones:
+    - "Imprime `1 y 2` e ignora el 3"
+    - "Imprime `1 y 2 3`"
+    - "No compila: `argument never used`"
+    - "Compila, pero entra en pánico al ejecutar"
+  correcta: 2
+  solucion: |
+    Error real: `error: argument never used`, con la marca `formatting specifier missing` bajo la cadena. La comprobación funciona en los dos sentidos: un hueco sin valor o un valor sin hueco son errores.
+    - Rust no ignora argumentos: uno sin usar suele ser un despiste.
+    - Los valores solo aparecen dentro de los huecos.
+    - Se detecta al compilar, no al ejecutar.
+  etiquetas: ["println!", "huecos"]
+
+- id: m02-texto-sin-comillas
+  titulo: "Hola sin comillas"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué le falta a `println!(Hola);`?"
+  ej: m02/p-texto-sin-comillas
+  opciones:
+    - "Las comillas: el primer argumento debe ser un texto literal entre comillas"
+    - "Un `;` extra"
+    - "Un `let Hola`"
+    - "Nada: imprime `Hola`"
+  correcta: 0
+  solucion: |
+    Error real: `error: format argument must be a string literal` (el argumento de formato debe ser un literal de texto). El `help:` propone `println!("{}", Hola);`, por si `Hola` fuera un valor; si querías imprimir la palabra, basta con `println!("Hola");`.
+    - El `;` está bien.
+    - Declarar `Hola` como variable no arreglaría que el primer argumento no es un literal.
+    - Sin comillas, `Hola` no es texto: es un nombre.
+  etiquetas: ["println!", "literales"]
+
+- id: m02-debug-comillas
+  titulo: "Las comillas que aparecen"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la **segunda** línea, `println!(\"{:?}\", \"año\");`?"
+  ej: m02/debug-comillas
+  opciones:
+    - "`año`"
+    - '`"año"`'
+    - '`a\u{f1}o`'
+    - "`[97, 241, 111]`"
+  correcta: 1
+  solucion: |
+    Salida real: `"año"`. `{:?}` (el trait `Debug`) muestra el texto como lo escribirías en el código, con comillas.
+    - `año` sin comillas es lo que imprime `{}` (la primera línea).
+    - `Debug` no escapa la ñ ni las tildes, solo caracteres especiales como saltos de línea o comillas.
+    - `{:?}` no muestra códigos ni bytes.
+  etiquetas: ["Debug", "Display", "formato"]
+
+- id: m02-debug-salto
+  titulo: "El salto que no salta"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime `println!(\"{:?}\", \"a\\nb\");`?"
+  ej: m02/p-debug-salto
+  opciones:
+    - "Dos líneas: `a` y `b`"
+    - '`"a\nb"` en una sola línea, con las comillas y la barra visibles'
+    - "`a b`"
+    - "`ab`"
+  correcta: 1
+  solucion: |
+    Salida real: `"a\nb"`, en una línea. Con `{:?}`, los caracteres especiales se muestran **escapados**, tal como los escribirías en el código: así ves exactamente qué contiene el texto.
+    - Dos líneas es lo que imprimiría `{}`.
+    - El salto no se convierte en espacio.
+    - El salto no desaparece: se muestra como `\n`.
+  etiquetas: ["Debug", "escapes"]
+
+- id: m02-posiciones
+  titulo: "b a b"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué imprime `println!(\"{1} {0} {1}\", \"a\", \"b\");`?"
+  opciones:
+    - "`a b a`"
+    - "`b a b`"
+    - "`1 0 1`"
+    - "No compila: no se puede repetir un argumento"
+  correcta: 1
+  solucion: |
+    Las posiciones empiezan en 0: `{0}` es `"a"` y `{1}` es `"b"`. Resultado comprobado: `b a b`. Un argumento se puede repetir.
+    - `a b a` sale si cuentas desde 1.
+    - Los números dentro de las llaves son posiciones, no texto.
+    - Repetir está permitido; lo prohibido es dejar un argumento sin usar.
+  etiquetas: ["huecos", "posiciones"]
+
+- id: m02-posicion-inexistente
+  titulo: "El hueco 2006"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Querías imprimir `Rust nació en 2006`. ¿Por qué no compila?"
+  ej: m02/p-posicion-inexistente
+  opciones:
+    - "Un número dentro de las llaves es la **posición** de un argumento, y no hay argumento 2006"
+    - "Los años no se pueden imprimir"
+    - "Falta `{:?}`"
+    - "`nació` lleva tilde"
+  correcta: 0
+  solucion: |
+    Error real: `invalid reference to positional argument 2006 (no arguments were given)`, con la nota `positional arguments are zero-based`. Para un texto fijo no hacen falta huecos: `println!("Rust nació en 2006");`.
+    - Cualquier número se puede imprimir como argumento o como texto.
+    - `{:?}` no cambia que `2006` se lea como posición.
+    - Las tildes están permitidas (UTF-8).
+  etiquetas: ["huecos", "posiciones"]
+
+- id: m02-inline-expresion
+  titulo: "Un cálculo dentro del hueco"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `println!(\"El año que viene tendrás {edad + 1}\");`?"
+  ej: m02/inline-expresion
+  opciones:
+    - "Dentro de `{…}` solo puede ir un nombre, no un cálculo; el cálculo va como argumento aparte"
+    - "Porque `edad` no existe"
+    - "Porque no se pueden sumar números dentro de un `println!`"
+    - "Porque falta `mut` en `edad`"
+  correcta: 0
+  solucion: |
+    El mensaje real es confuso: ``invalid format string: the `+` sign flag must appear after `:` in a format string``. El analizador lee `edad`, encuentra `+` y lo toma por la opción de signo mal colocada. La regla real es más simple: en el hueco va un nombre. Arreglo verificado: `println!("El año que viene tendrás {}", edad + 1);` imprime `El año que viene tendrás 31`.
+    - `edad` sí existe: está declarada en la línea anterior.
+    - Sumar en un argumento está permitido; lo que no se permite es dentro de las llaves.
+    - Leer `edad` no la cambia, así que `mut` no hace falta.
+  etiquetas: ["huecos", "inline"]
+
+- id: m02-mezcla-huecos
+  titulo: "Nombre y orden juntos"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: media
+  tipo: predice
+  enunciado: "Con `let x = 1;`, ¿qué imprime `println!(\"{x} {} {}\", 2, 3);`?"
+  ej: m02/p-mezcla-huecos
+  opciones:
+    - "`1 2 3`"
+    - "`2 3 1`"
+    - "`x 2 3`"
+    - "No compila: no se pueden mezclar huecos con nombre y sin nombre"
+  correcta: 0
+  solucion: |
+    Salida real: `1 2 3`. `{x}` usa la variable `x`; los `{}` vacíos toman los argumentos en orden. Un hueco con nombre no «gasta» ningún argumento de la lista.
+    - El orden de los huecos es el de la cadena: `{x}` va primero.
+    - `{x}` se rellena con el valor de `x`, no con la letra.
+    - Mezclar es válido.
+  etiquetas: ["huecos", "inline"]
+
+- id: m02-llaves-literales
+  titulo: "Llaves dentro de llaves"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime `println!(\"{{{}}}\", 5);`?"
+  ej: m02/p-llaves
+  opciones:
+    - "`{5}`"
+    - "`{{5}}`"
+    - "`5`"
+    - "No compila"
+  correcta: 0
+  solucion: |
+    Salida real: `{5}`. Se lee de izquierda a derecha: `{{` es una llave literal, `{}` es el hueco (el 5) y `}}` otra llave literal.
+    - `{{` imprime **una** llave, no dos.
+    - Las llaves duplicadas sí se imprimen, como una sola.
+    - Es una cadena válida.
+  etiquetas: ["formato", "llaves"]
+
+- id: m02-llave-sola
+  titulo: "Una llave suelta"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `println!(\"Abre { y cierra\");`?"
+  ej: m02/p-llave-sola
+  opciones:
+    - "Una `{` abre siempre un hueco; para escribir una llave hay que duplicarla: `{{`"
+    - "Las llaves solo se pueden escribir con `\\{`"
+    - "Falta un argumento después de la cadena"
+    - "`y` es una palabra reservada"
+  correcta: 0
+  solucion: |
+    Error real: ``invalid format string: expected `}`, found `y` ``, con la nota «if you intended to print `{`, you can escape it using `{{`».
+    - En el formato, la barra invertida no escapa llaves; `\{` ni siquiera es un escape válido en un texto de Rust.
+    - Aunque añadieras un argumento, `{ y cierra` no es un hueco bien formado.
+    - `y` no es palabra reservada; el problema es la llave.
+  etiquetas: ["formato", "llaves"]
+
+- id: m02-lista-con-llaves
+  titulo: "Una lista con {}"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `println!(\"{}\", [1, 2, 3]);`?"
+  ej: m02/lista-con-llaves
+  opciones:
+    - "Un array no implementa `Display`; se imprime con `{:?}` (E0277)"
+    - "Los arrays no se pueden imprimir"
+    - "Falta un hueco por cada elemento"
+    - "Hay que escribir `[1; 2; 3]`"
+  correcta: 0
+  solucion: |
+    Error real: ``error[E0277]: `[{integer}; 3]` doesn't implement `std::fmt::Display` ``. La nota final da el arreglo: «you may be able to use `{:?}` (or `{:#?}` for pretty-print) instead». Con `{:?}` imprime `[1, 2, 3]`.
+    - Sí se pueden imprimir, con `Debug`.
+    - Un array entero va en un solo hueco.
+    - `[1, 2, 3]` es la sintaxis correcta; `[x; n]` significa «n copias de x».
+  etiquetas: ["E0277", "Display", "Debug"]
+
+# ───────────── Formato avanzado ─────────────
+
+- id: m02-ancho-por-defecto
+  titulo: "¿Derecha o izquierda?"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprimen `println!(\"[{:5}]\", \"ab\");` y `println!(\"[{:5}]\", 42);`?"
+  ej: m02/p-ancho-texto
+  opciones:
+    - "`[ab   ]` y `[   42]`"
+    - "`[   ab]` y `[   42]`"
+    - "`[ab   ]` y `[42   ]`"
+    - "`[ab]` y `[42]`"
+  correcta: 0
+  solucion: |
+    Salida real: `[ab   ]` y `[   42]`. Sin indicar alineación, los **textos** van a la izquierda y los **números** a la derecha.
+    - Alinear el texto a la derecha hay que pedirlo con `>`.
+    - Alinear el número a la izquierda hay que pedirlo con `<`.
+    - `5` es el ancho mínimo: se rellena con espacios hasta 5 columnas.
+  etiquetas: ["ancho", "alineación"]
+
+- id: m02-centro-impar
+  titulo: "Centrar con sobrante"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime `println!(\"[{:*^6}]\", \"abc\");`?"
+  ej: m02/p-centro-impar
+  opciones:
+    - "`[*abc**]`"
+    - "`[**abc*]`"
+    - "`[***abc]`"
+    - "`[abc***]`"
+  correcta: 0
+  solucion: |
+    Salida real: `[*abc**]`. Sobran 3 columnas; al centrar, la que no se puede repartir va a la **derecha**.
+    - La columna sobrante no va a la izquierda.
+    - `[***abc]` sería `{:*>6}`.
+    - `[abc***]` sería `{:*<6}`.
+  etiquetas: ["ancho", "alineación", "relleno"]
+
+- id: m02-ceros-negativo
+  titulo: "Ceros y signo"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime `println!(\"{:05}\", -42);`?"
+  ej: m02/p-ceros-negativo
+  opciones:
+    - "`-0042`"
+    - "`000-42`"
+    - "`00-42`"
+    - "`-00042`"
+  correcta: 0
+  solucion: |
+    Salida real: `-0042`. El relleno con ceros va **después** del signo, y el ancho 5 incluye el signo: `-` + `0042`.
+    - Los ceros nunca se ponen delante del signo.
+    - Igual: el signo va primero.
+    - El ancho total es 5, no 6.
+  etiquetas: ["ancho", "ceros", "signo"]
+
+- id: m02-precision-tres
+  titulo: "Decimales que no estaban"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime `println!(\"{:.3}\", 2.0);`?"
+  ej: m02/p-precision
+  opciones:
+    - "`2.000`"
+    - "`2`"
+    - "`2.0`"
+    - "`  2`"
+  correcta: 0
+  solucion: |
+    Salida real: `2.000`. La precisión fija exactamente cuántos decimales se muestran, rellenando con ceros si hace falta.
+    - `2` sería con `{:.0}`.
+    - `2.0` es lo que imprime `{}` sin precisión.
+    - `.3` es la precisión, no el ancho.
+  etiquetas: ["precisión", "decimales"]
+
+- id: m02-redondeo
+  titulo: "¿2.5 da 3?"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: media
+  tipo: predice
+  enunciado: "El programa imprime `1.5`, `2.5` y `3.5` con `{:.0}`. ¿Qué tres líneas salen?"
+  ej: m02/redondeo
+  opciones:
+    - "`2`, `3`, `4`"
+    - "`2`, `2`, `4`"
+    - "`1`, `2`, `3`"
+    - "`2`, `3`, `3`"
+  correcta: 1
+  solucion: |
+    Salida real: `2`, `2`, `4` (y después `0.12` para `0.125` con dos decimales). Cuando el valor está **exactamente** en la mitad, el formato redondea hacia la cifra par.
+    - «Siempre hacia arriba» daría 2, 3, 4: no es la regla del formato.
+    - Truncar (quitar decimales) daría 1, 2, 3.
+    - La cuarta opción no sigue ninguna regla coherente.
+  etiquetas: ["precisión", "redondeo"]
+
+- id: m02-truncar-texto
+  titulo: "Precisión en un texto"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime `println!(\"{:.3}\", \"Rustáceo\");`?"
+  ej: m02/p-truncar-texto
+  opciones:
+    - "`Rus`"
+    - "`Rustáceo`"
+    - "`Rus...`"
+    - "No compila: la precisión es solo para números con decimales"
+  correcta: 0
+  solucion: |
+    Salida real: `Rus`. En un texto, la precisión es el **máximo de caracteres**: corta el resto.
+    - Sin precisión saldría entero.
+    - Rust no añade puntos suspensivos.
+    - La precisión también vale para textos.
+  etiquetas: ["precisión", "texto"]
+
+- id: m02-binario
+  titulo: "Diez en binario"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime `println!(\"{:08b}\", 10);`?"
+  ej: m02/p-binario
+  opciones:
+    - "`00001010`"
+    - "`1010`"
+    - "`00000010`"
+    - "`0b1010`"
+  correcta: 0
+  solucion: |
+    Salida real: `00001010`. `b` pide binario (10 = 8 + 2 = `1010`), `08` rellena con ceros hasta 8 cifras.
+    - `1010` sería `{:b}`, sin ancho.
+    - `10` en decimal no es `10` en binario.
+    - El prefijo `0b` solo aparece con `#`: `{:#b}`.
+  etiquetas: ["bases", "binario"]
+
+- id: m02-hex
+  titulo: "255 en hexadecimal"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime `println!(\"{:x} {:X} {:#x}\", 255, 255, 255);`?"
+  ej: m02/p-hex
+  opciones:
+    - "`ff FF 0xff`"
+    - "`FF ff 0xFF`"
+    - "`ff ff ff`"
+    - "`255 255 255`"
+  correcta: 0
+  solucion: |
+    Salida real: `ff FF 0xff`. `x` es hexadecimal en minúsculas, `X` en mayúsculas, y `#` añade el prefijo `0x`.
+    - Las mayúsculas las pide `X`, no `x`.
+    - `X` y `#` cambian la salida.
+    - Con `x` el número sale en base 16, no en decimal.
+  etiquetas: ["bases", "hexadecimal"]
+
+- id: m02-debug-bonito
+  titulo: "Debug en varias líneas"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Cuántas líneas imprime `println!(\"{:#?}\", [1, 2]);`?"
+  ej: m02/p-debug-bonito-lista
+  opciones:
+    - "4: `[`, `    1,`, `    2,` y `]`"
+    - "1: `[1, 2]`"
+    - "2: `1` y `2`"
+    - "3: `[`, `1, 2` y `]`"
+  correcta: 0
+  solucion: |
+    Salida real: cuatro líneas, `[`, `    1,`, `    2,` y `]`. `{:#?}` es el modo «bonito» de `Debug`: un elemento por línea, con sangría y coma final.
+    - `[1, 2]` en una línea es `{:?}` sin `#`.
+    - Los corchetes no desaparecen.
+    - Cada elemento va en su propia línea.
+  etiquetas: ["Debug", "formato"]
+
+- id: m02-print-sin-salto
+  titulo: "print! frente a println!"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m02/p-print-sin-salto
+  opciones:
+    - "`abc` y, en la línea siguiente, `d`"
+    - "`a`, `b`, `c` y `d`, cada una en su línea"
+    - "`abcd` en una línea"
+    - "`ab` y luego `cd`"
+  correcta: 0
+  solucion: |
+    Salida real: `abc` y después `d`. `print!` no añade salto de línea; `println!("c")` termina la línea, y `println!("d")` empieza otra.
+    - Solo `println!` salta de línea al final.
+    - El salto tras `c` existe porque ese es un `println!`.
+    - El salto llega tras la `c`, no tras la `b`.
+  etiquetas: ["print!", "println!"]
+
+- id: m02-escape-barra
+  titulo: "La ruta de Windows"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `println!(\"Guárdalo en C:\\dev\\hola\");`?"
+  ej: m02/barra-invertida
+  opciones:
+    - "La barra invertida empieza un escape, y `\\d` no es un escape válido"
+    - "Los textos no pueden contener dos puntos"
+    - "`Guárdalo` lleva tilde"
+    - "Falta un hueco `{}`"
+  correcta: 0
+  solucion: |
+    Error real: ``error: unknown character escape: `d` `` (y otro igual para la `h`). El arreglo verificado es duplicar cada barra, `"C:\\dev\\hola"`, que imprime `Guárdalo en C:\dev\hola`. El `help:` propone otra salida: el literal crudo `r"C:\dev\hola"`.
+    - Los dos puntos son un carácter normal.
+    - Las tildes están permitidas.
+    - Un texto sin huecos es válido.
+  etiquetas: ["escapes", "literales"]
+
+- id: m02-tabulador
+  titulo: "¿Cuántos caracteres?"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: media
+  tipo: opcion
+  enunciado: 'El texto `"a\tb"` de tu código, ¿cuántos caracteres tiene una vez compilado?'
+  opciones:
+    - '4: `a`, `\`, `t`, `b`'
+    - "3: `a`, un tabulador y `b`"
+    - "2: `a` y `b`"
+    - "Depende de la terminal"
+  correcta: 1
+  solucion: |
+    `\t` es una secuencia de escape que representa **un** carácter, el tabulador (byte 9). La traducción ocurre al leer el código fuente.
+    - La barra y la `t` juntas forman un solo carácter.
+    - El tabulador es un carácter más, aunque no se vea.
+    - La terminal decide cómo de ancho se **dibuja**, no cuántos caracteres hay.
+  etiquetas: ["escapes"]
+
+- id: m02-stderr
+  titulo: "Dos salidas"
+  mundo: 02-tu-primer-programa
+  tema: formato
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Ejecutas `cargo run > salida.txt` con este programa. ¿Qué acaba en `salida.txt`?"
+  ej: m02/stderr
+  opciones:
+    - "Solo `Resultado: 42`"
+    - "Solo `Aviso: esto va por stderr`"
+    - "Las dos líneas"
+    - "Nada: `>` no funciona con Cargo"
+  correcta: 0
+  solucion: |
+    `println!` escribe en la salida estándar (stdout) y `eprintln!` en la de errores (stderr). `>` solo redirige stdout, así que el aviso sigue apareciendo en pantalla.
+    - El aviso es justo lo que **no** va al archivo.
+    - Son dos canales separados; `>` solo captura uno.
+    - La redirección la hace la terminal, funciona con cualquier programa.
+  etiquetas: ["eprintln!", "stderr"]
+
+# ───────────── Comentarios ─────────────
+
+- id: m02-comentarios
+  titulo: "Lo que se ve y lo que no"
+  mundo: 02-tu-primer-programa
+  tema: comentarios
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Cuántas líneas imprime este programa?"
+  ej: m02/comentarios
+  opciones:
+    - "3: `Uno`, `Tres` y `Cuatro /* esto no es un comentario */`"
+    - "4: `Uno`, `Dos`, `Tres` y `Cuatro`"
+    - "3: `Uno`, `Tres` y `Cuatro`"
+    - "2: `Uno` y `Tres`"
+  correcta: 0
+  solucion: |
+    Salida real: `Uno`, `Tres` y `Cuatro /* esto no es un comentario */`. La línea de `Dos` está detrás de `//`, así que no existe para el compilador; y `/* … */` dentro de unas comillas es texto.
+    - El `println!("Dos")` está comentado.
+    - Dentro de un texto no hay comentarios.
+    - La última línea sí se ejecuta.
+  etiquetas: ["comentarios"]
+
+- id: m02-comentario-en-texto
+  titulo: "Barras dentro de comillas"
+  mundo: 02-tu-primer-programa
+  tema: comentarios
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime este programa?"
+  ej: m02/p-comentario-en-texto
+  opciones:
+    - "`// esto se imprime`"
+    - "Nada: las dos líneas son comentarios"
+    - "`// esto se imprime` y `esto no`"
+    - "`esto no`"
+  correcta: 0
+  solucion: |
+    Salida real: `// esto se imprime`. El primer `//` está dentro de un texto entre comillas, así que es texto. El segundo empieza fuera, así que comenta la línea entera.
+    - Solo la segunda línea es un comentario.
+    - El `println!("esto no")` está comentado.
+    - Justo al revés.
+  etiquetas: ["comentarios"]
+
+- id: m02-bloques-anidados
+  titulo: "Comentarios dentro de comentarios"
+  mundo: 02-tu-primer-programa
+  tema: comentarios
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Compila un programa con la línea `/* fuera /* dentro */ todavía fuera */`?"
+  ej: m02/bloques-anidados
+  opciones:
+    - "Sí: en Rust los comentarios de bloque se anidan"
+    - "No: el primer `*/` cierra el comentario y `todavía fuera */` es código inválido"
+    - "Solo con la edición 2015"
+    - "Solo si va fuera de `main`"
+  correcta: 0
+  solucion: |
+    Compila y el programa imprime `Los comentarios de bloque se anidan`. Rust cuenta los `/*` abiertos: el comentario acaba con el último `*/`.
+    - Esa sería la regla si no se anidaran.
+    - El anidamiento no depende de la edición.
+    - Los comentarios pueden ir en cualquier parte.
+  etiquetas: ["comentarios"]
+
+- id: m02-doc-suelto
+  titulo: "Documentación de nada"
+  mundo: 02-tu-primer-programa
+  tema: comentarios
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Un `///` al final de `main`. ¿Por qué es un error y no un simple comentario ignorado?"
+  ej: m02/doc-suelto
+  opciones:
+    - "Porque `///` es documentación del elemento de debajo, y aquí debajo no hay nada (E0585)"
+    - "Porque los comentarios no pueden ir dentro de `main`"
+    - "Porque `///` solo se permite en la primera línea del archivo"
+    - "Porque falta un `;` después del comentario"
+  correcta: 0
+  solucion: |
+    Error real: `error[E0585]: found a documentation comment that doesn't document anything`, con el `help:` «doc comments must come before what they document, if a comment was intended use `//`». Un `///` se convierte en un atributo `#[doc = "…"]`, y un atributo tiene que estar pegado a algo.
+    - Los comentarios `//` pueden ir en cualquier parte, también dentro de `main`.
+    - En la primera línea iría `//!`, que documenta lo que lo contiene.
+    - Los comentarios no llevan `;`.
+  etiquetas: ["E0585", "documentación"]
+
+- id: m02-doc-tipos
+  titulo: "Tres barras o barra-exclamación"
+  mundo: 02-tu-primer-programa
+  tema: comentarios
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Al principio de `main.rs` quieres describir el programa entero. ¿Qué usas?"
+  opciones:
+    - "`//!`"
+    - "`///`"
+    - "`/* */`"
+    - "`#`"
+  correcta: 0
+  solucion: |
+    `//!` documenta el elemento que **contiene** el comentario: al principio del archivo, el crate entero. `cargo doc` lo muestra en la portada.
+    - `///` documenta lo que viene **debajo** (por ejemplo, una función).
+    - `/* */` es un comentario normal que se descarta.
+    - `#` no es un comentario en Rust (empieza un atributo como `#[allow(…)]`).
+  etiquetas: ["documentación", "cargo doc"]
+
+# ───────────── rustc por dentro ─────────────
+
+- id: m02-orden-errores
+  titulo: "¿Qué error sale primero?"
+  mundo: 02-tu-primer-programa
+  tema: rustc
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Este programa tiene dos errores de tipos (líneas 2 y 3) y un nombre que no existe (línea 4). ¿Cuál informa primero rustc?"
+  ej: m02/muchos-errores
+  opciones:
+    - "E0425 de la línea 4: la resolución de nombres va antes que la comprobación de tipos"
+    - "E0308 de la línea 2, porque es la primera del archivo"
+    - "Solo uno: rustc se para en el primer error"
+    - "Los tres juntos en una sola línea"
+  correcta: 0
+  solucion: |
+    Salida real: primero ``error[E0425]: cannot find value `z` in this scope`` (línea 4) y después los dos `error[E0308]: mismatched types` (líneas 2 y 3); al final, `aborting due to 3 previous errors`. Los errores salen en el orden de las **fases**, no del archivo.
+    - El orden del archivo no manda.
+    - rustc sigue para darte todos los errores que puede.
+    - Cada error tiene su propio bloque.
+  etiquetas: ["E0425", "E0308", "rustc", "fases"]
+
+- id: m02-check-sin-linker
+  titulo: "check pasa, build no"
+  mundo: 02-tu-primer-programa
+  tema: rustc
+  dificultad: facil
+  tipo: opcion
+  enunciado: "`cargo check` termina bien pero `cargo build` falla con «linker `link.exe` not found». ¿Dónde está el problema?"
+  opciones:
+    - "En la instalación: falta el enlazador, que `cargo check` nunca usa"
+    - "En tu código: hay un error que `cargo check` no ve"
+    - "En el borrow checker"
+    - "En la edición de `Cargo.toml`"
+  correcta: 0
+  solucion: |
+    `cargo check` recorre las comprobaciones (tipos, borrow checker) y se detiene sin generar código ni enlazar. Si pasa, tu código es válido; lo que falta es la herramienta del último paso.
+    - `cargo check` comprueba todo el lenguaje.
+    - El borrow checker también corre en `cargo check`.
+    - La edición no tiene nada que ver con el enlazador.
+  etiquetas: ["cargo check", "enlazador", "link.exe"]
+
+- id: m02-overflow-mir
+  titulo: "El assert escondido"
+  mundo: 02-tu-primer-programa
+  tema: rustc
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En el MIR de `println!(\"{}\", 2 + 3)` compilado en modo depuración aparece `AddWithOverflow` seguido de un `assert`. Con `-O` aparece un simple `Add`. ¿Por qué?"
+  ej: m02/minimo
+  opciones:
+    - "En depuración, cada suma comprueba si se sale de rango y detiene el programa si pasa; optimizado, esa comprobación se quita"
+    - "Con `-O` el compilador no sabe sumar con comprobación"
+    - "`AddWithOverflow` es más rápido que `Add`"
+    - "Es un fallo del compilador"
+  correcta: 0
+  solucion: |
+    El MIR real en depuración: `_5 = AddWithOverflow(const 2_i32, const 3_i32);` y después un `assert` sobre `_5.1` (el indicador de desbordamiento) con el mensaje «attempt to compute … which would overflow». Con `-O` (como `cargo build --release`) la suma es `Add(const 2_i32, const 3_i32)`. Lo estudiarás en el mundo 3: desbordar es un pánico en depuración y da la vuelta en release.
+    - Es una decisión de perfil, no una limitación.
+    - Comprobar cuesta algo, así que la versión con comprobación es la más lenta.
+    - Es un comportamiento documentado y deliberado.
+  etiquetas: ["MIR", "overflow", "debug", "release"]
+
+# ───────────── Errores y avisos ─────────────
+
+- id: m02-donde-arreglar-e0384
+  titulo: "El síntoma y la causa"
+  mundo: 02-tu-primer-programa
+  tema: errores
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "El error marca `puntos = 20;` (línea 4). ¿Qué cambio propone el compilador, y en qué línea?"
+  ej: m02/asignar-inmutable
+  opciones:
+    - "Escribir `let mut puntos = 10;` en la línea 2"
+    - "Borrar la línea 4"
+    - "Quitar el `println!` de la línea 3"
+    - "Añadir un `;` en la línea 5"
+  correcta: 0
+  solucion: |
+    Error real: ``error[E0384]: cannot assign twice to immutable variable `puntos` ``. Marca la línea 2 con `first assignment to puntos` y el `help:` «consider making this binding mutable» muestra `let mut puntos = 10;`. El arreglo verificado imprime `Empiezas con 10 puntos` y `Ahora tienes 20 puntos`.
+    - Borrar la línea compila, pero cambia lo que querías hacer.
+    - Leer una variable inmutable está permitido.
+    - No falta ningún `;`.
+  etiquetas: ["E0384", "mut"]
+
+- id: m02-tipo-equivocado
+  titulo: "Esperado y encontrado"
+  mundo: 02-tu-primer-programa
+  tema: errores
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué significa el error de `let edad: i32 = \"treinta\";`?"
+  ej: m02/tipo-equivocado
+  opciones:
+    - "Se esperaba un número `i32` y se encontró un texto `&str` (E0308)"
+    - "Se esperaba un texto y se encontró un número"
+    - "`edad` no existe"
+    - "Falta `mut`"
+  correcta: 0
+  solucion: |
+    Error real: `error[E0308]: mismatched types`, con ``expected `i32`, found `&str` `` bajo el valor y `expected due to this` bajo `i32`. «Expected» es lo que debía haber; «found», lo que hay.
+    - Es al revés.
+    - La variable se está declarando justo ahí.
+    - `mut` no cambia el tipo de nada.
+  etiquetas: ["E0308", "tipos"]
+
+- id: m02-nombre-desconocido
+  titulo: "Una letra de menos"
+  mundo: 02-tu-primer-programa
+  tema: errores
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da este programa?"
+  ej: m02/nombre-desconocido
+  opciones:
+    - "E0425: `nombe` no existe; el `help:` sugiere `nombre`"
+    - "E0308: tipos que no coinciden"
+    - "E0384: no se puede asignar dos veces"
+    - "Ninguno: imprime `Hola, `"
+  correcta: 0
+  solucion: |
+    Error real: ``error[E0425]: cannot find value `nombe` in this scope`` y `help: a local variable with a similar name exists`, que marca con `+` la `r` que falta.
+    - No hay ningún tipo que no encaje.
+    - No se asigna nada dos veces.
+    - Un nombre inexistente es un error de compilación; no se imprime nada.
+  etiquetas: ["E0425", "nombres"]
+
+- id: m02-explain
+  titulo: "El diccionario del compilador"
+  mundo: 02-tu-primer-programa
+  tema: errores
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Qué comando muestra la explicación larga del error E0308?"
+  respuestas: ["rustc --explain E0308", "rustc --explain e0308"]
+  solucion: |
+    `rustc --explain E0308`. Empieza con «Expected type did not match the received type.» y sigue con ejemplos. Funciona sin conexión: la ficha está dentro del compilador.
+  etiquetas: ["rustc --explain", "E0308"]
+
+- id: m02-avisos-ejecuta
+  titulo: "Con avisos también corre"
+  mundo: 02-tu-primer-programa
+  tema: avisos
+  dificultad: facil
+  tipo: predice
+  enunciado: "Este programa tiene una variable sin usar y una función que nadie llama. ¿Qué pasa?"
+  ej: m02/avisos
+  opciones:
+    - "Compila con dos avisos y se ejecuta: imprime `El programa funciona igual`"
+    - "No compila: hay código que sobra"
+    - "Imprime también `Nadie me llama`"
+    - "Compila pero entra en pánico"
+  correcta: 0
+  solucion: |
+    Los avisos reales son ``warning: unused variable: `total` `` y ``warning: function `sin_usar` is never used``. Un aviso no impide compilar, y la salida real es `El programa funciona igual`.
+    - Código que sobra es sospechoso, no incorrecto.
+    - `sin_usar` no se ejecuta porque nadie la llama.
+    - Los avisos no cambian nada en ejecución.
+  etiquetas: ["avisos", "dead_code", "unused_variables"]
+
+- id: m02-mut-sin-cambio
+  titulo: "mut que sobra"
+  mundo: 02-tu-primer-programa
+  tema: avisos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "`let mut x = 5;` y luego solo `println!(\"{x}\");`. ¿Qué dice el compilador?"
+  ej: m02/p-mut-sin-cambio
+  opciones:
+    - "Un aviso: `variable does not need to be mutable`, y el programa imprime `5`"
+    - "Un error: no se puede imprimir una variable `mut`"
+    - "Nada"
+    - "Un error E0384"
+  correcta: 0
+  solucion: |
+    Aviso real: `warning: variable does not need to be mutable`, con `help: remove this mut`, del lint `unused_mut`. El programa imprime `5`.
+    - Imprimir una variable `mut` es normal.
+    - El compilador sí avisa: `mut` sin ninguna asignación es sospechoso.
+    - E0384 es lo contrario: asignar a una variable **sin** `mut`.
+  etiquetas: ["avisos", "unused_mut"]
+
+- id: m02-guion-bajo
+  titulo: "A propósito"
+  mundo: 02-tu-primer-programa
+  tema: avisos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál es la forma más limpia de evitar el aviso de una variable `total` que aún no usas?"
+  opciones:
+    - "Llamarla `_total`"
+    - "`#![allow(warnings)]` al principio del archivo"
+    - "Añadirle `mut`"
+    - "Imprimirla y borrar el `println!` más tarde"
+  correcta: 0
+  solucion: |
+    El propio aviso lo dice: «if this is intentional, prefix it with an underscore: `_total`». Afecta solo a esa variable.
+    - `#![allow(warnings)]` calla **todos** los avisos, también los útiles.
+    - `mut` no tiene que ver con usar la variable, y añadiría otro aviso (`unused_mut`).
+    - Funciona, pero ensucia la salida.
+  etiquetas: ["avisos", "unused_variables"]
+
+- id: m02-deny
+  titulo: "El aviso que se volvió error"
+  mundo: 02-tu-primer-programa
+  tema: avisos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa, si una variable sin usar es solo un aviso?"
+  ej: m02/avisos-como-errores
+  opciones:
+    - "`#![deny(unused_variables)]` sube ese lint al nivel de error para todo el crate"
+    - "Porque `total` es un nombre reservado"
+    - "Porque `#!` solo se permite en la edición 2015"
+    - "Porque falta un hueco para `total`"
+  correcta: 0
+  solucion: |
+    Error real: ``error: unused variable: `total` ``, con la nota «the lint level is defined here» apuntando a `#![deny(unused_variables)]`. El arreglo verificado usa `total` en el `println!` e imprime `Total: 42`.
+    - `total` es un nombre normal.
+    - Los atributos interiores `#![…]` existen en todas las ediciones.
+    - No falta ningún hueco: la cadena `"¿Compilará?"` no tiene ninguno y es válida.
+  etiquetas: ["avisos", "deny", "lints"]
+
+- id: m02-funcion-sin-llamar
+  titulo: "Código muerto"
+  mundo: 02-tu-primer-programa
+  tema: avisos
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "Una función que nadie llama produce un aviso. ¿Cómo se llama ese lint?"
+  ej: m02/p-funcion-sin-llamar
+  respuestas: ["dead_code"]
+  solucion: |
+    `dead_code` (código muerto). El aviso real es ``warning: function `saludar` is never used`` con la nota «`#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default». El programa imprime `Adiós` igualmente.
+  etiquetas: ["avisos", "dead_code"]
+
+# ───────────── Ediciones e historia ─────────────
+
+- id: m02-gen-reservada
+  titulo: "gen en 2024"
+  mundo: 02-tu-primer-programa
+  tema: ediciones
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Este programa compila en la edición 2021. ¿Por qué falla en la 2024?"
+  ej: m02/gen-reservada
+  opciones:
+    - "La edición 2024 reservó `gen` como palabra clave; como nombre se escribe `r#gen`"
+    - "La edición 2024 prohíbe las variables de tres letras"
+    - "`gen` es una macro y le falta el `!`"
+    - "La edición 2024 no admite `println!` con huecos con nombre"
+  correcta: 0
+  solucion: |
+    Primer error real: ``expected identifier, found reserved keyword `gen` ``, con el `help:` «escape `gen` to use it as an identifier» (`r#gen`). El segundo error, E0425, es consecuencia del primero. Comprobado con `--emit=metadata`: compila con `--edition 2015`, `2018` y `2021`, y falla con `2024`.
+    - Los nombres cortos están permitidos.
+    - `gen` no es una macro.
+    - Los huecos con nombre funcionan en 2024; el arreglo con `r#gen` imprime `Generación 7`.
+  etiquetas: ["ediciones", "2024", "r#"]
+
+- id: m02-edicion-por-defecto
+  titulo: "rustc a secas"
+  mundo: 02-tu-primer-programa
+  tema: ediciones
+  dificultad: media
+  tipo: opcion
+  enunciado: "Ejecutas `rustc programa.rs` sin `--edition`. ¿Qué edición usa?"
+  opciones:
+    - "2015"
+    - "2024"
+    - "La de `Cargo.toml`"
+    - "Ninguna: es obligatorio indicarla"
+  correcta: 0
+  solucion: |
+    Sin `--edition`, `rustc` usa la 2015 por compatibilidad. Comprobado: `let async = 1;` compila sin `--edition` y falla con `--edition 2018`. Cargo, en cambio, siempre le pasa la edición de tu `Cargo.toml`, y `cargo new` escribe `edition = "2024"`.
+    - La 2024 la pone Cargo, no `rustc`.
+    - `rustc` solo no lee `Cargo.toml`.
+    - Funciona sin indicarla.
+  etiquetas: ["ediciones", "rustc"]
+
+- id: m02-version-vs-edicion
+  titulo: "1.99.1 y 2024"
+  mundo: 02-tu-primer-programa
+  tema: ediciones
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué relación hay entre la versión `rustc 1.99.1` y la edición 2024?"
+  opciones:
+    - "Ninguna fija: la versión es el compilador instalado; la edición, un modo de idioma que elige cada proyecto"
+    - "Son lo mismo con dos nombres"
+    - "La edición 2024 solo funciona con compiladores de 2024"
+    - "Cada versión nueva es una edición nueva"
+  correcta: 0
+  solucion: |
+    Un compilador nuevo entiende todas las ediciones anteriores. Las versiones salen cada pocas semanas; las ediciones, de vez en cuando (2015, 2018, 2021, 2024).
+    - Son dos números distintos: `rustc --version` y `edition` en `Cargo.toml`.
+    - 1.99.1 es de octubre de 2026 y entiende la 2024 sin problema.
+    - Hay decenas de versiones y solo cuatro ediciones.
+  etiquetas: ["ediciones", "versiones"]
+
+- id: m02-cargo-fix
+  titulo: "Migrar de edición"
+  mundo: 02-tu-primer-programa
+  tema: ediciones
+  dificultad: media
+  tipo: opcion
+  enunciado: "Ejecutas `cargo fix --edition` en un proyecto 2021 con `let gen = 7;`. Según la prueba real, ¿qué ocurre?"
+  opciones:
+    - "Reescribe la línea como `let r#gen = 7;`, pero `Cargo.toml` sigue diciendo `edition = \"2021\"`: el cambio de número lo haces tú"
+    - "Cambia `Cargo.toml` a 2024 y no toca el código"
+    - "Borra la variable `gen`"
+    - "Instala la edición 2024"
+  correcta: 0
+  solucion: |
+    Salida real: `Migrating src\main.rs from 2021 edition to 2024` y `Fixed src\main.rs (1 fix)`; el archivo pasó a `let r#gen = 7;`. Después del comando, `Cargo.toml` seguía en `edition = "2021"`.
+    - Hace justo lo contrario: arregla el código y deja el número.
+    - No borra nada: transforma el código conservando lo que hace.
+    - Las ediciones no se instalan: vienen todas en el compilador.
+  etiquetas: ["ediciones", "cargo fix"]
+
+- id: m02-historia-anio
+  titulo: "El año del ascensor"
+  mundo: 02-tu-primer-programa
+  tema: historia
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿En qué año empezó Graydon Hoare a diseñar Rust, tras la enésima avería del ascensor de su edificio?"
+  respuestas: ["2006"]
+  solucion: |
+    En **2006**, en Vancouver, cuando trabajaba en Mozilla. Vivía en un piso 21 y el ascensor volvió a fallar por un error de software. Mozilla patrocinó el proyecto desde 2009.
+  etiquetas: ["historia"]
+
+- id: m02-historia-1-0
+  titulo: "Rust 1.0"
+  mundo: 02-tu-primer-programa
+  tema: historia
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuándo salió Rust 1.0?"
+  opciones:
+    - "El 15 de mayo de 2015"
+    - "En 2006"
+    - "En 2009"
+    - "El 20 de febrero de 2025"
+  correcta: 0
+  solucion: |
+    Rust 1.0 salió el **15 de mayo de 2015**, tras unos seis años de desarrollo patrocinado por Mozilla.
+    - 2006 es cuando Hoare empezó a diseñarlo.
+    - 2009 es cuando Mozilla empezó a patrocinarlo.
+    - 20 de febrero de 2025 es Rust 1.85, con la edición 2024.
+  etiquetas: ["historia", "versiones"]
+

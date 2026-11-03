@@ -1,0 +1,1 @@
+{ "debe_fallar": true, "nota": "Error capturado con el perfil debug (overflow-checks activadas). En release este archivo compila y la constante da la vuelta." }

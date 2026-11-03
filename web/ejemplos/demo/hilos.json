@@ -1,0 +1,1 @@
+{ "plataforma": "playground", "nota": "Los hilos no existen en el navegador (wasm32-wasip1)." }

@@ -1,0 +1,64 @@
+---
+title: "Diseñar con tipos"
+description: "Usa todo lo anterior para diseñar: haz que los estados inválidos no se puedan escribir. Newtypes, enums en vez de banderas, el patrón typestate y «parse, don't validate»."
+sidebar:
+  order: 12
+duracion: 13
+requiere: ["24-teoria-y-diseno/11-como-evoluciona"]
+tarjetas:
+  - p: "¿Qué significa «haz que los estados inválidos no se puedan representar»?"
+    r: "Diseñar los tipos para que sus valores sean exactamente los estados válidos: así el compilador impide los demás y no hacen falta comprobaciones al ejecutar."
+  - p: "¿Qué es el patrón typestate?"
+    r: "Codificar el estado de un objeto en su tipo (`Puerta<Abierta>`, `Puerta<Cerrada>`) para que solo existan las operaciones válidas en cada estado. Las transiciones consumen el valor y devuelven otro tipo."
+  - p: "¿Qué significa «parse, don't validate»?"
+    r: "En vez de comprobar un dato y seguir usando el tipo original, conviértelo una vez en un tipo que garantice la propiedad (por ejemplo `NoVacio<T>` en vez de `Vec<T>` + comprobación)."
+  - p: "¿Cuánto cuesta en memoria el estado en el patrón typestate con `PhantomData`?"
+    r: "Nada: `PhantomData<Estado>` y los structs de estado sin campos tienen tamaño cero."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo } from '~/components';
+
+Esta lección junta la teoría del mundo y la convierte en una herramienta de trabajo diario. La pregunta es siempre la misma: **¿cuántos valores tiene mi tipo, y cuántos de ellos tienen sentido?**
+
+## La idea
+
+> **Haz que los estados inválidos no se puedan representar.**
+
+Si un valor inválido no se puede **escribir**, no hace falta comprobarlo al ejecutar, ni documentar «no hagas esto», ni escribir tests para ello. Las técnicas, de menos a más:
+
+1. **Newtypes** (mundo 09): `struct Metros(f64);` y `struct Pies(f64);` no se pueden mezclar.
+2. **Enums en vez de combinaciones de campos**: en vez de `conectado: bool` y `error: Option<String>` (que permite «conectado con error»), un `enum Estado { Conectado, Desconectado, Fallo(String) }`. Es pasar de un producto a una suma (lección 2).
+3. **Constructores que validan una vez** («*parse, don't validate*»): un tipo con campos privados (mundo 12) cuyo único constructor comprueba la propiedad. A partir de ahí, el tipo **es** la prueba.
+4. **Typestate**: el estado forma parte del tipo, y cada estado tiene solo sus operaciones.
+
+## Pruébalo
+
+<Ejecutar ej="m24/typestate" />
+
+`abrir` **consume** la puerta cerrada (es afín: lección 6) y devuelve una abierta. No existe ningún camino para pasar por una puerta cerrada:
+
+<NoCompila ej="m24/typestate-mal" explicacion="`pasar` solo está definido para `Puerta<Abierta>`. Para `Puerta<Cerrada>`, el método no existe: E0599. El error de lógica («pasar por una puerta cerrada») se ha convertido en un error de compilación." />
+
+Y el estado no cuesta nada: la puerta ocupa lo mismo que su `String`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué funciona tan bien en Rust.** El patrón typestate necesita dos cosas: que el estado viejo **deje de existir** al hacer la transición (si no, podrías seguir usando la puerta cerrada después de abrirla) y que los marcadores de estado **no cuesten nada**. Lo primero lo da el ownership afín (mover consume); lo segundo, los tipos de tamaño cero. En lenguajes sin una de las dos, el patrón es mucho más débil.
+
+**Ejemplos reales.** Los *builders* que solo dejan llamar a `build()` cuando se han dado los campos obligatorios; los controladores de periféricos de embebido (mundo 23), donde un pin configurado como entrada no tiene método `set_high`; y los protocolos de red, donde un socket sin conectar no tiene `send`.
+
+**El límite.** No todo merece un tipo. Si un estado cambia con datos que llegan al ejecutar (lo que escribe el usuario), el typestate obliga a un `match` para «subir» el dato al tipo correcto. La pregunta práctica es: ¿cuánto cuesta un error aquí, y cuántas veces se repetirá la comprobación?
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Un struct tiene `cargando: bool`, `datos: Option<Vec<u8>>` y `error: Option<String>`. ¿Cuántas combinaciones de «formas» (ignorando el contenido) tiene, y cuántas tienen sentido?"
+  opciones={["8 y 3", "3 y 3", "4 y 2", "6 y 3"]}
+  correcta={0}
+  explicacion="2 × 2 × 2 = 8 combinaciones, pero solo tienen sentido «cargando», «con datos» y «con error». Un `enum Estado { Cargando, Listo(Vec<u8>), Fallo(String) }` tiene exactamente 3."
+  porque={["", "El struct tiene más combinaciones que el enum: ese es el problema.", "Cuenta las tres «dimensiones»: 2 × 2 × 2.", "Es un producto de tres factores de 2."]}
+/>

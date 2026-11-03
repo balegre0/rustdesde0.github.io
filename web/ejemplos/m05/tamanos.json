@@ -1,0 +1,1 @@
+{ "nota": "En el navegador (wasm32) un usize mide 4 bytes. En un PC de 64 bits mide 8." }

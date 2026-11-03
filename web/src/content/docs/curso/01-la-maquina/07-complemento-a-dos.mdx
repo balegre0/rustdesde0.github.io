@@ -1,0 +1,140 @@
+---
+title: "Complemento a dos"
+description: "Descubre cómo guarda la máquina los números negativos, por qué un i8 va de −128 a 127 y cómo se cambia de signo con bits."
+sidebar:
+  order: 7
+duracion: 12
+desde: "1.0"
+requiere: ["01-la-maquina/06-enteros-sin-signo"]
+tarjetas:
+  - p: "En complemento a dos con 8 bits, ¿cuánto vale el bit de la izquierda?"
+    r: "−128. Los otros siete valen lo mismo que siempre (64, 32, … 1)."
+  - p: "¿Cómo se calcula −x en complemento a dos?"
+    r: "Se invierten todos los bits de x y se suma 1. En Rust: `!x + 1`."
+  - p: "¿Cuál es el rango de un `i8`? ¿Por qué no es simétrico?"
+    r: "De −128 a 127. El 0 ocupa una de las combinaciones «positivas», así que queda un negativo más que positivos."
+  - p: "¿Cómo son los bits de −1 en un `i8`?"
+    r: "`11111111`: todos a 1."
+  - p: "¿Qué devuelve `i8::MIN.checked_neg()`?"
+    r: "`None`: el opuesto de −128 sería 128, que no cabe en un `i8`."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa, Bits } from '~/components';
+
+Vas a ver el truco con el que la máquina guarda números negativos sin necesitar un símbolo «menos».
+
+## Predice
+
+Un `i8` es un entero **con signo** (*signed*) de 8 bits. ¿Qué bits imprime `{:08b}` para el −1?
+
+<Predice
+  ej="m01/menos-uno-predice"
+  opciones={["`11111111`", "`10000001`", "`-0000001`", "`00000001`"]}
+  correcta={0}
+  explicacion="En complemento a dos, −1 son **todos los bits a 1**. Así, si le sumas 1, todos los bits se ponen a 0 (con el último acarreo perdido) y da 0, como debe ser."
+  porque={["Correcto.", "Eso sería «un bit de signo y el 1», un sistema que la máquina no usa: tendría dos ceros (+0 y −0) y sumar sería más complicado.", "En los bits no hay sitio para un signo «−»: solo ceros y unos.", "Ese es el +1. El −1 tiene que ser distinto."]}
+/>
+
+## La idea
+
+En un entero sin signo, el bit de la izquierda vale 128. El **complemento a dos** (*two's complement*) cambia una sola cosa: ese bit vale **−128**. Los demás siguen igual.
+
+| −128 | 64 | 32 | 16 | 8 | 4 | 2 | 1 |
+|---|---|---|---|---|---|---|---|
+
+Con eso se leen todos los `i8`. `01111111` = 127 (el máximo). `10000000` = −128 (el mínimo). `11111111` = −128 + 127 = **−1**. Si el bit de la izquierda está encendido, el número es negativo; por eso se le llama **bit de signo** (*sign bit*).
+
+Para cambiar de signo hay una receta: **invierte todos los bits y suma 1**. En Rust, el operador `!` invierte los bits de un entero. Así que −x es `!x + 1`.
+
+El rango es asimétrico: de **−128 a 127**. Hay 256 combinaciones; la mitad empieza por 1 (los 128 negativos) y la otra mitad por 0 (el 0 y 127 positivos). Los tipos con signo de Rust son `i8`, `i16`, `i32`, `i64`, `i128` e `isize`.
+
+<Bits objetivo={251} />
+
+Forma los bits del −5 como `i8`. Leídos como `u8` valen 251. Pista: 5 es `00000101`; inviértelo y suma 1.
+
+## Pruébalo
+
+<Ejecutar ej="m01/complemento-a-dos" />
+
+Salida real:
+
+```text
+   0 -> 00000000
+   1 -> 00000001
+   2 -> 00000010
+ 127 -> 01111111
+  -1 -> 11111111
+  -2 -> 11111110
+-128 -> 10000000
+5        = 00000101
+!5       = 11111010
+!5 + 1   = 11111011 = -5
+11001000 como u8 = 200, como i8 = -56
+```
+
+La última línea es la idea de la lección 3 otra vez: los mismos bits `11001000` son 200 sin signo y −56 con signo (−128 + 64 + 8 = −56). Fíjate: 200 − 256 = −56. Un byte con el bit de signo encendido vale, con signo, lo mismo que sin signo menos 256.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+¿Por qué este sistema y no otro? Porque **sumar funciona igual** con signo y sin signo. Suma los bits de 200 (`11001000`) y de 100 (`01100100`) tirando el bit que sobra y obtienes `00101100`, que es 44. Con signo, eso es −56 + 100 = 44. ¡Lo mismo! La CPU usa el mismo circuito sumador para los dos tipos. Solo cambia cómo se interpretan el resultado y el desbordamiento.
+
+Otra consecuencia: −1 son todos los bits a 1 en cualquier tamaño. En un `i32`, −1 es `0xffffffff`.
+
+Y una cosa que no hay: un «−0». Si inviertes `00000000` y sumas 1, el acarreo se sale por la izquierda y vuelve a dar `00000000`. Solo hay un cero.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="El negativo sin opuesto">
+
+❌ «Todo número tiene su opuesto: el de −128 es 128.»
+
+✅ En un `i8`, 128 no cabe. Rust te deja preguntarlo sin riesgo con `checked_neg`, que devuelve `None` cuando el resultado no cabe:
+
+<Ejecutar ej="m01/sin-opuesto" />
+
+Salida real:
+
+```text
+i8: de -128 a 127
+opuesto de 127:  Some(-127)
+opuesto de -128: None
+```
+
+Qué pasa si en lugar de preguntar escribes directamente `-x` con `x = -128` (y la diferencia entre el modo de pruebas y el modo final) lo verás en el Mundo 3.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m01/complemento-reto"
+  enunciado="Cambia SOLO los bits del literal para que el programa imprima `11111101 como i8 = -3`. Usa la receta: escribe el 3, invierte y suma 1."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuánto vale `10000001` leído como `i8`?"
+  opciones={["−127", "−1", "129", "−129"]}
+  correcta={0}
+  explicacion="−128 + 1 = −127."
+  porque={["Correcto.", "−1 son todos los bits a 1 (`11111111`).", "129 es la lectura **sin signo** (`u8`).", "−129 no cabe en un `i8`: el mínimo es −128."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál es el máximo de un `i8`?"
+  opciones={["127", "128", "255", "−128"]}
+  correcta={0}
+  porque={["Correcto: `01111111`.", "128 necesitaría encender el bit de signo, que vale −128.", "255 es el máximo de un `u8`.", "−128 es el **mínimo**."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué la CPU puede usar el mismo circuito para sumar `u8` e `i8`?"
+  opciones={["Porque en complemento a dos la suma de bits da el resultado correcto en los dos casos", "Porque Rust convierte siempre los `i8` en `u8` antes de sumar", "Porque los negativos se guardan con un bit de signo aparte que la suma ignora", "No puede: necesita dos circuitos distintos"]}
+  correcta={0}
+  porque={["Correcto: es la gran ventaja del complemento a dos.", "No hay conversión: son los mismos bits leídos de otra forma.", "En complemento a dos el bit de signo **forma parte** del número (vale −128); la suma no lo ignora.", "Sí puede; el ejemplo de 200 + 100 frente a −56 + 100 lo muestra."]}
+/>

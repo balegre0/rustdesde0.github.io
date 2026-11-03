@@ -1,0 +1,53 @@
+---
+title: "Rust en Linux y en otros núcleos"
+description: "Rust ya está dentro del núcleo de Linux, de Android y de Windows. Qué se escribe en Rust, cómo se integra con el código existente y qué otros sistemas operativos están escritos en Rust."
+sidebar:
+  order: 12
+duracion: 10
+requiere: ["23-embebido-y-tu-so/11-tu-propio-asignador"]
+tarjetas:
+  - p: "¿Qué es Rust for Linux?"
+    r: "El proyecto, fundado por Miguel Ojeda, que permite escribir partes del núcleo de Linux (sobre todo drivers) en Rust. Llegó al núcleo en la versión 6.1 (2022)."
+  - p: "¿Qué hace una «abstracción segura» del núcleo en Rust?"
+    r: "Envuelve las funciones del núcleo (escritas en otro lenguaje) en tipos de Rust con interfaz segura, para que los drivers no necesiten `unsafe`."
+  - p: "Tres sistemas operativos escritos en Rust:"
+    r: "Redox (tipo Unix, micronúcleo), Theseus (de investigación) y Tock (para microcontroladores)."
+---
+
+import { Pregunta } from '~/components';
+
+Tu núcleo de juguete es el primer paso. En el mundo real, Rust ya forma parte de los sistemas operativos que usa casi todo el mundo.
+
+## Linux
+
+**Rust for Linux** es el proyecto (fundado por Miguel Ojeda en 2020) que permite escribir código del núcleo de Linux en Rust. Entró en la rama principal con **Linux 6.1** (diciembre de 2022) como experimento. Desde entonces:
+
+- Se escriben en Rust, sobre todo, **controladores** (*drivers*): por ejemplo, los nuevos drivers de gráficos Nova (NVIDIA) y Tyr (Mali), o un driver de red PHY.
+- **Android 16**, con el núcleo 6.12, incluye en producción el asignador de memoria compartida **ashmem** escrito en Rust: millones de dispositivos ya ejecutan Rust en el núcleo.
+- En 2025, los mantenedores decidieron que Rust **deja de ser un experimento**: la documentación del núcleo lo refleja desde Linux 7.0. Todavía no funciona en todas las arquitecturas ni configuraciones, y la compilación con GCC (gccrs) sigue incompleta.
+
+**Cómo se integra.** El código del núcleo existente está escrito en otro lenguaje. Rust for Linux crea **abstracciones seguras**: tipos de Rust que envuelven las estructuras y funciones del núcleo, con su `unsafe` revisado una vez, para que cada driver pueda escribirse casi sin `unsafe`. Es la misma idea de `split_at_mut` (mundo 07) a escala de un sistema operativo.
+
+## Windows y Android
+
+- Microsoft ha reescrito partes del núcleo de Windows en Rust (por ejemplo, componentes de `win32k`) y publica `windows-drivers-rs` para escribir drivers.
+- En Android, Google escribe en Rust gran parte del código nuevo de sistema (Bluetooth, binder, componentes de seguridad), y atribuye a ello la caída de las vulnerabilidades de memoria en la plataforma.
+
+## Sistemas operativos escritos en Rust
+
+- **Redox**: un sistema tipo Unix con micronúcleo, entorno gráfico y su propia biblioteca de sistema.
+- **Theseus**: un sistema de investigación que usa el sistema de tipos de Rust para aislar componentes.
+- **Tock**: un sistema operativo para microcontroladores, con aplicaciones aisladas entre sí.
+- **Hubris** (Oxide Computer): un núcleo pequeño para el firmware de servidores.
+
+Leer su código es el siguiente paso natural después de blog_os.
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué papel cumplen las abstracciones seguras en Rust for Linux?"
+  opciones={["Traducir el núcleo entero a Rust", "Envolver las interfaces del núcleo existente en tipos de Rust seguros, para que los drivers casi no necesiten `unsafe`", "Hacer el núcleo más rápido", "Sustituir el compilador"]}
+  correcta={1}
+  explicacion="El `unsafe` se concentra y se revisa una vez, en las abstracciones; los drivers usan la interfaz segura."
+  porque={["No se reescribe el núcleo: se añade código nuevo en Rust.", "", "El objetivo es la seguridad, no la velocidad.", "Se usa el `rustc` normal."]}
+/>

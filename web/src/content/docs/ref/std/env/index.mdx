@@ -1,0 +1,69 @@
+---
+title: "std::env"
+description: "El entorno del programa: argumentos de la línea de órdenes, variables de entorno y carpeta actual."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::env`
+
+## Para qué sirve
+
+Lo que el sistema operativo le da a tu programa al arrancar: los **argumentos** (`mi_programa archivo.txt -v`), las **variables de entorno** (`PATH`, `HOME`…) y la **carpeta actual**.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| `args` | Los argumentos como `String` (el primero suele ser el propio programa). | 1.0 |
+| `var` | Lee una variable de entorno. | 1.0 |
+| `vars` | Todas las variables. | 1.0 |
+| `set_var, remove_var` | Cambian variables: son `unsafe` desde la edición 2024. | 1.0 |
+| `current_dir` | La carpeta actual. | 1.0 |
+| `consts` | Arquitectura y sistema para el que se compiló. | 1.0 |
+
+**Ficha detallada:** [args, var y vars](/ref/std/env/args-y-var/)
+
+## Conceptos clave
+
+- **`args()`** entra en pánico si un argumento no es Unicode válido; `args_os()` no.
+- **`set_var` es `unsafe` en la edición 2024**: si otro hilo lee el entorno a la vez, en algunos sistemas es comportamiento indefinido. Llámala solo al principio, antes de crear hilos.
+- **En el navegador** solo hay un argumento (`programa`), ninguna variable y la carpeta actual es `/`. `env::consts::OS` sale vacío en `wasm32-wasip1`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/env-basico" />
+
+**Salida:**
+
+```text
+1 argumento(s): ["programa"]
+IDIOMA: environment variable not found
+0
+Ok("/")
+wasm32 
+```
+
+## Sinopsis
+
+```rust
+pub fn args() -> Args
+
+pub fn var<K: AsRef<OsStr>>(key: K) -> Result<String, VarError>
+
+pub fn current_dir() -> Result<PathBuf>
+
+pub unsafe fn set_var<K: AsRef<OsStr>, V: AsRef<OsStr>>(key: K, value: V)
+```
+
+## Ver también
+
+- [std::process](/ref/std/process/)
+- [std::fs](/ref/std/fs/)
+
+## Aprende esto en
+
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/)

@@ -1,0 +1,124 @@
+---
+title: "El viaje de tu código por rustc"
+description: "Sigue a tu programa desde el texto hasta el ejecutable: tokens, AST, macros, HIR, tipos, MIR, borrow checker, LLVM y enlazador."
+sidebar:
+  order: 6
+duracion: 15
+desde: "1.0"
+requiere: ["02-tu-primer-programa/02-println-y-las-macros", "00-el-taller/07-check-build-y-release"]
+tarjetas:
+  - p: "Nombra en orden las grandes fases de rustc."
+    r: "Tokens → AST → expansión de macros y resolución de nombres → HIR → comprobación de tipos → MIR → borrow checker → generación de código (LLVM) → enlazado."
+  - p: "¿Por qué `cargo check` funciona sin `link.exe` y `cargo build` no?"
+    r: "`cargo check` se detiene tras las comprobaciones (tipos, borrow checker) y no genera código ni enlaza; el enlazador solo hace falta en el último paso."
+  - p: "¿Qué es el MIR?"
+    r: "La representación intermedia de nivel medio de rustc: el código como un grafo de bloques básicos. Sobre él trabaja el borrow checker."
+  - p: "Un programa tiene un nombre mal escrito y un error de tipos. ¿Cuál informa primero rustc?"
+    r: "Normalmente el del nombre (E0425): la resolución de nombres ocurre antes que la comprobación de tipos (E0308)."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Hasta ahora `rustc` ha sido una caja negra: entra texto, sale un programa. Hoy abres la caja y miras las paradas del viaje. No vas a memorizar los detalles (para eso está el mundo 21), pero vas a entender **por qué** los errores salen en el orden en que salen y qué hace `cargo check` en realidad.
+
+## Predice
+
+Este programa tiene tres errores: dos de tipos (líneas 2 y 3: un texto donde se espera un número) y un nombre que no existe (línea 4: `z`). ¿Cuál informa primero el compilador?
+
+<Predice
+  ej="m02/muchos-errores"
+  opciones={["E0308 en la línea 2, porque es la primera línea con un error", "E0425 en la línea 4: el nombre `z` no existe", "Solo informa del primero que encuentra y se para", "Los tres a la vez, en una sola línea"]}
+  correcta={1}
+  explicacion="Los errores no salen en el orden del archivo, sino en el orden de las **fases** del compilador. Buscar a qué se refiere cada nombre ocurre antes que comprobar los tipos, así que E0425 sale primero, y después los dos E0308."
+  porque={["El compilador no recorre el archivo una sola vez de arriba abajo: lo recorre por fases, y cada fase informa de sus errores.", "", "rustc intenta seguir para darte todos los errores que pueda de una vez: aquí informa de tres.", "Cada error tiene su propio bloque con su código y su ubicación."]}
+/>
+
+## La idea
+
+`rustc` transforma tu programa en varios pasos. Cada paso produce una representación nueva, más fácil de analizar para el paso siguiente:
+
+1. **Análisis léxico** (*lexing*): el texto se parte en **tokens**: `fn`, `main`, `(`, `)`, `{`, `"hola"`… Los comentarios normales se descartan aquí.
+2. **Análisis sintáctico** (*parsing*): los tokens se organizan en un árbol, el **AST** (*abstract syntax tree*, árbol de sintaxis abstracta). Un paréntesis sin cerrar falla en este punto.
+3. **Expansión de macros y resolución de nombres**: `println!` se sustituye por su código, y cada nombre (`x`, `nombre`, `println`) se enlaza con lo que significa. Aquí nace E0425, «cannot find value».
+4. **HIR** (*high-level IR*, representación intermedia de alto nivel): el AST «desazucarado», con algunas construcciones cómodas ya traducidas a otras más simples.
+5. **Comprobación de tipos** (*type checking*): se deduce el tipo de cada valor y se comprueba que todo encaja. Aquí nace E0308, «mismatched types».
+6. **MIR** (*mid-level IR*): el programa como un grafo de **bloques básicos** con instrucciones muy simples. Sobre el MIR trabaja el **borrow checker**, el comprobador de préstamos que protagonizará los mundos 6 a 8.
+7. **Generación de código** (*codegen*): el MIR se traduce a **LLVM IR**, y LLVM (un proyecto de compilador independiente) lo optimiza y lo convierte en código máquina.
+8. **Enlazado** (*linking*): el **enlazador** (*linker*) junta tu código con el de la biblioteca estándar en un ejecutable. En Windows con MSVC, ese enlazador es `link.exe`.
+
+## Pruébalo
+
+Un programa diminuto:
+
+<Ejecutar ej="m02/minimo" />
+
+```text
+5
+```
+
+Ahora vas a mirar una de las paradas intermedias. `rustc --emit=mir` escribe el MIR en un archivo en vez de generar el programa. Este es un fragmento real del MIR de `main` (Rust 1.99.1, compilado en modo depuración):
+
+```text
+    bb0: {
+        _5 = AddWithOverflow(const 2_i32, const 3_i32);
+        assert(!move (_5.1: bool), "attempt to compute `{} + {}`, which would overflow", const 2_i32, const 3_i32) -> [success: bb1, unwind unreachable];
+    }
+```
+
+`bb0` es el **bloque básico** 0. `_5` es una variable interna que guarda dos cosas: el resultado de `2 + 3` y un indicador de si la suma se ha salido de rango. La instrucción `assert` comprueba ese indicador: si la suma desbordara, el programa se detendría con el mensaje «attempt to compute … which would overflow». Esa comprobación existe porque se compiló en modo depuración. Con `-O` (optimizado, como `cargo build --release`), el mismo MIR trae una suma simple, `Add(const 2_i32, const 3_i32)`, sin comprobación. Esta diferencia entre los dos modos la estudiarás en el mundo 3.
+
+Más abajo, en el mismo MIR, aparece `std::io::_print(move _2)`: la expansión de `println!` que viste en la lección de las macros.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Las piezas del compilador y lo que hace cargo check">
+El propio `rustc` está escrito en Rust y dividido en muchos crates. Según la guía para desarrolladores del compilador (*rustc-dev-guide*), algunas de las piezas son: `rustc_lexer` (tokens), `rustc_parse` y `rustc_ast` (el AST), `rustc_expand` (macros), `rustc_hir` (el HIR), `rustc_mir_build` y `rustc_mir_transform` (construir y transformar el MIR), `rustc_borrowck` (el borrow checker) y `rustc_codegen_ssa` con `rustc_codegen_llvm` (la generación de código).
+
+**`cargo check`** recorre las fases hasta el borrow checker y se detiene: guarda solo los **metadatos** (`--emit=metadata`) y no genera código máquina. Por eso es mucho más rápido que `cargo build`, y por eso funciona aunque falte `link.exe`: el enlazador es la **última** parada, y `cargo check` no llega hasta ella. Es la herramienta que este curso usa para comprobar que un ejemplo compila en una máquina sin enlazador.
+
+**El tamaño.** El programa de esta lección, compilado para el navegador con optimización de tamaño y sin símbolos, ocupa unos 47 KB. Casi todo es la parte de la biblioteca estándar que hace falta para imprimir; tu `main` son unas pocas instrucciones.
+
+Las representaciones internas (MIR, LLVM IR) **cambian entre versiones** del compilador. No memorices su texto: aprende a pedirlas y a reconocer las ideas.
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Arreglar los errores en el orden del archivo">
+❌ Ver diez errores, ir al último y empezar a arreglar desde ahí, o asustarse por la cantidad.
+
+✅ Arregla **el primero que aparece** y vuelve a compilar. Un error en una fase puede provocar otros en las fases siguientes, que desaparecen solos al arreglar el original. Además, `cargo check` tarda muy poco: compilar a menudo es barato.
+</Trampa>
+
+## Tu turno
+
+Ordena las fases de `rustc`, de la primera a la última.
+
+<Ordena
+  lineas={["Partir el texto en tokens", "Construir el AST", "Expandir macros y resolver nombres", "Comprobar los tipos (sobre el HIR)", "Construir el MIR y pasar el borrow checker", "Generar código máquina con LLVM", "Enlazar con link.exe"]}
+  distractores={["Ejecutar el programa para ver si funciona"]}
+  explicacion="Del texto a los tokens, de los tokens al árbol, del árbol a los nombres y tipos, de ahí al MIR (donde trabaja el borrow checker) y por último a código máquina y enlazado. El compilador **nunca ejecuta** tu programa para comprobarlo: todo lo que comprueba lo deduce leyéndolo."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`cargo check` termina sin errores, pero `cargo build` falla con «linker `link.exe` not found». ¿Dónde está el problema?"
+  opciones={["En tu código: hay un error que `cargo check` no ve", "En la instalación: falta el enlazador, la última fase", "En el borrow checker", "En la expansión de macros"]}
+  correcta={1}
+  explicacion="`cargo check` ya ha pasado por tipos y borrow checker. Lo que falla es la última parada, el enlazado, que no depende de tu código sino de tener instalado `link.exe`."
+  porque={["`cargo check` recorre todas las comprobaciones del lenguaje; si pasa, tu código es válido.", "", "El borrow checker también lo ejecuta `cargo check`.", "Las macros se expanden en una fase temprana, que `cargo check` también recorre."]}
+/>
+
+<Pregunta
+  pregunta="¿En qué representación trabaja el borrow checker?"
+  opciones={["En los tokens", "En el AST", "En el MIR", "En el código máquina"]}
+  correcta={2}
+  explicacion="El borrow checker analiza el MIR, donde el programa es un grafo de bloques básicos con instrucciones simples. Así puede seguir por qué caminos pasa cada valor."
+  porque={["Los tokens no tienen estructura: son palabras sueltas.", "El AST todavía no tiene tipos ni está simplificado.", "", "El código máquina ya no sabe nada de préstamos ni de tipos de Rust."]}
+/>
+
+<Respuesta
+  pregunta="¿Qué opción de rustc escribe el MIR de tu programa en un archivo?"
+  respuestas={["--emit=mir", "--emit mir", "-emit=mir"]}
+  explicacion="`rustc --emit=mir archivo.rs`. Con `--emit=llvm-ir` obtienes el LLVM IR, y con `--emit=asm`, el ensamblador."
+/>

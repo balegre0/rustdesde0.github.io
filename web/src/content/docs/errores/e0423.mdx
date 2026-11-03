@@ -1,0 +1,80 @@
+---
+title: "E0423: se esperaba un valor y hay un tipo"
+description: "Usas el nombre de un struct como si fuera un valor, sin darle sus campos."
+sidebar:
+  order: 34
+insignias: ["Nombres, módulos y visibilidad"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot find value `Punto` in this scope ``
+
+## Qué significa
+
+`Punto` es el **nombre de un tipo** con campos. Para crear un valor hay que escribir todos sus campos: `Punto { x: 0, y: 0 }`. Solo los structs unitarios (`struct Marca;`) y los de tupla (`struct Par(i32, i32);`) tienen un valor o constructor con su mismo nombre.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0423" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0423]: cannot find value `Punto` in this scope
+ --> E0423.rs:7:13
+  |
+1 | / struct Punto {
+2 | |     x: i32,
+3 | |     y: i32,
+4 | | }
+  | |_- `Punto` defined here
+...
+7 |       let p = Punto;
+  |               ^^^^^ help: use struct literal syntax instead: `Punto { x: val, y: val }`
+  |
+  = note: a struct named `Punto` exists in another namespace
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Escribir `let p = Punto;` olvidando los campos.
+- Confundir un struct con campos con, por ejemplo, una función constructora `Punto::new()`.
+
+## Cómo arreglarlo
+
+Crea el valor con sus campos (`Punto { x: 0, y: 0 }`) o define y llama a un constructor (`Punto::new()`).
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+struct Punto {
+    x: i32,
+    y: i32,
+}
+
+fn main() {
+    let p = Punto { x: 0, y: 0 };
+    println!("{} {}", p.x, p.y);
+}
+```
+
+**Salida:**
+
+```text
+0 0
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0423` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0425](/errores/e0425/): nombre no encontrado
+- [E0063](/errores/e0063/): falta un campo al crear un struct
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

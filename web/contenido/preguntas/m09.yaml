@@ -1,0 +1,737 @@
+# Banco de preguntas del mundo 09 (CONTENIDO.md §7.1). Todo verificado con rustc 1.99.1, ed. 2024.
+- id: m09-campo-sin-mut
+  titulo: "Un campo que no se deja cambiar"
+  mundo: 09-structs-enums-y-patrones
+  tema: structs
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m09/campo-sin-mut
+  opciones:
+    - "La variable `c` no es `mut`, y la mutabilidad es de la variable dueña, no de cada campo (E0594)"
+    - "El campo `valor` tendría que declararse `mut valor: u32`"
+    - "Los structs nunca se pueden modificar después de crearlos"
+    - "`c.valor + 1` puede desbordar y Rust lo prohíbe"
+  correcta: 0
+  solucion: |
+    rustc dice `error[E0594]: cannot assign to c.valor, as c is not declared as mutable` y sugiere `let mut c`.
+    - En Rust no existen campos `mut` sueltos: esa sintaxis no compila.
+    - Los structs sí se pueden modificar… si su dueño es `mut`.
+    - El desbordamiento se comprueba al ejecutar (pánico en debug), no impide compilar.
+  etiquetas: ["E0594", "mut", "struct"]
+
+- id: m09-actualizacion-struct
+  titulo: "El resto, de Ana"
+  mundo: 09-structs-enums-y-patrones
+  tema: structs
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m09/structs-predice
+  opciones:
+    - "`Luis tiene 3 vidas y 120 puntos`"
+    - "`Luis tiene 0 vidas y 0 puntos`"
+    - "No compila: faltan campos"
+    - "`Ana tiene 3 vidas y 120 puntos`"
+  correcta: 0
+  solucion: |
+    `..ana` (sintaxis de actualización) rellena los campos que faltan —`vidas` y `puntos`— con los de `ana`. El `nombre` lo damos nosotros.
+    Rust nunca inventa valores por defecto para los campos, y con `..ana` no falta ninguno.
+  etiquetas: ["struct", "..base"]
+
+- id: m09-tamano-reordenado
+  titulo: "8 o 12 bytes"
+  mundo: 09-structs-enums-y-patrones
+  tema: layout
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la primera línea?"
+  ej: m09/structs-tamano
+  opciones:
+    - "`Mezcla:        8 bytes (alineamiento 4)`"
+    - "`Mezcla:        7 bytes (alineamiento 1)`"
+    - "`Mezcla:        12 bytes (alineamiento 4)`"
+    - "`Mezcla:        16 bytes (alineamiento 8)`"
+  correcta: 0
+  solucion: |
+    Con `repr(Rust)` el compilador puede reordenar los campos: pone `b: u32`, luego `c: u16`, luego `a: u8`, y añade 1 byte de relleno para que el tamaño sea múltiplo del alineamiento (4). Total: 8.
+    - 7 sería sin relleno (solo pasa con `repr(packed)`).
+    - 12 es lo que ocupa con `#[repr(C)]`, que respeta el orden escrito.
+    - Ningún campo pide alineamiento 8.
+  etiquetas: ["size_of", "repr", "padding"]
+
+- id: m09-falta-campo
+  titulo: "Se te olvidó la y"
+  mundo: 09-structs-enums-y-patrones
+  tema: structs
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m09/falta-campo
+  opciones:
+    - "Al crear un struct hay que dar todos sus campos (E0063: missing field `y`)"
+    - "`y` vale 0 por defecto, pero hay que escribir `..Default`"
+    - "Los campos deben darse en el orden en que se declararon"
+    - "`p` debería ser `mut`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0063]: missing field y in initializer of Punto`. En Rust no hay campos «sin inicializar» ni valores por defecto implícitos.
+    - No existe ningún valor por defecto automático (aunque sí la sintaxis `..otro_valor`).
+    - El orden de los campos al crear el struct da igual.
+    - `mut` solo hace falta para cambiar el valor después de crearlo.
+  etiquetas: ["E0063", "struct"]
+
+- id: m09-newtype-mezcla
+  titulo: "Pies no son metros"
+  mundo: 09-structs-enums-y-patrones
+  tema: structs
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila, si `Metros` y `Pies` guardan los dos un `f64`?"
+  ej: m09/mezclar-unidades
+  opciones:
+    - "Son tipos distintos: los structs son nominales y cuenta el nombre (E0308)"
+    - "Porque `f64` no se puede guardar en un tuple struct"
+    - "Porque falta `#[derive(Copy)]`"
+    - "Porque `avanzar` debería recibir `&Metros`"
+  correcta: 0
+  solucion: |
+    `error[E0308]: mismatched types … expected Metros, found Pies`. Un newtype crea un tipo nuevo aunque por dentro sea idéntico: es lo que evita mezclar unidades.
+    - Un tuple struct puede guardar cualquier tipo.
+    - `Copy` no tiene que ver con qué tipos acepta una función.
+    - Con `&Metros` seguiría fallando: `&Pies` tampoco es `&Metros`.
+  etiquetas: ["E0308", "newtype"]
+
+- id: m09-tamano-newtype
+  titulo: "¿Cuánto pesa un newtype?"
+  mundo: 09-structs-enums-y-patrones
+  tema: layout
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuántos bytes ocupa `struct Celsius(f64);`?"
+  opciones: ["8", "16", "9", "0"]
+  correcta: 0
+  solucion: |
+    Exactamente lo que su único campo: 8 bytes (medido con `size_of` en el ejemplo `m09/tuple-structs`). El nombre del tipo solo existe al compilar; en memoria no queda rastro. Por eso se dice que es una abstracción de coste cero.
+  etiquetas: ["newtype", "size_of", "ZST"]
+
+- id: m09-unit-struct
+  titulo: "Un struct que no ocupa nada"
+  mundo: 09-structs-enums-y-patrones
+  tema: layout
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuántos bytes ocupa `struct Silencio;` (un unit struct)? Escribe solo el número."
+  respuestas: ["0"]
+  solucion: |
+    0 bytes: es un tipo de tamaño cero (ZST). Lo comprueba el ejemplo `m09/tuple-structs`, que imprime `Silencio ocupa 0 bytes`.
+  etiquetas: ["ZST", "unit struct"]
+
+- id: m09-metodo-mut
+  titulo: "Sumar sin permiso"
+  mundo: 09-structs-enums-y-patrones
+  tema: metodos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m09/metodo-sin-mut
+  opciones:
+    - "`sumar` pide `&mut self` y `c` no es `mut`: no se puede sacar un préstamo exclusivo (E0596)"
+    - "Un método no puede cambiar campos"
+    - "Hay que llamarlo como `Contador::sumar(c)`"
+    - "`self.n += 1` desborda"
+  correcta: 0
+  solucion: |
+    `error[E0596]: cannot borrow c as mutable, as it is not declared as mutable`. El punto intenta crear `&mut c` para el método y la variable no lo permite.
+    - Los métodos con `&mut self` sí cambian campos.
+    - `Contador::sumar(c)` ni siquiera tiene el tipo correcto: pide `&mut Contador`.
+    - El valor empieza en 0; no hay desbordamiento.
+  etiquetas: ["E0596", "&mut self"]
+
+- id: m09-metodo-self
+  titulo: "El ticket ya no está"
+  mundo: 09-structs-enums-y-patrones
+  tema: metodos
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila la segunda llamada a `canjear`?"
+  ej: m09/usar-tras-self
+  opciones:
+    - "`canjear` recibe `self` por valor: se queda con el ticket y `t` queda movido (E0382)"
+    - "Un método no puede llamarse dos veces seguidas"
+    - "`format!` consume el `String`"
+    - "Falta `#[derive(Clone)]`, que Rust exige para métodos"
+  correcta: 0
+  solucion: |
+    `error[E0382]: use of moved value: t`, con la nota «Ticket::canjear takes ownership of the receiver self». Si el método recibiera `&self`, podrías llamarlo las veces que quisieras.
+    - Llamar varias veces es normal con `&self` o `&mut self`.
+    - `format!` solo lee sus argumentos.
+    - `Clone` no es obligatorio; lo que importa es la forma de `self`.
+  etiquetas: ["E0382", "self"]
+
+- id: m09-contador-predice
+  titulo: "Dos sumas"
+  mundo: 09-structs-enums-y-patrones
+  tema: metodos
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m09/metodos-predice
+  opciones: ["`12`", "`10`", "`11`", "No compila"]
+  correcta: 0
+  solucion: |
+    `sumar(&mut self)` trabaja sobre el contador original (préstamo exclusivo), así que los cambios se acumulan: 10 → 11 → 12.
+  etiquetas: ["&mut self"]
+
+- id: m09-azucar-metodo
+  titulo: "Sin azúcar"
+  mundo: 09-structs-enums-y-patrones
+  tema: metodos
+  dificultad: media
+  tipo: opcion
+  enunciado: "Si `area` es `fn area(&self) -> u32`, ¿a qué equivale `r.area()`?"
+  opciones: ["`Rectangulo::area(&r)`", "`Rectangulo::area(r)`", "`Rectangulo::area(&mut r)`", "`area(r.self)`"]
+  correcta: 0
+  solucion: |
+    El operador punto hace auto-referencia: mira que el método pide `&self` y pasa `&r`. El ejemplo `m09/metodos` imprime lo mismo con las dos formas (`área tras duplicar = 48` y `lo mismo, sin azúcar: 48`).
+    - Pasar `r` lo movería.
+    - `&mut r` se usa solo para métodos con `&mut self`.
+  etiquetas: ["auto-ref", "métodos"]
+
+- id: m09-new-metodo
+  titulo: "new con punto"
+  mundo: 09-structs-enums-y-patrones
+  tema: metodos
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `a.new(5, 6)`?"
+  ej: m09/new-como-metodo
+  opciones:
+    - "`new` no tiene `self`: es una función asociada y se llama `Punto::new(5, 6)` (E0599)"
+    - "`new` es una palabra reservada"
+    - "`a` no es `mut`"
+    - "Los constructores solo se pueden llamar una vez"
+  correcta: 0
+  solucion: |
+    `error[E0599]: no method named new found for struct Punto`, con la pista «this is an associated function, not a method». Sin `self` no hay sintaxis de punto.
+    - `new` es solo una convención.
+    - La mutabilidad no tiene nada que ver.
+    - Puedes llamar a `Punto::new` todas las veces que quieras.
+  etiquetas: ["E0599", "función asociada"]
+
+- id: m09-self-mayuscula
+  titulo: "Self con mayúscula"
+  mundo: 09-structs-enums-y-patrones
+  tema: metodos
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Dentro de `impl Temperatura { … }`, ¿qué es `Self`?"
+  opciones: ["Un alias del tipo `Temperatura`", "El valor sobre el que se llama el método", "Una referencia a `Temperatura`", "Una palabra que solo vale en traits"]
+  correcta: 0
+  solucion: |
+    `Self` (mayúscula) es el tipo; `self` (minúscula) es el valor. `fn new(c: f64) -> Self { Self { celsius: c } }` devuelve y construye una `Temperatura`.
+  etiquetas: ["Self"]
+
+- id: m09-enum-campo
+  titulo: "El radio que quizá no existe"
+  mundo: 09-structs-enums-y-patrones
+  tema: enums
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `f.radio`?"
+  ej: m09/campo-de-enum
+  opciones:
+    - "No toda `Forma` tiene radio: hay que preguntar la variante con `match` (E0609)"
+    - "Los campos de un enum se leen con `f::radio`"
+    - "Falta `pub` en el campo"
+    - "`radio` es `f64` y hay que escribir `f.radio as f64`"
+  correcta: 0
+  solucion: |
+    `error[E0609]: no field radio on type Forma`. El campo pertenece a la variante `Circulo`, no al tipo `Forma`. Un `match` o un `if let` te dan acceso solo cuando sabes que es un círculo.
+  etiquetas: ["E0609", "enum"]
+
+- id: m09-mensajes-predice
+  titulo: "Tres mensajes"
+  mundo: 09-structs-enums-y-patrones
+  tema: enums
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m09/enums-predice
+  opciones:
+    - "`ir a 2,-1`, `hola`, `adiós`"
+    - "`Mover`, `Escribir`, `Salir`"
+    - "No compila: variantes con datos distintos"
+    - "`adiós`, `hola`, `ir a 2,-1`"
+  correcta: 0
+  solucion: |
+    Cada brazo desmonta su variante: `Mover { x, y }` saca las coordenadas, `Escribir(texto)` saca el `String` (y lo devuelve movido). El `for` recorre el array en orden.
+  etiquetas: ["enum", "match"]
+
+- id: m09-y-o
+  titulo: "¿Y u O?"
+  mundo: 09-structs-enums-y-patrones
+  tema: enums
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Un pedido puede ser de recogida (con una hora) o a domicilio (con una dirección). ¿Qué tipo lo modela mejor?"
+  opciones:
+    - "`enum Entrega { Recogida { hora: u8 }, Domicilio { direccion: String } }`"
+    - "`struct Entrega { hora: u8, direccion: String }`"
+    - "`struct Entrega { es_domicilio: bool, dato: String }`"
+    - "Dos variables `hora` y `direccion` y un comentario"
+  correcta: 0
+  solucion: |
+    Es un «o», así que es un enum: cada caso lleva solo su dato. Con el struct de dos campos tendrías siempre una hora y una dirección, aunque una no tenga sentido; con el `bool` + `String`, la hora tendría que ir como texto y nada impide incoherencias.
+  etiquetas: ["diseño", "enum"]
+
+- id: m09-option-predice
+  titulo: "La décima nota"
+  mundo: 09-structs-enums-y-patrones
+  tema: option
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m09/option-predice
+  opciones:
+    - "`Some(7) None` y `0`"
+    - "Un pánico: índice fuera de rango"
+    - "`7 0` y `0`"
+    - "`Some(7) Some(0)` y `0`"
+  correcta: 0
+  solucion: |
+    `first()` y `get(10)` devuelven `Option<&i32>`; la posición 10 no existe, así que `get` da `None` (sin pánico). `unwrap_or(&0)` saca el valor o usa `&0`.
+    - El pánico lo daría `notas[10]`, no `get(10)`.
+  etiquetas: ["Option", "get"]
+
+- id: m09-option-suma
+  titulo: "Sumar a un quizás"
+  mundo: 09-structs-enums-y-patrones
+  tema: option
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `edad + 10`?"
+  ej: m09/option-suma
+  opciones:
+    - "`edad` es `Option<&i32>`: puede no haber edad y un `Option` no se suma (E0369)"
+    - "Porque `10` es `u32` y la edad `i32`"
+    - "Porque `edades` no es `mut`"
+    - "Porque `get` devuelve una copia"
+  correcta: 0
+  solucion: |
+    `error[E0369]: cannot add {integer} to Option<&{integer}>`. Rust no te deja usar un valor que podría faltar como si estuviera. Se saca antes con `match`, `if let`, `unwrap_or`…
+  etiquetas: ["E0369", "Option"]
+
+- id: m09-unwrap-none
+  titulo: "unwrap sobre nada"
+  mundo: 09-structs-enums-y-patrones
+  tema: option
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué pasa al ejecutar?"
+  ej: m09/option-unwrap-none
+  opciones:
+    - "Imprime `Vamos a sacar el último…` y luego un pánico: `called Option::unwrap() on a None value`"
+    - "Imprime `Vamos a sacar el último…` y luego `0`"
+    - "No compila: `last()` sobre un Vec vacío"
+    - "Imprime `None`"
+  correcta: 0
+  solucion: |
+    `v.last()` de un `Vec` vacío es `None`. `unwrap()` sobre `None` provoca un pánico con el mensaje real `called Option::unwrap() on a None value` y la línea exacta. El compilador no puede saber que el `Vec` estará vacío, así que compila.
+  etiquetas: ["unwrap", "pánico"]
+
+- id: m09-map-none
+  titulo: "map sobre None"
+  mundo: 09-structs-enums-y-patrones
+  tema: option
+  dificultad: media
+  tipo: respuesta
+  enunciado: "¿Qué imprime `println!(\"{:?}\", None::<i32>.map(|x| x + 1));`?"
+  respuestas: ["None"]
+  solucion: |
+    Con `None`, `map` no llama a la función y devuelve `None`. Verificado: imprime `None`.
+  etiquetas: ["Option", "map"]
+
+- id: m09-map-unwrap-or
+  titulo: "Doble o nada"
+  mundo: 09-structs-enums-y-patrones
+  tema: option
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué valen `Some(5).map(|v| v * 2).unwrap_or(0)` y `None::<i32>.map(|v| v * 2).unwrap_or(-1)`?"
+  opciones: ["`10` y `-1`", "`10` y `0`", "`5` y `-1`", "`Some(10)` y `None`"]
+  correcta: 0
+  solucion: |
+    `map` dobla el 5 → `Some(10)`, y `unwrap_or` saca el 10. Con `None`, `map` no hace nada y `unwrap_or(-1)` devuelve el valor de reserva. Verificado: imprime `10` y `-1`.
+  etiquetas: ["map", "unwrap_or"]
+
+- id: m09-nicho-referencia
+  titulo: "El None gratis"
+  mundo: 09-structs-enums-y-patrones
+  tema: layout
+  dificultad: media
+  tipo: predice
+  enunciado: "En el navegador (wasm32), ¿qué imprime?"
+  ej: m09/nichos-predice
+  opciones:
+    - "`u32: 4  Option<u32>: 8` y `&u32: 4  Option<&u32>: 4`"
+    - "`u32: 4  Option<u32>: 5` y `&u32: 4  Option<&u32>: 5`"
+    - "`u32: 4  Option<u32>: 8` y `&u32: 4  Option<&u32>: 8`"
+    - "`u32: 4  Option<u32>: 4` y `&u32: 8  Option<&u32>: 8`"
+  correcta: 0
+  solucion: |
+    Una referencia nunca vale 0: ese valor (el nicho) representa `None`, y `Option<&u32>` ocupa lo mismo que `&u32`. Un `u32` puede valer cualquier cosa: hace falta una etiqueta, y con el relleno hasta múltiplo de 4 quedan 8 bytes. En x86-64 las referencias miden 8.
+  etiquetas: ["nicho", "size_of", "wasm32"]
+
+- id: m09-option-option-bool
+  titulo: "Muñecas rusas de bool"
+  mundo: 09-structs-enums-y-patrones
+  tema: layout
+  dificultad: dificil
+  tipo: respuesta
+  enunciado: "¿Cuántos bytes ocupa `Option<Option<bool>>`? Escribe solo el número."
+  respuestas: ["1"]
+  solucion: |
+    Un `bool` solo usa los valores 0 y 1 de su byte; quedan 254 nichos. El `None` interior puede usar el 2 y el exterior el 3. Medido en el ejemplo `m09/nichos`: 1 byte.
+  etiquetas: ["nicho", "bool"]
+
+- id: m09-un-solo-nicho
+  titulo: "Un solo cero"
+  mundo: 09-structs-enums-y-patrones
+  tema: layout
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "En wasm32, `enum Dos { Caja(Box<u64>), Nada }` ocupa 4 bytes. ¿Y `enum Tres { Caja(Box<u64>), Nada, Otra }`?"
+  opciones: ["8", "4", "5", "12"]
+  correcta: 0
+  solucion: |
+    Un puntero tiene un único valor imposible (el 0). Sirve para codificar `Nada`, pero no `Nada` y `Otra` a la vez, así que vuelve la etiqueta: 4 + 1, redondeado a 8. (En x86-64: 8 y 16.) rustc no usa los bits bajos que el alineamiento deja a cero.
+  etiquetas: ["nicho", "Box"]
+
+- id: m09-raw-sin-nicho
+  titulo: "El puntero que sí puede ser nulo"
+  mundo: 09-structs-enums-y-patrones
+  tema: layout
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué `Option<*const u8>` ocupa el doble que `*const u8`?"
+  opciones:
+    - "Porque un puntero crudo puede valer 0 legalmente: no tiene nicho y necesita etiqueta"
+    - "Porque los punteros crudos guardan su longitud"
+    - "Porque `Option` siempre duplica el tamaño"
+    - "Porque los punteros crudos son de 64 bits incluso en wasm32"
+  correcta: 0
+  solucion: |
+    A diferencia de `&T` y `Box<T>`, `*const T` puede ser nulo, así que el 0 ya es un valor válido y no queda nada libre para `None`. Medido en wasm32: 4 frente a 8.
+  etiquetas: ["nicho", "punteros crudos"]
+
+- id: m09-variante-grande
+  titulo: "El Ping de mil bytes"
+  mundo: 09-structs-enums-y-patrones
+  tema: layout
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime la primera línea?"
+  ej: m09/variante-grande
+  opciones: ["`Mensaje:        1001 bytes`", "`Mensaje:        1 bytes`", "`Mensaje:        1000 bytes`", "`Mensaje:        1004 bytes`"]
+  correcta: 0
+  solucion: |
+    Un enum ocupa lo que su variante más grande más la etiqueta: 1000 + 1. Como el array de `u8` tiene alineamiento 1, no hay relleno. Con `Box<[u8; 1000]>` el enum baja a 4 bytes (un puntero, con el nicho del 0 para `Ping`).
+  etiquetas: ["enum", "Box", "large_enum_variant"]
+
+- id: m09-lista-infinita
+  titulo: "Una lista dentro de una lista"
+  mundo: 09-structs-enums-y-patrones
+  tema: layout
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este enum?"
+  ej: m09/lista-infinita
+  opciones:
+    - "Su tamaño sería infinito: una `Lista` contiene otra `Lista` entera (E0072)"
+    - "Los enums no pueden tener variantes con datos y sin datos a la vez"
+    - "Falta `#[derive(Debug)]`"
+    - "`i32` no puede ir en un enum"
+  correcta: 0
+  solucion: |
+    `error[E0072]: recursive type Lista has infinite size`, con la sugerencia de añadir indirección (`Box<Lista>`). Un `Box` tiene tamaño fijo (un puntero) y el siguiente nodo vive en el heap.
+  etiquetas: ["E0072", "Box", "recursión"]
+
+- id: m09-match-falta-variante
+  titulo: "¿Y el oeste?"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m09/match-falta
+  opciones:
+    - "El `match` no cubre `Direccion::Oeste` (E0004)"
+    - "Las variantes deben aparecer en el orden declarado"
+    - "`grados` debería devolver `Option<u32>`"
+    - "Falta un `else`"
+  correcta: 0
+  solucion: |
+    `error[E0004]: non-exhaustive patterns: Direccion::Oeste not covered`. rustc incluso propone el brazo que falta. El orden de los brazos no importa para la exhaustividad.
+  etiquetas: ["E0004", "exhaustividad"]
+
+- id: m09-match-u8
+  titulo: "Notas hasta 255"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: media
+  tipo: no-compila
+  enunciado: "Los brazos cubren de 0 a 10. ¿Por qué no compila?"
+  ej: m09/match-enteros
+  opciones:
+    - "El tipo es `u8` y faltan los valores de 11 a 255 (`11_u8..=u8::MAX`)"
+    - "Los rangos no se pueden usar en `match`"
+    - "Falta el caso negativo"
+    - "Los rangos deben ser exclusivos (`0..5`)"
+  correcta: 0
+  solucion: |
+    El compilador razona con el tipo, no con tu intención: `error[E0004]: non-exhaustive patterns: 11_u8..=u8::MAX not covered`. Un `u8` no tiene negativos. Se arregla con un brazo `_`, o mejor con un tipo `Nota` que solo admita 0..=10.
+  etiquetas: ["E0004", "rangos"]
+
+- id: m09-orden-brazos
+  titulo: "Cero, poco, bastante, mucho"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m09/match-predice
+  opciones:
+    - "`0: cero`, `3: poco`, `8: bastante`, `15: mucho`"
+    - "`0: cero`, `3: poco`, `8: poco`, `15: mucho`"
+    - "`0: mucho`, `3: mucho`, `8: mucho`, `15: mucho`"
+    - "No compila"
+  correcta: 0
+  solucion: |
+    Los brazos se prueban de arriba abajo y gana el primero que encaja. `_` va al final y solo recoge lo que no encajó antes.
+  etiquetas: ["match", "rangos", "|"]
+
+- id: m09-inalcanzable
+  titulo: "El siete que nunca llega"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué pasa con este programa?"
+  ej: m09/match-inalcanzable
+  opciones:
+    - "Compila con el aviso `unreachable pattern` e imprime `cualquier cosa`"
+    - "No compila: hay dos brazos que encajan con 7"
+    - "Imprime `siete`, porque es más concreto"
+    - "Imprime las dos cosas"
+  correcta: 0
+  solucion: |
+    `_` encaja con todo y va primero, así que el brazo `7` nunca se alcanza: es un aviso (no un error) y gana el primer brazo. Rust no reordena los brazos por lo concretos que sean.
+  etiquetas: ["unreachable_patterns"]
+
+- id: m09-variable-patron
+  titulo: "Acierto imposible"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: dificil
+  tipo: predice
+  enunciado: "`objetivo` vale 5 y `tirada` vale 2. ¿Qué imprime?"
+  ej: m09/variable-atrapa-todo
+  opciones:
+    - "`¡acertaste! (2)` (y rustc avisa de que el brazo `_` es inalcanzable)"
+    - "`fallaste`"
+    - "`¡acertaste! (5)`"
+    - "No compila: `objetivo` ya está declarado"
+  correcta: 0
+  solucion: |
+    Un nombre dentro de un patrón no compara: declara una variable nueva que encaja con cualquier valor. `objetivo` (el del patrón) vale 2. rustc avisa y explica que comparar con un nombre solo funciona con constantes. Para comparar con una variable: `t if t == objetivo`.
+  etiquetas: ["patrones", "guarda", "sombra"]
+
+- id: m09-guardas-predice
+  titulo: "Puntos en el plano"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime para `(5, 5)`?"
+  ej: m09/patrones-predice
+  opciones: ["`en la diagonal (5)`", "`en (5, 5)`", "`en el eje X, x=5`", "`origen`"]
+  correcta: 0
+  solucion: |
+    `(5, 5)` no encaja con los brazos que exigen un 0. Sí encaja con `(x, y) if x == y`: el patrón y la guarda se cumplen. El brazo general `(x, y)` queda detrás.
+  etiquetas: ["guarda", "tuplas"]
+
+- id: m09-arroba
+  titulo: "Comprobar y guardar"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué hace el patrón `n @ 1..=9`?"
+  opciones:
+    - "Encaja si el valor está entre 1 y 9 y lo guarda en `n`"
+    - "Guarda en `n` un número aleatorio entre 1 y 9"
+    - "Encaja con cualquier valor y lo recorta a 1..=9"
+    - "Es un error de sintaxis"
+  correcta: 0
+  solucion: |
+    `@` (enlace) une un nombre y un patrón: el valor tiene que encajar con el patrón de la derecha y además queda guardado. En el ejemplo `m09/patrones`, `Evento::Rueda(n @ 1..)` imprime `rueda arriba 3`.
+  etiquetas: ["@", "rangos"]
+
+- id: m09-slice-resto
+  titulo: "La cabeza y el resto"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: media
+  tipo: opcion
+  enunciado: "Con `notas = [4, 8, 6, 10]`, ¿qué imprime `match &notas[..] { [] => …, [solo] => …, [cabeza, resto @ ..] => println!(\"cabeza {cabeza}, quedan {}\", resto.len()) }`?"
+  opciones: ["`cabeza 4, quedan 3`", "`cabeza 4, quedan 4`", "`cabeza 10, quedan 3`", "No compila: los slices no admiten patrones"]
+  correcta: 0
+  solucion: |
+    `resto @ ..` guarda en un slice todo lo que queda tras el primero: `[8, 6, 10]`, de longitud 3. Verificado en el ejemplo `m09/patrones`.
+  etiquetas: ["slice patterns", "@"]
+
+- id: m09-binding-ref
+  titulo: "¿Qué tipo tiene c?"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "`e` es un `&Evento` y escribes `match e { Evento::Tecla(c) => … }` con `Tecla(char)`. ¿De qué tipo es `c`?"
+  opciones: ["`&char`", "`char`", "`&&char`", "`Option<char>`"]
+  correcta: 0
+  solucion: |
+    Al desmontar a través de una referencia, el modo de enlace por defecto pasa a ser «por referencia» (match ergonomics), así que `c` es `&char`. Por eso en `m09/patrones` la guarda escribe `*boton == 2`.
+  etiquetas: ["match ergonomics", "binding mode"]
+
+- id: m09-movido-en-match
+  titulo: "La carta se fue"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `correo.is_some()` después del `match`?"
+  ej: m09/mover-en-match
+  opciones:
+    - "El patrón `Some(c)` movió la `Carta` fuera de `correo`: queda parcialmente movido (E0382)"
+    - "`is_some` no existe para `Option<Carta>`"
+    - "Un `match` destruye siempre el valor que examina"
+    - "Falta un brazo `_`"
+  correcta: 0
+  solucion: |
+    `error[E0382]: borrow of partially moved value: correo`. Al hacer `match correo` por valor, `c` se queda con la carta (no es `Copy`). Arreglos: `match &correo` (entonces `c` es `&Carta`) o `Some(ref c)`, como sugiere rustc.
+    - Un `match` sobre algo `Copy`, o sobre una referencia, no mueve nada.
+  etiquetas: ["E0382", "movimiento parcial", "ref"]
+
+- id: m09-comparar-enum
+  titulo: "== sin permiso"
+  mundo: 09-structs-enums-y-patrones
+  tema: enums
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `m == Modo::Oscuro`?"
+  ej: m09/comparar-enum
+  opciones:
+    - "Tu enum no implementa `PartialEq`: añade `#[derive(PartialEq)]` o usa `matches!` (E0369)"
+    - "Los enums solo se comparan con `match`, nunca con `==`"
+    - "Hay que escribir `m.eq(Modo::Oscuro)`"
+    - "`Modo::Oscuro` es un tipo, no un valor"
+  correcta: 0
+  solucion: |
+    `error[E0369]: binary operation == cannot be applied to type Modo`, y rustc sugiere `#[derive(PartialEq)]`. Rust no inventa la comparación por ti. `matches!(m, Modo::Oscuro)` compara con un patrón sin necesitar `PartialEq`.
+  etiquetas: ["E0369", "PartialEq", "matches!"]
+
+- id: m09-let-else-diverge
+  titulo: "Un else que no se va"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este `let else`?"
+  ej: m09/let-else-sin-salir
+  opciones:
+    - "El `else` debe divergir (return, break, continue, pánico): si no, `n` no existiría después"
+    - "`let else` solo funciona con `Option`, no con `Result`"
+    - "Falta `mut` en `n`"
+    - "`println!` no se puede usar dentro de un `else`"
+  correcta: 0
+  solucion: |
+    `error[E0308]: else clause of let...else does not diverge … expected !, found ()`. Si el `else` terminara normalmente, la línea siguiente usaría un `n` que nunca se asignó.
+    - `let else` acepta cualquier patrón refutable (`Ok(n)`, `Some(x)`, `[a, b]`…).
+  etiquetas: ["let else", "!", "E0308"]
+
+- id: m09-let-refutable
+  titulo: "let que puede fallar"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `let Some(n) = quizas;`?"
+  ej: m09/let-refutable
+  opciones:
+    - "`let` necesita un patrón irrefutable y `Some(n)` no cubre `None` (E0005)"
+    - "Porque `quizas` debería ser `mut`"
+    - "Porque `n` no tiene tipo"
+    - "Porque `Some` solo puede usarse en `match`"
+  correcta: 0
+  solucion: |
+    `error[E0005]: refutable pattern in local binding … pattern None not covered`. rustc sugiere `let Some(n) = quizas else { todo!() };`. También valen `if let` y `match`.
+  etiquetas: ["E0005", "refutabilidad"]
+
+- id: m09-while-let-pila
+  titulo: "Vaciar la pila"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la primera línea?"
+  ej: m09/if-let-predice
+  opciones: ["`3 2 1 `", "`1 2 3 `", "`3`", "Nada: bucle infinito"]
+  correcta: 0
+  solucion: |
+    `pop()` saca por el final y devuelve `Some(tope)`; cuando la pila queda vacía devuelve `None` y el `while let` termina.
+  etiquetas: ["while let", "pop"]
+
+- id: m09-irrefutables
+  titulo: "¿Cuál vale en un let?"
+  mundo: 09-structs-enums-y-patrones
+  tema: patrones
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál de estos patrones se puede usar en un `let` normal?"
+  opciones: ["`(_, s, _)` sobre una tupla de tres", "`Some(x)` sobre un `Option`", "`3` sobre un `i32`", "`[a, b]` sobre un `&[i32]` (slice)"]
+  correcta: 0
+  solucion: |
+    Una tupla siempre tiene sus tres elementos: el patrón es irrefutable. Los otros pueden fallar: `None`, cualquier número distinto de 3, un slice de longitud distinta de 2. (Con un array `[i32; 2]`, `[a, b]` sí sería irrefutable.)
+  etiquetas: ["refutabilidad", "let"]
+
+- id: m09-typestate
+  titulo: "Enviar sin pagar"
+  mundo: 09-structs-enums-y-patrones
+  tema: diseno
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `p.enviar()`?"
+  ej: m09/enviar-sin-pagar
+  opciones:
+    - "`enviar` solo existe en `PedidoPagado`; un pendiente no lo tiene (E0599). Es el patrón typestate funcionando"
+    - "Porque `enviar` recibe `&self` y `p` no es `mut`"
+    - "Porque los structs no pueden tener el mismo campo `total`"
+    - "Porque falta llamar antes a `p.new()`"
+  correcta: 0
+  solucion: |
+    `error[E0599]: no method named enviar found for struct PedidoPendiente`. Cada estado es un tipo; `pagar(self) -> PedidoPagado` es la única forma de llegar al tipo que sabe enviarse. El fallo «enviar sin pagar» es imposible de escribir.
+  etiquetas: ["typestate", "E0599", "diseño"]
+
+- id: m09-banderas
+  titulo: "Demasiados bool"
+  mundo: 09-structs-enums-y-patrones
+  tema: diseno
+  dificultad: media
+  tipo: opcion
+  enunciado: "`struct Conexion { conectada: bool, autenticada: bool }`. ¿Cuántas combinaciones permite el tipo y cuántas tienen sentido si «autenticada» exige «conectada»?"
+  opciones: ["4 y 3", "2 y 2", "4 y 4", "3 y 3"]
+  correcta: 0
+  solucion: |
+    Dos `bool` dan 2 × 2 = 4 combinaciones; «autenticada pero desconectada» es absurda. Un enum con tres variantes (`Desconectada`, `Conectada`, `Autenticada`) tiene exactamente 3 valores: ninguno sobra.
+  etiquetas: ["diseño", "estados imposibles"]

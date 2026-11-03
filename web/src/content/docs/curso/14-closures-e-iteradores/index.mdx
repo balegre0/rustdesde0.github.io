@@ -1,0 +1,32 @@
+---
+title: "Mundo 14 · Closures e iteradores"
+description: "Funciones que se llevan su entorno y recorridos de datos que se escriben como recetas y se ejecutan tan rápido como un bucle a mano."
+sidebar:
+  order: 0
+---
+
+Hasta ahora, para recorrer una lista escribías un `for` y, dentro, hacías las cuentas a mano. En este mundo aprendes a decir **qué** quieres («los pares, al cuadrado, sumados») en vez de **cómo** hacerlo paso a paso. Dos piezas lo hacen posible:
+
+- Un **closure** es una función pequeña, sin nombre, que puede **capturar** variables de alrededor. Se escribe con barras: `|x| x * 2`.
+- Un **iterador** es algo que entrega valores **de uno en uno** cuando se los pides. Se encadenan como piezas de una tubería: `v.iter().filter(...).map(...).sum()`.
+
+Y una promesa que vas a comprobar con el ensamblador delante: esas cadenas no cuestan nada extra. El compilador las convierte en el mismo código máquina que el bucle que habrías escrito tú.
+
+## Lo que vas a conseguir
+
+| # | Lección | Al terminar sabrás… |
+|---|---|---|
+| 1 | Closures: funciones con memoria | escribir `\|x\| x * 2` y saber qué tipo tiene un closure |
+| 2 | Cómo captura un closure | distinguir captura por préstamo compartido, exclusivo o por valor, y usar `move` |
+| 3 | `Fn`, `FnMut` y `FnOnce` | saber qué trait elige el compilador y por qué |
+| 4 | Closures como parámetros y como resultado | pasar closures a funciones, devolverlos y guardarlos en un `Vec` |
+| 5 | El trait `Iterator` y la pereza | entender `next()`, `Some`/`None` y por qué un iterador no hace nada hasta que lo consumes |
+| 6 | `iter`, `iter_mut` e `into_iter` | elegir si recorres prestando, prestando para cambiar o llevándote los valores |
+| 7 | Adaptadores | encadenar `map`, `filter`, `enumerate`, `zip`, `take`, `skip`, `chain`, `flat_map` y `rev` |
+| 8 | Consumidores y `collect` | resumir con `sum`, `fold`, `any`, `find`… y construir colecciones con turbofish |
+| 9 | Coste cero: el mismo ensamblador que un bucle | leer el asm real y ver que iterador y bucle son idénticos |
+| 10 | Tu propio iterador | implementar `Iterator` y usar `from_fn` y `successors` |
+| 11 | Iteradores de nivel experto | devolver `impl Iterator`, `collect` a `Result`, `windows`, `chunks` y `peekable` |
+| 12 | Jefe: el informe de ventas | juntarlo todo en un programa completo |
+
+Requisitos: los mundos 0–13. Sobre todo **préstamos** (mundo 7): un closure que captura una variable la *presta*, con las mismas reglas de siempre. Y **traits y genéricos** (mundo 13): `Fn` e `Iterator` son traits, e `impl Fn` es un genérico.

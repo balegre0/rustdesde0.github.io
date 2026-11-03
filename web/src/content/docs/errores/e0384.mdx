@@ -1,0 +1,79 @@
+---
+title: "E0384: asignar dos veces a una variable inmutable"
+description: "Asignas un valor nuevo a una variable que no declaraste con mut."
+sidebar:
+  order: 30
+insignias: ["Propiedad y movimientos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot assign twice to immutable variable `vidas` ``
+
+## Qué significa
+
+En Rust las variables son **inmutables por defecto**. `let vidas = 3;` fija el valor; para poder cambiarlo con `vidas = 2;` tienes que declararla `let mut vidas`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0384" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0384]: cannot assign twice to immutable variable `vidas`
+ --> E0384.rs:4:5
+  |
+2 |     let vidas = 3;
+  |         ----- first assignment to `vidas`
+3 |     println!("{vidas}");
+4 |     vidas = 2;
+  |     ^^^^^^^^^ cannot assign twice to immutable variable
+  |
+help: consider making this binding mutable
+  |
+2 |     let mut vidas = 3;
+  |         +++
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Olvidar `mut` en un contador o acumulador.
+- Reasignar un parámetro de función (los parámetros también son inmutables salvo `mut x: T`).
+- Asignar dentro de un bucle a una variable declarada sin `mut`.
+
+## Cómo arreglarlo
+
+Añade `mut` (`let mut vidas = 3;`). Si en realidad querías un valor nuevo con el mismo nombre, puedes **sombrear** (*shadowing*) con otro `let vidas = 2;`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let mut vidas = 3;
+    println!("{vidas}");
+    vidas = 2;
+    println!("{vidas}");
+}
+```
+
+**Salida:**
+
+```text
+3
+2
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0384` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0596](/errores/e0596/): préstamo exclusivo de algo no mutable
+- [E0594](/errores/e0594/): asignar a través de un préstamo compartido
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)

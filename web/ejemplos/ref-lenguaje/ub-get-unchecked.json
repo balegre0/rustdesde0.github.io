@@ -1,0 +1,1 @@
+{"nota": "En modo debug, std (o rustc) comprueba esta precondición y detiene el programa. En release la comprobación desaparece. Para un diagnóstico completo, ejecútalo con Miri en el Playground (Tools → Miri).", "perfiles": ["debug"]}

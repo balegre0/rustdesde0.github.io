@@ -1,0 +1,60 @@
+---
+title: "continue"
+description: "Palabra clave estricta: salta al siguiente paso de un bucle."
+sidebar:
+  order: 7
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`continue` abandona **el paso actual** de un bucle y pasa directamente al siguiente.
+
+## Sinopsis
+
+```text
+continue              // siguiente paso del bucle más interior
+continue 'etiqueta    // siguiente paso del bucle con esa etiqueta
+```
+
+## Qué hace
+
+- En un `for`, pide el siguiente elemento al iterador.
+- En un `while` o `while let`, vuelve a comprobar la condición.
+- En un `loop`, vuelve al principio del cuerpo.
+
+Con etiqueta, el salto afecta al bucle nombrado, aunque estés dentro de otro. A diferencia de `break`, `continue` **nunca lleva valor**. Su tipo es `!`.
+
+Solo funciona con bucles: un bloque etiquetado no se puede «continuar».
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-continue" />
+
+Salida:
+
+```text
+3 es múltiplo de 3
+6 es múltiplo de 3
+9 es múltiplo de 3
+(0,0) (1,0) (1,1) (2,0) (2,1) (2,2)
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-continue-error" />
+
+`error[E0268]: continue outside of a loop`.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+- [`break`](/ref/lenguaje/palabras-clave/break/) · [`for`](/ref/lenguaje/palabras-clave/for/) · [`while`](/ref/lenguaje/palabras-clave/while/) · [`loop`](/ref/lenguaje/palabras-clave/loop/)
+
+## Aprende esto en
+
+- [Mundo 04 · Expresiones y control](/curso/04-expresiones-y-control/)

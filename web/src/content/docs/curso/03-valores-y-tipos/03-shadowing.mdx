@@ -1,0 +1,107 @@
+---
+title: "Sombreado: reutilizar un nombre"
+description: "Aprende a declarar otra variable con el mismo nombre (shadowing), en qué se diferencia de mut y por qué permite cambiar de tipo."
+sidebar:
+  order: 3
+duracion: 10
+desde: "1.0"
+requiere: ["03-valores-y-tipos/02-mut"]
+tarjetas:
+  - p: "¿Qué es el sombreado (shadowing)?"
+    r: "Declarar con `let` una variable nueva con el mismo nombre que otra; la nueva tapa a la anterior."
+  - p: "¿Puede el sombreado cambiar el tipo de una variable?"
+    r: "Sí, porque es una variable nueva. Con `mut` no: el tipo es fijo."
+  - p: "¿Qué pasa con una variable sombreada dentro de un bloque `{}` al salir del bloque?"
+    r: "La sombra desaparece y el nombre vuelve a referirse a la variable de fuera."
+  - p: "¿Qué error da `let mut s = \"   \"; s = s.len();`?"
+    r: "E0308 (tipos que no coinciden): se esperaba `&str` y se encontró `usize`."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Hoy vas a ver un truco muy de Rust: declarar **otra** variable con el mismo nombre. Parece lo mismo que `mut`, pero no lo es, y la diferencia te va a ahorrar muchos nombres raros como `edad_texto` y `edad_numero`.
+
+## Predice
+
+<Predice
+  ej="m03/sombra"
+  opciones={["`dentro: 110` y `fuera: 10`", "`dentro: 110` y `fuera: 110`", "`dentro: 105` y `fuera: 5`", "No compila: `x` ya existe"]}
+  correcta={0}
+  explicacion="Primero `x` es 5. La segunda `let x` crea otra `x` que vale 5 × 2 = 10. Dentro del bloque, una tercera `x` vale 10 + 100 = 110, pero solo vive hasta la `}`. Fuera vuelve a verse la `x` que vale 10."
+  porque={["", "La `x` de dentro del bloque desaparece al cerrar la llave: no modifica la de fuera.", "La segunda `let x = x * 2` ya había convertido 5 en 10 antes del bloque.", "Volver a declarar un nombre con `let` está permitido: es el sombreado."]}
+/>
+
+## La idea
+
+Si escribes `let` con un nombre que ya existe, creas una **variable nueva** que **sombrea** (*shadows*) a la anterior: a partir de ahí, el nombre se refiere a la nueva. La vieja no se modifica; simplemente ya no se puede nombrar.
+
+Tiene dos diferencias importantes con `mut`:
+
+1. **Cada sombra es una variable distinta**, así que puede tener **otro tipo**. Con `mut` cambias el valor, pero el tipo queda fijo para siempre.
+2. **La sombra respeta los bloques**. Una sombra creada dentro de `{ ... }` desaparece al cerrar la llave, y el nombre vuelve a referirse a la de fuera.
+
+El uso típico es transformar un valor paso a paso sin inventar nombres: leer un texto, convertirlo en número, ajustarlo… todo con el mismo nombre. Y, si no pones `mut`, cada paso sigue siendo inmutable.
+
+## Pruébalo
+
+<Ejecutar ej="m03/sombra-tipo" />
+
+Salida real:
+
+```text
+texto: [    ]
+número: 4
+```
+
+La primera `espacios` es texto (cuatro espacios). La segunda es un **número** (`usize`): cuántos bytes tiene ese texto. Mismo nombre, otro tipo, sin conflicto.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Dos variables, dos huecos">
+Para el compilador, las dos `espacios` son tan distintas como si se llamaran `espacios_1` y `espacios_2`. Cada una tiene su tipo y su propio sitio: la primera es una referencia a texto (`&str`, que en el navegador ocupa 8 bytes y en tu PC 16, como verás en la lección 12) y la segunda es un `usize` (4 bytes en el navegador, 8 en tu PC).
+
+El valor viejo **no se borra** al sombrearlo: sigue existiendo hasta que termina su bloque, aunque ya no tengas forma de nombrarlo. Esto será importante en el Mundo 6, cuando veas que hay valores que hay que liberar: sombrear no los libera antes de tiempo.
+
+Comparado con `mut`: con `let mut x` hay **un** hueco y cada asignación escribe encima. Con el sombreado hay **varios** huecos, uno por `let`. El optimizador suele reutilizar el espacio cuando la variable vieja ya no se usa, así que no cuesta más memoria.
+</BajoElCapo>
+
+## Trampa típica
+
+Si intentas cambiar el tipo con `mut` en vez de con sombreado:
+
+<NoCompila ej="m03/mut-tipo" explicacion="E0308: tipos que no coinciden. `espacios` es un `&str` para siempre; `len()` devuelve un `usize`, que no cabe en una variable de texto. La solución es sombrear con otro `let`." />
+
+El error dice «se esperaba `&str`, se encontró `usize`» y señala el valor inicial como la razón: el tipo de una variable lo fija su primer valor (o su anotación), y `mut` no cambia eso.
+
+## Tu turno
+
+<Reto
+  ej="m03/temperatura"
+  enunciado={'`grados` empieza como el texto "21". Usa sombreado para convertirlo en número con `grados.parse::<i32>().unwrap()`, súmale 1 (otra sombra) e imprime `mañana: 22`.'}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál es la diferencia principal entre `let x = x + 1;` y `x = x + 1;`?"
+  opciones={["Ninguna", "La primera crea una variable nueva; la segunda cambia la existente y necesita `mut`", "La primera es más lenta", "La segunda crea una variable nueva"]}
+  correcta={1}
+  explicacion="Con `let` es sombreado: una variable nueva que puede incluso cambiar de tipo. Sin `let` es una asignación a la misma variable, que debe ser `mut`."
+  porque={["Se parecen mucho, pero una crea y la otra modifica.", "", "No hay coste extra en ejecución: el optimizador reutiliza el espacio.", "Es al revés: la asignación sin `let` modifica la existente."]}
+/>
+
+<Pregunta
+  pregunta={'`let n = 1; { let n = 2; } println!("{n}");` ¿Qué imprime?'}
+  opciones={["1", "2", "No compila", "3"]}
+  correcta={0}
+  explicacion="La `n` del bloque es una sombra que muere en la `}`. Fuera, `n` vuelve a ser la primera, que vale 1."
+  porque={["", "La sombra no sale del bloque donde se creó.", "Sombrear dentro de un bloque es válido (aunque el compilador puede avisar de que la `n` interior no se usa).", "No se suma nada: son variables distintas."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál de estas cosas **solo** se puede hacer con sombreado, no con `mut`?"
+  opciones={["Cambiar el valor", "Cambiar el tipo", "Sumar 1", "Imprimir la variable"]}
+  correcta={1}
+  explicacion="El tipo de una variable es fijo. Para «cambiarlo» hay que crear otra variable con el mismo nombre."
+  porque={["Cambiar el valor es justo lo que hace `mut`.", "", "Sumar 1 se puede con `x += 1` si `x` es `mut`.", "Imprimir se puede siempre."]}
+/>

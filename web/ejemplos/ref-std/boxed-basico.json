@@ -1,0 +1,3 @@
+{
+  "nota": "En el navegador (wasm32) un puntero mide 4 bytes; en un PC de 64 bits mide 8."
+}

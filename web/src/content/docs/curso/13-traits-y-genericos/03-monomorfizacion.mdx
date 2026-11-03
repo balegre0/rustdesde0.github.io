@@ -1,0 +1,121 @@
+---
+title: "Monomorfización: una copia por tipo"
+description: "Descubre qué hace el compilador con una función genérica y mira en el ensamblador real lo que ganas y lo que pagas."
+sidebar:
+  order: 3
+duracion: 11
+desde: "1.0"
+requiere: ["13-traits-y-genericos/02-genericos-y-bounds"]
+tarjetas:
+  - p: "¿Qué es la monomorfización?"
+    r: "Convertir una función genérica en una copia concreta por cada tipo con el que se usa: `doble::<i32>`, `doble::<f64>`… Ocurre al compilar."
+  - p: "¿Qué ganas con la monomorfización?"
+    r: "Velocidad: cada copia está especializada para su tipo, las llamadas son directas y el compilador puede insertarlas (inlining). El genérico no cuesta nada al ejecutar."
+  - p: "¿Qué pagas con la monomorfización?"
+    r: "Tamaño y tiempo de compilación: cada tipo usado añade otra copia de la función al ejecutable, y el compilador tiene que generarla y optimizarla."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Vas a ver qué queda de una función genérica cuando el programa ya está compilado: varias funciones normales, una por tipo.
+
+## Predice
+
+<Predice
+  ej="m13/type-name"
+  opciones={["`i32`, `u8` y `&str`", "`T`, `T` y `T`", "`i32`, `i32` y `&str`", "`integer`, `u8` y `String`"]}
+  correcta={0}
+  explicacion="Dentro de cada copia, `T` **ya es** un tipo concreto. Un `7` sin sufijo es `i32` (el entero por defecto), `7u8` es `u8`, y un literal de texto es `&str`."
+  porque={["Correcto.", "`T` solo existe en el código fuente: al ejecutar, cada copia conoce su tipo real.", "El sufijo `u8` fija el tipo de ese literal.", "`type_name` da nombres de Rust, y un literal entre comillas es `&str`, no `String`."]}
+/>
+
+## La idea
+
+Escribes `fn doble<T>(x: T) -> T` una vez. Pero el procesador no sabe qué es un «`T`»: sumar dos `i32` es una instrucción y sumar dos `f64` es otra muy distinta. Así que el compilador hace lo único posible: **mira todas las llamadas** y, por cada tipo distinto que encuentra, escribe una copia de la función con `T` sustituido. Este proceso se llama **monomorfización** (*monomorphization*: «hacer de una sola forma»).
+
+El resultado tiene dos caras. **Lo que ganas**: cada copia es tan rápida como si la hubieras escrito a mano para ese tipo; no hay ninguna decisión «¿qué tipo era?» al ejecutar, y el compilador puede incluso pegar el cuerpo dentro de quien la llama (*inlining*). **Lo que pagas**: el ejecutable crece con cada tipo usado y la compilación tarda más, porque hay más código que generar y optimizar.
+
+Llamar diez veces con `i32` **no** crea diez copias: crea una y la reutiliza. El coste crece con el número de **tipos distintos**, no de llamadas.
+
+## Pruébalo
+
+<Ejecutar ej="m13/mono" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Este es el ensamblador real de dos usos de una función genérica (x86-64, Windows, `rustc 1.99.1 -O`). El fuente:
+
+```rust
+#[inline(never)]
+fn doble<T: Add<Output = T> + Copy>(x: T) -> T { x + x }
+#[unsafe(no_mangle)] pub fn usa_i32(a: i32) -> i32 { doble(a) }
+#[unsafe(no_mangle)] pub fn usa_f64(b: f64) -> f64 { doble(b) }
+```
+
+Y lo que sale (quitando directivas):
+
+```text
+_RINvCsQRxP6z4OUx_4mono5dobledEB2_:      ; doble::<f64>
+	addsd	xmm0, xmm0                       ; suma de decimales (registro xmm)
+	ret
+
+_RINvCsQRxP6z4OUx_4mono5doblelEB2_:      ; doble::<i32>
+	lea	eax, [rcx + rcx]                   ; suma de enteros
+	ret
+
+usa_f64:
+	jmp	_RINvCsQRxP6z4OUx_4mono5dobledEB2_
+usa_i32:
+	jmp	_RINvCsQRxP6z4OUx_4mono5doblelEB2_
+```
+
+Hay **dos funciones `doble`** con nombres distintos. El nombre «destrozado» (*mangled*) codifica el tipo: la `d` antes de `EB2_` significa `f64` y la `l` significa `i32`. Cada copia usa instrucciones distintas: `addsd` trabaja con registros de coma flotante y `lea eax, [rcx + rcx]` es un truco para sumar un entero consigo mismo. No queda ni rastro de «`T`».
+
+Si quitas `#[inline(never)]`, el optimizador hace algo aún mejor: pega la suma directamente dentro de `usa_i32` y `usa_f64`, y la función `doble` desaparece. Eso solo es posible porque la llamada es directa a una copia concreta.
+
+Hay técnicas para reducir el coste en tamaño cuando una función genérica es grande: mover la parte que no depende de `T` a una función interna normal, que existe una sola vez. En la lección 5 verás la alternativa opuesta: `dyn Trait`, una sola copia que decide al ejecutar.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Los genéricos son lentos porque comprueban el tipo al ejecutar»">
+
+Es al revés. Los genéricos se resuelven **al compilar**: el programa terminado no sabe que hubo un genérico. Lo que sí puede crecer es el **tamaño** del ejecutable y el **tiempo de compilación**, si usas una función genérica grande con muchísimos tipos.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["Escribes `fn doble<T>(x: T) -> T` una sola vez", "El compilador comprueba el cuerpo una vez, con los bounds", "Recorre las llamadas: `doble(21)` y `doble(1.25)`", "Genera `doble::<i32>` y `doble::<f64>`", "Optimiza cada copia por separado"]}
+  explicacion="Primero se comprueba el genérico (una vez, para todo `T`); después se monomorfiza (una copia por tipo usado); al final cada copia se optimiza como una función normal."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Llamas a `doble` 100 veces con `i32`, 3 veces con `f64` y 1 vez con `u8`. ¿Cuántas copias de `doble` genera el compilador?"
+  opciones={["3", "104", "1", "100"]}
+  correcta={0}
+  explicacion="Una por **tipo distinto**: `i32`, `f64` y `u8`. Las llamadas con el mismo tipo reutilizan la misma copia."
+  porque={["Correcto.", "No se copia por llamada, sino por tipo.", "Una sola copia no podría usar instrucciones distintas para enteros y decimales.", "Las 100 llamadas con `i32` comparten copia."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál es el principal coste de la monomorfización?"
+  opciones={["Ejecutables más grandes y compilación más lenta", "Cada llamada comprueba el tipo al ejecutar", "No se pueden usar referencias con genéricos", "Los genéricos no se pueden optimizar"]}
+  correcta={0}
+  explicacion="Más copias = más código que generar, optimizar y guardar en el ejecutable."
+  porque={["Correcto.", "No hay comprobación al ejecutar: todo se decidió al compilar.", "Los genéricos funcionan perfectamente con referencias (`&[T]`).", "Al contrario: cada copia se optimiza como código especializado."]}
+/>
+
+<Pregunta
+  pregunta="En el asm, `doble::<f64>` usa `addsd` y `doble::<i32>` usa `lea`. ¿Qué demuestra?"
+  opciones={["Que son dos funciones distintas, cada una con instrucciones para su tipo", "Que el procesador entiende los genéricos", "Que una de las dos está mal compilada", "Que el código genérico se interpreta al ejecutar"]}
+  correcta={0}
+  explicacion="Cada copia es código máquina normal, especializado. El procesador nunca ve un genérico."
+  porque={["Correcto.", "El procesador solo ve instrucciones concretas.", "Las dos son correctas: es el mismo cálculo con tipos distintos.", "Rust compila a código máquina; no hay intérprete."]}
+/>

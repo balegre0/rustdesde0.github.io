@@ -1,0 +1,118 @@
+---
+title: "Las fugas son seguras"
+description: "Descubres que perder memoria a propósito con mem::forget o Box::leak no necesita unsafe, y por qué Rust lo decidió así."
+sidebar:
+  order: 7
+duracion: 10
+desde: "1.0"
+requiere: ["15-punteros-inteligentes/06-weak-y-ciclos"]
+tarjetas:
+  - p: "¿`std::mem::forget` necesita `unsafe`?"
+    r: "No. Olvidar un valor (no ejecutar su `Drop`) puede perder memoria, pero no causa comportamiento indefinido."
+  - p: "¿Qué devuelve `Box::leak(b)`?"
+    r: "Una referencia `&'static mut T` al valor del heap, que ya nunca se liberará. Útil para datos que viven todo el programa."
+  - p: "¿Por qué ningún código seguro puede depender de que se ejecute un `Drop`?"
+    r: "Porque desde código seguro se puede impedir que se ejecute: `mem::forget`, `Box::leak` o un ciclo de `Rc`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa, Historia } from '~/components';
+
+Vas a perder memoria **a propósito**, sin `unsafe`, y a entender la frontera exacta entre lo que Rust considera peligroso y lo que solo es un despilfarro.
+
+## Predice
+
+<Predice
+  ej="m15/fugas"
+  pregunta="Hay dos `Ruidoso` que dicen «adiós» al destruirse: uno se pasa a `mem::forget` y el otro no. ¿Qué despedidas aparecen?"
+  opciones={["adiós, olvidado y adiós, normal", "Solo adiós, normal", "Ninguna", "No compila: mem::forget es unsafe"]}
+  correcta={1}
+  explicacion="`mem::forget` se queda con el valor y no ejecuta su `Drop`: «olvidado» nunca se despide. Y no hace falta `unsafe`."
+  porque={["`forget` impide justamente que se ejecute el `Drop`.", "Correcto.", "«normal» sí sale de ámbito con normalidad.", "Es una función segura desde Rust 1.0."]}
+/>
+
+## La idea
+
+Rust promete que, en código seguro, nunca habrá **comportamiento indefinido** (UB): ni uso tras liberar, ni doble liberación, ni carreras de datos. Lo que **no** promete es que toda la memoria se libere. Una **fuga** es memoria que sigue reservada aunque ya nadie la use: desperdicia recursos, pero no corrompe nada ni deja leer basura.
+
+Por eso existen funciones **seguras** para fugar a propósito. `std::mem::forget(x)` toma `x` y no ejecuta su `Drop`. `Box::leak(b)` hace algo más útil: suelta la Box y te devuelve una referencia `&'static mut T`, que vale **durante todo el programa** porque esa memoria ya no se liberará nunca. Es la forma limpia de crear en ejecución datos que deben vivir para siempre, como una configuración leída al arrancar.
+
+La consecuencia de diseño es profunda: **ningún código puede confiar en que un `Drop` llegue a ejecutarse** para mantener la seguridad. Un `Drop` sirve para limpiar, no para garantizar que no haya UB. Quien diseña tipos con `unsafe` por dentro tiene que contar con que alguien haga `forget` de su valor.
+
+## Pruébalo
+
+<Ejecutar ej="m15/fugas" />
+
+`config` es un `&'static mut String`: lo puedes modificar y usar en cualquier parte del programa sin preocuparte por tiempos de vida.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`mem::forget` está implementado envolviendo el valor en `ManuallyDrop<T>`, un tipo que le dice al compilador «no insertes el `drop` de esto». Los bytes del valor desaparecen de la pila sin que nadie llame al destructor; si poseía memoria del heap, esa memoria queda reservada y sin dueño.
+
+`Box::leak` hace lo mismo con la Box y convierte su puntero en una referencia:
+
+```text
+antes:   PILA: b: Box<String> ●──► HEAP: String
+después: PILA: config: &'static mut String ●──► HEAP: String   (sin dueño; nunca se libera)
+```
+
+Las tres formas de fugar desde código seguro:
+
+| Cómo | Qué queda |
+|---|---|
+| `mem::forget(x)` | el `Drop` de `x` no se ejecuta |
+| `Box::leak(b)` | una `&'static mut T` al heap |
+| un ciclo de `Rc` | valores que se mantienen vivos entre sí |
+
+Al acabar el proceso, el sistema operativo recupera toda su memoria. Una fuga solo es un problema real en programas que se ejecutan mucho tiempo (servidores, juegos) y fugan una y otra vez.
+
+</BajoElCapo>
+
+<Historia titulo="La «leakpocalypse» de 2015">
+
+Pocas semanas antes de Rust 1.0 se descubrió que una API de la biblioteca estándar para hilos con préstamos confiaba en que un `Drop` se ejecutara siempre. Con un ciclo de `Rc` se podía impedir ese `Drop` y provocar un uso tras liberar desde código seguro. La decisión fue de principio: se aceptó que fugar es seguro, `mem::forget` dejó de ser `unsafe` y aquella API se retiró. Años después volvió con un diseño que no depende de `Drop`: `std::thread::scope` (mundo 17).
+
+</Historia>
+
+## Trampa típica
+
+<Trampa titulo="Usar Box::leak para callar al borrow checker">
+
+❌ Fugar un `String` en un bucle solo porque el compilador pedía un `&'static str`:
+
+```rust
+for linea in lineas {
+    let nombre: &'static str = Box::leak(linea.into_boxed_str()); // fuga en cada vuelta
+    guardar(nombre);
+}
+```
+
+✅ Si el dato no tiene que vivir todo el programa, cambia el diseño: guarda `String` (propietario) en lugar de `&'static str`. `Box::leak` es para un puñado de valores que viven hasta el final, no para cada iteración.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m15/r-leak"
+  enunciado={"Completa `nombre_global`: construye el texto con `format!(\"jugador-{n}\")`, conviértelo con `.into_boxed_str()` y fúgalo con `Box::leak` para devolver un `&'static str`. Debe imprimir `jugador-7 y jugador-42`."}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estas cosas es comportamiento indefinido en Rust?"
+  opciones={["Una fuga de memoria", "Un ciclo de `Rc`", "Leer memoria ya liberada", "Llamar a `mem::forget`"]}
+  correcta={2}
+  explicacion="El uso tras liberar es UB. Las fugas, en cualquiera de sus formas, son seguras."
+  porque={["Una fuga desperdicia memoria, pero no es UB.", "Es una fuga, no UB.", "Correcto.", "Es una función segura."]}
+/>
+
+<Pregunta
+  pregunta="Diseñas un tipo cuyo `Drop` restaura un dato importante. ¿Puede la seguridad de tu tipo depender de que ese `Drop` se ejecute?"
+  opciones={["Sí, Rust garantiza que `Drop` siempre se ejecuta", "No: cualquiera puede impedirlo con `mem::forget` sin `unsafe`", "Solo si el tipo es `Copy`", "Solo en modo debug"]}
+  correcta={1}
+  explicacion="Como fugar es seguro, una API segura nunca puede requerir que el destructor se ejecute para evitar UB."
+  porque={["Esa garantía no existe.", "Correcto.", "Un tipo con `Drop` no puede ser `Copy`.", "Es igual en cualquier perfil."]}
+/>

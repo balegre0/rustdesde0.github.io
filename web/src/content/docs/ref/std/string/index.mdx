@@ -1,0 +1,39 @@
+---
+title: "std::string"
+description: "String: texto UTF-8 que crece y es dueño de sus bytes; ToString y los errores de conversión."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "alloc"]
+---
+**Ruta:** `std::string`
+
+## Para qué sirve
+
+`String` es el tipo de texto **con propiedad**: guarda sus bytes en el montón, puede crecer y se libera solo al salir de su ámbito. Su pareja es `&str`, un **préstamo** de un trozo de texto (de un `String`, de un literal o de otro sitio). Regla práctica: guarda `String` en tus structs y recibe `&str` en tus funciones.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`String`](/ref/std/string/string/) | Texto UTF-8 con propiedad. | 1.0 |
+| `ToString` | `.to_string()` para todo lo que implementa `Display`. | 1.0 |
+| `FromUtf8Error` | El error de `String::from_utf8`. | 1.0 |
+
+**Catálogo completo:** [String y str: todos los métodos](/ref/std/string/catalogo/)
+
+## Conceptos clave
+
+- **Siempre UTF-8**: un `String` nunca contiene bytes inválidos. La «ñ» ocupa 2 bytes, el «€» 3 y un emoji 4.
+- **Índices en bytes**: `len()` cuenta bytes, no letras, y los cortes `&s[a..b]` deben caer en el límite de un carácter o entran en pánico.
+- **Por dentro**: un `String` es un `Vec<u8>` con la garantía extra de ser UTF-8: puntero, capacidad y longitud.
+
+## Ver también
+
+- [str (métodos de texto)](/ref/std/str/str/)
+- [char](/ref/std/char/)
+- [format!](/ref/std/macros/format/)
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

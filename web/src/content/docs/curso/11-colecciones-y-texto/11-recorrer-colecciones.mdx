@@ -1,0 +1,84 @@
+---
+title: "Recorrer colecciones"
+description: "iter, iter_mut e into_iter: qué presta y qué consume cada forma de recorrer, qué hace for con cada una, y cómo funciona con mapas y con enumerate."
+sidebar:
+  order: 11
+duracion: 11
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/10-vecdeque-y-elegir"]
+tarjetas:
+  - p: "¿Qué tipo de elemento da `for x in &v` con `v: Vec<T>`? ¿Y `&mut v`? ¿Y `v`?"
+    r: "&T (préstamo compartido), &mut T (préstamo exclusivo) y T (consume el Vec)."
+  - p: "¿Qué da recorrer `&mapa` si mapa es un HashMap<K, V>?"
+    r: "Pares (&K, &V). Con &mut mapa, (&K, &mut V): los valores se pueden cambiar, las claves no."
+  - p: "¿Por qué no se pueden modificar las claves al recorrer un mapa?"
+    r: "Porque su posición depende de la clave (su hash o su orden): cambiarla rompería la estructura."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Recorrer una colección parece trivial, pero en Rust hay tres formas y cada una dice algo distinto sobre la **propiedad**: mirar, modificar o quedarse con los elementos.
+
+## Predice
+
+<Predice
+  ej="m11/iterar-predice"
+  opciones={["`[10, 20, 30] 60`", "`[1, 2, 3] 6`", "`[10, 20, 30] 6`", "No compila"]}
+  correcta={0}
+  explicacion="El primer `for` presta en exclusiva cada elemento y lo multiplica; el segundo solo lee. El vector sigue vivo al final."
+  porque={["", "`*x *= 10` modifica el vector de verdad.", "La suma se hace después de multiplicar.", "Las dos formas son correctas."]}
+/>
+
+## La idea
+
+| Escribes | Equivale a | Cada `x` es | El vector, después |
+|---|---|---|---|
+| `for x in &v` | `v.iter()` | `&T` | intacto |
+| `for x in &mut v` | `v.iter_mut()` | `&mut T` | modificado |
+| `for x in v` | `v.into_iter()` | `T` | **consumido** |
+
+Con los mapas igual, pero cada elemento es un **par**: `&mapa` da `(&K, &V)` y `&mut mapa` da `(&K, &mut V)`. Las claves nunca se pueden modificar en un recorrido: la posición de cada entrada depende de su clave.
+
+Para tener también el índice: `.iter().enumerate()` da `(índice, &T)`.
+
+## Pruébalo
+
+<Ejecutar ej="m11/iterar" />
+
+Y el error de consumir lo que todavía necesitas:
+
+<NoCompila ej="m11/for-consume" explicacion="`for t in tareas` mueve el vector al bucle: después ya no existe. Si solo querías leer, `for t in &tareas`." />
+
+<Reto
+  ej="m11/subir-precios"
+  enunciado="Sube un 10 % todos los precios **dentro del propio vector** (recorriéndolo con `&mut`) y luego súmalos recorriéndolo con `&`. Debe imprimir `total 38.50` y `[11.0, 22.0, 5.5]`."
+/>
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`for` es azúcar.** `for x in coleccion { … }` se convierte en:
+
+```rust
+let mut it = IntoIterator::into_iter(coleccion);
+while let Some(x) = it.next() { … }
+```
+
+`&Vec<T>`, `&mut Vec<T>` y `Vec<T>` implementan `IntoIterator` cada uno a su manera: por eso lo que pongas detrás de `in` decide si se presta o se consume. Lo verás a fondo en el mundo 14.
+
+**El recorrido mantiene el préstamo.** Mientras dura `for x in &v`, el iterador guarda un préstamo de `v`. Por eso no puedes hacer `v.push(…)` dentro del bucle:
+
+<NoCompila ej="m11/modificar-mientras" explicacion="El préstamo compartido del recorrido vive todo el bucle, y `push` necesita uno exclusivo. Si `push` reubicara el vector, el recorrido seguiría leyendo memoria liberada." />
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Recorres un `BTreeMap<&str, f64>` de precios y quieres subir cada precio un 10 %. ¿Qué escribes?"
+  opciones={["`for (_, p) in &mut precios { *p *= 1.10; }`", "`for (_, p) in &precios { *p *= 1.10; }`", "`for (k, _) in &mut precios { *k = …; }`", "`for p in precios.values() { *p *= 1.10; }`"]}
+  correcta={0}
+  explicacion="`&mut mapa` da `(&K, &mut V)`: los valores se pueden cambiar. (También vale `precios.values_mut()`.)"
+  porque={["", "`&precios` da `&f64`: solo lectura.", "Las claves no se pueden modificar.", "`values()` da `&V`; haría falta `values_mut()`."]}
+/>

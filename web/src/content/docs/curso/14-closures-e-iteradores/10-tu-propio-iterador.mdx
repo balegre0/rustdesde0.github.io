@@ -1,0 +1,101 @@
+---
+title: "Tu propio iterador"
+description: "Implementa Iterator para tu tipo y consigue gratis todos los adaptadores; o fabrica uno al vuelo con from_fn y successors."
+sidebar:
+  order: 10
+duracion: 12
+desde: "1.34"
+requiere: ["14-closures-e-iteradores/09-coste-cero", "13-traits-y-genericos"]
+tarjetas:
+  - p: "¿Qué tienes que escribir para que tu struct sea un iterador?"
+    r: "`impl Iterator for MiTipo { type Item = …; fn next(&mut self) -> Option<Self::Item> { … } }`. Nada más: `map`, `filter`, `sum`… vienen con métodos por defecto."
+  - p: "¿Qué error da olvidar `type Item` en `impl Iterator`?"
+    r: "E0046: «not all trait items implemented, missing: `Item`»."
+  - p: "¿Para qué sirve `std::iter::from_fn`?"
+    r: "Crea un iterador a partir de un closure `FnMut() -> Option<T>`: cada llamada al closure es un `next()`. El estado vive en las capturas."
+  - p: "¿Qué hace `iter::successors(Some(a), f)`?"
+    r: "Empieza en `a` y calcula cada elemento aplicando `f` al anterior; se para cuando `f` devuelve `None`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a crear tus propios iteradores: primero implementando el trait `Iterator` para un struct, y después con dos atajos de la biblioteca estándar que usan closures.
+
+## Predice
+
+<Predice
+  ej="m14/contador"
+  opciones={["`3... 2... 1... ¡despegue!` / `suma de pares de 10 a 1 = 30` / `[500, 400, 300, 200, 100]`", "No compila: `CuentaAtras` no tiene método `filter`", "`3... 2... 1... 0... ¡despegue!` / `30` / `[500, 400, 300, 200, 100, 0]`", "`3... 2... 1... ¡despegue!` / `suma de pares de 10 a 1 = 25` / `[500, 400, 300, 200, 100]`"]}
+  correcta={0}
+  explicacion="Basta con `next()` para que `CuentaAtras` tenga todos los métodos de `Iterator`. Al llegar a 0 devuelve `None`, así que el 0 no se entrega. Pares de 10 a 1: 10 + 8 + 6 + 4 + 2 = 30."
+  porque={["Correcto.", "`filter` es un método por defecto de `Iterator`: lo hereda cualquier tipo que lo implemente.", "Cuando `actual` es 0, `next` devuelve `None` sin entregar el 0.", "Eso sería la suma de los impares (9 + 7 + 5 + 3 + 1)."]}
+/>
+
+## La idea
+
+Para que tu tipo sea un iterador, necesitas dos cosas: un **estado** (dónde vas) y un `next()` que entregue el siguiente valor y avance. El trait `Iterator` tiene decenas de métodos más, pero todos tienen implementación **por defecto** escrita en función de `next()`. Implementas uno y te regalan el resto: `map`, `filter`, `zip`, `sum`, `collect`…
+
+Cuando el iterador es sencillo, ni siquiera hace falta un struct. Hay atajos que lo fabrican desde un closure:
+
+- **`iter::from_fn(f)`**: cada `next()` llama a tu closure `f` (un `FnMut`, porque cambia su estado capturado) y entrega lo que devuelva. `None` termina.
+- **`iter::successors(primero, f)`**: cada elemento sale del anterior aplicando `f`.
+- **`iter::repeat(x)`** (infinito), **`iter::once(x)`** (uno solo) y **`iter::empty()`** (ninguno).
+
+## Pruébalo
+
+<Ejecutar ej="m14/from-fn" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un método por defecto es una función genérica escrita una vez en la biblioteca estándar. Por ejemplo, `count` es, en esencia:
+
+```rust
+fn count(self) -> usize {
+    let mut n = 0;
+    let mut it = self;
+    while let Some(_) = it.next() { n += 1; }
+    n
+}
+```
+
+Cuando llamas `CuentaAtras { actual: 10 }.filter(…).sum()`, el compilador monomorfiza `filter` y `sum` para **tu** tipo, con **tu** `next()` dentro: el mismo coste cero de la lección anterior. Muchos adaptadores se pueden especializar implementando métodos extra (por ejemplo `size_hint`, que dice cuántos elementos quedan y ayuda a `collect` a reservar memoria de una vez).
+
+`from_fn` devuelve un `FromFn<F>`: un struct que guarda tu closure y cuyo `next()` es simplemente llamarlo. El estado del iterador son **las capturas del closure**: en el ejemplo, `a` y `b`, movidas dentro con `move`.
+
+Un detalle de diseño: después de devolver `None`, el trait no obliga a seguir devolviendo `None`. Si lo necesitas garantizado, `.fuse()` lo asegura.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m14/iterator-sin-item"
+  explicacion="`Iterator` exige el tipo asociado `Item`: sin él, ¿qué tipo tiene `Self::Item`? E0046 lo dice directamente, «missing: `Item`», y propone la línea que falta: `type Item = /* Type */;`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m14/pasos"
+  enunciado="Implementa `next()` para `Pasos`: debe entregar `actual`, `actual + paso`, … mientras sea **menor** que `fin`. Salida esperada: `[0, 5, 10, 15]`, `12` (1 + 4 + 7) y `0`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Implementas `Iterator` para tu struct escribiendo solo `type Item` y `next`. ¿Puedes llamar a `.rev()` sobre él?"
+  opciones={["No: `rev` necesita además `DoubleEndedIterator` (saber ir hacia atrás con `next_back`)", "Sí, como a cualquier adaptador", "Sí, pero `rev` recorrerá el iterador entero para guardarlo", "No: los iteradores propios no admiten adaptadores"]}
+  correcta={0}
+  explicacion="`rev` está en `Iterator` pero con un requisito extra: `Self: DoubleEndedIterator`. Hay que implementar `next_back` para poder usarlo."
+  porque={["Correcto.", "La mayoría sí, pero `rev` pide un trait más.", "`rev` no guarda nada: llama a `next_back`.", "Admiten todos los métodos por defecto."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué trait de closure pide `iter::from_fn` y por qué?"
+  opciones={["`FnMut`: el closure cambia su estado capturado en cada llamada", "`Fn`: solo se lee", "`FnOnce`: se llama una vez", "Ninguno: recibe un puntero a función"]}
+  correcta={0}
+  explicacion="El estado del iterador vive en las capturas, y avanzar es modificarlas."
+  porque={["Correcto.", "Con `Fn` no podría avanzar.", "Se llama una vez por elemento: muchas veces.", "Recibe cualquier closure que cumpla `FnMut() -> Option<T>`."]}
+/>

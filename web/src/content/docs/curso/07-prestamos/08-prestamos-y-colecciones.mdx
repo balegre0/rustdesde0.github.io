@@ -1,0 +1,100 @@
+---
+title: "Préstamos y colecciones"
+description: "Recorrer con &v, &mut v o v; no modificar un Vec mientras lo recorres; y por qué no puedes sacar un String de dentro de un préstamo (E0507)."
+sidebar:
+  order: 8
+duracion: 13
+desde: "1.0"
+requiere: ["07-prestamos/07-copiar-y-represtar"]
+tarjetas:
+  - p: "¿Qué tipo tiene `x` en `for x in &v` si `v: Vec<String>`? ¿Y en `for x in &mut v`? ¿Y en `for x in v`?"
+    r: "`&String` (préstamo compartido), `&mut String` (préstamo exclusivo) y `String` (el vector se mueve y se consume)."
+  - p: "¿Por qué no puedes hacer `v.push(…)` dentro de `for x in &v`?"
+    r: "El bucle mantiene un préstamo compartido de `v` durante todo el recorrido; `push` necesita uno exclusivo (E0502). Si se permitiera, `push` podría reubicar el vector y el recorrido seguiría leyendo memoria liberada."
+  - p: "¿Qué dice E0507?"
+    r: "Que intentas mover un valor fuera de algo prestado (*cannot move out of …*), por ejemplo `let s = v[0];` con `v: &Vec<String>`."
+  - p: "Tres arreglos de E0507:"
+    r: "Devolver o guardar un préstamo (`&v[0]`), clonar (`v[0].clone()`) o, si tienes `&mut`, quitarlo dejando otro en su sitio (`std::mem::take`, `swap`, `remove`)."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Los préstamos brillan con las colecciones: recorrer un `Vec`, modificar sus elementos, leer uno sin sacarlo. Aquí vas a ver las tres formas de recorrer y los dos errores que más aparecen con colecciones.
+
+## Predice
+
+<NoCompila ej="m07/p-mutar-mientras-recorre" explicacion={"Piensa antes de leer: mientras el `for` va por el elemento 2, el `push` añade otro. ¿Qué podría pasarle al recorrido si el vector se mudara a otro bloque de memoria?"} />
+
+## La idea
+
+**Tres formas de recorrer**, tres préstamos distintos:
+
+| Escribes | Cada `x` es | El vector, después |
+|---|---|---|
+| `for x in &v` | `&T`: lees cada elemento | intacto |
+| `for x in &mut v` | `&mut T`: modificas cada elemento | modificado |
+| `for x in v` | `T`: te quedas con cada elemento | **movido**: ya no existe |
+
+**No se modifica lo que se está recorriendo.** `for x in &v` mantiene un préstamo compartido de `v` **durante todo el bucle**. Un `push` dentro pide uno exclusivo: E0502. Y es una suerte, porque si `push` reubicara el vector, el recorrido seguiría avanzando por memoria liberada. Este fallo tiene nombre: **invalidación de iteradores** (*iterator invalidation*).
+
+**No se saca nada de un préstamo.** Si solo tienes `&v`, puedes mirar los elementos pero no **llevártelos**: eso sería mover algo que no es tuyo. Es el E0507.
+
+## Pruébalo
+
+<Ejecutar ej="m07/recorrer-tres-formas" />
+
+Para el error del principio, el arreglo es separar las dos fases: **primero se lee, después se modifica**.
+
+<Ejecutar ej="m07/recorrer-y-anadir" />
+
+Ahora, E0507. Esta función recibe un préstamo del vector e intenta devolver el primer `String` **por valor**:
+
+<NoCompila ej="m07/p-sacar-de-ref" explicacion="`v[0]` es el `String` que vive dentro del vector. Devolverlo por valor lo **movería** fuera, y el vector no es de la función: su dueño lo liberaría después, con un hueco donde había un `String` (o lo liberaría dos veces). El arreglo devuelve un préstamo: `&v[0]`." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`for x in &v` es azúcar.** El compilador lo convierte en `(&v).into_iter()`, que da un iterador de `&T`. Ese iterador guarda dentro una referencia al vector (en realidad, dos punteros: el elemento actual y el final). Mientras el iterador vive (todo el bucle), el préstamo vive. Lo verás a fondo en el mundo 14.
+
+**Por qué E0507 aunque el índice sea válido.** No es un problema de índices: es de propiedad. Para un tipo `Copy` como `i32`, `let n = v[0];` funciona porque **copia**. Para un `String`, «sacarlo» deja el hueco con unos bytes que el vector seguiría considerando suyos.
+
+**Las formas legales de sacar algo** (cuando tienes `&mut`):
+
+- `v.remove(i)` o `v.pop()`: el vector deja de tener ese elemento y te lo da.
+- `std::mem::take(&mut v[i])`: te llevas el valor y deja en su sitio el valor por defecto (un `String` vacío).
+- `std::mem::replace(&mut v[i], otro)` y `std::mem::swap`: cambias uno por otro.
+
+En todas, el vector **nunca** queda con un hueco.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Arreglar E0507 con clone() sin pensar">
+
+El compilador sugiere a menudo `help: consider cloning the value`. Clonar funciona, pero **duplica** el texto en el heap.
+
+❌ `v[0].clone()` en un bucle de un millón de vueltas solo para imprimir.
+
+✅ Pregúntate si necesitas **tu propia copia** o te basta con **mirar**. Para mirar, `&v[0]`. Para quedártelo de verdad y que el vector lo pierda, `remove` o `take`. Clona solo cuando de verdad quieres dos copias independientes.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Quieres poner en mayúsculas cada `String` de `nombres` y seguir usando el vector después. ¿Qué bucle usas?"
+  opciones={["`for n in nombres`", "`for n in &nombres`", "`for n in &mut nombres`", "`for n in nombres.clone()`"]}
+  correcta={2}
+  explicacion="Para modificar cada elemento sin consumir el vector hace falta un préstamo exclusivo de cada uno: `&mut nombres`."
+  porque={["Consume el vector: después no podrías usarlo.", "Cada `n` sería `&String`: solo lectura.", "", "Modificarías una copia que se tira al acabar el bucle."]}
+/>
+
+<Pregunta
+  pregunta="`fn f(v: &Vec<String>) -> String { v[0] }` da E0507. ¿Qué arreglo NO cambia la firma ni copia el texto?"
+  opciones={["`v[0].clone()`", "Cambiar a `-> &String` y devolver `&v[0]`", "`v.remove(0)`", "No hay ninguno"]}
+  correcta={3}
+  explicacion="Con la firma `-> String` hay que entregar un `String` propio, y con `&Vec` solo se puede conseguir copiándolo. Si no quieres copiar, tienes que cambiar la firma (devolver `&String`) o recibir el vector de otra forma."
+  porque={["Funciona, pero copia el texto.", "Funciona, pero cambia la firma.", "Necesita `&mut Vec`, no `&Vec`: tampoco compila tal cual.", ""]}
+/>

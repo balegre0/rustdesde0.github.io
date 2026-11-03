@@ -1,0 +1,69 @@
+---
+title: "mut"
+description: "Palabra clave estricta: variables mutables, préstamos exclusivos &mut, punteros *mut y static mut."
+sidebar:
+  order: 24
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`mut` significa **«se puede modificar»**. En Rust nada es modificable si no lo dices.
+
+## Sinopsis
+
+```text
+let mut x = …;               // variable mutable
+&mut lugar                   // préstamo exclusivo
+&mut T                       // tipo referencia exclusiva
+*mut T                       // puntero crudo mutable
+&raw mut lugar               // puntero *mut sin pasar por una referencia
+fn f(mut x: T)               // parámetro mutable
+static mut NOMBRE: T = …;    // static mutable (unsafe)
+```
+
+## Qué hace
+
+### Uso 1 · Variables y patrones mutables
+
+`let mut x` permite reasignar `x` y tomar `&mut x`. En un patrón, `mut` afecta solo a la variable que lo lleva: en `let (mut a, b)`, `b` sigue inmutable.
+
+### Uso 2 · Préstamo exclusivo `&mut T`
+
+`&mut x` presta `x` para modificarlo. La regla de oro: **mientras exista un `&mut`, no puede haber ningún otro préstamo** (ni compartido ni exclusivo) del mismo valor. Esto evita el **aliasing con mutación**: que alguien lea datos mientras otro los cambia (o los libera, al hacer crecer un `Vec`), y las **carreras de datos** entre hilos.
+
+### Uso 3 · Punteros `*mut T` y `static mut`
+
+Un `*mut T` permite escribir a través de él, pero desreferenciarlo exige `unsafe`. `static mut` es una variable global modificable; acceder a ella es `unsafe` y, en la edición 2024, crear referencias a ella es un error. Prefiere atómicos o `Mutex`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-mut" />
+
+Salida:
+
+```text
+2
+[2, 4, 6]
+30 20
+6
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-mut-error" />
+
+`error[E0499]: cannot borrow v as mutable more than once at a time`. Las marcas del error señalan el primer préstamo, el segundo, y el uso posterior del primero que hace que se solapen.
+
+## Desde
+
+Rust 1.0. `&raw mut`: 1.82.
+
+## Ver también
+
+- [`let`](/ref/lenguaje/palabras-clave/let/) · [`ref`](/ref/lenguaje/palabras-clave/ref/) · [`static`](/ref/lenguaje/palabras-clave/static/) · [`raw`](/ref/lenguaje/palabras-clave/raw/) · [Subtipos y varianza](/ref/lenguaje/subtipos-y-varianza/): por qué `&mut T` es invariante.
+
+## Aprende esto en
+
+- [Mundo 07 · Préstamos](/curso/07-prestamos/)

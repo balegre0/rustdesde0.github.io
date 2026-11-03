@@ -1,0 +1,41 @@
+---
+title: "#[diagnostic::on_unimplemented] y #[diagnostic::do_not_recommend]"
+description: "Atributos del espacio diagnostic:: para mejorar los mensajes de error que ven los usuarios de tu trait."
+sidebar:
+  order: 28
+insignias: ["Desde 1.78", "Diagnósticos"]
+---
+import { NoCompila } from '~/components';
+
+El espacio de nombres `diagnostic::` agrupa atributos que **solo** cambian los mensajes de error. Si el compilador no entiende uno (por ser de una versión más nueva), lo ignora con un aviso: nunca rompen la compilación.
+
+## Sinopsis
+
+```text
+#[diagnostic::on_unimplemented(
+    message = "…",   // primera línea del error ({Self} y los genéricos se sustituyen)
+    label = "…",     // texto bajo la marca ^^^
+    note = "…",      // notas extra (se puede repetir)
+)]
+trait MiTrait { … }
+
+#[diagnostic::do_not_recommend]
+impl<T: Display> MiTrait for T { … }
+```
+
+## Qué hace
+
+- **`on_unimplemented`**, en un trait: cuando un tipo no lo implementa, el error E0277 usa tus textos en vez del genérico. Es lo que hace la biblioteca estándar con mensajes como *`` `x` is not an iterator ``*. Ideal para bibliotecas con traits que el usuario implementa o deriva.
+- **`do_not_recommend`**, en un `impl`: el compilador no sugiere esa implementación en los errores. Útil con implementaciones genéricas que, si se mencionan, confunden más de lo que ayudan.
+
+## Ejemplo
+
+<NoCompila ej="ref-lenguaje/at-on-unimplemented" />
+
+## Desde
+
+`on_unimplemented`: Rust 1.78. `do_not_recommend`: 1.85.
+
+## Ver también
+
+[E0277](/errores/e0277/) · [Niveles de lint](/ref/lenguaje/atributos/lints/)

@@ -1,0 +1,109 @@
+---
+title: "Arc<T>"
+description: "Rc para hilos: varios dueños de un valor compartido entre hilos, con contador atómico."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "alloc"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::sync::Arc`
+
+## Sinopsis
+
+```rust
+pub struct Arc<T, A = Global>
+where
+    A: Allocator,
+    T: ?Sized,
+{ /* private fields */ }
+```
+
+## Qué hace
+
+`Arc<T>` (*atomically reference counted*) funciona igual que `Rc<T>`, pero suma y resta su contador con **operaciones atómicas**, que son seguras aunque varios hilos lo hagan a la vez. Es `Send` y `Sync` si `T` es `Send + Sync`. Como `Rc`, solo da acceso compartido: para modificar, combínalo con `Mutex`, `RwLock` o atómicos.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`new`](#new) | Crea el primer `Arc`. | 1.0 |
+| [`clone`](#clone) | Otro dueño (suma 1, de forma atómica). | 1.0 |
+| [`strong_count`](#strong_count) | Cuántos dueños hay en este momento (otro hilo puede cambiarlo justo después). | 1.15 |
+| [`downgrade`](#downgrade) | Crea un `sync::Weak`. | 1.4 |
+| [`try_unwrap`](#try_unwrap) | Recupera el valor si es el único dueño. | 1.4 |
+
+### `new`
+
+```rust
+pub fn new(data: T) -> Arc<T>
+```
+
+Crea el primer `Arc`.
+
+### `clone`
+
+```rust
+fn clone(&self) -> Arc<T, A>
+```
+
+Otro dueño (suma 1, de forma atómica).
+
+### `strong_count`
+
+```rust
+pub fn strong_count(this: &Arc<T, A>) -> usize
+```
+
+Cuántos dueños hay en este momento (otro hilo puede cambiarlo justo después).
+
+### `downgrade`
+
+```rust
+pub fn downgrade(this: &Arc<T, A>) -> Weak<T, A>
+where
+    A: AllocatorClone,
+```
+
+Crea un `sync::Weak`.
+
+### `try_unwrap`
+
+```rust
+pub fn try_unwrap(this: Arc<T, A>) -> Result<T, Arc<T, A>>
+```
+
+Recupera el valor si es el único dueño.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/sync-arc" />
+
+**Salida:**
+
+```text
+2 [1, 2, 3]
+1
+```
+
+<Ejecutar ej="ref-std/sync-arc-hilos" />
+
+Este ejemplo crea **hilos**, y el navegador no puede ejecutarlos: el botón lo envía al Playground de Rust (play.rust-lang.org). Aquí se ha comprobado que compila; su salida no se reproduce en esta página porque solo la da una ejecución real.
+
+## Rendimiento
+
+Las operaciones atómicas cuestan algo más que las normales: en un solo hilo, `Rc` es más barato.
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `strong_count` (1.15), `downgrade` (1.4), `try_unwrap` (1.4).
+
+## Ver también
+
+- [Rc](/ref/std/rc/rc/)
+- [Mutex](/ref/std/sync/mutex/)
+- [thread::spawn](/ref/std/thread/spawn/)
+
+## Aprende esto en
+
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

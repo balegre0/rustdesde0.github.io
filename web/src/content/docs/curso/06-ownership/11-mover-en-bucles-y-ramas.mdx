@@ -1,0 +1,88 @@
+---
+title: "Mover en bucles y ramas"
+description: "El compilador sigue cada camino: un valor movido en un bucle no puede moverse en la vuelta siguiente, y uno movido en una rama no puede usarse después. Las banderas de drop deciden al ejecutar."
+sidebar:
+  order: 11
+duracion: 12
+desde: "1.0"
+requiere: ["06-ownership/10-ownership-y-colecciones"]
+tarjetas:
+  - p: "¿Por qué `for _ in 0..3 { guardar(nota); }` da E0382?"
+    r: "Porque la primera vuelta mueve `nota`, y en la segunda ya no tiene permisos. El compilador lo sabe aunque no sepa cuántas vueltas habrá."
+  - p: "Si un valor se mueve solo dentro de un `if`, ¿se puede usar después del `if`?"
+    r: "No: hay un camino (el de la rama tomada) en el que ya se movió. El compilador exige que el uso sea válido por todos los caminos."
+  - p: "¿Qué es una bandera de drop?"
+    r: "Un booleano oculto que el compilador añade cuando no sabe al compilar si un valor se movió: al ejecutar, decide si hay que liberarlo al final del ámbito."
+  - p: "¿Qué es un movimiento parcial?"
+    r: "Mover solo un campo de una tupla o struct (`let a = par.0;`). Los demás campos se pueden seguir usando, pero el conjunto ya no."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Hasta ahora los movimientos eran en línea recta. Con bucles y `if`, el compilador tiene que razonar sobre **todos los caminos** posibles. Vas a ver cómo lo hace y qué truco usa cuando no puede saberlo al compilar.
+
+## Predice
+
+<NoCompila ej="m06/mover-en-bucle" explicacion={"En la primera vuelta, `guardar(nota)` mueve `nota` dentro de la función. ¿Qué tiene `nota` al empezar la segunda vuelta?"} />
+
+## La idea
+
+El compilador no ejecuta el programa: lo mira como un **mapa de caminos**. Un valor se puede usar en un punto solo si, **por todos los caminos** que llegan a ese punto, sigue siendo de su dueña.
+
+**En un bucle**, el final de cada vuelta lleva al principio de la siguiente. Si una vuelta mueve `nota`, el camino «vuelta 1 → vuelta 2» llega a `guardar(nota)` con `nota` ya movida. Error, aunque el bucle fuera a dar una sola vuelta.
+
+**En un `if`**, hay dos caminos: la rama tomada y la no tomada. Si una rama mueve el valor, después del `if` hay un camino en el que ya no es tuyo:
+
+<NoCompila ej="m06/mover-en-if" explicacion="Si `urgente` es `true`, `nota` se mueve a `guardar`. Después del `if`, el `println!` llega por ese camino con `nota` ya movida. Da igual que `urgente` sea una constante: el compilador comprueba los dos caminos." />
+
+**Movimiento parcial.** Puedes mover un solo campo de una tupla o un struct. Los demás siguen siendo usables, pero el conjunto ya no:
+
+<Ejecutar ej="m06/p-movimiento-parcial" />
+
+<NoCompila ej="m06/p-movimiento-parcial-mal" explicacion="`par.0` se movió a `izq`. `par.1` sigue siendo usable, pero `par` entero no, porque le falta una parte." />
+
+## Pruébalo
+
+Si el compilador no sabe al compilar si un valor se movió, ¿cómo sabe al final del ámbito si tiene que liberarlo? Míralo con un tipo que avisa cuando se libera:
+
+<Ejecutar ej="m06/bandera-de-drop" />
+
+En la vuelta con `urgente = true`, la nota se libera **dentro** de `consumir`. En la vuelta con `false`, se libera al final de la vuelta. Nunca se libera dos veces.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Banderas de drop.** Cuando un valor se mueve solo en algunos caminos, el compilador añade una variable booleana oculta, la **bandera de drop** (*drop flag*): vale `true` mientras la variable es dueña y pasa a `false` al moverla. Al final del ámbito, el `drop` se ejecuta solo si la bandera sigue en `true`. Es el único caso en que el ownership deja un rastro al ejecutar, y es un simple booleano en la pila. Si el compilador puede decidirlo todo al compilar, la bandera ni existe.
+
+**Lo que se comprueba en el MIR.** El análisis que da E0382 se llama *move paths* y trabaja sobre el MIR (el grafo de bloques del programa): para cada punto calcula qué caminos de datos (`nota`, `par.0`, `par.1`…) pueden estar movidos. Es el mismo grafo que usará el comprobador de préstamos en el mundo 07.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Arreglar el bucle con clone() en cada vuelta">
+
+❌ `guardar(nota.clone())` en cada vuelta. Compila, pero clona el texto tres veces.
+
+✅ Pregúntate qué necesita `guardar`. Si de verdad tiene que quedarse con **un texto distinto** en cada vuelta, clonar es correcto. Si solo lo lee, en el mundo 07 lo cambiarás para que reciba un préstamo, y el bucle no clonará nada.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta={"`let s = String::from(\"a\"); if cond { drop(s); } println!(\"fin\");` ¿Compila?"}
+  opciones={["Sí: `s` no se usa después del `if`", "No: E0382", "Solo si `cond` es `false`", "No: falta un `else`"]}
+  correcta={0}
+  explicacion="Mover en una rama está permitido. Lo prohibido es **usar** después el valor. Aquí no se usa, y la bandera de drop se encarga de no liberarlo dos veces."
+  porque={["", "No hay ningún uso de `s` después del `if`.", "El compilador no depende del valor de `cond`.", "El `else` es opcional."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuándo añade el compilador una bandera de drop?"
+  opciones={["Siempre", "Cuando un valor se mueve solo en algunos caminos y no se puede saber al compilar si hay que liberarlo", "Cuando el tipo es `Copy`", "Nunca: todo se decide al compilar"]}
+  correcta={1}
+  explicacion="Si en todos los caminos se mueve (o en ninguno), el compilador sabe dónde va el `drop` y no hace falta bandera."
+  porque={["Casi nunca hace falta.", "", "Los tipos `Copy` no tienen `drop`.", "Es justo la excepción: un booleano al ejecutar."]}
+/>

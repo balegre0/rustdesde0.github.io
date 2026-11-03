@@ -1,0 +1,100 @@
+---
+title: "Jefe: el informe de ventas"
+description: "Junta closures, traits de llamada, iteradores propios, adaptadores y consumidores en un programa completo."
+sidebar:
+  order: 12
+duracion: 15
+desde: "2024"
+requiere: ["14-closures-e-iteradores/11-iteradores-expertos"]
+tarjetas:
+  - p: "¿Por qué `al_menos(2000)` devuelve `impl Fn(&&Venta) -> bool` con `&&`?"
+    r: "Porque se usa en `ventas.iter().filter(…)`: `iter()` entrega `&Venta` y `filter` pasa a su closure una referencia a cada elemento, `&&Venta`."
+  - p: "¿Por qué se puede hacer `zip` con un iterador infinito como `Numerador`?"
+    r: "Porque `zip` se para en cuanto uno de los dos se acaba, y la pereza hace que solo se pidan los números necesarios."
+  - p: "¿Qué trait de closure acepta `max_by_key`? ¿Cómo lo sabes?"
+    r: "`FnMut`: el closure del jefe incrementa `consultas` y compila. Un bound `Fn` lo habría rechazado con E0594."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Último combate del mundo: un informe de ventas escrito **sin un solo índice**, solo con closures e iteradores. Primero lees y predices; después escribes el tuyo.
+
+## Predice
+
+<Predice
+  ej="m14/jefe-informe"
+  pregunta="Lee el programa entero. ¿Qué imprime la última línea?"
+  opciones={['`Estrella: Some("café") (4 consultas)`', '`Estrella: Some("agua") (4 consultas)`', '`Estrella: Some("café") (1 consultas)`', "No compila: el closure de `max_by_key` modifica `consultas`"]}
+  correcta={0}
+  explicacion="Importes: café 3600, té 360, churros 3000, agua 3000. Gana el café. `max_by_key` llama a la clave una vez por elemento: 4 consultas. Y su closure puede ser `FnMut`, así que modificar `consultas` está permitido."
+  porque={["Correcto.", "El agua vende más unidades (50), pero la clave es el importe: 50 · 60 = 3000, menos que 3600.", "Para encontrar el máximo hay que mirar todos los elementos.", "`max_by_key` pide `FnMut`, no `Fn`."]}
+/>
+
+## La idea
+
+El programa del jefe usa una pieza de cada lección:
+
+| Pieza | Lección | Dónde |
+|---|---|---|
+| Closure que captura con `move` y se devuelve con `impl Fn` | 2 y 4 | `al_menos(minimo)` |
+| Iterador propio con `next()` | 10 | `Numerador`, infinito |
+| `iter()` frente a mover | 6 | `ventas.iter()` presta: `ventas` sigue usable |
+| Adaptadores `map`, `filter`, `zip` | 7 | el total y el listado numerado |
+| Consumidores `sum`, `max_by_key` | 8 | el total y la estrella |
+| Closure `FnMut` | 3 | el contador de consultas |
+
+Fíjate en el `zip` del paso 4: empareja un iterador **infinito** con la lista filtrada. No se cuelga porque `zip` se para con el más corto, y la pereza hace que `Numerador` solo genere 1, 2 y 3.
+
+## Pruébalo
+
+<Ejecutar ej="m14/jefe-informe" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Cuenta los **tipos** que el compilador ha inventado en el paso 4: el closure devuelto por `al_menos` (un struct con un campo `minimo: u32`), `Filter<slice::Iter<'_, Venta>, ese closure>`, `Numerador` y `Zip<Numerador, Filter<…>>`. Todos se conocen al compilar, así que el `for` se monomorfiza en un bucle concreto sin vtables ni memoria en el montón. Lo único que vive en el montón es el `Vec` de ventas.
+
+Y cuenta los **préstamos**: `ventas.iter()` presta el vector tres veces seguidas (total, listado, estrella), siempre en compartido. Por eso `ventas` sigue disponible al final. El único préstamo exclusivo es el de `consultas`, dentro del closure de `max_by_key`, y termina con esa llamada: por eso podemos imprimir `consultas` en la línea siguiente.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m14/fn-no-muta"
+  explicacion="Repaso del error más típico del mundo: una función que pide `Fn` y recibe un closure que modifica lo capturado (E0594). Si el contador de consultas del jefe se pasara a una función con bound `Fn`, pasaría esto. La solución es pedir `FnMut`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m14/jefe-texto"
+  enunciado={'El reto final: completa las tres funciones **solo con iteradores y closures**, sin bucles. `longitudes` da la longitud en caracteres (no en bytes) de cada palabra; `mas_larga` devuelve la palabra más larga (con empate, la última); `contar_si` cuenta las palabras que cumplen la condición que recibe. Salida esperada: `[2, 8, 4, 6, 3, 2, 6]`, `Some("pingüino")`, `None`, `4` y `2`.'}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En `contar_si(texto, |p| p.chars().count() >= minimo)`, ¿cómo captura el closure a `minimo`?"
+  opciones={["Por préstamo compartido: solo lo lee", "Por valor: lo mueve", "Por préstamo exclusivo", "No lo captura: es un parámetro"]}
+  correcta={0}
+  explicacion="Sin `move` y solo leyendo, basta `&minimo`. El closure es `Fn`, que es lo que pide `contar_si`."
+  porque={["Correcto.", "Haría falta `move` para eso.", "Solo sería exclusivo si lo modificara.", "Es una variable de `main` que el closure usa desde fuera: eso es capturar."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `longitudes` usa `p.chars().count()` y no `p.len()`?"
+  opciones={["`len()` cuenta bytes, y «ü» o «ñ» ocupan 2 bytes en UTF-8", "`len()` no existe para `&str`", "`chars().count()` es más rápido", "Da igual: devuelven lo mismo"]}
+  correcta={0}
+  explicacion={'`"pingüino".len()` es 9 (bytes), pero tiene 8 caracteres.'}
+  porque={["Correcto.", "Existe, pero mide bytes.", "Es más lento: tiene que decodificar UTF-8.", "Solo coinciden si el texto es ASCII."]}
+/>
+
+<Pregunta
+  pregunta={'`mas_larga("")` devuelve `None`. ¿De dónde sale ese `None`?'}
+  opciones={["`max_by_key` sobre un iterador vacío no tiene máximo y devuelve `None`", "`split_whitespace` entra en pánico con un texto vacío", "Hay que comprobarlo a mano con un `if`", "Del `todo!()`"]}
+  correcta={0}
+  explicacion="Los consumidores que buscan un elemento (`max`, `min`, `find`, `max_by_key`…) devuelven `Option` justo para este caso."
+  porque={["Correcto.", "Con texto vacío, `split_whitespace` simplemente no entrega nada.", "El `Option` ya lo cubre: no hace falta.", "La solución no tiene `todo!()`."]}
+/>

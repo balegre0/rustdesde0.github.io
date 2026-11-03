@@ -1,0 +1,122 @@
+---
+title: "¿Hasta cuándo dura un préstamo?"
+description: "Un préstamo vive desde que se crea hasta su último uso, no hasta la llave que cierra el bloque. Así funcionan los lifetimes no léxicos (NLL)."
+sidebar:
+  order: 6
+duracion: 11
+desde: "1.31"
+requiere: ["07-prestamos/05-ni-mover-ni-asignar"]
+tarjetas:
+  - p: "¿Hasta cuándo está vivo un préstamo?"
+    r: "Desde que se crea hasta su último uso. No hasta el final del bloque."
+  - p: "¿Qué significa NLL?"
+    r: "*Non-lexical lifetimes*, lifetimes no léxicos: el compilador calcula la vida de cada préstamo según los usos, no según las llaves `{}`. Llegó con la edición 2018 (Rust 1.31)."
+  - p: "¿Por qué `let r = &mut x; println!(\"{x}\"); *r += 1;` no compila?"
+    r: "Porque `r` se usa después del `println!`, así que está vivo cuando se lee `x`: un compartido mientras hay un exclusivo vivo (E0502)."
+  - p: "¿Cuál es la forma más común de arreglar un E0502?"
+    r: "Reordenar: hacer el último uso del préstamo antes de la línea que necesita el permiso contrario."
+---
+
+import { Ejecutar, NoCompila, Predice, Prestamos, Pregunta, BajoElCapo, Trampa, Ordena } from '~/components';
+
+Hasta ahora has visto frases como «mientras el préstamo esté vivo». Toca precisar **cuánto** vive, porque de eso depende que tu programa compile o no.
+
+## Predice
+
+<Predice
+  ej="m07/nll-predice"
+  opciones={["`[10, 20, 30] 3`", "No compila: `total` y `vista` están vivas a la vez", "No compila: `puntos` no se puede leer después de prestarla como `&mut`", "`[10, 20] 2`"]}
+  correcta={0}
+  explicacion="`total` se usa por última vez en el `push`. Desde ahí ya no cuenta como vivo, así que crear `vista` es correcto aunque `total` siga «en el ámbito» hasta el final de `main`."
+  porque={["", "Estarían vivas a la vez solo si `total` se usara después de crear `vista`.", "Se puede volver a usar `puntos` en cuanto `total` deja de usarse.", "El `push` sí se ejecutó: añadió `20 + 10`."]}
+/>
+
+## La idea
+
+> **Un préstamo vive desde que se crea hasta su último uso.**
+
+La variable que guarda la referencia puede seguir existiendo hasta la `}`, pero al comprobador de préstamos no le importa: lo que mira es **si se va a volver a usar**. Si no, el préstamo ha terminado y la dueña recupera sus permisos.
+
+A esta forma de calcular la vida de los préstamos se la llama **NLL** (*non-lexical lifetimes*, «lifetimes no léxicos»): no se guían por el texto (las llaves), sino por el flujo del programa.
+
+Con eso, muchos errores se arreglan **reordenando**. Esto no compila:
+
+<NoCompila ej="m07/p-nll-mal" explicacion="`primero` se usa en el `println!`, después del `push`. Por tanto está vivo durante el `push`: E0502." />
+
+Y esto sí, con las mismas líneas en otro orden:
+
+<Ejecutar ej="m07/p-nll-ok" />
+
+## Pruébalo
+
+Fíjate en cómo los permisos vuelven en cuanto acaba cada préstamo:
+
+<Prestamos lineas={[
+  { codigo: "let mut x = 5;", permisos: { x: "RWO" } },
+  { codigo: "let r = &mut x;", permisos: { x: "---", r: "R-O", "*r": "RW-" } },
+  { codigo: "*r += 1;", permisos: { x: "RWO" }, nota: "Último uso de r: el préstamo exclusivo termina AQUÍ, no al final de main." },
+  { codigo: "let s = &x;", permisos: { x: "R--", s: "R-O" }, nota: "Un compartido nuevo: posible porque r ya no está vivo." },
+  { codigo: "println!(\"{s}\");", permisos: { x: "RWO" } }
+]} />
+
+<Ejecutar ej="m07/p-mut-tras-ultimo-uso" />
+
+Ahora, el error más traicionero de esta lección. `println!` **presta** sus argumentos (los lee con `&`), así que imprimir la dueña mientras hay un `&mut` vivo también choca:
+
+<NoCompila ej="m07/p-println-con-mut" explicacion={"`println!(\"{x}\")` necesita leer `x` (un préstamo compartido), pero `r` se usa después: está vivo. Arreglo: haz `*r += 1` antes de imprimir."} />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Cómo lo calcula el compilador.** El comprobador de préstamos trabaja sobre el **MIR**, un grafo de bloques que representa todos los caminos posibles del programa. Para cada préstamo calcula el conjunto de puntos del grafo donde todavía puede usarse (su *región*). Después recorre cada instrucción y comprueba que ninguna choca con un préstamo vivo en ese punto. Si hay un `if`, un préstamo usado solo en una rama está vivo solo en esa rama.
+
+**Por qué se llama «no léxico».** Antes de 2018, un préstamo duraba hasta el final de su bloque léxico (el par de llaves que lo contiene). Mucho código correcto no compilaba y había que abrir bloques `{ }` artificiales para «cortar» préstamos. NLL quitó esa necesidad. En la mayoría de los tutoriales antiguos aún verás esos bloques: hoy sobran.
+
+**Ojo con `drop`.** Un valor con destructor (`Drop`) cuenta como **usado** en su `}`, porque ahí se ejecuta su `drop`. Si ese valor guarda un préstamo, el préstamo vive hasta la `}`. Lo verás con structs que guardan referencias en el mundo 08.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Pensar que el préstamo dura lo que dura la variable">
+
+❌ «`r` existe hasta el final de `main`, así que `x` estará bloqueada hasta el final».
+
+✅ Lo que cuenta es el **último uso** de `r`. Si no vuelves a usarla, `x` está libre otra vez, aunque `r` siga declarada.
+
+La consecuencia práctica: cuando veas E0502 o E0499, busca la marca `borrow later used here`. Ese uso es lo que mantiene vivo el préstamo. ¿Puedes moverlo antes? Casi siempre es el arreglo.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  enunciado="Ordena las líneas para que el programa compile e imprima `[1, 2, 3, 4]` en la última línea."
+  lineas={[
+    "let mut v = vec![1, 2, 3];",
+    "let primero = &v[0];",
+    "println!(\"primero = {primero}\");",
+    "v.push(4);",
+    "println!(\"{v:?}\");"
+  ]}
+  explicacion="El préstamo `primero` tiene que terminar (último uso en el primer `println!`) antes de que `push` pida el préstamo exclusivo."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`let r = &v;` está en la línea 2 y su último uso en la línea 4. El bloque termina en la línea 9. ¿Desde qué línea puede llamarse `v.push(…)`?"
+  opciones={["Desde la 3", "Desde la 5", "Desde la 10, fuera del bloque", "Nunca, mientras exista `r`"]}
+  correcta={1}
+  explicacion="El préstamo vive hasta su último uso, la línea 4. A partir de la 5, `v` vuelve a tener todos sus permisos."
+  porque={["En la línea 3, `r` todavía tiene un uso pendiente (el de la 4).", "", "Así funcionaba antes de 2018. Con NLL, la `}` no importa.", "La variable puede existir, pero si no se usa, el préstamo ya terminó."]}
+/>
+
+<Pregunta
+  pregunta={"¿Por qué `println!(\"{x}\")` puede chocar con un `&mut x` vivo?"}
+  opciones={["Porque `println!` mueve `x`", "Porque `println!` presta `x` para leerla, y no puede haber un compartido con un exclusivo vivo", "Porque `println!` necesita `&mut x`", "No puede chocar nunca"]}
+  correcta={1}
+  explicacion="Las macros de formato toman referencias compartidas de sus argumentos. Por eso imprimir no mueve nada, pero sí cuenta como un préstamo compartido."
+  porque={["Si lo moviera, no podrías imprimir dos veces la misma variable.", "", "Solo lee; no necesita modificar.", "Lo has visto arriba: E0502."]}
+/>

@@ -1,0 +1,47 @@
+---
+title: "Mundo 07 · Préstamos"
+description: "Usar un valor sin quedártelo: referencias compartidas (&) y exclusivas (&mut), la regla «muchos lectores o un solo escritor» y el error de memoria que evita."
+sidebar:
+  order: 0
+---
+
+El mundo 06 terminó con un problema: si pasar un `String` a una función lo **mueve**, ¿cómo lo usa una función sin quedárselo? Devolviéndolo cada vez funcionaría, pero sería agotador. La respuesta de Rust es **prestar**.
+
+Un **préstamo** (*borrow*) te deja usar un valor que es de otro. Hay dos clases, y toda la seguridad de Rust cabe en la regla que las une:
+
+| Préstamo | Se escribe | Puedes… | ¿Cuántos a la vez? |
+|---|---|---|---|
+| **Compartido** | `&x` | leer | todos los que quieras |
+| **Exclusivo** | `&mut x` | leer y modificar | **uno solo**, y sin compartidos vivos |
+
+> **Muchos lectores o un solo escritor. Nunca las dos cosas a la vez.**
+
+Esa regla es la que impide que un programa lea memoria que otra parte acaba de liberar o mover. El compilador la comprueba **antes** de ejecutar: el componente que lo hace se llama **comprobador de préstamos** (*borrow checker*). No cuesta nada al ejecutar, porque cuando el programa arranca ya no queda nada que comprobar.
+
+Vas a seguir usando las tablas de permisos del mundo 06 (**R** leer, **W** escribir, **O** propiedad). Ahora verás que un préstamo **quita** permisos a la dueña mientras está vivo y se los **devuelve** cuando deja de usarse.
+
+## Lecciones
+
+1. [Prestar](/curso/07-prestamos/01-prestar/): usar sin quedarse (`&`).
+2. [Una referencia por dentro](/curso/07-prestamos/02-referencias-por-dentro/): direcciones, `*` y auto-deref.
+3. [El préstamo exclusivo](/curso/07-prestamos/03-prestamo-exclusivo/): modificar a través de `&mut`.
+4. [La regla](/curso/07-prestamos/04-la-regla/): muchos lectores o un escritor (E0499, E0502).
+5. [Ni mover ni asignar lo prestado](/curso/07-prestamos/05-ni-mover-ni-asignar/): E0505 y E0506.
+6. [¿Hasta cuándo dura un préstamo?](/curso/07-prestamos/06-hasta-cuando-dura/): hasta su último uso (NLL).
+7. [Copiar, mover y represtar referencias](/curso/07-prestamos/07-copiar-y-represtar/): `&` se copia, `&mut` se mueve.
+8. [Préstamos y colecciones](/curso/07-prestamos/08-prestamos-y-colecciones/): recorrer, modificar y E0507.
+9. [Slices](/curso/07-prestamos/09-slices/): prestar un trozo (`&[T]` y `&str`).
+10. [Partir préstamos](/curso/07-prestamos/10-partir-prestamos/): campos e índices.
+11. [Cuando el compilador es demasiado estricto](/curso/07-prestamos/11-limites-del-comprobador/): falsos positivos y cómo rodearlos.
+12. [Jefe: el registro de lecturas](/curso/07-prestamos/12-jefe/): todo junto.
+
+## Lo que el compilador vigila en este mundo
+
+| Error | Qué te impide hacer | Qué fallo de memoria evita |
+|---|---|---|
+| [E0499](/errores/e0499/) | Dos préstamos exclusivos del mismo valor a la vez | Dos escritores pisándose; una vista que queda apuntando a memoria liberada |
+| [E0502](/errores/e0502/) | Un préstamo exclusivo mientras hay compartidos vivos (o al revés) | Leer a través de una referencia después de que el valor se moviera o liberara |
+| [E0505](/errores/e0505/) | Mover un valor mientras está prestado | Que el préstamo apunte a algo que ya tiene otro dueño (o se liberó) |
+| [E0506](/errores/e0506/) | Asignar a una variable mientras está prestada | Que el lector vea cambiar el valor bajo sus pies |
+| [E0596](/errores/e0596/) | Modificar a través de algo que no es `mut` | Escrituras por un camino que prometió solo leer |
+| [E0507](/errores/e0507/) | Sacar un valor de dentro de un préstamo | Que el dueño original libere algo que ya no es suyo |

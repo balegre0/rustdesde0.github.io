@@ -1,0 +1,91 @@
+---
+// Portada: una acción principal («Empieza ahora» o «Continuar»), la práctica a mano y la búsqueda.
+import { Icon } from '@astrojs/starlight/components';
+import { lecciones } from '../../lib/lecciones';
+import { preguntas, problemas, listas, quizzes, itemsCompila } from '../../lib/practica';
+const ls = await lecciones();
+const primera = ls[0]?.href ?? '/curso/';
+const secciones = [
+  { href: '/preguntas/', titulo: 'Preguntas', n: preguntas.length, unidad: 'preguntas', desc: 'Ownership, préstamos, lifetimes, traits… con solución detallada y tu tasa de acierto.' },
+  { href: '/problemas/', titulo: 'Problemas', n: problemas.length, unidad: 'problemas', desc: 'Escribe la función, pasa las pruebas, compara con la solución.' },
+  { href: '/curso/', titulo: 'Módulos guiados', n: ls.length, unidad: 'lecciones', desc: '25 mundos, de cómo funciona la máquina al diseño del lenguaje. Lecciones de 8 a 15 minutos.' },
+  { href: '/quizzes/', titulo: 'Quizzes', n: quizzes.length, unidad: 'quizzes', desc: 'Tandas cronometradas con puntuación y mejor marca.' },
+  { href: '/juegos/', titulo: 'Juegos', n: 2, unidad: 'juegos', desc: `¿Compila? en 60 segundos (${itemsCompila().length} programas) y Predice la salida.` },
+  { href: '/listas/', titulo: 'Listas', n: listas.length, unidad: 'listas', desc: 'Recorridos cerrados por la biblioteca para hacer de principio a fin.' },
+];
+---
+<div class="rdc-inicio not-content">
+  <p class="rdc-inicio-lema">Aprende Rust practicando: cientos de preguntas y problemas, lecciones cortas y cada programa ejecutable aquí mismo. En español, para quien nunca ha programado y para quien quiere entenderlo hasta el fondo.</p>
+  <div class="rdc-acciones" data-acciones>
+    <a class="rdc-boton grande" href={primera} data-empieza>
+      <span data-empieza-texto>Empieza ahora</span><Icon name="right-arrow" />
+    </a>
+    <a class="rdc-boton secundario grande" href="/curso/" data-continuar hidden>
+      <span>Continuar: <span data-continuar-titulo></span></span><Icon name="right-arrow" />
+    </a>
+    <a class="rdc-boton secundario grande" href="/preguntas/" data-practicar>Practicar preguntas</a>
+  </div>
+  <p class="rdc-inicio-busca">
+    Para buscar en todo el sitio (lecciones, referencia, errores como <code>E0499</code>), pulsa <kbd>S</kbd>, <kbd>/</kbd> o <kbd>Ctrl</kbd>&thinsp;+&thinsp;<kbd>K</kbd>.
+  </p>
+  <p class="rdc-inicio-hoy" data-hoy hidden>
+    <span data-racha></span>
+    <a href="/repaso/" data-repaso hidden><Icon name="random" /><span data-repaso-texto></span></a>
+  </p>
+
+  <h2 class="rdc-inicio-h2">Practica</h2>
+  <ul class="rdc-secciones" role="list">
+    {secciones.map((s) => (
+      <li>
+        <a href={s.href}>
+          <span class="rdc-sec-cab"><span class="rdc-sec-titulo">{s.titulo}</span><span class="rdc-sec-n rdc-num">{s.n} {s.unidad}</span></span>
+          <span class="rdc-sec-desc">{s.desc}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+
+  <div class="rdc-promesa">
+    <h2 class="rdc-inicio-h2">Qué es esto (y qué no)</h2>
+    <ul>
+      <li><strong>Desde cero de verdad.</strong> No hace falta saber programar: cada término se explica la primera vez que aparece.</li>
+      <li><strong>Salidas y errores reales.</strong> Cada programa se ha compilado con rustc 1.99.1 (edición 2024) y ejecutado; cada error que ves es el que da el compilador.</li>
+      <li><strong>Hasta el fondo.</strong> Ownership y préstamos con su porqué, lifetimes, traits, unsafe y comportamiento indefinido, el compilador por dentro.</li>
+      <li><strong>Sin cuentas.</strong> Tu progreso, tu racha y tus marcas se guardan en tu navegador. Puedes exportarlos.</li>
+      <li><strong>No es rápido ni mágico.</strong> Al borrow checker se le gana entendiéndolo, no peleando. Equivocarse es parte del camino.</li>
+    </ul>
+    <p class="rdc-inicio-pie"><a href="/arbol/">Árbol de progreso</a> · <a href="/ref/">Referencia</a> · <a href="/errores/">Errores del compilador</a> · <a href="/panel/">Tu panel</a></p>
+  </div>
+</div>
+
+<script>
+  import { leer, racha } from '../../runtime/progreso';
+  import { cargarIndice, pendientes, minutosPara, MAX_SESION } from '../../runtime/tarjetas';
+  const p = leer();
+  const cont = document.querySelector<HTMLAnchorElement>('[data-continuar]');
+  const emp = document.querySelector<HTMLAnchorElement>('[data-empieza]');
+  if (p.ultima && cont && emp) {
+    cont.href = p.ultima.url;
+    cont.querySelector('[data-continuar-titulo]')!.textContent = p.ultima.titulo;
+    cont.hidden = false;
+    // Una sola acción principal: «Continuar» pasa a ser la principal
+    cont.classList.remove('secundario');
+    emp.classList.add('secundario');
+    emp.querySelector('[data-empieza-texto]')!.textContent = 'Empezar desde el principio';
+    emp.parentElement!.append(emp);
+  }
+  const hoyEl = document.querySelector<HTMLElement>('[data-hoy]')!;
+  const r = racha(p);
+  if (r.dias > 0) {
+    hoyEl.hidden = false;
+    hoyEl.querySelector('[data-racha]')!.textContent = `Racha: ${r.dias} ${r.dias === 1 ? 'día' : 'días'}${r.hoyHecho ? '' : ' · practica algo hoy para seguirla'}`;
+  }
+  cargarIndice().then((ind) => {
+    const n = Math.min(pendientes(ind, p).length, MAX_SESION);
+    const el = document.querySelector<HTMLElement>('[data-repaso]');
+    if (!el || n === 0) return;
+    el.querySelector('[data-repaso-texto]')!.textContent = `${n} ${n === 1 ? 'tarjeta' : 'tarjetas'} para hoy · ~${minutosPara(n)} min`;
+    el.hidden = false;
+    hoyEl.hidden = false;
+  }).catch(() => {});
+</script>

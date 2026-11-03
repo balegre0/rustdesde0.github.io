@@ -1,0 +1,125 @@
+---
+title: "Conversiones y el tour de traits estándar"
+description: "Convierte entre tipos con From, Into, TryFrom y AsRef, y conoce de un vistazo el resto de traits que verás por todas partes."
+sidebar:
+  order: 9
+duracion: 14
+desde: "1.0"
+requiere: ["13-traits-y-genericos/08-derive-y-comparar", "10-errores"]
+tarjetas:
+  - p: "¿Qué relación hay entre `From` e `Into`?"
+    r: "Si implementas `From<A> for B`, obtienes gratis `Into<B> for A` (por una impl general). Se implementa `From`; se usa el que sea más cómodo."
+  - p: "¿Cuándo `TryFrom` en vez de `From`?"
+    r: "Cuando la conversión puede fallar. `try_from` devuelve `Result<Self, Self::Error>`: `u8::try_from(300)` da `Err`."
+  - p: "¿Para qué sirve `fn f(x: impl AsRef<str>)`?"
+    r: "Para aceptar cualquier cosa que se pueda ver como `&str` (un `&str`, un `String`, un `&String`…) sin copiar nada: `x.as_ref()` da el `&str`."
+  - p: "¿Por qué `let x = 5u8.into();` no compila?"
+    r: "Porque `into` puede convertir a muchos tipos (`u16`, `u32`, `f64`…) y nada dice a cuál (E0283). Hay que anotar el destino: `let x: u32 = 5u8.into();`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a aprender la forma idiomática de convertir un valor de un tipo a otro, y a reconocer los traits de la biblioteca estándar que aparecen en casi cualquier firma.
+
+## Predice
+
+<Predice
+  ej="m13/from-into"
+  opciones={["`6.5`", "No compila: solo se implementó `From`, no `Into`", "`2.54`", "No compila: `4.0.into()` es ambiguo"]}
+  correcta={0}
+  explicacion="Implementar `From<f64> for Metros` regala `Into<Metros> for f64`. Y aquí no hay ambigüedad: la anotación `let b: Metros` dice el destino."
+  porque={["Correcto.", "`Into` viene de regalo con `From`.", "Se suman los dos valores: 2.5 + 4.0.", "Lo sería sin anotación; `let b: Metros` la resuelve."]}
+/>
+
+## La idea
+
+Rust **nunca** convierte tipos por su cuenta: un `u8` no se convierte solo en `u32`, ni un `bool` en un número. Las conversiones se piden, y los traits de conversión son la forma estándar de ofrecerlas:
+
+- **`From<A> for B`**: «un `B` se puede construir desde un `A`, y **siempre** funciona». Se usa `B::from(a)`. Al implementarlo obtienes gratis **`Into`**: `a.into()`, que necesita saber el destino.
+- **`TryFrom<A> for B`**: igual, pero **puede fallar**; devuelve `Result`. Su pareja es `TryInto`. Es la forma correcta de pasar un `i32` a `u8`: `u8::try_from(300)` te avisa en vez de recortar en silencio como hace `as`.
+- **`AsRef<T>`**: «me puedo ver como un `&T`, sin copiar». Una función con `impl AsRef<str>` acepta `&str`, `String` y `&String`.
+
+Ya conoces otros que encajan aquí: el operador `?` usa `From` para convertir tu error en el de la función (mundo 10), y `Display` es lo que hace funcionar `{}` y `.to_string()`.
+
+## Pruébalo
+
+<Ejecutar ej="m13/conversiones" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`Into` no se implementa casi nunca a mano porque la biblioteca estándar tiene esta impl general:
+
+```rust
+impl<T, U> Into<U> for T
+where
+    U: From<T>,
+{
+    fn into(self) -> U {
+        U::from(self)
+    }
+}
+```
+
+Es decir: «si `U` se puede construir desde `T`, entonces `T` se convierte en `U`». Al escribir `From`, la coherencia hace el resto. Lo mismo pasa con `TryInto` y `TryFrom`. Y como `From<T> for T` también existe (todo tipo se convierte en sí mismo), `x.into()` sin destino conocido es ambiguo.
+
+**El tour de traits estándar.** Los que ya has visto en este mundo y los que vienen:
+
+| Trait | Para qué | Dónde lo verás a fondo |
+|---|---|---|
+| `Debug`, `Display` | `{:?}` y `{}` | lecciones 8 y 7 |
+| `Clone`, `Copy` | duplicar valores | lección 8, mundo 6 |
+| `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash` | comparar, ordenar, usar en mapas | lección 8 |
+| `Default` | un valor inicial sensato | lección 8 |
+| `From`/`Into`, `TryFrom`/`TryInto`, `AsRef` | convertir | esta lección |
+| `Add`, `Mul`, `Neg`, `Index`… | operadores | lección 10 |
+| `Iterator`, `IntoIterator` | recorrer con `for` | mundo 14 |
+| `Fn`, `FnMut`, `FnOnce` | llamar closures | mundo 14 |
+| `Deref`, `DerefMut` | que `*x` y los métodos atraviesen un envoltorio | mundo 15 |
+| `Drop` | código que se ejecuta al destruir un valor | mundo 15 |
+| `Send`, `Sync` | compartir entre hilos | mundo 17 |
+
+Una regla de diseño para tus tipos: implementa `Debug` siempre (te ayudará a depurar), `Display` solo si hay una forma «para humanos» clara de mostrarlo, y `From` para las conversiones sin pérdida.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m13/into-ambiguo"
+  explicacion="`5u8` se puede convertir en `u16`, `u32`, `u64`, `f64`… y en el propio `u8`. Nada dice cuál quieres (E0283). Arreglo: anota la variable o, mejor aún, escribe el destino delante con `u64::from(5u8)`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m13/reto-tryfrom"
+  enunciado="Implementa `TryFrom<u8>` para el enum `Dia`: 1 → `Lunes`, 2 → `Martes`, 3 → `Miercoles`, y cualquier otro número devuelve `Err` con ese mismo número (`type Error = u8;`). Después descomenta las líneas de `main`: deben salir `Ok(Martes)` y `Err(9)`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Implementas `From<Celsius> for Fahrenheit`. ¿Qué puedes escribir ahora sin más código?"
+  opciones={["`let f: Fahrenheit = c.into();`", "`let c: Celsius = f.into();`", "`let f = c.into();` sin anotación", "Nada más: hay que implementar `Into` aparte"]}
+  correcta={0}
+  explicacion="`From<Celsius> for Fahrenheit` da `Into<Fahrenheit> for Celsius`. Solo en esa dirección."
+  porque={["Correcto.", "La conversión al revés no existe: nadie la ha implementado.", "Sin anotación, el destino es ambiguo.", "`Into` viene de regalo por la impl general de la biblioteca estándar."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué diferencia hay entre `300i32 as u8` y `u8::try_from(300i32)`?"
+  opciones={["`as` recorta en silencio (da 44); `try_from` devuelve un `Err`", "Ninguna: los dos dan error", "`as` da pánico; `try_from` recorta", "`try_from` no existe para enteros"]}
+  correcta={0}
+  explicacion="`as` se queda con los 8 bits bajos (300 − 256 = 44). `try_from` comprueba el rango."
+  porque={["Correcto.", "`as` nunca falla con enteros: trunca.", "Es al revés, y `try_from` no entra en pánico: devuelve `Err`.", "La biblioteca estándar implementa `TryFrom` entre todos los enteros."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué acepta `fn letras(t: impl AsRef<str>)`?"
+  opciones={["`&str`, `String` y `&String`, entre otros", "Solo `&str`", "Solo `String`", "Cualquier tipo, convirtiéndolo con `Display`"]}
+  correcta={0}
+  explicacion="Todos ellos implementan `AsRef<str>`, y `as_ref()` da un `&str` sin copiar."
+  porque={["Correcto.", "Esa es la gracia: acepta más que `&str`.", "También acepta préstamos.", "`AsRef` no usa `Display`; un `i32` no lo cumple."]}
+/>

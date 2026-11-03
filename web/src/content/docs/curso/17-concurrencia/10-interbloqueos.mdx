@@ -1,0 +1,91 @@
+---
+title: "Interbloqueos: seguro no es correcto"
+description: "Rust impide las carreras de datos, pero no los interbloqueos. El abrazo mortal de dos candados, el orden global de adquisición y el mutex que no se puede tomar dos veces."
+sidebar:
+  order: 10
+duracion: 12
+desde: "1.0"
+requiere: ["17-concurrencia/09-atomicos-y-ordering"]
+tarjetas:
+  - p: "¿Impide Rust los interbloqueos?"
+    r: "No. Garantiza que no hay carreras de datos, pero un programa seguro puede quedarse bloqueado para siempre."
+  - p: "¿Cuál es la regla clásica para evitar interbloqueos con varios candados?"
+    r: "Que todos los hilos tomen los candados en el mismo orden global."
+  - p: "¿Qué pasa si un hilo llama dos veces a lock() del mismo Mutex sin soltarlo?"
+    r: "Se bloquea para siempre o entra en pánico, según la plataforma: el Mutex de Rust no es reentrante."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Has visto que Rust hace **imposibles** las carreras de datos. Eso no significa que todo programa concurrente que compila sea correcto. Hay un fallo que el compilador no puede ver: el **interbloqueo** (*deadlock*).
+
+## Predice
+
+Dos hilos transfieren dinero entre dos cuentas. Cada uno toma los dos candados, pero en distinto orden:
+
+<Ejecutar ej="m17/interbloqueo" />
+
+Antes de ejecutarlo en el Playground: ¿llegará a imprimir algo?
+
+## La idea
+
+Un **interbloqueo** ocurre cuando cada hilo espera algo que tiene otro, en círculo:
+
+1. El hilo 1 toma A y espera B.
+2. El hilo 2 toma B y espera A.
+3. Ninguno suelta lo que tiene. Esperan para siempre.
+
+No hay ninguna carrera de datos, ningún comportamiento indefinido: el programa simplemente deja de avanzar. Por eso Rust lo compila. Las soluciones son de **diseño**:
+
+- **Orden global**: todos los hilos toman los candados en el mismo orden (por ejemplo, por identificador de cuenta). Sin ciclo de espera, no hay interbloqueo.
+- **Menos candados a la vez**: si puedes, nunca tengas dos.
+- **Soltar pronto**: mantén los guards en bloques cortos y no llames a código desconocido con un candado tomado.
+
+## Pruébalo
+
+La versión con orden global (en el Playground):
+
+<Ejecutar ej="m17/interbloqueo-orden" />
+
+Y el caso más tonto, que también pasa: un hilo que pide **dos veces** el mismo candado.
+
+<Ejecutar ej="m17/relock-mismo-hilo" />
+
+En el navegador no hay hilos, así que la biblioteca estándar lo detecta y entra en pánico («cannot recursively acquire mutex»). En tu PC, con hilos de verdad, el programa normalmente se quedaría bloqueado para siempre.
+
+<Reto
+  ej="m17/reto-orden"
+  enunciado="Este programa **puede** bloquearse para siempre: los dos hilos toman `tinta` y `papel` en distinto orden. Arréglalo sin quitar ningún `lock`, para que siempre imprima `tinta = 7, papel = 7`."
+/>
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Las cuatro condiciones de Coffman.** Un interbloqueo necesita, a la vez: exclusión mutua (los recursos no se comparten), retener y esperar (un hilo tiene uno y pide otro), sin expropiación (nadie le quita lo que tiene) y espera circular. Romper cualquiera lo evita. El orden global rompe la espera circular; `try_lock` (pedir sin esperar y soltar todo si falla) rompe «retener y esperar».
+
+**No reentrante.** Hay candados que permiten que el mismo hilo los tome varias veces (reentrantes). El `Mutex` de Rust no lo es: con un `&mut T` por cada guard, permitirlo daría dos préstamos exclusivos del mismo dato. En nightly existe `std::sync::ReentrantLock` (todavía inestable en Rust 1.99), que solo da acceso compartido (`&T`); en estable, el crate `parking_lot` ofrece `ReentrantMutex` con la misma idea.
+
+**Encontrarlos.** Como no los ve el compilador, se buscan con herramientas: `parking_lot` tiene un detector opcional, y el crate `loom` prueba sistemáticamente las intercalaciones de tus tests de concurrencia.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Un guard que vive más de lo que parece">
+
+❌ `match datos.lock().unwrap().get(k) { … }`: el guard es un temporal de la expresión del `match` y vive **todo** el `match`. Si dentro llamas a algo que vuelve a tomar `datos`, te bloqueas tú solo.
+
+✅ Saca lo que necesites a una variable antes (`let v = datos.lock().unwrap().get(k).cloned();`) y haz el `match` sobre `v`. La edición 2024 acortó la vida de algunos de estos temporales (por ejemplo, en `if let`), pero no la del `match`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué Rust no puede impedir los interbloqueos en tiempo de compilación?"
+  opciones={["Porque dependen del orden en que se ejecutan los hilos y del diseño, no de cómo se comparte la memoria", "Porque los `Mutex` son `unsafe`", "Porque es un error del compilador", "Sí los impide"]}
+  correcta={0}
+  explicacion="El sistema de tipos garantiza que el acceso a la memoria es seguro. Que el programa avance siempre es una propiedad de su lógica."
+  porque={["", "`Mutex` tiene una interfaz completamente segura.", "Es una limitación de lo que un sistema de tipos puede comprobar.", "Has visto un ejemplo que compila y se bloquea."]}
+/>

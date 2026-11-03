@@ -1,0 +1,107 @@
+---
+title: "panic! y el desenrollado"
+description: "Descubre qué es un pánico, quién lo provoca y qué pasa con la memoria cuando el programa se detiene."
+sidebar:
+  order: 1
+duracion: 11
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones/06-option-sin-null"]
+tarjetas:
+  - p: "¿Qué es un pánico en Rust?"
+    r: "La forma de detener el programa (o el hilo) cuando ocurre algo que indica un fallo del programador: un índice fuera de rango, un `unwrap` sobre `None`, un `assert!` que no se cumple…"
+  - p: "¿Qué es el desenrollado (unwinding)?"
+    r: "Lo que hace por defecto un pánico en un PC: recorre la pila hacia atrás, marco a marco, ejecutando los `Drop` de cada valor, para liberar la memoria y los recursos ordenadamente."
+  - p: "¿Qué cambia con `panic = \"abort\"`?"
+    r: "El pánico termina el proceso al instante, sin desenrollar ni ejecutar `Drop`. El binario es más pequeño. El objetivo `wasm32-wasip1` (este navegador) funciona así."
+  - p: "¿Para qué sirven `todo!()` y `unreachable!()`?"
+    r: "Son pánicos con significado: `todo!` marca código sin escribir todavía; `unreachable!` marca un camino que, según tu razonamiento, no puede ocurrir."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer la forma más drástica de tratar un error: parar. Y a saber cuándo es la correcta.
+
+## Predice
+
+<Predice
+  ej="m10/panic-predice"
+  opciones={["`empiezo` y luego un pánico: `index out of bounds: the len is 3 but the index is 3`", "`empiezo`, una línea vacía y `termino`", "`empiezo`, `miércoles` y `termino`", "No compila: el índice está fuera de rango"]}
+  correcta={0}
+  explicacion="Los índices van de 0 a 2. `dias[3]` no existe, y Rust no lee memoria ajena: detiene el programa con un pánico que dice la longitud y el índice. `termino` nunca se imprime."
+  porque={["Correcto.", "Rust nunca inventa un valor vacío para una posición que no existe.", "`len()` es 3, pero el último índice es 2.", "El índice se calcula al ejecutar (`dias.len()`); el compilador no lo sigue."]}
+/>
+
+## La idea
+
+Un **pánico** (*panic*) detiene el programa con un mensaje. Lo provocan:
+
+- la biblioteca estándar, cuando le pides algo imposible: un índice fuera de rango, `unwrap()` sobre `None`, una división entera entre 0, un desbordamiento en modo debug;
+- tú, con `panic!("mensaje")`, o con `assert!(condición, "mensaje")`, que entra en pánico si la condición es falsa;
+- `todo!()` (código pendiente) y `unreachable!()` (un camino que creías imposible).
+
+Un pánico significa **«este programa tiene un fallo»**, no «el usuario se ha equivocado». Si el usuario escribe «hola» donde iba un número, eso es normal y se trata con `Result` (lección 2). Pero si tu código pide la posición 3 de un array de 3, el programa ya no sabe en qué estado está, y lo honesto es parar **antes** de hacer daño: leer memoria que no es suya sería **comportamiento indefinido**, y Rust seguro nunca lo permite.
+
+## Pruébalo
+
+<Ejecutar ej="m10/panic" />
+
+Fíjate en que el `Drop` de `Ruidoso` (que imprimiría «se libera a») **no aparece** en el navegador. Lo explica el siguiente apartado.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Cuando ocurre un pánico, primero se ejecuta el **gancho de pánico** (*panic hook*), que imprime `thread 'main' … panicked at archivo:línea:columna` y el mensaje. Después actúa la **estrategia de pánico**, que se elige al compilar:
+
+- **`unwind`** (desenrollar, la opción por defecto en un PC): el programa recorre la pila hacia atrás, marco a marco, y ejecuta el `Drop` de cada valor vivo. Así se liberan memoria, archivos y candados de forma ordenada. Un pánico que desenrolla se puede incluso atrapar con `std::panic::catch_unwind` (rara vez es buena idea).
+- **`abort`**: termina el proceso al instante, sin ejecutar ningún `Drop`. Es más rápido y da binarios más pequeños (no hacen falta las tablas de desenrollado). Se pide en `Cargo.toml` con `panic = "abort"` (mundo 12).
+
+El objetivo **`wasm32-wasip1`**, donde se ejecutan los ejemplos de este navegador, usa `abort`: por eso el `Drop` no se ve. En tu PC, el mismo programa imprimiría «(se libera a)» tras el mensaje del pánico.
+
+En el código máquina, el camino del pánico está marcado como «frío» (*cold*) y se coloca aparte, para no estorbar al camino normal: comprobar un índice cuesta una comparación y un salto que casi nunca se toma.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="El mismo programa, dos resultados">
+
+El desbordamiento de enteros es un pánico **solo en modo debug**. En modo release (optimizado) no se comprueba y el número da la vuelta: `0 - 1` en un `u8` da `255`.
+
+<Ejecutar ej="m10/overflow-panic" />
+
+No confíes en el pánico para detectar desbordamientos en producción: usa `checked_sub`, `saturating_sub` o `wrapping_sub` (mundo 3) cuando el desbordamiento sea posible.
+
+</Trampa>
+
+<Ejecutar ej="m10/todo-y-unreachable" titulo="todo! es un pánico con mensaje" />
+
+## Tu turno
+
+<Reto
+  ej="m10/pinchar"
+  enunciado="Escribe `porcentaje(parte, total)`, que devuelve `parte * 100 / total` y entra en pánico con el mensaje `el total no puede ser 0` si `total` es 0 (usa `assert!`). Con `porcentaje(1, 4)` debe imprimir `25`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estas situaciones merece un pánico?"
+  opciones={["Una función interna recibe un índice que, por cómo está escrito el programa, nunca debería estar fuera de rango", "El usuario escribe letras donde se esperaba su edad", "Un archivo de configuración no existe", "El servidor tarda en responder"]}
+  correcta={0}
+  porque={["Correcto: es un fallo del programa, y seguir sería peor.", "Es un error esperable: se trata con `Result` y se le pide otra vez.", "Es una situación normal: se informa al usuario o se usan valores por defecto.", "La red falla a menudo: se reintenta o se informa."]}
+/>
+
+<Pregunta
+  pregunta="En un PC, con la configuración por defecto, ¿se ejecutan los `Drop` de las variables vivas cuando hay un pánico?"
+  opciones={["Sí: el pánico desenrolla la pila y ejecuta los `Drop`", "No: un pánico nunca ejecuta `Drop`", "Solo los de `main`", "Solo si se usa `catch_unwind`"]}
+  correcta={0}
+  porque={["Correcto: la estrategia por defecto es `unwind`.", "Eso pasa con `panic = \"abort\"` (y en el navegador), no por defecto.", "Se ejecutan los de todos los marcos que se desenrollan.", "El desenrollado ocurre aunque nadie atrape el pánico."]}
+/>
+
+<Pregunta
+  pregunta="`let x: u8 = 0; let y = x - 1;` con `x` leído del teclado. ¿Qué pasa al ejecutar en modo release?"
+  opciones={["`y` vale 255: en release no se comprueba el desbordamiento", "Pánico: `attempt to subtract with overflow`", "`y` vale -1", "No compila"]}
+  correcta={0}
+  porque={["Correcto: en release, la aritmética da la vuelta.", "Eso pasa en debug.", "Un `u8` no puede ser negativo.", "Si el valor viene del teclado, el compilador no puede saberlo."]}
+/>

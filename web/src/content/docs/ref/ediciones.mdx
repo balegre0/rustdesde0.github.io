@@ -1,0 +1,151 @@
+---
+title: "Ediciones"
+description: "Qué es una edición de Rust y qué cambió exactamente en 2015, 2018, 2021 y 2024, con cada cambio comprobado."
+sidebar:
+  order: 4
+desde: "1.0"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+Una **edición** es un «modo» del lenguaje que eliges por crate. Permite hacer cambios que romperían programas antiguos **sin** romperlos: cada crate sigue compilando con la edición que declara.
+
+## En una frase
+
+Hay cuatro ediciones: **2015** (la de Rust 1.0), **2018** (Rust 1.31), **2021** (Rust 1.56) y **2024** (Rust 1.85). Este curso usa la **2024**. Crates de ediciones distintas se enlazan entre sí sin problema.
+
+## Cómo funcionan
+
+- Se declara en `Cargo.toml` con `edition = "2024"` (o con `rustc --edition 2024`). Si no se dice nada, `rustc` usa **2015**; `cargo new` escribe la más reciente.
+- Una edición solo cambia cómo se **lee** el código de ese crate: palabras clave, reglas de sintaxis, algunos avisos que pasan a errores, el prelude… El compilador es el mismo y la biblioteca estándar también.
+- Los cambios entre ediciones son pequeños a propósito. `cargo fix --edition` migra casi todo de forma automática.
+- No hay edición 2027 anunciada en Rust 1.99: `rustc --edition` solo acepta `2015`, `2018`, `2021` y `2024` (y `future`, para pruebas internas).
+
+Todos los resultados de esta página se han comprobado compilando el mismo archivo con `rustc 1.99.1 --edition` 2015, 2018, 2021 y 2024.
+
+## Rust 2015
+
+La edición original, con Rust 1.0 (15 de mayo de 2015). Su tema fue la **estabilidad**: a partir de 1.0, el código que compila sigue compilando.
+
+Rasgos que la distinguen de las posteriores:
+
+- `async`, `await`, `dyn` y `try` son identificadores normales (`dyn` es una palabra clave débil, solo en posición de tipo).
+- Los objetos trait se pueden escribir sin `dyn`: `Box<Trait>` (con un aviso).
+- Las rutas de `use` empiezan siempre en la raíz del crate, y las dependencias se declaran con `extern crate`.
+- Los métodos de un trait pueden tener **parámetros anónimos**: `fn f(&self, u8);` compila con el aviso `anonymous parameters are deprecated and will be removed in the next edition`.
+
+## Rust 2018
+
+Llegó con Rust 1.31 (6 de diciembre de 2018). Su tema fue la **productividad**. Cambios propios de la edición:
+
+1. **Sistema de rutas nuevo**: las rutas de `use` funcionan igual que el resto; empiezan por el nombre de un crate, `crate`, `self`, `super` o algo en ámbito. Las que empiezan por `::` tienen que nombrar un crate externo. `extern crate` deja de ser necesario: Cargo pasa las dependencias al *prelude externo*. Las rutas de `pub(in ruta)` deben empezar por `crate`, `self` o `super`.
+2. **Palabras clave nuevas**: `async`, `await` y `dyn` pasan a ser estrictas; `try` queda reservada. Para usar esos nombres existen los identificadores crudos (`r#try`).
+3. **Parámetros anónimos de traits prohibidos**: `fn f(&self, u8);` da `error: expected one of :, @, or |, found )`.
+4. El aviso `tyvar_behind_raw_pointer` pasa a error.
+
+Otras mejoras de aquella época (no exclusivas de la edición, porque llegaron a todas): *non-lexical lifetimes* (préstamos que acaban en su último uso; en 2015 desde 1.36), `mod.rs` opcional, `'_`, `impl Trait`, `dyn`, macros importables con `use`, `$( … )?` en macros.
+
+## Rust 2021
+
+Llegó con Rust 1.56 (21 de octubre de 2021). Cambios:
+
+1. **Captura disjunta en closures**: una closure captura solo los **campos** que usa (`p.apodos`), no la variable entera. Compilado como 2018, el ejemplo de abajo da `error[E0499]: cannot borrow p.nombre as mutable more than once at a time`.
+2. **`IntoIterator` para arrays por valor**: `array.into_iter()` da los elementos (`T`). En 2015/2018 daba referencias (`&T`) por compatibilidad, y el ejemplo da `error[E0308]: mismatched types`.
+3. **Prelude nuevo**: añade `TryFrom`, `TryInto` y `FromIterator`.
+4. **Resolver de *features* de Cargo versión 2** por defecto.
+5. **`panic!` coherente**: el primer argumento es siempre una cadena de formato, como en `println!`. `panic!(s)` con una variable da `error: format argument must be a string literal` (en 2018 era un aviso). Para lanzar un valor que no es texto: `std::panic::panic_any`.
+6. **Sintaxis reservada**: `prefijo#ident`, `prefijo"…"`, `prefijo'…'` y `'prefijo#` quedan reservados para usos futuros. Por ejemplo, `z"x"` dentro de una macro da `error: prefix z is unknown`. Gracias a esto existen los literales `c"…"` (1.77) y los tiempos de vida crudos `'r#nombre`.
+7. **Avisos que pasan a error**: escribir un objeto trait sin `dyn` (`error[E0782]: expected a type, found a trait`) y los patrones de rango con `...` (`error[E0783]: ... range patterns are deprecated`; se escribe `..=`).
+8. **`$x:pat` en macros acepta alternativas** `A | B`; el nuevo fragmento `pat_param` conserva el comportamiento anterior.
+
+<Ejecutar ej="ref-lenguaje/ed-2021-captura" />
+
+Salida:
+
+```text
+Ada L. ["condesa", "matemática"]
+```
+
+<Ejecutar ej="ref-lenguaje/ed-2021-arrays" />
+
+Salida:
+
+```text
+x y
+```
+
+## Rust 2024
+
+Llegó con Rust 1.85 (20 de febrero de 2025). Es la edición más grande. Todos los cambios, por áreas:
+
+### Lenguaje
+
+1. **Captura de tiempos de vida en `impl Trait` de retorno**: el tipo opaco captura **todos** los parámetros genéricos y tiempos de vida en ámbito. Con `use<…>` se elige cuáles. El ejemplo de abajo, compilado como 2021, da `error[E0700]: hidden type for impl Iterator<Item = char> captures lifetime that does not appear in bounds`.
+2. **Ámbito de los temporales de `if let`**: el temporal del escrutinio se destruye antes de entrar en el `else`. Ver el ejemplo en [Destructores](/ref/lenguaje/destructores-y-orden-de-drop/).
+3. **Ámbito de los temporales de la expresión final**: los temporales de la última expresión de un bloque se destruyen **antes** que las variables locales. `c.borrow().len()` al final de una función deja de dar `error[E0597]: c does not live long enough`.
+4. **Fallback del tipo `!`**: cuando el compilador no puede deducir el tipo de una expresión divergente, ahora usa `!` en vez de `()`. Código como `match b { true => f(), false => panic!() }` con `f<T: Default>()` da en 2024 `error[E0277]: the trait bound !: Default is not satisfied` (y en 2021, el aviso convertido en error `this function depends on never type fallback being ()`). El aviso `never_type_fallback_flowing_into_unsafe` pasa a *deny*.
+5. **Reservas en la ergonomía de `match`**: no se puede escribir `ref`, `mut` o `&` explícitos donde el modo de enlace por defecto ya no es «mover»: `error: cannot explicitly borrow within an implicitly-borrowing pattern`. Ver [`ref`](/ref/lenguaje/palabras-clave/ref/).
+6. **`unsafe extern`**: los bloques `extern` deben escribirse `unsafe extern` (`error: extern blocks must be unsafe`), y sus elementos pueden marcarse `safe` o `unsafe`.
+7. **Atributos inseguros**: `no_mangle`, `export_name` y `link_section` se escriben `#[unsafe(…)]` (`error: unsafe attribute used without unsafe`).
+8. **`unsafe_op_in_unsafe_fn` avisa**: dentro de una `unsafe fn`, cada operación insegura necesita su bloque `unsafe`. Sin él: `warning[E0133]: dereference of raw pointer is unsafe and requires unsafe block`, con la nota `an unsafe function restricts its caller, but its body is safe by default`. En 2021 compilaba sin aviso.
+9. **Referencias a `static mut` prohibidas**: el aviso `static_mut_refs` pasa a *deny*: `error: creating a shared reference to mutable static` (en 2021, aviso).
+10. **Cadenas `let`**: `if let A = x && cond && let B = y` (estable desde 1.88, **solo** en 2024; en otras ediciones: `error: let chains are only allowed in Rust 2024 or later`).
+11. **Palabra clave `gen` reservada**: `let gen = 1;` da `error: expected identifier, found reserved keyword gen`.
+12. **Sintaxis reservada**: los literales «con guarda» sin prefijo `#"…"#` y dos o más `#` seguidos quedan reservados (`error: invalid string literal` con la nota `unprefixed guarded string literals are reserved for future use since Rust 2024`).
+
+### Macros
+
+13. **El fragmento `expr` acepta `const { … }` y `_`**. El nuevo `expr_2021` conserva el comportamiento anterior. En el ejemplo de abajo, compilado como 2021 gana la regla `const`; como 2024, la regla `expr`.
+14. **Falta de especificador de fragmento** (`$nombre` sin `:tipo`) en una regla: error. (Desde Rust 1.89 es error en todas las ediciones.)
+
+### Biblioteca estándar
+
+15. **Prelude nuevo**: añade `Future` e `IntoFuture`. En 2021, `fn f() -> impl Future<…>` sin `use` da `error[E0405]: cannot find trait Future in this scope`.
+16. **`IntoIterator for Box<[T]>` por valor**: `boxed_slice.into_iter()` da `T` en vez de `&T`.
+17. **Funciones que pasan a ser `unsafe`**: `std::env::set_var`, `std::env::remove_var` y `std::os::unix::process::CommandExt::before_exec`.
+
+### Cargo, rustdoc y rustfmt
+
+18. **Resolver de Cargo versión 3**, que tiene en cuenta el campo `rust-version` de las dependencias al elegir versiones.
+19. Cargo: desaparecen los nombres duplicados de tablas y claves (`[project]` en vez de `[package]`, `default_features` en vez de `default-features`…), y se rechaza `default-features = false` en una dependencia heredada del *workspace* si el *workspace* no lo desactiva.
+20. rustdoc: las pruebas de documentación se combinan en un solo ejecutable; cambian las rutas relativas de `include!` en documentación anidada.
+21. rustfmt: **edición de estilo** 2024 (formato de identificadores crudos, orden de versiones, correcciones varias).
+
+### Ejemplos de 2024
+
+<Ejecutar ej="ref-lenguaje/ed-2024-cola" />
+
+Salida: `4`.
+
+<Ejecutar ej="ref-lenguaje/ed-2024-rpit" />
+
+Salida:
+
+```text
+hola
+[0, 1, 2]
+```
+
+<Ejecutar ej="ref-lenguaje/ed-2024-expr" />
+
+Salida: `primera regla (expr)`. Compilado como 2021, imprime `segunda regla (const)`.
+
+<Ejecutar ej="ref-lenguaje/ed-2024-box-slice" />
+
+Salida: `60`.
+
+<NoCompila ej="ref-lenguaje/ed-2024-set-var" />
+
+`error[E0133]: call to unsafe function set_var is unsafe and requires unsafe block`. Cambiar el entorno del proceso mientras otro hilo lo lee puede provocar comportamiento indefinido en algunas plataformas; por eso ahora quien llama tiene que prometerlo.
+
+## Después de 2024
+
+No hay una edición 2027 oficial en Rust 1.99. Hay trabajo preparatorio: por ejemplo, los nuevos tipos de rango de `core::range` (1.95–1.96) que podrían cambiar el significado de `a..b` en una edición futura.
+
+## Ver también
+
+- [Versiones](/ref/versiones/) · [Palabras clave](/ref/lenguaje/palabras-clave/) · [Destructores y orden de drop](/ref/lenguaje/destructores-y-orden-de-drop/) · [`unsafe`](/ref/lenguaje/palabras-clave/unsafe/)
+
+## Aprende esto en
+
+- [Mundo 12 · Módulos, crates y Cargo](/curso/12-modulos-crates-y-cargo/) · [Mundo 24 · Teoría y diseño](/curso/24-teoria-y-diseno/)

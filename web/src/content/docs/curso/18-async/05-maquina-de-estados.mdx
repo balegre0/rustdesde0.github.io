@@ -1,0 +1,137 @@
+---
+title: "async fn es una máquina de estados"
+description: "Ver qué genera el compilador para una async fn y medir cuántos bytes ocupa de verdad."
+sidebar:
+  order: 5
+duracion: 13
+desde: "1.39"
+requiere: ["18-async/04-ejecutor", "09-structs-enums-y-patrones/05-enums-con-datos"]
+tarjetas:
+  - p: "¿En qué convierte el compilador el cuerpo de una async fn?"
+    r: "En un enum (una corrutina) con una variante por estado: sin empezar, uno por cada .await, terminado y en pánico."
+  - p: "¿Qué variables se guardan dentro del future?"
+    r: "Las que siguen vivas a través de algún .await (y los argumentos)."
+  - p: "¿Cuánto mide el future de una async fn con un array de 100 bytes vivo a través de un .await, frente a la misma sin el array?"
+    r: "120 bytes frente a 24 (medido con rustc 1.99.1)."
+  - p: "¿Cómo se adelgaza un future?"
+    r: "Haciendo que lo grande muera antes del .await (encerrarlo en un bloque) o metiéndolo en un Box."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a ver lo que hay **dentro** de una `async fn`: un `enum` que el compilador escribe por ti, y que puedes medir byte a byte.
+
+## Predice
+
+<Predice
+  ej="m18/tamanos"
+  opciones={[
+    "con array: 8 bytes / sin array: 8 bytes",
+    "con array: 120 bytes / sin array: 24 bytes",
+    "con array: 100 bytes / sin array: 0 bytes",
+    "No se puede medir un future"
+  ]}
+  correcta={1}
+  explicacion="El array de 100 bytes sigue vivo después del `.await`, así que tiene que viajar dentro del future. Sin él, quedan el argumento `x` (8 bytes, guardado dos veces) y poco más."
+  porque={[
+    "Un future no es un puntero: guarda sus datos dentro.",
+    "Correcto: medido con rustc 1.99.1.",
+    "Faltan el argumento, el estado y el relleno de alineación.",
+    "Un future es un valor normal: `size_of_val` lo mide."
+  ]}
+/>
+
+## La idea
+
+Cuando `poll` devuelve `Pending`, la función **termina** (lección 2). Pero una `async fn` puede pararse a mitad, en un `.await`, y continuar después justo donde se quedó, con sus variables intactas. ¿Dónde viven esas variables mientras tanto? No en la pila, que se borró: **dentro del propio future**.
+
+Para lograrlo, el compilador transforma el cuerpo en una **máquina de estados**: un `enum` con una variante por cada sitio donde puede estar parada la función. Cada variante guarda exactamente las variables que hacen falta para seguir desde ahí. El `poll` generado es un `match` sobre el estado actual: ejecuta hasta el próximo `.await`, cambia de variante y devuelve `Pending`; o llega al final y devuelve `Ready`.
+
+Lo puedes escribir a mano. El ejemplo de abajo es lo que, más o menos, genera el compilador para `async fn doble(x: u32) -> u32 { Ceder(false).await; x * 2 }`.
+
+## Pruébalo
+
+<Ejecutar ej="m18/maquina-a-mano" />
+
+Tres estados: `SinEmpezar` (guarda el argumento), `Esperando` (guarda `x` y el future interno) y `Terminado`. Cada `.await` del código original se convierte en «sondear el de dentro y, si dice `Pending`, devolver `Pending`».
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Con el compilador nightly puedes pedirle el plano exacto (`-Zprint-type-sizes`). Esta es la salida real, con rustc nightly 1.101.0, para `con_array` (allí se llama `af`):
+
+```text
+print-type-size type: `{async fn body of af()}`: 120 bytes, alignment: 8 bytes
+print-type-size     discriminant: 1 bytes
+print-type-size     variant `Unresumed`: 8 bytes
+print-type-size         upvar `.x`: 8 bytes, offset: 0 bytes, alignment: 8 bytes
+print-type-size     variant `Suspend0`: 117 bytes
+print-type-size         upvar `.x`: 8 bytes, offset: 0 bytes, alignment: 8 bytes
+print-type-size         local `.x`: 8 bytes
+print-type-size         local `.a`: 100 bytes
+print-type-size         local `.__awaitee`: 1 bytes, type: {async fn body of paso()}
+print-type-size     variant `Returned`: 8 bytes
+print-type-size         upvar `.x`: 8 bytes, offset: 0 bytes, alignment: 8 bytes
+print-type-size     variant `Panicked`: 8 bytes
+print-type-size         upvar `.x`: 8 bytes, offset: 0 bytes, alignment: 8 bytes
+print-type-size     end padding: 2 bytes
+```
+
+Cómo se lee:
+
+| Estado | Qué significa | Qué guarda |
+|---|---|---|
+| `Unresumed` | creado, nunca sondeado | el argumento `x` (*upvar*: capturado al crear el future) |
+| `Suspend0` | parado en el primer (y único) `.await` | `x`, una copia local de `x`, el array `a` y el future interno `__awaitee` |
+| `Returned` | ya devolvió `Ready` | el hueco de `x` aparece, pero ya no se usa (sondearlo otra vez provoca un pánico) |
+| `Panicked` | hubo un pánico dentro | igual que `Returned` |
+
+Las cuentas: 1 byte de discriminante + 117 del estado más grande, redondeado a múltiplo de la alineación (8) = **120**. La versión sin array mide **24**. El future de `paso()` mide **1 byte**: solo su discriminante, porque no guarda nada. En el navegador, aunque `usize` mida 4 bytes, estos tamaños salen iguales: aquí todo son `u64`, `u8` y arrays.
+
+Nota de vocabulario: dentro del compilador estas máquinas se llaman **corrutinas** (*coroutines*); un future de `async fn` es una corrutina con una interfaz concreta.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Futures gordos sin querer">
+
+❌ Mantener algo grande vivo a través de un `.await` aunque ya no lo necesites:
+
+```rust
+async fn primero(x: u8) -> u8 {
+    let tabla = [x; 100];
+    let p = tabla[0];
+    paso().await;          // `tabla` sigue viva: viaja dentro del future
+    p + tabla[1] - tabla[1]
+}
+```
+
+Cada tarea que lances lleva esos bytes encima, y los futures anidados suman los tamaños de los de dentro. Clippy tiene una lint, `large_futures`, que avisa cuando un future pasa de cierto tamaño.
+
+✅ Haz que lo grande muera **antes** del `.await` (enciérralo en un bloque `{ }`), o mételo en un `Box` para que dentro del future solo viaje un puntero.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m18/reto-adelgazar" enunciado="La función `primero` ocupa más de 100 bytes porque `tabla` vive a través del `.await`. Reescríbela para que `tabla` solo exista antes del `.await` y el future mida 4 bytes. (Debe devolver el mismo valor.)" />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una `async fn` tiene tres `.await` en su cuerpo. ¿Cuántas variantes tendrá su máquina de estados?"
+  opciones={["3", "4", "6", "1"]}
+  correcta={2}
+  explicacion="Una por cada `.await` (Suspend0, Suspend1, Suspend2) más Unresumed, Returned y Panicked: 6. Lo comprobamos con `-Zprint-type-sizes` en nightly 1.101.0."
+  porque={["Faltan los estados de inicio y fin.", "Cuenta también Returned y Panicked.", "Correcto: 3 de suspensión + 3 fijos.", "Una corrutina sin estados no podría pararse."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué variable **no** hace falta guardar dentro del future?"
+  opciones={["Una que se usa antes y después de un `.await`", "Un argumento de la función", "Una variable temporal que nace y muere entre dos `.await` sin cruzar ninguno", "El future interno que se está esperando"]}
+  correcta={2}
+  explicacion="Si una variable no está viva en ningún punto de suspensión, puede vivir en la pila durante un sondeo y desaparecer: no ocupa sitio en el future."
+  porque={["Esa cruza el `.await`: hay que guardarla.", "Los argumentos se guardan desde el estado Unresumed.", "Correcto.", "El `__awaitee` se guarda: es el que se sondea al volver."]}
+/>

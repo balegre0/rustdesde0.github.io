@@ -1,0 +1,179 @@
+---
+title: "Que te llamen a ti"
+description: "Exporta funciones de Rust con el ABI de C, compílalas como `staticlib` o `cdylib`, genera la cabecera con cbindgen y protege la frontera de los pánicos."
+sidebar:
+  order: 9
+duracion: 13
+desde: "2024"
+requiere: ["22-sistemas-y-ffi/08-llamar-a-una-biblioteca-externa"]
+tarjetas:
+  - p: "¿Qué dos cosas necesita una función de Rust para que la llame código de fuera?"
+    r: "La convención de llamada de C (`pub extern \"C\" fn`) y un nombre de símbolo fijo, sin *mangling*: `#[unsafe(no_mangle)]` en la edición 2024."
+  - p: "¿Qué diferencia hay entre `crate-type = \"staticlib\"` y `\"cdylib\"`?"
+    r: "`staticlib` produce una biblioteca estática (`.a`/`.lib`) que se copia dentro del ejecutable de quien la usa; `cdylib` produce una biblioteca dinámica (`.dll`/`.so`/`.dylib`) que se carga al ejecutar."
+  - p: "¿Qué pasa si un pánico intenta salir de una función `extern \"C\"`?"
+    r: "El proceso aborta. Para que no ocurra, captura el pánico dentro con `std::panic::catch_unwind` y conviértelo en un código de error."
+  - p: "¿Por qué `#[unsafe(no_mangle)]` lleva `unsafe`?"
+    r: "Porque un símbolo sin mangling puede chocar con otro del mismo nombre en el programa final (por ejemplo, de la biblioteca del sistema), y eso es comportamiento indefinido que el compilador no puede detectar."
+---
+
+import { Pregunta, BajoElCapo, Trampa } from '~/components';
+
+La otra dirección de la frontera: escribir una biblioteca en Rust que use un programa escrito en otro lenguaje. Es la forma más habitual de introducir Rust en un proyecto que ya existe: una pieza cada vez.
+
+## Predice
+
+<Pregunta
+  pregunta="Escribes `pub fn suma(a: i32, b: i32) -> i32` en un crate de Rust y compilas una biblioteca. Desde fuera intentan llamar al símbolo `suma` y el enlazador no lo encuentra. ¿Por qué?"
+  opciones={[
+    "Porque falta `pub`",
+    "Porque Rust guarda la función con un nombre «decorado» (*mangling*) que incluye el crate y un hash, y además usa su propia convención de llamada, que no es estable",
+    "Porque las funciones de Rust no se pueden exportar",
+    "Porque `i32` no existe fuera de Rust"
+  ]}
+  correcta={1}
+  explicacion={"El símbolo real es algo como `_RNv…4suma` (lo viste en el mundo 21). Para exportar hay que fijar el nombre (`#[unsafe(no_mangle)]`) y la convención (`extern \"C\"`)."}
+  porque={["Ya es `pub`; no basta.", "", "Se pueden exportar con los atributos adecuados.", "`i32` es un entero de 32 bits con signo: existe en todas partes."]}
+/>
+
+## La idea
+
+Una función exportada lleva dos marcas:
+
+```rust
+#[unsafe(no_mangle)]
+pub extern "C" fn rs_contar_vocales(s: *const c_char) -> u32 { … }
+```
+
+- `extern "C"` hace que use la **convención de llamada de C** de la plataforma.
+- `#[unsafe(no_mangle)]` hace que el símbolo se llame exactamente `rs_contar_vocales`. Es `unsafe` porque dos símbolos con el mismo nombre en el programa final chocan (por eso se suele poner un prefijo como `rs_`).
+
+Luego eliges qué produce el crate, en `Cargo.toml`:
+
+```toml
+[lib]
+crate-type = ["staticlib"]   # biblioteca estática: .lib (Windows) / .a (Unix)
+# crate-type = ["cdylib"]    # biblioteca dinámica: .dll / .so / .dylib
+```
+
+El otro lado necesita las **declaraciones** de tus funciones, en una cabecera `.h`. La herramienta **cbindgen** la genera leyendo tu código: cada `#[repr(C)]` y cada `extern "C" fn` exportada.
+
+En la frontera, **las reglas de Rust ya no se comprueban**: un puntero que te pasan puede ser nulo, colgante o apuntar a texto que no es UTF-8. Compruébalo todo antes de convertirlo a referencias de Rust.
+
+## Pruébalo
+
+La biblioteca (`ejemplos/m22/desde-c-lib.rs`):
+
+```rust
+use std::ffi::{c_char, CStr};
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rs_contar_vocales(s: *const c_char) -> u32 {
+    if s.is_null() { return 0; }
+    let texto = unsafe { CStr::from_ptr(s) };
+    texto.to_bytes().iter().filter(|b| b"aeiouAEIOU".contains(b)).count() as u32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rs_puede_entrar_en_panico(x: i32) -> i32 {
+    let r = std::panic::catch_unwind(|| { if x < 0 { panic!("negativo"); } x * 2 });
+    r.unwrap_or(-1)
+}
+```
+
+Un programa en C que la usa (`ejemplos/m22/desde-c-main.c`):
+
+```c
+#include <stdio.h>
+#include <stdint.h>
+uint32_t rs_contar_vocales(const char *s);
+int32_t rs_puede_entrar_en_panico(int32_t x);
+int main(void) {
+    printf("vocales: %u\n", rs_contar_vocales("murcielago"));
+    printf("nulo: %u\n", rs_contar_vocales(0));
+    printf("doble: %d\n", rs_puede_entrar_en_panico(21));
+    return 0;
+}
+```
+
+Compilado y ejecutado de verdad para el curso (WebAssembly, rustc 1.99.1 y el compilador de C de Zig):
+
+```bash
+rustc --edition 2024 --crate-type staticlib --target wasm32-wasip1 -O desde-c-lib.rs -o librs.a
+zig cc -target wasm32-wasi desde-c-main.c librs.a -o programa.wasm
+```
+
+Salida real:
+
+```text
+vocales: 5
+nulo: 0
+doble: 42
+```
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`CStr::from_ptr` es `unsafe`.** Recorre la memoria desde el puntero hasta encontrar un 0. Si el puntero no es válido o no hay 0, lee fuera de límites. Por eso comprobamos `is_null()` primero, y por eso el contrato de la función (documentado en la cabecera) debe decir «una cadena válida terminada en 0, o nulo».
+
+**Pánicos en la frontera.** El desenrollado de un pánico (mundo 21, lección 13) no puede cruzar a código que no es Rust: ese código no sabe ejecutar los `drop`. Si un pánico llega al borde de una función `extern "C"`, Rust **aborta el proceso**. Para convertir el pánico en un valor de error, `catch_unwind` lo detiene dentro, como en `rs_puede_entrar_en_panico`. (Ojo: con `panic = "abort"`, como en el navegador, `catch_unwind` no captura nada; por eso solo probamos el caso sin pánico). Si los dos lados de verdad soportan desenrollado, existe la ABI `extern "C-unwind"`.
+
+**Qué hay dentro de una `staticlib`.** Todo lo que tu crate necesita, incluida la parte usada de `std`, en un único archivo. Por eso nuestro `programa.wasm` mide unos 3 MB sin optimizar el enlazado: lleva `std` dentro. `rustc --print native-static-libs` te dice qué bibliotecas del sistema tiene que enlazar además quien use tu `staticlib`.
+
+**Propiedad a través de la frontera.** Si devuelves memoria reservada por Rust (un `Box` convertido con `Box::into_raw`), ofrece también la función que la libera (`rs_liberar(p)`, que hace `Box::from_raw`). La memoria la debe liberar **el mismo asignador** que la reservó.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Convertir el puntero en `&str` sin comprobar nada">
+
+❌ `let s: &str = unsafe { CStr::from_ptr(p) }.to_str().unwrap();` → si `p` es nulo, comportamiento indefinido; si el texto no es UTF-8, pánico… que en la frontera aborta el proceso.
+
+✅ Comprueba `p.is_null()`, usa `to_str()` y devuelve un código de error si falla, o trabaja con bytes (`to_bytes()`), como en `rs_contar_vocales`.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Quieres que un programa en otro lenguaje cargue tu biblioteca al ejecutarse, como un plugin. ¿Qué `crate-type` eliges?"
+  opciones={["`bin`", "`rlib`", "`staticlib`", "`cdylib`"]}
+  correcta={3}
+  explicacion="`cdylib` produce una biblioteca dinámica con ABI de C, que se carga en tiempo de ejecución."
+  porque={["`bin` es un ejecutable.", "`rlib` es el formato para otros crates de Rust, con metadatos de Rust.", "`staticlib` se copia dentro del ejecutable al enlazar, no se carga después.", ""]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `rs_contar_vocales` comprueba `s.is_null()` antes de nada?"
+  opciones={[
+    "Por estilo",
+    "Porque `CStr::from_ptr` con un puntero nulo es comportamiento indefinido, y el código de fuera puede pasar nulo",
+    "Porque Rust no admite punteros",
+    "Porque los nulos se convierten en pánicos automáticamente"
+  ]}
+  correcta={1}
+  explicacion="En la frontera no hay borrow checker que te proteja: cada suposición sobre los argumentos hay que comprobarla o documentarla."
+  porque={["Es una cuestión de seguridad, no de estilo.", "", "Rust tiene punteros crudos (`*const T`).", "Desreferenciar un nulo no es un pánico: es UB."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué genera cbindgen?"
+  opciones={[
+    "Una biblioteca dinámica",
+    "Un archivo de cabecera `.h` con las declaraciones de tus funciones `extern \"C\"` y tus tipos `repr(C)`",
+    "Código Rust a partir de cabeceras",
+    "Un instalador"
+  ]}
+  correcta={1}
+  explicacion="Es la herramienta inversa de bindgen: de Rust hacia las declaraciones que necesita el otro lado."
+  porque={["La biblioteca la genera rustc con `crate-type`.", "", "Eso es bindgen.", "No tiene nada que ver con instalar."]}
+/>
+
+## Para saber más
+
+- The Rust Reference, «Linkage»: https://doc.rust-lang.org/reference/linkage.html
+- cbindgen: https://github.com/mozilla/cbindgen

@@ -1,0 +1,156 @@
+---
+title: "Pánicos y unwinding"
+description: "Sigue a un `panic!` desde que salta hasta que termina el programa, y comprueba en el MIR real qué cambia entre `panic = \"unwind\"` y `panic = \"abort\"`."
+sidebar:
+  order: 13
+duracion: 12
+desde: "1.0"
+requiere: ["21-el-compilador-por-dentro/04-leer-mir", "10-errores"]
+tarjetas:
+  - p: "¿Qué es el *unwinding* (desenrollado)?"
+    r: "Tras un pánico, recorrer la pila de llamadas hacia atrás ejecutando los `drop` de cada función, hasta un `catch_unwind` o el final del hilo."
+  - p: "¿Qué cambia en el MIR al compilar con `-C panic=abort`?"
+    r: "Desaparecen los bloques `(cleanup)` y las aristas de unwind pasan a `unwind unreachable`: un pánico termina el proceso sin ejecutar ningún `drop`."
+  - p: "¿Qué estrategia de pánico usa el target `wasm32-wasip1` del navegador?"
+    r: "`abort`: lo dice `rustc --print cfg --target wasm32-wasip1` (`panic=\"abort\"`). Por eso en el navegador `catch_unwind` no captura nada."
+  - p: "¿Qué pasa si un pánico intenta salir de una función `extern \"C\"`?"
+    r: "El proceso aborta. Para permitir que un pánico cruce esa frontera existe la ABI `extern \"C-unwind\"`."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Un `panic!` no es solo «el programa se para». Entre el pánico y el final hay una maquinaria precisa que decide si se liberan los recursos, si se puede capturar y qué se imprime. Y esa maquinaria **se ve en el MIR**.
+
+## Predice
+
+<Pregunta
+  pregunta={"El programa de abajo crea un `Ruidoso(\"a\")` (que imprime al destruirse) dentro de `catch_unwind` y luego entra en pánico. **En el navegador**, ¿qué se ve después del mensaje del pánico?"}
+  opciones={[
+    "`drop de a` y luego `catch_unwind devolvió Err: true`",
+    "Nada más: el programa termina en el pánico, sin ejecutar el `drop` de `a` ni seguir después de `catch_unwind`",
+    "`catch_unwind devolvió Err: false`",
+    "Un error de compilación: `catch_unwind` no existe en wasm"
+  ]}
+  correcta={1}
+  explicacion="El target del navegador compila con la estrategia `abort`: un pánico imprime su mensaje y termina el programa al instante. No hay desenrollado, así que ni se ejecuta `drop` ni `catch_unwind` puede devolver nada. En un PC (estrategia `unwind`) el resultado sería la primera opción."
+  porque={[
+    "Eso es lo que ocurre con la estrategia `unwind`, la de los ejecutables de escritorio.",
+    "",
+    "`catch_unwind` nunca devuelve `Ok` si la closure entra en pánico.",
+    "Compila: la función existe; lo que no puede es capturar pánicos que abortan."
+  ]}
+/>
+
+<Ejecutar ej="m21/panico-en-wasm" />
+
+## La idea
+
+Cuando se ejecuta `panic!("…")`:
+
+1. Se llama al **panic hook**: la función que imprime `thread 'main' panicked at archivo:línea` y el mensaje. Puedes cambiarla con `std::panic::set_hook`.
+2. Se pone en marcha el **runtime de pánico**, que es una de dos implementaciones elegidas al compilar:
+   - **`unwind`** (por defecto en Windows, Linux y macOS): se **desenrolla** la pila. Cada función por la que pasa el pánico ejecuta los `drop` de sus variables, como si saliera normalmente. Si algo más arriba llamó a `std::panic::catch_unwind`, ahí se detiene y devuelve `Err`. Si no, termina el hilo (y si es el principal, el programa).
+   - **`abort`**: el proceso termina en el acto. Sin `drop`, sin captura. Produce binarios más pequeños y es lo habitual en embebido y en el navegador.
+
+La elección se hace con `-C panic=abort` (o `panic = "abort"` en un perfil de `Cargo.toml`). Dos reglas de seguridad: un pánico **mientras ya se desenrolla otro** aborta siempre; y un pánico que intente salir de una función `extern "C"` (llamada desde código de fuera de Rust) **aborta**, porque el código de fuera no sabe ejecutar los `drop` de Rust. Si de verdad quieres que cruce, la ABI se llama `extern "C-unwind"`.
+
+## Pruébalo
+
+Comprueba tú la estrategia de cada target:
+
+```bash
+rustc --print cfg | grep panic                          # tu PC:      panic="unwind"
+rustc --print cfg --target wasm32-wasip1 | grep panic   # navegador:  panic="abort"
+```
+
+(Salida real de rustc 1.99.1 en x86-64 Windows: `panic="unwind"` y `panic="abort"`.)
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Recuerda el MIR de `saluda` de la lección 4: `String::len(move _3) -> [return: bb1, unwind: bb3]`, con un bloque `bb3 (cleanup)` que hace `drop(_2)` y termina en `resume`. Esa arista `unwind` **es** el camino del desenrollado: si `len` entrara en pánico, se saltaría a `bb3`, se liberaría el `String` y `resume` pasaría el pánico a la función anterior.
+
+Ahora el mismo código con `rustc --edition 2024 --crate-type lib --emit=mir -C opt-level=0 -C panic=abort`. MIR real:
+
+```text
+    bb0: {
+        _2 = move _1;
+        _3 = &_2;
+        _0 = String::len(move _3) -> [return: bb1, unwind unreachable];
+    }
+
+    bb1: {
+        drop(_2) -> [return: bb2, unwind unreachable];
+    }
+
+    bb2: {
+        return;
+    }
+```
+
+Los bloques `cleanup` **han desaparecido** y cada arista dice `unwind unreachable`: con `abort` no hay camino de pánico que recorrer. Menos código, y ninguna tabla de desenrollado en el binario.
+
+**Cómo se desenrolla en la máquina.** Con `unwind`, el compilador genera por cada función información para el sistema operativo sobre cómo deshacer su marco de pila y dónde están sus bloques `cleanup` (*landing pads*). En Windows el mecanismo se llama SEH (*Structured Exception Handling*) y se ve en el ensamblador como directivas `.seh_proc`, `.seh_pushreg`, `.seh_endprologue` y `.seh_endproc` alrededor de cada función. En Linux y macOS se usan tablas DWARF (`.eh_frame`). Lo que imprime cada caso al ejecutarse lo verás en tu PC; en el navegador solo verás la versión `abort`.
+
+**El camino frío.** Las funciones de pánico de la biblioteca están marcadas `#[cold]` y `#[track_caller]` (para que el mensaje diga **tu** línea, no la de `std`). En el ensamblador de un acceso `v[i]`, la comprobación de límites es una comparación y un salto a un `call …panic_bounds_check` seguido de `ud2`, colocados al final de la función, fuera del camino normal.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Usar `catch_unwind` como si fuera manejo de errores">
+
+❌ Envolver código en `catch_unwind` para «recuperarse» de errores esperados.
+
+✅ Los errores esperados se devuelven con `Result` (mundo 10). `catch_unwind` es para fronteras concretas: que un pánico en un hilo de trabajo o en un callback no tumbe todo el servidor, o que no cruce una frontera `extern "C"`. Y recuerda que con `panic = "abort"` no captura nada.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Un programa de escritorio (estrategia `unwind`) tiene `let _g = Guarda;` en `main` y luego llama a `f()`, que entra en pánico sin `catch_unwind`. ¿Se ejecuta el `Drop` de `_g`?"
+  opciones={[
+    "No, nunca se ejecuta ningún `Drop` tras un pánico",
+    "Sí: el desenrollado pasa por `main` y ejecuta los `drop` de sus variables antes de terminar el hilo",
+    "Solo si `Guarda` es `Copy`",
+    "Solo en modo release"
+  ]}
+  correcta={1}
+  explicacion="El pánico sube por la pila: sale de `f`, pasa por el bloque `cleanup` de `main` (que hace `drop(_g)`) y termina el hilo principal. Así no se quedan recursos sin liberar."
+  porque={["Eso es lo que pasa con `abort`.", "", "Un tipo `Copy` no puede implementar `Drop`.", "La estrategia de pánico no depende del perfil, sino de `panic = ...`."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En el MIR compilado con `-C panic=abort`, ¿qué indica `unwind unreachable`?"
+  opciones={[
+    "Que la función nunca puede entrar en pánico",
+    "Que no existe camino de desenrollado: si hay pánico, el proceso aborta sin pasar por ningún `cleanup`",
+    "Que el código es inalcanzable y se borrará",
+    "Que el pánico se ignora"
+  ]}
+  correcta={1}
+  explicacion="La función puede entrar en pánico igual; lo que no existe es el camino de vuelta ejecutando `drop`."
+  porque={["`String::len` podría (en teoría) entrar en pánico; la arista habla de qué pasa entonces.", "", "Lo inalcanzable es el camino de unwind, no la llamada.", "Un pánico nunca se ignora: con `abort`, termina el proceso."]}
+/>
+
+<Pregunta
+  pregunta={"¿Por qué un pánico que intenta salir de una función `extern \"C\"` aborta el proceso?"}
+  opciones={[
+    "Porque las funciones `extern \"C\"` no pueden contener código de Rust",
+    "Porque quien llamó a esa función no es código de Rust y no sabe desenrollar ni ejecutar `drop`; dejarlo cruzar sería comportamiento indefinido",
+    "Porque `extern \"C\"` desactiva los pánicos",
+    "No aborta: se convierte en un código de error"
+  ]}
+  correcta={1}
+  explicacion={"La frontera con código externo no sabe nada de las tablas de desenrollado de Rust. Por eso el comportamiento seguro es abortar, y `extern \"C-unwind\"` existe para los casos en que ambos lados sí lo soportan."}
+  porque={["Una función `extern \"C\"` escrita en Rust contiene código de Rust normal.", "", "Dentro de ella puedes entrar en pánico; el problema es que el pánico **salga** de ella.", "Rust no convierte pánicos en códigos de error automáticamente."]}
+/>
+
+## Para saber más
+
+- Mundo 10 (errores): cuándo entrar en pánico y cuándo devolver `Result`.
+- Rustonomicon, «Unwinding»: https://doc.rust-lang.org/nomicon/unwinding.html

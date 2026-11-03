@@ -1,0 +1,56 @@
+---
+title: "Jefe: tu propio grep"
+description: "Una herramienta de terminal completa: lee la entrada estándar, busca sin distinguir mayúsculas, escribe con búfer, manda los avisos a stderr y devuelve un código de salida como grep."
+sidebar:
+  order: 13
+duracion: 20
+desde: "1.61"
+requiere: ["22-sistemas-y-ffi/12-windows-y-unix"]
+tarjetas:
+  - p: "¿Qué códigos de salida usa grep?"
+    r: "0 si encontró algo, 1 si no encontró nada y 2 si hubo un error de uso. En Rust: main devuelve ExitCode."
+  - p: "¿Dónde van los mensajes de error de una herramienta de terminal?"
+    r: "A la salida de errores (stderr, con eprintln!), para no mezclarse con los resultados de stdout."
+---
+
+import { Ejecutar, Pregunta } from '~/components';
+
+El jefe del mundo es una herramienta de terminal de verdad, con todo lo que se espera de una: lee de la entrada estándar, escribe con búfer, separa resultados y errores, y devuelve un código de salida que otros programas pueden usar.
+
+## El programa
+
+<Ejecutar ej="m22/minigrep" />
+
+La entrada de este ejemplo ya viene preparada: la primera línea es el patrón (`rust`) y el resto, el texto. Encuentra las dos líneas que contienen «rust» sin distinguir mayúsculas y termina con un resumen al estilo de `wc`.
+
+Fíjate en las piezas:
+
+1. **Entrada**: `stdin().lock()` una vez y `BufRead` para leer línea a línea.
+2. **Búsqueda separada de la E/S**: `buscar` recibe cualquier `impl BufRead` y cualquier `impl Write`, así que se podría probar con un `Cursor` y un `Vec<u8>`.
+3. **Salida con búfer**: `BufWriter` sobre `stdout().lock()`, y `flush()` al final.
+4. **Errores a stderr**: `eprintln!` para el uso incorrecto y los fallos de lectura.
+5. **Código de salida**: `main` devuelve `ExitCode`, como `grep`: 0 si hay coincidencias, 1 si no, 2 si el uso es incorrecto.
+
+En tu PC, con `cargo run`, puedes usarlo en una tubería:
+
+```powershell
+"rust`nRust es rápido.`nFin." | cargo run
+```
+
+## Repaso relámpago
+
+<Pregunta
+  pregunta="¿Por qué `buscar` recibe `impl Write` en vez de escribir directamente con `println!`?"
+  opciones={["Para poder probarla escribiendo en memoria (un `Vec<u8>`) y para usar un búfer", "Porque `println!` no funciona con `BufRead`", "Por rendimiento únicamente", "No hay ningún motivo"]}
+  correcta={0}
+  explicacion="Separar la lógica de dónde se escribe hace el código comprobable y flexible: la misma función sirve para la terminal, un archivo o un test."
+  porque={["", "Funcionaría, pero no se podría probar ni redirigir.", "El búfer es una ventaja, pero no la única.", "Lo hay: probarla y reutilizarla."]}
+/>
+
+## Lo que te llevas del mundo 22
+
+- Argumentos, entorno, entrada y salida, con sus errores en el tipo.
+- Archivos y rutas (`Path`, `PathBuf`), procesos (`Command`, `ExitCode`) y red (`TcpListener`).
+- Texto del sistema: `OsString`, `CString`, `CStr`.
+- FFI en los dos sentidos: `unsafe extern`, `repr(C)`, `no_mangle`, `cdylib`.
+- `no_std`, `alloc` y tu propio asignador.

@@ -1,0 +1,94 @@
+---
+title: "E0038: el trait no es compatible con dyn"
+description: "Usas dyn Trait con un trait que tiene métodos que no se pueden llamar a través de un objeto de trait."
+sidebar:
+  order: 6
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` the trait `Clonable` is not dyn compatible ``
+
+## Qué significa
+
+Un objeto de trait (`dyn Clonable`) oculta el tipo concreto: solo se sabe que «implementa el trait». Un método que devuelve `Self` necesita conocer ese tipo (y su tamaño) para devolverlo, así que no puede llamarse a través de `dyn`. Por eso el trait no es **compatible con dyn** (*dyn compatible*).
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0038" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0038]: the trait `Clonable` is not dyn compatible
+  --> E0038.rs:12:28
+   |
+12 |     let cosas: Vec<Box<dyn Clonable>> = vec![Box::new(1)];
+   |                            ^^^^^^^^ `Clonable` is not dyn compatible
+   |
+note: for a trait to be dyn compatible it needs to allow building a vtable
+      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
+  --> E0038.rs:2:27
+   |
+ 1 | trait Clonable {
+   |       -------- this trait is not dyn compatible...
+ 2 |     fn duplicar(&self) -> Self;
+   |                           ^^^^ ...because method `duplicar` references the `Self` type in its return type
+   = help: consider moving `duplicar` to another trait
+   = help: only type `i32` implements `Clonable`; consider using it directly instead.
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Métodos que devuelven `Self` o lo reciben por valor.
+- Métodos genéricos (`fn f<T>(&self, x: T)`).
+- Traits que exigen `Sized` o `Clone` como supertrait.
+
+## Cómo arreglarlo
+
+Devuelve `Box<dyn Trait>` en lugar de `Self`, añade `where Self: Sized` a los métodos que no deben llamarse por `dyn`, o usa genéricos (`impl Trait`, `T: Trait`) en lugar de `dyn`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+trait Clonable {
+    fn duplicar(&self) -> Box<dyn Clonable>;
+    fn mostrar(&self) -> String;
+}
+
+impl Clonable for i32 {
+    fn duplicar(&self) -> Box<dyn Clonable> {
+        Box::new(*self)
+    }
+    fn mostrar(&self) -> String {
+        self.to_string()
+    }
+}
+
+fn main() {
+    let cosas: Vec<Box<dyn Clonable>> = vec![Box::new(1)];
+    let copia = cosas[0].duplicar();
+    println!("{} {}", cosas.len(), copia.mostrar());
+}
+```
+
+**Salida:**
+
+```text
+1 1
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0038` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0746](/errores/e0746/): devolver dyn Trait sin indirección
+- [E0277](/errores/e0277/): un tipo no implementa el trait que se necesita
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

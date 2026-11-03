@@ -1,0 +1,122 @@
+---
+title: "Cell<T>"
+description: "Mutabilidad interior para valores Copy: get, set, replace y update a través de &self."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::cell::Cell`
+
+## Sinopsis
+
+```rust
+pub struct Cell<T>
+where
+    T: ?Sized,
+{ /* private fields */ }
+```
+
+## Qué hace
+
+`Cell<T>` guarda un valor que puedes cambiar aunque solo tengas `&Cell<T>`. No da referencias al interior: `get` copia el valor hacia fuera (requiere `T: Copy`) y `set` lo reemplaza. Ideal para contadores y banderas dentro de structs que se usan con `&self`.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`new`](#new) | Crea la celda. | 1.0 |
+| [`get`](#get) | Devuelve una copia del valor (`T: Copy`). | 1.0 |
+| [`set`](#set) | Reemplaza el valor. | 1.0 |
+| [`replace`](#replace) | Pone un valor y devuelve el anterior. | 1.17 |
+| [`update`](#update) | Aplica una función al valor y guarda el resultado. | 1.88 |
+| [`take`](#take) | Saca el valor dejando `T::default()`. | 1.17 |
+| [`into_inner`](#into_inner) | Consume la celda y devuelve el valor. | 1.17 |
+
+### `new`
+
+```rust
+pub const fn new(value: T) -> Cell<T>
+```
+
+Crea la celda.
+
+### `get`
+
+```rust
+pub const fn get(&self) -> T
+```
+
+Devuelve una copia del valor (`T: Copy`).
+
+### `set`
+
+```rust
+pub fn set(&self, val: T)
+```
+
+Reemplaza el valor.
+
+### `replace`
+
+```rust
+pub const fn replace(&self, val: T) -> T
+```
+
+Pone un valor y devuelve el anterior.
+
+### `update`
+
+```rust
+pub fn update(&self, f: impl FnOnce(T) -> T)
+```
+
+Aplica una función al valor y guarda el resultado.
+
+### `take`
+
+```rust
+pub fn take(&self) -> T
+where
+    T: Default,
+```
+
+Saca el valor dejando `T::default()`.
+
+### `into_inner`
+
+```rust
+pub const fn into_inner(self) -> T
+```
+
+Consume la celda y devuelve el valor.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/cell-cell" />
+
+**Salida:**
+
+```text
+botón usado 2 veces
+5 9
+18
+```
+
+## Rendimiento
+
+Sin coste extra: `Cell<T>` ocupa lo mismo que `T` y sus operaciones son copias normales.
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `replace` (1.17), `update` (1.88), `take` (1.17), `into_inner` (1.17).
+
+## Ver también
+
+- [RefCell](/ref/std/cell/refcell/)
+- [atómicos (entre hilos)](/ref/std/sync/atomic/)
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

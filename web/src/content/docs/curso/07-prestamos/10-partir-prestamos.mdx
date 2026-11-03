@@ -1,0 +1,91 @@
+---
+title: "Partir préstamos"
+description: "El compilador sabe que dos campos distintos no se solapan, pero no sabe lo mismo de dos índices. split_at_mut y swap resuelven el segundo caso."
+sidebar:
+  order: 10
+duracion: 10
+desde: "1.0"
+requiere: ["07-prestamos/09-slices"]
+tarjetas:
+  - p: "¿Puedes tener `&mut t.0` y `&mut t.1` a la vez?"
+    r: "Sí. Son campos distintos y el compilador sabe que no se solapan: son préstamos disjuntos."
+  - p: "¿Por qué `let a = &mut v[0]; let b = &mut v[1];` da E0499?"
+    r: "Porque indexar es una llamada a un método que presta todo `v`. El compilador no razona sobre valores de índices: no sabe que 0 ≠ 1."
+  - p: "¿Qué hace `v.split_at_mut(i)`?"
+    r: "Parte la slice en dos préstamos exclusivos que no se solapan: `[..i]` y `[i..]`. Por dentro usa `unsafe`, pero la función es segura."
+  - p: "¿Cómo intercambias dos elementos de un vector?"
+    r: "Con `v.swap(i, j)`. `std::mem::swap(&mut v[i], &mut v[j])` da E0499."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+La regla dice «un solo `&mut` a la vez», pero ¿a la vez **de qué**? Si un struct tiene dos campos, ¿puedes modificar los dos a la vez? Depende de cómo llegues a ellos.
+
+## Predice
+
+<NoCompila ej="m07/p-indices-dos-mut" explicacion={"`v[0]` y `v[1]` son elementos distintos: nunca se solapan. Entonces, ¿por qué se queja el compilador? Piensa en qué es, por dentro, `v[0]`."} />
+
+## La idea
+
+El comprobador de préstamos sigue **caminos**: `t`, `t.0`, `t.1`, `*r`, `v`…
+
+- **Campos distintos: sí.** `t.0` y `t.1` son caminos que no se solapan, y el compilador lo sabe al mirar el tipo. Puedes tener `&mut t.0` y `&mut t.1` vivos a la vez: son **préstamos disjuntos**.
+- **Índices distintos: no.** `v[0]` es en realidad `*IndexMut::index_mut(&mut v, 0)`: una **llamada a un método** que presta **todo** `v`. Para el compilador, `v[0]` y `v[1]` son dos préstamos exclusivos de `v`: E0499. No razona sobre el **valor** de los índices (podrían venir de variables y ser iguales).
+
+Para los índices, la biblioteca estándar trae herramientas que **parten** una slice en trozos que no se solapan:
+
+- `v.split_at_mut(i)` → dos `&mut [T]`: `[..i]` y `[i..]`.
+- `v.swap(i, j)` para intercambiar.
+- `v.get_disjoint_mut([i, j])` → varios `&mut T` a índices distintos (devuelve error si alguno se repite o está fuera).
+
+## Pruébalo
+
+Campos disjuntos, sin problema:
+
+<Ejecutar ej="m07/p-campos-disjuntos" />
+
+Índices, con `split_at_mut`:
+
+<Ejecutar ej="m07/p-split-at-mut" />
+
+Y el intercambio, que con `mem::swap` choca:
+
+<NoCompila ej="m07/p-swap-indices" explicacion="Las dos expresiones `&mut v[0]` y `&mut v[2]` prestan todo `v` en exclusiva a la vez. El arreglo es el método pensado para esto: `v.swap(0, 2)`." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`split_at_mut` usa `unsafe`, y está bien.** Por dentro, `split_at_mut` hace aritmética con punteros crudos para crear dos slices exclusivas. El compilador no puede demostrar que no se solapan, pero quien escribió la función **sí** lo demostró (una va de 0 a `i` y la otra de `i` al final) y la envolvió en una **interfaz segura**. Ese es el papel de `unsafe` en Rust: un bloque pequeño, revisado a mano, detrás de una función que el comprobador puede usar sin miedo. Lo verás en el mundo 20.
+
+**Los campos de un struct a través de métodos.** La disjunción funciona cuando el compilador **ve** los caminos. Si accedes a un campo a través de un método (`fn items(&mut self) -> &mut Vec<…>`), el método presta todo `self` y la disjunción se pierde. Lo verás en la próxima lección.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Pelearse con dos índices">
+
+❌ Abrir bloques, clonar el vector o copiar los dos valores a mano para modificar `v[i]` y `v[j]` a la vez.
+
+✅ Busca primero el método: `swap`, `split_at_mut`, `get_disjoint_mut`, `chunks_mut`, `iter_mut`. La biblioteca estándar ya resolvió casi todos los casos con interfaces seguras.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`struct P { x: i32, y: i32 }`, `let mut p = P { x: 1, y: 2 };`. ¿Compila `let a = &mut p.x; let b = &mut p.y; *a += *b;`?"
+  opciones={["Sí: son campos distintos", "No: E0499", "No: E0502", "Solo si `P` es `Copy`"]}
+  correcta={0}
+  explicacion="`p.x` y `p.y` son caminos que no se solapan. El compilador lo ve directamente en el tipo y permite los dos préstamos exclusivos."
+  porque={["", "E0499 sería si los dos préstamos fueran del mismo camino.", "No hay ningún préstamo compartido.", "`Copy` no tiene nada que ver con prestar campos."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué el compilador no deja tener `&mut v[i]` y `&mut v[j]` a la vez?"
+  opciones={["Porque `i` y `j` podrían ser iguales, y la indexación presta todo `v`", "Porque los vectores no se pueden prestar en exclusiva", "Porque los índices tienen que ser constantes", "Sí lo deja si `i != j`"]}
+  correcta={0}
+  explicacion="Indexar es una llamada a `index_mut(&mut v, i)`, que presta el vector entero. Además, el compilador no conoce los valores de `i` y `j` al compilar."
+  porque={["", "Sí se pueden: `&mut v` es lo normal.", "Ni siquiera con constantes lo permite.", "El compilador no comprueba valores al compilar; lo hace `get_disjoint_mut` al ejecutar."]}
+/>

@@ -1,0 +1,131 @@
+---
+title: "Hexadecimal, el atajo"
+description: "Lee bytes en hexadecimal como lo hacen los programadores: dos cifras por byte, sin perderte entre ceros y unos."
+sidebar:
+  order: 5
+duracion: 10
+desde: "1.0"
+requiere: ["01-la-maquina/04-contar-en-binario"]
+tarjetas:
+  - p: "¿Cuántos bits resume una cifra hexadecimal?"
+    r: "4 bits. Por eso un byte se escribe siempre con 2 cifras hexadecimales."
+  - p: "¿Cuánto valen las cifras `a`, `b`, `c`, `d`, `e` y `f` en hexadecimal?"
+    r: "10, 11, 12, 13, 14 y 15."
+  - p: "¿Qué diferencia hay entre `{:x}`, `{:02x}` y `{:#x}`?"
+    r: "`{:x}` escribe en hexadecimal; `{:02x}` además rellena con ceros hasta 2 cifras; `{:#x}` añade el prefijo `0x`."
+  - p: "¿Cuánto vale `0x10`?"
+    r: "16: un 1 en la posición de los «dieciseises» y un 0 en la de las unidades."
+---
+
+import { Ejecutar, Predice, Pregunta, Respuesta, Ordena, BajoElCapo, Trampa, Bits } from '~/components';
+
+Vas a aprender el idioma en que se escriben las direcciones y los volcados de memoria: el hexadecimal.
+
+## Predice
+
+`{:#x}` escribe un número en **hexadecimal** (*hexadecimal*, o *hex*) con el prefijo `0x`. ¿Qué imprime para el 255?
+
+<Predice
+  ej="m01/hex-predice"
+  opciones={["`0xff`", "`0x255`", "`ff`", "`0x11111111`"]}
+  correcta={0}
+  explicacion="255 = 15 × 16 + 15. La cifra que vale 15 es la `f`, así que 255 se escribe `ff`. El `#` añade el prefijo `0x`."
+  porque={["Correcto.", "El número no se copia tal cual: hay que pasarlo a base 16.", "Sin `#` saldría `ff`; con `#` Rust añade `0x`.", "Eso es 255 en **binario** con un prefijo equivocado; `{:#b}` daría `0b11111111`."]}
+/>
+
+## La idea
+
+El binario es lo que hay de verdad en la máquina, pero es incómodo: `11001000` es difícil de leer y fácil de copiar mal. El **hexadecimal** es base 16. Tiene dieciséis cifras: del `0` al `9` y luego `a` (10), `b` (11), `c` (12), `d` (13), `e` (14) y `f` (15).
+
+El truco que lo hace tan útil: **una cifra hexadecimal equivale exactamente a 4 bits**. Con 4 bits hay 16 combinaciones, justo las 16 cifras. Así que un byte (8 bits) son **dos cifras hex**, siempre:
+
+```text
+1100 1000   <- un byte, partido en dos mitades de 4 bits
+  c    8    <- cada mitad es una cifra hex: 0xc8
+```
+
+Para pasar de hex a decimal, la cifra de la izquierda vale 16 veces la de la derecha: `0xc8` = 12 × 16 + 8 = **200**. A cada mitad de 4 bits se le llama a veces **nibble** (*nibble*).
+
+<Bits objetivo={171} />
+
+Forma el 171 = `0xab`. Pista: `a` = `1010` en la mitad izquierda y `b` = `1011` en la derecha.
+
+## Pruébalo
+
+<Ejecutar ej="m01/hexadecimal" />
+
+Salida real:
+
+```text
+  0 -> 0000 -> 0
+  9 -> 1001 -> 9
+ 10 -> 1010 -> a
+ 15 -> 1111 -> f
+  5 -> 00000101 -> 05
+ 16 -> 00010000 -> 10
+200 -> 11001000 -> c8
+255 -> 11111111 -> ff
+0x1000
+0x2a vale 42
+```
+
+Fíjate en el 16: en binario es `0001 0000`, y en hex `10`. Cada mitad del byte se convierte por separado.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Por eso las direcciones que viste con `{:p}` salían en hex: una dirección de 4 bytes son exactamente 8 cifras hex, y de un vistazo puedes ver qué byte es cuál. Los programas que enseñan memoria (depuradores, volcados) usan siempre hex por la misma razón.
+
+En Rust puedes escribir un número en el código en cualquier base: `42`, `0x2a`, `0b0010_1010` y `0o52` (octal, base 8) son **el mismo número**. La base solo cambia cómo se escribe, no lo que se guarda. Dentro de la memoria, los cuatro son los mismos 8 bits.
+
+Las letras de un número hex pueden ir en minúscula o mayúscula: `0xFF` y `0xff` valen lo mismo. Si quieres que `println!` use mayúsculas, pide `{:X}`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="El 10 que vale 16">
+
+❌ Leer `0x10` como «diez».
+
+✅ En hex, `10` es «un dieciséis y cero unidades»: **16**. Cuando veas `0x`, cambia el chip: ya no estás en decimal.
+
+❌ Escribir bytes con `{:x}` y obtener `5` para el byte 5. En una lista de bytes, eso descuadra la columna: `5` parece medio byte.
+
+✅ Para bytes usa `{:02x}`: siempre dos cifras, `05`.
+
+</Trampa>
+
+## Tu turno
+
+Ordena las líneas para que el programa imprima el byte 200 en hexadecimal con dos cifras (`c8`). Sobran dos.
+
+<Ordena
+  lineas={["fn main() {", "    let byte: u8 = 0xc8;", '    println!("{:02x}", byte);', "}"]}
+  distractores={["    let byte: u8 = 0x200;", '    println!("{:02b}", byte);']}
+  explicacion="`0xc8` es 200. `0x200` sería 512, que ni siquiera cabe en un `u8`. Y la letra del formato importa: `x` es hex, `b` es binario."
+/>
+
+## Comprueba
+
+<Respuesta
+  pregunta="¿Cuánto vale `0x2a` en decimal?"
+  respuestas={["42"]}
+  explicacion="2 × 16 + 10 (la `a`) = 42."
+/>
+
+<Pregunta
+  pregunta="¿Cuántas cifras hexadecimales hacen falta para escribir un `u32` completo?"
+  opciones={["8", "4", "32", "2"]}
+  correcta={0}
+  explicacion="Un `u32` son 4 bytes; cada byte son 2 cifras hex: 4 × 2 = 8. Por ejemplo, `0xffffffff`."
+  porque={["Correcto.", "4 es el número de **bytes**; cada byte necesita 2 cifras.", "32 es el número de bits; cada cifra hex resume 4.", "2 cifras son un solo byte."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué número es `0xff`?"
+  opciones={["255", "15", "1515", "256"]}
+  correcta={0}
+  porque={["Correcto: 15 × 16 + 15. Es un byte con todos los bits a 1.", "15 es `0xf`, una sola cifra.", "Las cifras no se pegan: la de la izquierda vale 16 veces más.", "256 es `0x100` y ya no cabe en un byte."]}
+/>

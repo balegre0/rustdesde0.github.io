@@ -1,0 +1,52 @@
+---
+title: "#[proc_macro], #[proc_macro_derive] y #[proc_macro_attribute]"
+description: "Los tres atributos que definen macros procedurales: tipo función, derive y atributo. Solo se usan en crates con proc-macro = true."
+sidebar:
+  order: 13
+insignias: ["Desde 1.30", "Macros"]
+---
+
+Las **macros procedurales** son funciones de Rust que reciben código (`TokenStream`) y devuelven código. Se definen con uno de estos tres atributos, en un crate especial.
+
+## Sinopsis
+
+```toml
+# Cargo.toml del crate de macros
+[lib]
+proc-macro = true
+```
+
+```rust
+use proc_macro::TokenStream;
+
+#[proc_macro]                           // uso: mi_macro!(…)
+pub fn mi_macro(entrada: TokenStream) -> TokenStream { … }
+
+#[proc_macro_derive(Saludar, attributes(saludo))]   // uso: #[derive(Saludar)]
+pub fn derive_saludar(entrada: TokenStream) -> TokenStream { … }
+
+#[proc_macro_attribute]                 // uso: #[cronometrar] fn f() { … }
+pub fn cronometrar(args: TokenStream, elemento: TokenStream) -> TokenStream { … }
+```
+
+## Qué hace
+
+- **`proc_macro`**: macro tipo función. Recibe lo que hay entre los paréntesis.
+- **`proc_macro_derive(Nombre, attributes(a, b))`**: macro derive. Recibe la definición del tipo y devuelve código que se **añade** (no sustituye). `attributes(…)` declara atributos auxiliares que el usuario puede poner en los campos (`#[saludo = "hola"]`).
+- **`proc_macro_attribute`**: macro atributo. Recibe los argumentos del atributo y el elemento, y devuelve lo que lo **sustituye**.
+
+Casi siempre se escriben con los crates `syn` (analizar) y `quote` (generar).
+
+## Bajo el capó
+
+Un crate `proc-macro` se compila para **tu PC** (no para el destino) como una biblioteca dinámica que el compilador carga y **ejecuta** al compilar. Por eso una macro procedural puede hacer cualquier cosa: es una de las razones para revisar las dependencias.
+
+Los ejemplos de esta ficha no se pueden ejecutar en el navegador: necesitan dos crates. Los tienes paso a paso en el [Mundo 19](/curso/19-macros/).
+
+## Desde
+
+Rust 1.15 (derive) y 1.30 (función y atributo).
+
+## Ver también
+
+[`#[derive]`](/ref/lenguaje/atributos/derive/) · [Macros](/ref/lenguaje/macros/)

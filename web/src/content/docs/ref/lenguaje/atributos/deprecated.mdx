@@ -1,0 +1,40 @@
+---
+title: "#[deprecated]"
+description: "Marca un elemento como obsoleto: quien lo use recibe un aviso con la versión y una nota sobre qué usar en su lugar."
+sidebar:
+  order: 6
+insignias: ["Desde 1.9", "Diagnósticos"]
+---
+import { Ejecutar, NoCompila } from '~/components';
+
+`#[deprecated]` avisa a quien use un elemento de que dejará de existir o de que hay una alternativa mejor.
+
+## Sinopsis
+
+```text
+#[deprecated]
+#[deprecated = "nota"]
+#[deprecated(since = "2.0.0", note = "usa `nueva` en su lugar")]
+```
+
+Se aplica a casi cualquier elemento: funciones, tipos, campos, variantes, traits, módulos, constantes.
+
+## Qué hace
+
+Cada uso del elemento genera el aviso `deprecated` (nivel *warn*), con la nota. No cambia nada del programa: el elemento sigue funcionando. Es la forma correcta de retirar algo de una biblioteca: márcalo en una versión menor y quítalo en la siguiente mayor.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-deprecated" />
+
+`#[allow(deprecated)]` silencia el aviso en un sitio concreto. Y con `deny`:
+
+<NoCompila ej="ref-lenguaje/at-deprecated-aviso" />
+
+## Desde
+
+Rust 1.9.
+
+## Ver también
+
+[Niveles de lint](/ref/lenguaje/atributos/lints/) · [Publicar](/curso/12-modulos-crates-y-cargo/12-publicar/)

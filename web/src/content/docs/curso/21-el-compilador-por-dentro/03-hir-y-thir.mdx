@@ -1,0 +1,171 @@
+---
+title: "HIR y THIR: quitar el azúcar"
+description: "Escribe a mano lo que queda de `for` y `?` tras el lowering, y mira cómo la comprobación de tipos vuelve explícito cada método y cada conversión."
+sidebar:
+  order: 3
+duracion: 13
+desde: "1.0"
+requiere: ["21-el-compilador-por-dentro/02-tokens-ast-y-macros"]
+tarjetas:
+  - p: "¿En qué se convierte `x?` dentro de una función que devuelve `Result`?"
+    r: "En un `match` sobre `Try::branch(x)`: si es `Continue(v)` el valor es `v`; si es `Break(r)`, se hace `return FromResidual::from_residual(r)`."
+  - p: "¿Qué diferencia hay entre HIR y THIR?"
+    r: "El HIR es el AST sin azúcar, todavía sin tipos. El THIR existe solo para cuerpos de funciones y tiene cada expresión con su tipo, cada método resuelto a una función concreta y cada conversión implícita escrita."
+  - p: "¿Qué comprobaciones se hacen sobre el THIR?"
+    r: "La exhaustividad de los `match` (patrones) y la comprobación de operaciones `unsafe`; después el THIR se convierte en MIR."
+  - p: "¿Qué es la inferencia de tipos en rustc?"
+    r: "Dentro de cada función, el compilador crea variables de tipo desconocido y las va igualando (unificación) con lo que exige cada uso, hasta que todas quedan determinadas."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Después de expandir macros, el compilador hace *lowering*: reescribe el AST en una forma más pequeña, el **HIR**, donde muchas construcciones se expresan con otras más básicas. Luego comprueba los tipos y produce el **THIR**, donde nada queda implícito. En esta lección escribes tú mismo esas traducciones.
+
+## Predice
+
+<Predice
+  ej="m21/interrogacion-a-mano"
+  opciones={[
+    "Ok(42) Ok(42), y luego un pánico porque «veintiuno» no es un número",
+    "Ok(42) Ok(42), Err(ParseIntError { kind: InvalidDigit }) dos veces",
+    "Ok(42) Err(...): la versión a mano se comporta distinto",
+    "No compila: `?` no se puede escribir a mano"
+  ]}
+  correcta={1}
+  explicacion="`?` no entra en pánico: devuelve el error a quien llamó. Y la versión a mano con `match` + `return Err(From::from(...))` es, en esencia, lo mismo que el compilador escribe por ti."
+  porque={[
+    "`?` propaga el error con `return`; los pánicos son de `unwrap` o `expect`.",
+    "",
+    "Las dos funciones hacen lo mismo con las mismas entradas.",
+    "Todo lo que hace `?` se puede escribir con `match` y `return`."
+  ]}
+/>
+
+## La idea
+
+**El HIR** es el árbol después de quitar el azúcar sintáctico (*desugaring*). Algunas traducciones:
+
+- `for pat in expr { cuerpo }` → `match IntoIterator::into_iter(expr) { mut iter => loop { match Iterator::next(&mut iter) { None => break, Some(pat) => cuerpo } } }`
+- `expr?` → `match Try::branch(expr) { Continue(v) => v, Break(r) => return FromResidual::from_residual(r) }`
+- `while let pat = expr { … }` → `loop { match expr { pat => …, _ => break } }`
+- `async fn f() -> T` → una función que devuelve `impl Future<Output = T>` (lo verás en la lección 12).
+
+Con menos construcciones, las etapas siguientes tienen menos casos que tratar. Por eso el borrow checker no necesita saber nada de `for`: solo ve `loop` y `match`.
+
+**La comprobación de tipos** recorre el HIR de cada función. Para cada expresión cuyo tipo no conoce todavía crea una **variable de inferencia** y la va igualando con lo que exige cada uso (*unificación*): si pasas `v` a una función que espera `&[u32]`, eso fija el tipo. También **resuelve métodos**: `x.len()` tiene que convertirse en una función concreta, quizá tras añadir `&` o `*` automáticamente (*autoref* y *autoderef*).
+
+**El THIR** es el resultado: un árbol solo de cuerpos, donde cada nodo lleva su tipo, cada `.metodo()` es una llamada normal a una ruta concreta y cada conversión implícita (como `&String` → `&str`) está escrita. Sobre el THIR se comprueban la **exhaustividad de los `match`** y las **operaciones `unsafe`**, y de él se construye el MIR.
+
+## Pruébalo
+
+El `for` de siempre y su versión sin azúcar, escrita a mano con las rutas completas de los traits. Mismo resultado:
+
+<Ejecutar ej="m21/for-a-mano" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El HIR real de `?`.** Para `fn doble(s: &str) -> Result<i32, ParseIntError> { let n: i32 = s.parse()?; Ok(n * 2) }`, salida real de `rustc +nightly -Zunpretty=hir` (nightly 1.101.0):
+
+```text
+fn doble(s: &'_ str)
+    ->
+        Result<i32,
+        std::num::ParseIntError> {
+    let n: i32 =
+        match branch(s.parse()) {
+            Break {  0: residual } => return from_residual(residual),
+            Continue {  0: val } => val,
+        };
+    Ok(n * 2)
+}
+```
+
+Fíjate en `&'_ str`: el lowering ya hizo explícita la **lifetime elidida** que no escribiste.
+
+**El THIR real.** Para `fn suma(a: u8, b: u8) -> u32 { (a + b).into() }`, un fragmento real de `rustc +nightly -Zunpretty=thir-tree` (171 líneas en total; quitamos los `span`):
+
+```text
+Call {
+    ty: FnDef(DefId(2:4071 ~ core[4712]::convert::Into::into), Binder { value: [u8, u32], bound_vars: [] })
+    from_hir_call: true
+    fun:
+        Expr {
+            ty: FnDef(DefId(2:4071 ~ core[4712]::convert::Into::into), ...)
+            kind: ZstLiteral(user_ty: None)
+        }
+    args: [
+        Expr {
+            ty: u8
+            kind:
+                Binary {
+                    op: Add
+                    lhs: ... VarRef { id: LocalVarId(...) } ...
+```
+
+Lo que tú escribiste como `.into()` aquí ya es una **llamada a una función concreta**: `core::convert::Into::into` con los argumentos de tipo `[u8, u32]` (es decir, `<u8 as Into<u32>>::into`). El `DefId(2:4071)` identifica la definición: crate número 2 (`core`), elemento 4071. Y cada expresión lleva su `ty:`. Nada se deja a la imaginación de las etapas siguientes.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m21/tipos-no-cuadran" explicacion="E0308 es de la comprobación de tipos: unificar el tipo del argumento (`u8`) con el de la firma (`u32`) falla. Rust no convierte números por su cuenta: el `help:` te propone `.into()`, una conversión explícita sin pérdida." />
+
+<Trampa titulo="Creer que la inferencia «adivina» tipos mirando todo el programa">
+
+❌ «Rust deduce los tipos de mis funciones a partir de cómo las uso en otros sitios.»
+
+✅ La inferencia trabaja **dentro de cada cuerpo de función**. Las firmas (`fn area(lado: u32) -> u32`) se escriben siempre completas, y son el contrato que cada cuerpo comprueba por separado. Gracias a eso, cambiar el interior de una función no puede romper los tipos de otra.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={[
+    "let n: i32 = match Try::branch(s.parse::<i32>()) {",
+    "    ControlFlow::Continue(val) => val,",
+    "    ControlFlow::Break(residuo) => return FromResidual::from_residual(residuo),",
+    "};",
+    "Ok(n * 2)"
+  ]}
+  distractores={["    ControlFlow::Break(residuo) => panic!(\"error\"),", "let n: i32 = s.parse().unwrap();"]}
+  explicacion="Así es `let n: i32 = s.parse()?; Ok(n * 2)` sin azúcar. El caso `Break` **devuelve** el error convertido con `FromResidual` (que para `Result` usa `From::from`); nunca entra en pánico."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué construcción **no** llega al MIR tal cual, porque desaparece en el lowering a HIR?"
+  opciones={["`match`", "`loop`", "`for`", "una llamada a función"]}
+  correcta={2}
+  explicacion="`for` se reescribe como `match` + `loop` + llamadas a `into_iter` y `next`. Las otras tres son construcciones básicas que se mantienen."
+  porque={["`match` es básico: el `for` se traduce justamente a `match`.", "`loop` es básico: el `for` se traduce a `loop`.", "", "Las llamadas son la pieza más básica de todas."]}
+/>
+
+<Pregunta
+  pregunta="En el THIR, ¿qué es `v.len()` cuando `v: Vec<u8>`?"
+  opciones={[
+    "Una búsqueda en tiempo de ejecución del método `len`",
+    "Una llamada directa a una función concreta, con el `&` automático ya escrito",
+    "Un acceso a un campo llamado `len`",
+    "Lo mismo que en el texto: el THIR no cambia los métodos"
+  ]}
+  correcta={1}
+  explicacion="La resolución de métodos ocurre al comprobar tipos. En el THIR la llamada ya apunta a la función concreta y el préstamo automático (*autoref*) está explícito."
+  porque={["Rust resuelve los métodos al compilar (salvo en `dyn Trait`, que usa una vtable).", "", "`len` es un método, aunque internamente lea un campo.", "Justamente el THIR existe para que nada quede implícito."]}
+/>
+
+<Pregunta
+  pregunta="¿Sobre qué representación comprueba rustc que un `match` cubre todos los casos?"
+  opciones={["Tokens", "AST", "THIR", "LLVM IR"]}
+  correcta={2}
+  explicacion="La exhaustividad necesita conocer el tipo exacto de lo que se compara (para saber todas sus variantes), así que se hace sobre el THIR, que ya tiene tipos."
+  porque={["Los tokens no tienen estructura ni tipos.", "El AST todavía no tiene tipos: no sabe qué variantes existen.", "", "En LLVM IR ya no hay enums ni patrones."]}
+/>
+
+## Para saber más
+
+- [Leer MIR](/curso/21-el-compilador-por-dentro/04-leer-mir/), la siguiente parada del viaje.
+- *rustc-dev-guide*, capítulos «The HIR», «Type inference» y «The THIR»: https://rustc-dev-guide.rust-lang.org/

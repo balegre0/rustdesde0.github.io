@@ -1,0 +1,1 @@
+{ "nota": "En el navegador (wasm32) un puntero y un usize miden 4 bytes: Vec ocupa 12. En un PC de 64 bits, 24." }

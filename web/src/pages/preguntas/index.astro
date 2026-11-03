@@ -1,0 +1,92 @@
+---
+// /preguntas/ — biblioteca de preguntas: tabla filtrable y buscable, con tu tasa de acierto (localStorage).
+import Practica from '../../components/paginas/Practica.astro';
+import { preguntas, DIFICULTAD, TIPO, nombreMundo, nombreTema, numMundo, ordenDif } from '../../lib/practica';
+import { mundos } from '../../lib/lecciones';
+
+const titulos = new Map((await mundos()).map((m) => [m.slug, m.titulo]));
+const filas = [...preguntas].sort((a, b) => numMundo(a.mundo) - numMundo(b.mundo) || ordenDif(a.dificultad) - ordenDif(b.dificultad) || a.titulo.localeCompare(b.titulo, 'es'));
+const temas = [...new Set(filas.map((p) => p.tema))].sort((a, b) => nombreTema(a).localeCompare(nombreTema(b), 'es'));
+const ms = [...new Set(filas.map((p) => p.mundo).filter(Boolean) as string[])].sort();
+const tipos = [...new Set(filas.map((p) => p.tipo))];
+---
+<Practica titulo="Preguntas" descripcion="Biblioteca de preguntas de Rust con solución detallada: ownership, préstamos, lifetimes, traits y más. Filtra por tema, mundo y dificultad.">
+  <div class="rdc-tabla-cab">
+    <p class="rdc-lead">Preguntas cortas con <strong>solución detallada</strong>. Cada una apunta a un malentendido real: si fallas, lee el porqué. Tu tasa de acierto cuenta solo tu <em>primera</em> respuesta.</p>
+    <dl class="rdc-mini-cifras" data-resumen>
+      <div><dt>Preguntas</dt><dd class="rdc-num">{filas.length}</dd></div>
+      <div><dt>Respondidas</dt><dd class="rdc-num" data-respondidas>0</dd></div>
+      <div><dt>Acierto a la primera</dt><dd class="rdc-num" data-acierto>—</dd></div>
+    </dl>
+  </div>
+
+  <form class="rdc-filtros" data-filtros role="search" aria-label="Filtrar preguntas" onsubmit="return false">
+    <label class="rdc-filtro rdc-filtro-busca">
+      <span class="rdc-sr">Buscar</span>
+      <input type="search" name="q" placeholder="Buscar por título, etiqueta o error (E0499)…" autocomplete="off" spellcheck="false" />
+    </label>
+    <label class="rdc-filtro"><span>Tema</span>
+      <select name="tema"><option value="">Todos</option>{temas.map((t) => <option value={t}>{nombreTema(t)}</option>)}</select>
+    </label>
+    <label class="rdc-filtro"><span>Mundo</span>
+      <select name="mundo"><option value="">Todos</option>{ms.map((m) => <option value={m}>{nombreMundo(m, titulos)}</option>)}</select>
+    </label>
+    <label class="rdc-filtro"><span>Dificultad</span>
+      <select name="dificultad"><option value="">Todas</option>{Object.entries(DIFICULTAD).map(([k, v]) => <option value={k}>{v}</option>)}</select>
+    </label>
+    <label class="rdc-filtro"><span>Tipo</span>
+      <select name="tipo"><option value="">Todos</option>{tipos.map((t) => <option value={t}>{TIPO[t]}</option>)}</select>
+    </label>
+    <label class="rdc-filtro"><span>Estado</span>
+      <select name="estado"><option value="">Todas</option><option value="nueva">Sin hacer</option><option value="ok">Acertadas a la primera</option><option value="mal">Falladas a la primera</option></select>
+    </label>
+  </form>
+  <p class="rdc-tabla-cuenta" aria-live="polite"><span data-cuenta>{filas.length}</span> de {filas.length} preguntas <button type="button" class="rdc-boton sutil pequeno" data-limpiar hidden>Quitar filtros</button></p>
+
+  <div class="rdc-tabla-scroll">
+    <table class="rdc-tabla" data-tabla>
+      <thead>
+        <tr>
+          <th scope="col" data-orden="titulo" aria-sort="none"><button type="button">Título</button></th>
+          <th scope="col" data-orden="tema" aria-sort="none"><button type="button">Tema</button></th>
+          <th scope="col" data-orden="mundo" aria-sort="ascending" class="rdc-col-mundo"><button type="button">Mundo</button></th>
+          <th scope="col" data-orden="dificultad" aria-sort="none"><button type="button">Dificultad</button></th>
+          <th scope="col" data-orden="tipo" aria-sort="none" class="rdc-col-tipo"><button type="button">Tipo</button></th>
+          <th scope="col" data-orden="estado" aria-sort="none" class="rdc-col-estado"><button type="button">Tu acierto</button></th>
+        </tr>
+      </thead>
+      <tbody>
+        {filas.map((p, i) => (
+          <tr data-id={p.id} data-tema={p.tema} data-mundo={p.mundo ?? ''} data-dificultad={p.dificultad} data-tipo={p.tipo} data-i={i}
+              data-texto={[p.titulo, p.tema, nombreTema(p.tema), p.mundo ?? '', ...p.etiquetas].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')}
+              data-k-titulo={p.titulo} data-k-tema={nombreTema(p.tema)} data-k-mundo={String(numMundo(p.mundo)).padStart(2, '0')} data-k-dificultad={ordenDif(p.dificultad)} data-k-tipo={p.tipo}>
+            <td class="rdc-col-titulo"><a href={`/preguntas/${p.id}/`}>{p.titulo}</a>{p.etiquetas.length > 0 && <span class="rdc-etiquetas">{p.etiquetas.slice(0, 3).map((e) => <span class="rdc-etiqueta">{e}</span>)}</span>}</td>
+            <td>{nombreTema(p.tema)}</td>
+            <td class="rdc-col-mundo">{nombreMundo(p.mundo, titulos)}</td>
+            <td><span class="rdc-dif" data-dif={p.dificultad}>{DIFICULTAD[p.dificultad]}</span></td>
+            <td class="rdc-col-tipo">{TIPO[p.tipo]}</td>
+            <td class="rdc-col-estado"><span class="rdc-estado" data-estado="nueva"><span aria-hidden="true">—</span><span class="rdc-sr">Sin hacer</span></span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {filas.length === 0 && <p>Todavía no hay preguntas publicadas.</p>}
+    <p class="rdc-tabla-vacia" data-vacia hidden>Ninguna pregunta cumple esos filtros.</p>
+  </div>
+</Practica>
+
+<script>
+  import { iniciarTabla } from '../../runtime/tabla';
+  import { leer, EVENTO } from '../../runtime/progreso';
+  const estadoDe = (id: string) => { const r = leer().preguntas[id]; return r ? (r.primera ? 'ok' : 'mal') : 'nueva'; };
+  const tabla = iniciarTabla({ estadoDe, textos: { ok: ['✓', 'Acertada a la primera'], mal: ['✗', 'Fallada a la primera'], nueva: ['—', 'Sin hacer'] } });
+  const resumen = () => {
+    const p = leer();
+    const ids = new Set([...document.querySelectorAll<HTMLElement>('[data-tabla] tbody tr')].map((r) => r.dataset.id!));
+    const hechas = Object.entries(p.preguntas).filter(([k]) => ids.has(k));
+    document.querySelector('[data-respondidas]')!.textContent = String(hechas.length);
+    document.querySelector('[data-acierto]')!.textContent = hechas.length ? `${Math.round((100 * hechas.filter(([, v]) => v.primera).length) / hechas.length)} %` : '—';
+  };
+  resumen();
+  window.addEventListener(EVENTO, () => { tabla.refrescar(); resumen(); });
+</script>

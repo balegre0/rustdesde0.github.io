@@ -1,0 +1,67 @@
+---
+title: "'static"
+description: "Palabra clave débil: el tiempo de vida que dura todo el programa."
+sidebar:
+  order: 70
+desde: "1.0"
+categoria: "debil"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`'static` es el **tiempo de vida más largo**: el de algo que puede seguir siendo válido hasta que el programa termina.
+
+## Sinopsis
+
+```text
+&'static T          // referencia válida durante todo el programa
+T: 'static          // límite: T no contiene préstamos de vida corta
+dyn Trait + 'static
+```
+
+## Qué hace
+
+### En una referencia: `&'static T`
+
+Una `&'static T` apunta a datos que **nunca** se liberan mientras el programa corre: literales de texto (están dentro del propio ejecutable), elementos `static`, constantes promovidas (`&5`) o memoria «filtrada» a propósito con `Box::leak`.
+
+### En un límite: `T: 'static`
+
+`T: 'static` **no** significa «T vive para siempre». Significa que `T` **no contiene préstamos** que puedan caducar antes: un `String`, un `Vec<u8>` o un `i32` lo cumplen (son dueños de sus datos), aunque se destruyan en cuanto salen de ámbito. Un `&'a str` con `'a` corto no lo cumple. Este límite aparece, por ejemplo, en `thread::spawn`: el hilo podría durar más que la función que lo lanzó.
+
+### Por defecto
+
+- En un `const` o `static`, las referencias sin tiempo de vida escrito son `'static`.
+- `Box<dyn Trait>` significa `Box<dyn Trait + 'static>`.
+
+`'static` es palabra clave débil: es especial **solo** como tiempo de vida. No se puede declarar un parámetro genérico llamado `'static`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-static-lifetime" />
+
+Salida:
+
+```text
+Ferris
+"dueño de sus datos"
+Ferris!
+```
+
+## Errores
+
+<NoCompila ej="ref-lenguaje/kw-static-lifetime-error" />
+
+`error[E0597]: local does not live long enough`, con la nota `argument requires that local is borrowed for 'static`. Si el compilador lo aceptara, el préstamo podría usarse cuando `local` ya se hubiera liberado: **uso tras liberar**.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+- [`static`](/ref/lenguaje/palabras-clave/static/) · [Elisión de lifetimes](/ref/lenguaje/elision-de-lifetimes/) · [Subtipos y varianza](/ref/lenguaje/subtipos-y-varianza/): `&'static T` es subtipo de `&'a T`.
+
+## Aprende esto en
+
+- [Mundo 08 · Lifetimes](/curso/08-lifetimes/)

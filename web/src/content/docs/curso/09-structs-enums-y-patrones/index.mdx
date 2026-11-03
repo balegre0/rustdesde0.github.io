@@ -1,0 +1,33 @@
+---
+title: "Mundo 9 · Structs, enums y patrones"
+description: "Inventa tus propios tipos de datos y aprende a desmontarlos con patrones, con la garantía de que no se te escapa ningún caso."
+sidebar:
+  order: 0
+---
+
+Hasta ahora has usado los tipos que trae Rust: números, `bool`, `char`, `String`, tuplas y arrays. En este mundo **creas los tuyos**. Es el salto de «usar el lenguaje» a «modelar el problema»: un `Jugador`, una `Forma`, un `Pedido` que solo puede estar en estados válidos.
+
+Dos herramientas, una idea:
+
+- Un **struct** junta varios datos que van *a la vez* («un libro tiene título **y** páginas **y** …»).
+- Un **enum** elige *uno* entre varios casos («una forma es un círculo **o** un rectángulo **o** …»).
+- Un **patrón** es la forma de preguntar «¿qué hay dentro?» y sacar las piezas. El compilador comprueba que tus patrones cubren **todos** los casos posibles.
+
+## Lo que vas a conseguir
+
+| # | Lección | Al terminar sabrás… |
+|---|---|---|
+| 1 | Structs: datos con nombre | crear, leer y cambiar structs; por qué el compilador reordena sus campos |
+| 2 | Tuple structs, unit structs y newtypes | dar un tipo propio a un número para no mezclar metros con segundos |
+| 3 | Métodos e `impl` | escribir `rect.area()`; `&self`, `&mut self` y `self` |
+| 4 | Funciones asociadas y `Self` | escribir constructores como `Punto::new(1, 2)` |
+| 5 | Enums con datos | modelar «uno de varios casos» con datos dentro de cada caso |
+| 6 | `Option`: por qué no existe el null | trabajar con valores que pueden faltar sin pánicos sorpresa |
+| 7 | `match` exhaustivo | leer el error E0004 y usar `_` con cabeza |
+| 8 | Patrones a fondo | guardas, `@`, rangos, `\|`, patrones anidados y de slices |
+| 9 | `if let`, `while let` y `let else` | atajos para cuando solo te importa un caso |
+| 10 | Layout de enums y nichos | cuánto ocupa un enum en memoria y por qué `Option<&T>` no cuesta nada |
+| 11 | Diseñar con tipos | hacer que los estados imposibles no se puedan escribir |
+| 12 | Jefe: la máquina expendedora | juntar todo en un programa completo |
+
+Requisitos: los mundos 0–8 (sobre todo propiedad y préstamos: un campo `String` dentro de un struct se *mueve* igual que una variable `String`).

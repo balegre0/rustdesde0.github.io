@@ -1,0 +1,111 @@
+---
+title: "Traits: capacidades con nombre"
+description: "Define un trait, implementalo para tus tipos y ahorra código con métodos por defecto."
+sidebar:
+  order: 1
+duracion: 12
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones"]
+tarjetas:
+  - p: "¿Qué es un trait?"
+    r: "Una lista de métodos (capacidades) con nombre. Un tipo implementa el trait cuando escribe `impl Trait for Tipo` y aporta esos métodos."
+  - p: "¿Qué es un método por defecto?"
+    r: "Un método del trait que ya trae cuerpo. Los tipos que implementan el trait lo reciben gratis y pueden reemplazarlo con su propia versión."
+  - p: "¿Qué error da olvidar un método obligatorio en un `impl`?"
+    r: "E0046: «not all trait items implemented, missing: …». El compilador nombra el método que falta."
+  - p: "¿Qué dos formas hay de llamar a un método de trait?"
+    r: "Con punto, `valor.metodo()`, o con la ruta completa, `Trait::metodo(&valor)`. La segunda sirve cuando hay ambigüedad."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a dar nombre a una capacidad («tener área», «saber saludar») y a enseñársela a varios tipos distintos, cada uno a su manera.
+
+## Predice
+
+<Predice
+  ej="m13/predice-saludo"
+  opciones={["`Hola, soy R2` y `Miau`", "`Hola, soy R2` y `Hola, soy Misi`", "No compila: `Gata` no puede reescribir `saludo`", "`Hola, soy R2` y `Hola, soy Misi Miau`"]}
+  correcta={0}
+  explicacion="`Robot` usa el método por defecto `saludo`, que llama a su `nombre`. `Gata` escribe su propio `saludo`, y el suyo **reemplaza** al de por defecto."
+  porque={["Correcto.", "Eso pasaría si `Gata` no reescribiera `saludo`.", "Reescribir un método por defecto está permitido: para eso existe.", "La versión de `Gata` sustituye a la de por defecto; no se combinan."]}
+/>
+
+## La idea
+
+Imagina un formulario con casillas: «tiene área», «tiene nombre». Un **trait** es ese formulario. Lo declaras con `trait Forma` y una lista de **firmas** de métodos, sin cuerpo:
+
+```rust
+trait Forma {
+    fn area(&self) -> f64;
+    fn nombre(&self) -> String;
+}
+```
+
+Cada tipo que quiera ser una `Forma` rellena el formulario con un bloque `impl Forma for Circulo { … }`, donde escribe el cuerpo de **todos** los métodos. Si falta uno, el compilador no te deja seguir. A partir de ahí, `c.area()` funciona como cualquier método.
+
+Un trait también puede traer métodos **con cuerpo**: los **métodos por defecto** (*default methods*). Los reciben todos los tipos que implementan el trait, y cada uno puede reemplazarlos. Lo interesante es que un método por defecto puede usar los obligatorios: `describir` llama a `self.nombre()` y `self.area()` sin saber todavía de qué tipo será `self`.
+
+## Pruébalo
+
+<Ejecutar ej="m13/traits-basico" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un trait **no ocupa memoria** en tus valores. `Circulo` sigue siendo un `f64` de 8 bytes; implementar `Forma` no le añade nada. Lo que el compilador guarda es una tabla, en tiempo de compilación, de qué tipos implementan qué traits.
+
+Cuando escribes `c.area()`, el compilador busca un método `area` primero entre los métodos propios de `Circulo` (los de `impl Circulo`) y después entre los traits **que estén en ámbito** e implemente `Circulo`. Encuentra `Forma::area` y la llamada se convierte en `<Circulo as Forma>::area(&c)`: una llamada directa a una función concreta, igual que cualquier función normal. No hay ninguna búsqueda al ejecutar.
+
+Esa forma larga, `<Tipo as Trait>::metodo`, se llama **sintaxis totalmente cualificada** (*fully qualified syntax*). La necesitarás cuando dos traits tengan un método con el mismo nombre: `Forma::area(&r)` en el ejemplo es su versión corta.
+
+Un detalle de diseño: para usar un método de trait, **el trait tiene que estar en ámbito** (definido en el mismo módulo o traído con `use`). Por eso a veces verás `use std::io::Write;` solo para poder llamar a `.write_all()`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m13/falta-metodo"
+  explicacion="El `impl` promete que `Cuadrado` es una `Forma`, pero solo escribe `area`. Un trait es un contrato completo: o están todos los métodos obligatorios, o nada (E0046). El compilador te dice cuál falta y dónde se declaró."
+/>
+
+<Trampa titulo="Un método por defecto no es una herencia de datos">
+
+Los traits solo contienen **comportamiento** (métodos, tipos, constantes), nunca campos. Si un método por defecto necesita un dato, lo pide con otro método del trait (`fn nombre(&self) -> String`), y cada tipo decide de dónde lo saca.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m13/reto-describir"
+  enunciado="Añade a `Animal` un método por defecto `presentarse` que devuelva el nombre, la palabra «dice» y el sonido (`El perro dice guau`), implementa `Animal` para `Vaca` (se llama «La vaca» y dice «muu») y haz que `main` imprima la presentación de los dos animales."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Un trait tiene un método por defecto `describir`. El tipo `Rombo` implementa el trait sin escribir `describir`. ¿Qué pasa al llamar `rombo.describir()`?"
+  opciones={["Se ejecuta el cuerpo por defecto del trait", "Error: hay que escribir todos los métodos en el `impl`", "Error: `describir` no existe para `Rombo`", "Se ejecuta, pero devuelve una cadena vacía"]}
+  correcta={0}
+  explicacion="Los métodos por defecto existen precisamente para no tener que reescribirlos. Solo los métodos **sin** cuerpo son obligatorios."
+  porque={["Correcto.", "Solo son obligatorios los que no tienen cuerpo.", "Implementar el trait le da a `Rombo` todos sus métodos.", "Ejecuta el cuerpo escrito en el trait, sea cual sea."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuántos bytes añade a un `struct Circulo { radio: f64 }` implementar tres traits?"
+  opciones={["0: los traits no se guardan dentro del valor", "8 por cada trait", "24: un puntero por trait", "Depende de cuántos métodos tenga cada trait"]}
+  correcta={0}
+  explicacion="Un `impl` es información para el compilador. El valor sigue teniendo solo sus campos."
+  porque={["Correcto.", "No hay ningún campo oculto por trait.", "Eso se parece a una vtable, pero las vtables solo aparecen con `dyn Trait` (lección 5) y van **fuera** del valor.", "El número de métodos no cambia el tamaño del valor."]}
+/>
+
+<Pregunta
+  pregunta="Escribes `r.area()` en otro módulo y el compilador dice que `area` no existe, aunque `Rectangulo` implementa `Forma`. ¿Qué falta lo más probable?"
+  opciones={["Traer el trait al ámbito con `use`", "Escribir `impl Forma for Rectangulo` otra vez", "Hacer público el campo `ancho`", "Llamarlo con `r::area()`"]}
+  correcta={0}
+  explicacion="Los métodos de un trait solo se ven cuando el trait está en ámbito. Con `use ruta::Forma;` aparecen."
+  porque={["Correcto.", "Repetir el `impl` daría otro error (E0119: implementación duplicada).", "Los campos no influyen en si un método se encuentra.", "`r::area` busca un módulo llamado `r`; no es una llamada a método."]}
+/>

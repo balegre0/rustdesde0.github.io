@@ -1,0 +1,33 @@
+---
+// <NoCompila ej="m07/dos-mut" explicacion? /> — CONTENIDO.md §4
+// Código que NO compila (ejemplo con "debe_fallar") + el error real de rustc capturado en build,
+// con enlace a /errores/E0xxx/ y «Ver arreglo» (ejecuta <id>.arreglo.rs) si existe.
+import { Code } from '@astrojs/starlight/components';
+import Diagnostico from './interno/Diagnostico.astro';
+import Ejecutable from './interno/Ejecutable.astro';
+import { ejemplo, nombreArchivo } from '../lib/ejemplos';
+import { mdEnLinea } from './islas/md';
+
+interface Props { ej: string; explicacion?: string; titulo?: string }
+const { ej, explicacion, titulo } = Astro.props;
+const e = ejemplo(ej, 'NoCompila');
+if (!e.debeFallar || !e.diagnosticos?.length) throw new Error(`<NoCompila ej="${ej}">: el ejemplo debe tener "debe_fallar": true en ejemplos/${e.id}.json.`);
+const errs = e.diagnosticos.filter((d) => d.nivel === 'error');
+const marcadas = [...new Set(errs.map((d) => d.linea).filter((x): x is number => !!x))];
+const codigos = [...new Set(errs.map((d) => d.codigo).filter(Boolean))];
+---
+<div class="rdc-nocompila" data-nocompila>
+  <Code code={e.codigo.replace(/\n$/, '')} lang="rust" title={titulo ?? nombreArchivo(e)} mark={marcadas} />
+  <p class="rdc-nocompila-estado">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M18.3 7.1 16.9 5.7 12 10.6 7.1 5.7 5.7 7.1l4.9 4.9-4.9 4.9 1.4 1.4 4.9-4.9 4.9 4.9 1.4-1.4-4.9-4.9z" /></svg>
+    No compila{codigos.length ? <> · <span class="rdc-mono">{codigos.join(', ')}</span></> : null}{marcadas.length ? ` · línea ${marcadas.join(', ')}` : ''}
+  </p>
+  <Diagnostico diagnosticos={e.diagnosticos} />
+  {explicacion && <p class="rdc-nocompila-expl" set:html={mdEnLinea(explicacion)} />}
+  {e.arreglo && (
+    <details class="rdc-arreglo" data-arreglo>
+      <summary>Ver arreglo</summary>
+      <Ejecutable ej={ej} arreglo componente="NoCompila" titulo={`${nombreArchivo(e).replace(/\.rs$/, '')}.arreglo.rs`} />
+    </details>
+  )}
+</div>

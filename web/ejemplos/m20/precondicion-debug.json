@@ -1,0 +1,1 @@
+{ "nota": "La comprobación solo existe con debug-assertions; en release no hay red y sería UB." }

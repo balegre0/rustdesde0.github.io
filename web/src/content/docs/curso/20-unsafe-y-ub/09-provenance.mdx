@@ -1,0 +1,119 @@
+---
+title: "Provenance: un puntero es más que una dirección"
+description: "Descubres que cada puntero lleva un permiso sobre una asignación concreta y usas las APIs de strict provenance."
+sidebar:
+  order: 9
+duracion: 12
+desde: "1.84"
+requiere: ["20-unsafe-y-ub/02-punteros-crudos"]
+tarjetas:
+  - p: "¿Qué es la provenance de un puntero?"
+    r: "El permiso que lleva sobre una asignación concreta (de qué memoria «viene»). Dirección + provenance = puntero."
+  - p: "¿Qué hacen `addr`, `with_addr` y `map_addr`?"
+    r: "`addr` da la dirección como usize (sin provenance); `with_addr` y `map_addr` crean un puntero con otra dirección CONSERVANDO la provenance original."
+  - p: "¿Para qué sirve `ptr::without_provenance(a)`?"
+    r: "Para crear un puntero con dirección `a` y sin permiso: vale como centinela o para comparar, nunca para leer o escribir."
+  - p: "¿Desde qué versión son estables las APIs de strict provenance?"
+    r: "Rust 1.84 (enero de 2025)."
+---
+
+import { Ejecutar, Ordena, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Vas a descubrir que dos punteros con la **misma dirección** pueden no ser intercambiables, y a usar las herramientas que Rust da para manipular direcciones sin perder el permiso.
+
+## Predice
+
+<Pregunta
+  pregunta="Tienes dos arrays `a` y `b` en la pila, y por casualidad `a.as_ptr().add(a.len())` (justo después del final de `a`) tiene la misma dirección que `b.as_ptr()`. ¿Puedes leer `b[0]` a través del primero?"
+  opciones={["Sí, la dirección es la misma", "No: ese puntero tiene permiso sobre `a`, no sobre `b`; leer `b` con él es UB", "Solo si los arrays son del mismo tipo", "Solo en release"]}
+  correcta={1}
+  explicacion="Un puntero no es solo un número: lleva su **provenance**, el permiso sobre la asignación de la que salió. El de `a` no autoriza a tocar `b`, aunque las direcciones coincidan."
+  porque={["La dirección no lo es todo: falta el permiso.", "Correcto.", "El tipo no cambia de qué asignación viene el puntero.", "El UB no depende del perfil de compilación."]}
+/>
+
+## La idea
+
+En tu procesador, un puntero es un número. En la **máquina abstracta** de Rust (la que define qué programas tienen significado), un puntero es un número **más** su *provenance* (procedencia): de qué asignación salió y qué parte de ella puede tocar. Por eso un puntero solo puede leer dentro de la asignación de la que viene.
+
+Esto tiene una consecuencia práctica: convertir un puntero en entero y luego otra vez en puntero (`p as usize as *const T`) **pierde** información. ¿De dónde vendría el permiso del puntero nuevo? Rust 1.84 estabilizó las APIs de *strict provenance* para que no tengas que hacerlo:
+
+- `p.addr()`: la dirección como `usize`, sin permiso (solo para calcular o imprimir).
+- `p.with_addr(a)` y `p.map_addr(|a| …)`: un puntero con **otra dirección** y **la misma provenance** que `p`.
+- `ptr::without_provenance(a)`: un puntero sin permiso (centinelas, valores especiales).
+- `ptr::dangling()` / `NonNull::dangling()`: un puntero alineado y no nulo que no apunta a nada (para colecciones vacías).
+
+## Pruébalo
+
+El caso típico: guardar una **etiqueta** en los bits bajos de un puntero alineado (lo hacen intérpretes y estructuras de datos sin bloqueos). Como un `u32` está alineado a 4, los dos bits bajos de su dirección valen 0 y se pueden usar:
+
+<Ejecutar ej="m20/etiquetar-puntero" />
+
+`map_addr` cambia la dirección dos veces (pone el bit y lo quita), pero el puntero `limpio` **conserva** la provenance de `x`, así que leer `*limpio` es correcto. Con `as usize` y vuelta, no podrías afirmarlo.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué la provenance no es teoría:** el optimizador la usa. Si dos punteros vienen de asignaciones distintas, el compilador asume que no pueden tocar la misma memoria, aunque por casualidad sus direcciones coincidan en una ejecución. Y existe hardware (las arquitecturas CHERI) donde un puntero es una *capability* de 128 bits que el procesador verifica: allí un entero **no puede** volver a ser puntero. *Strict provenance* hace que el código Rust sea portable a esas máquinas.
+
+**Dos regímenes:**
+
+| Régimen | APIs | Cuándo |
+|---|---|---|
+| Estricto | `addr`, `with_addr`, `map_addr`, `without_provenance` | siempre que puedas: el permiso viaja con el puntero |
+| Expuesto | `expose_provenance()` y `with_exposed_provenance(a)` | cuando una dirección **tiene** que pasar por un entero (por ejemplo, la guarda un sistema externo) |
+
+`expose_provenance` «publica» el permiso del puntero; `with_exposed_provenance` crea un puntero que puede usar alguno de los permisos publicados. Es más débil para el optimizador y Miri lo vigila menos (con `-Zmiri-strict-provenance` lo rechaza), así que es el último recurso.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Ida y vuelta por usize">
+
+❌ `let n = p as usize; let q = (n | 1) as *const u32;` y luego quitar el bit y leer. El `as` de entero a puntero no sabe de qué asignación sacar el permiso: es la vía «expuesta» implícita, y con `-Zmiri-strict-provenance` Miri la rechaza.
+
+✅ `let q = p.map_addr(|a| a | 1);` hace la misma cuenta y conserva el permiso. Usa `addr()` solo para **mirar** la dirección.
+
+</Trampa>
+
+## Tu turno
+
+Ordena las líneas para guardar una etiqueta en el bit bajo de un puntero y volver a leer el valor de forma correcta:
+
+<Ordena
+  lineas={["let x: u64 = 99;", "let p: *const u64 = &x;", "let marcado = p.map_addr(|a| a | 1);", "let limpio = marcado.map_addr(|a| a & !1);", "let v = unsafe { *limpio };"]}
+  distractores={["let limpio = (marcado.addr() & !1) as *const u64;", "let v = unsafe { *marcado };"]}
+  explicacion="`map_addr` cambia la dirección y conserva la provenance. Convertir un usize en puntero con `as` pierde el permiso estricto, y leer `*marcado` sería un acceso desalineado (dirección impar): UB."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué devuelve `p.addr()`?"
+  opciones={["Un puntero nuevo con la misma provenance", "La dirección como `usize`, sin provenance", "La provenance como número", "El valor apuntado"]}
+  correcta={1}
+  explicacion="`addr` es para mirar o calcular. Para volver a tener un puntero usable, `p.with_addr(a)` o `p.map_addr(f)`."
+  porque={["Eso lo hace `with_addr`.", "Correcto.", "La provenance no es un número que se pueda leer.", "Para eso hay que desreferenciar."]}
+/>
+
+<Pregunta
+  pregunta="¿Para qué sirve `std::ptr::without_provenance::<u32>(8)`?"
+  opciones={["Para leer la dirección 8", "Para crear un puntero centinela que se puede comparar pero no desreferenciar", "Para reservar 8 bytes", "No compila"]}
+  correcta={1}
+  explicacion="Un puntero sin provenance no tiene permiso sobre ninguna memoria. Leer a través de él es UB, pero como valor especial es perfectamente válido."
+  porque={["Leer por un puntero sin permiso es UB.", "Correcto.", "No reserva memoria.", "Compila y es estable desde 1.84 (el ejemplo lo usa)."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué funciona guardar una etiqueta en el bit bajo de un `*const u32`?"
+  opciones={["Porque los punteros siempre son pares", "Porque un `u32` está alineado a 4: los dos bits bajos de su dirección son 0", "Porque Rust reserva ese bit", "Porque `map_addr` lo limpia solo"]}
+  correcta={1}
+  explicacion="La alineación garantiza ceros en los bits bajos. Hay que quitarlos antes de desreferenciar: un acceso por la dirección marcada estaría desalineado."
+  porque={["Un `*const u8` puede tener cualquier dirección.", "Correcto.", "No hay ningún bit reservado: lo da la alineación.", "Hay que limpiarlo tú, como en el ejemplo."]}
+/>
+
+## Para saber más
+
+- Documentación de `std::ptr`, sección «Provenance».
+- Ralf Jung, serie «Pointers Are Complicated» (blog, en inglés).

@@ -1,0 +1,32 @@
+---
+title: "#![feature]"
+description: "Activa características inestables del lenguaje o de la biblioteca. Solo funciona en el compilador nightly."
+sidebar:
+  order: 29
+insignias: ["Nightly · inestable"]
+---
+
+`#![feature(…)]` activa una característica que todavía no es estable.
+
+## Sinopsis
+
+```rust
+#![feature(never_type, try_blocks)]
+```
+
+## Qué hace
+
+Las novedades de Rust se implementan primero **detrás de una feature** (la «puerta» de la característica). Solo el compilador **nightly** acepta `#![feature]`; en stable y beta es el error E0554. Cada feature tiene una **incidencia de seguimiento** en el repositorio de Rust, enlazada desde el *Unstable Book* (`rustup doc --unstable-book`), donde se discute su estado.
+
+Para probarlas:
+
+```powershell
+rustup toolchain install nightly
+cargo +nightly run
+```
+
+Úsalas para **experimentar**, no en código que tenga que compilar dentro de un año: pueden cambiar o desaparecer.
+
+## Ver también
+
+[Cómo evoluciona Rust](/curso/24-teoria-y-diseno/11-como-evoluciona/)

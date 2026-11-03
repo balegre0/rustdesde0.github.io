@@ -1,0 +1,101 @@
+---
+title: "Elisión: las lifetimes que no escribes"
+description: "Tres reglas fijas permiten omitir casi todas las anotaciones. Si después de aplicarlas la salida sigue sin lifetime, el compilador pide que la escribas (E0106)."
+sidebar:
+  order: 4
+duracion: 12
+desde: "1.0"
+requiere: ["08-lifetimes/03-anotar-funciones"]
+tarjetas:
+  - p: "Regla 1 de la elisión:"
+    r: "Cada referencia de entrada sin anotar recibe su propia lifetime distinta."
+  - p: "Regla 2 de la elisión:"
+    r: "Si hay exactamente una lifetime de entrada, se asigna a todas las referencias de salida."
+  - p: "Regla 3 de la elisión:"
+    r: "Si hay `&self` o `&mut self`, la lifetime de `self` se asigna a todas las referencias de salida."
+  - p: "¿Las reglas de elisión deducen algo mirando el cuerpo?"
+    r: "No. Son reglas fijas sobre la firma. Si se equivocan con lo que hace el cuerpo, el cuerpo no compila."
+  - p: "¿Qué significa `'_`?"
+    r: "La lifetime anónima: «aquí hay una lifetime, dedúcela con las reglas de siempre». Sirve para que se vea que un tipo lleva una referencia, como `Lector<'_>`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Si cada función con referencias necesitara `'a`, el código estaría lleno de apóstrofos. No lo está porque el compilador aplica tres **reglas de elisión** («omisión»). Te las vas a aprender, porque explican cuándo un `'a` sobra y cuándo es obligatorio.
+
+## Predice
+
+<Predice
+  ej="m08/p-elision-una-entrada"
+  opciones={["`[hola]`", "No compila: E0106, falta la lifetime", "`[hola mundo]`", "No compila: la slice apunta a una variable local"]}
+  correcta={0}
+  explicacion="Hay una sola referencia de entrada, así que el compilador entiende que la salida sale de ella: `fn primera_palabra<'a>(s: &'a str) -> &'a str`. Y la slice apunta a `frase`, que vive en `main`."
+  porque={["", "Con una sola entrada, la regla 2 rellena la lifetime de la salida.", "`find(' ')` encuentra el espacio y corta antes.", "`s` viene de fuera: la slice apunta al texto de `frase`, no a nada local."]}
+/>
+
+## La idea
+
+El compilador rellena las lifetimes de las firmas con **tres reglas**, siempre en este orden:
+
+1. **Cada referencia de entrada** sin anotar recibe **su propia** lifetime.
+   `fn f(a: &str, b: &str)` se entiende como `fn f<'x, 'y>(a: &'x str, b: &'y str)`.
+2. Si hay **exactamente una** lifetime de entrada, se usa para **todas las salidas**.
+   `fn f(s: &str) -> &str` se entiende como `fn f<'x>(s: &'x str) -> &'x str`.
+3. Si una de las entradas es **`&self` o `&mut self`**, su lifetime se usa para **todas las salidas**.
+   `fn f(&self, otro: &str) -> &str` devuelve algo atado a `self`.
+
+Si después de las tres reglas alguna salida sigue sin lifetime, **E0106**: tienes que escribirla tú. Es el caso de dos entradas sin `self`:
+
+<NoCompila ej="m08/p-elision-dos-entradas" explicacion="Regla 1: `a` y `b` reciben lifetimes distintas. Regla 2: no aplica (hay dos). Regla 3: no hay `self`. La salida queda sin lifetime: E0106. El arreglo ata las dos entradas y la salida con `'a`." />
+
+## Pruébalo
+
+La regla 3, cuando acierta:
+
+<Ejecutar ej="m08/p-elision-self" />
+
+`inicio` devuelve un trozo de `self.texto`: la regla 3 le da la lifetime de `self`, y el cuerpo la cumple. Ahora, cuando la regla **no** acierta:
+
+<NoCompila ej="m08/p-elision-self-mal" explicacion="La regla 3 ata la salida a `self`, pero el cuerpo devuelve `otro`, que no tiene nada que ver con `self`. Las reglas no miran el cuerpo: si fallan, tienes que escribir la firma de verdad: `fn otro<'b>(&self, otro: &'b str) -> &'b str`." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Las closures no siguen estas reglas.** Las reglas de elisión son para **funciones**. En una closure con tipos anotados, la lifetime de la salida no se ata a la de la entrada:
+
+<NoCompila ej="m08/p-closure-elision" explicacion="En una closure, `&i32` de entrada y `&i32` de salida reciben lifetimes independientes, así que devolver `x` no cumple la de salida. Es una limitación conocida. Se rodea quitando las anotaciones (el compilador infiere mejor sin ellas) o usando una función normal." />
+
+**`'_`, la lifetime anónima.** Cuando un tipo lleva una referencia dentro (un struct con lifetime, como verás en la lección 6), puedes escribir `'_` para decir «aquí hay una lifetime; aplícale las reglas de siempre»: `fn lector(&self) -> Lector<'_>`. Desde la edición 2018 se recomienda escribirla en esos casos, para que quien lee la firma vea que hay un préstamo. El aviso `elided_lifetimes_in_paths` lo exige si lo activas.
+
+**Dónde están escritas.** Las reglas forman parte de la *Reference* de Rust, en el capítulo *Lifetime elision*. Incluyen también las de `dyn Trait` (lección 8) y las de `impl` (lección 7).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Creer que la elisión «adivina»">
+
+❌ «El compilador ve que devuelvo `otro` y le pone su lifetime».
+
+✅ Las reglas son **mecánicas**: miran solo la forma de la firma. Si con `&self` devuelves algo que no sale de `self`, la regla 3 se equivoca y te toca anotar. Cuando el error mencione *lifetime may not live long enough* en un método, mira primero si la regla 3 te ha atado la salida a `self`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué firma completa entiende el compilador para `fn f(&self, n: &str) -> &str`?"
+  opciones={["`fn f<'a, 'b>(&'a self, n: &'b str) -> &'b str`", "`fn f<'a, 'b>(&'a self, n: &'b str) -> &'a str`", "Ninguna: da E0106", "`fn f<'a>(&'a self, n: &'a str) -> &'a str`"]}
+  correcta={1}
+  explicacion="Regla 1: `self` y `n` reciben lifetimes distintas. Regla 3: hay `&self`, así que la salida recibe la de `self`."
+  porque={["Eso sería si la salida saliera de `n`; habría que escribirlo.", "", "La regla 3 rellena la salida: no hay error.", "La regla 1 da lifetimes distintas a cada entrada."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál necesita anotaciones explícitas?"
+  opciones={["`fn f(s: &str) -> &str`", "`fn f(&self) -> &str`", "`fn f(a: &str, b: &[u8]) -> &str`", "`fn f(a: &str) -> String`"]}
+  correcta={2}
+  explicacion="Dos entradas por referencia, salida por referencia y sin `self`: ninguna regla rellena la salida."
+  porque={["Una entrada: regla 2.", "Hay `self`: regla 3.", "", "La salida no es una referencia: no necesita lifetime."]}
+/>

@@ -1,0 +1,96 @@
+---
+title: "E0369: operador binario no aplicable"
+description: "Usas `+`, `-`, `*`, `==`, `<` u otro operador con un tipo que no lo implementa."
+sidebar:
+  order: 26
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot add `Dinero` to `Dinero` ``
+
+## Qué significa
+
+Los operadores son traits: `a + b` es `Add::add(a, b)`; `==` es `PartialEq`; `<` es `PartialOrd`. Un struct propio no tiene ninguno de ellos hasta que lo implementas o lo derivas.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0369" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0369]: cannot add `Dinero` to `Dinero`
+  --> E0369.rs:8:19
+   |
+ 8 |     let total = a + b;
+   |                 - ^ - Dinero
+   |                 |
+   |                 Dinero
+   |
+note: an implementation of `Add` might be missing for `Dinero`
+  --> E0369.rs:1:1
+   |
+ 1 | struct Dinero {
+   | ^^^^^^^^^^^^^ must implement `Add`
+note: the trait `Add` must be implemented
+  --> /rustc/…/library/core/src/ops/arith.rs:76:1
+   |
+76 | pub const trait Add<Rhs = Self> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Sumar dos structs propios.
+- Comparar con `==` tipos que no implementan `PartialEq`.
+- Concatenar dos `&str` con `+` (hace falta un `String` a la izquierda).
+
+## Cómo arreglarlo
+
+Implementa el trait del operador (`impl Add for Dinero`), o deriva los de comparación (`#[derive(PartialEq, PartialOrd)]`). Para textos: `String::from(a) + b` o `format!("{a}{b}")`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+use std::ops::Add;
+
+struct Dinero {
+    centimos: u64,
+}
+
+impl Add for Dinero {
+    type Output = Dinero;
+    fn add(self, otro: Dinero) -> Dinero {
+        Dinero { centimos: self.centimos + otro.centimos }
+    }
+}
+
+fn main() {
+    let a = Dinero { centimos: 150 };
+    let b = Dinero { centimos: 250 };
+    let total = a + b;
+    println!("{}", total.centimos);
+}
+```
+
+**Salida:**
+
+```text
+400
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0369` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0277](/errores/e0277/): un tipo no implementa el trait que se necesita
+- [E0600](/errores/e0600/): operador unario no aplicable
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

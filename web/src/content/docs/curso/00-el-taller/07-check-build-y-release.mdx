@@ -1,0 +1,75 @@
+---
+title: "check, build y --release"
+description: "cargo check comprueba sin generar el programa, cargo build lo genera y --release lo optimiza. Qué hay dentro de la carpeta target."
+sidebar:
+  order: 7
+duracion: 10
+requiere: ["00-el-taller/06-cargo-new-y-run"]
+tarjetas:
+  - p: "¿Para qué sirve `cargo check`?"
+    r: "Para comprobar que el código compila sin generar el ejecutable. Es mucho más rápido que `build` y no necesita el enlazador."
+  - p: "¿Qué diferencia hay entre el perfil `dev` y el `release`?"
+    r: "`dev` (por defecto) compila rápido, sin optimizar y con comprobaciones extra (como el desbordamiento de enteros). `release` (`--release`) tarda más en compilar pero genera un programa mucho más rápido."
+  - p: "¿Se puede borrar la carpeta `target`?"
+    r: "Sí: solo contiene resultados de compilación. `cargo clean` la borra y se regenera al compilar."
+---
+
+import { Ejecutar, Pregunta } from '~/components';
+
+Hasta ahora has usado `cargo run`, que compila y ejecuta. Cargo tiene más órdenes, y elegir bien cuál usar te ahorrará mucho tiempo de espera.
+
+## La idea
+
+| Orden | Qué hace | Cuándo |
+|---|---|---|
+| `cargo check` | comprueba que todo compila; **no** genera el ejecutable | mientras escribes: es lo más rápido |
+| `cargo build` | compila y genera `target\debug\hola.exe` | cuando quieres el programa sin ejecutarlo |
+| `cargo run` | `build` + ejecutar | para probar |
+| `cargo build --release` | compila **optimizando** → `target\release\hola.exe` | para la versión final o para medir velocidad |
+| `cargo clean` | borra `target` | si algo se ha quedado raro o necesitas espacio |
+
+Hay dos **perfiles** de compilación:
+
+- **`dev`** (por defecto): compila deprisa y añade comprobaciones extra. Por ejemplo, si un entero se desborda, el programa se detiene con un error (mundo 03).
+- **`release`** (`--release`): tarda más en compilar, pero el programa puede ser **decenas de veces más rápido**. Algunas comprobaciones se quitan.
+
+Tu código puede saber en qué perfil se compiló:
+
+<Ejecutar ej="m00/perfil" />
+
+Este ejemplo tiene dos perfiles: cámbialo con el selector y verás las dos salidas.
+
+## La carpeta target
+
+`target\` es donde Cargo guarda todo lo que genera:
+
+```text
+target\
+├── debug\           ← perfil dev
+│   ├── hola.exe     ← tu programa
+│   ├── deps\        ← tus dependencias compiladas
+│   └── incremental\ ← datos para recompilar más rápido
+└── release\         ← perfil release (si lo has usado)
+```
+
+Puede ocupar cientos de megas, pero **no es tuya**: Cargo la regenera cuando haga falta. Por eso el `.gitignore` que creó `cargo new` le dice a Git que la ignore.
+
+Un consejo para Windows: el antivirus (Windows Defender) analiza cada archivo nuevo de `target` y eso ralentiza la compilación. Puedes añadir tu carpeta de proyectos a sus exclusiones o, mejor, crear una **Unidad de desarrollo** (*Dev Drive*), pensada justo para esto.
+
+## Comprueba
+
+<Pregunta
+  pregunta="Estás escribiendo código y solo quieres saber si compila. ¿Qué orden es la más rápida?"
+  opciones={["`cargo run`", "`cargo build --release`", "`cargo check`", "`cargo clean`"]}
+  correcta={2}
+  explicacion="`cargo check` hace el análisis completo (tipos, préstamos…) pero se salta la generación de código y el enlazado."
+  porque={["Además de compilar, ejecuta.", "Es la más lenta: optimiza.", "", "Borra lo compilado."]}
+/>
+
+<Pregunta
+  pregunta="¿Dónde está el ejecutable tras `cargo build --release`?"
+  opciones={["`target\\debug\\`", "`target\\release\\`", "`src\\`", "En la carpeta del proyecto"]}
+  correcta={1}
+  explicacion="Cada perfil tiene su subcarpeta en `target`."
+  porque={["Esa es la del perfil `dev`.", "", "En `src` solo está tu código.", "Cargo nunca mezcla lo generado con tus archivos."]}
+/>

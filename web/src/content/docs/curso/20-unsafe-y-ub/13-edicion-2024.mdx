@@ -1,0 +1,103 @@
+---
+title: "Unsafe en la edición 2024"
+description: "Repasas los cambios de la edición 2024 sobre unsafe, con el error real de cada uno y el motivo del cambio."
+sidebar:
+  order: 13
+duracion: 10
+desde: "2024"
+requiere: ["20-unsafe-y-ub/12-ffi"]
+tarjetas:
+  - p: "Cita los cambios de la edición 2024 relacionados con unsafe."
+    r: "unsafe extern obligatorio; atributos unsafe(...) (no_mangle, export_name, link_section); unsafe_op_in_unsafe_fn avisa; static_mut_refs es error; set_var y remove_var son unsafe."
+  - p: "¿Por qué `std::env::set_var` pasó a ser unsafe?"
+    r: "Porque modificar el entorno mientras otro hilo lo lee (por ejemplo, la biblioteca de C del sistema al consultar la zona horaria) es una carrera de datos."
+  - p: "¿Qué alternativa propone rustc a `&STATIC_MUT`?"
+    r: "`&raw const STATIC_MUT` (un puntero, no una referencia). Mejor aún: un atómico, Mutex, OnceLock o LazyLock."
+---
+
+import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a repasar, con los errores reales de `rustc` 1.99.1, los cinco cambios que la edición 2024 hizo alrededor de `unsafe`. Todos tienen el mismo espíritu: **que lo peligroso se vea**.
+
+## Predice
+
+<NoCompila ej="m20/set-var" explicacion="En la edición 2024, `set_var` es una función unsafe (E0133). Cambiar variables de entorno no es peligroso por sí mismo: lo peligroso es hacerlo mientras otro hilo las lee, y eso la función no puede comprobarlo." />
+
+## La idea
+
+Una **edición** es un conjunto de cambios que solo se aplican si tu crate lo pide (`edition = "2024"` en `Cargo.toml`, lo que pone `cargo new`). Así Rust puede endurecer reglas sin romper código antiguo. La edición 2024 (Rust 1.85) hizo cinco cambios sobre `unsafe`:
+
+| # | Cambio | Antes | Ahora |
+|---|---|---|---|
+| 1 | `extern` debe ser `unsafe extern` | `extern "C" { … }` | `unsafe extern "C" { … }`, con `safe fn` opcional |
+| 2 | atributos inseguros | `#[no_mangle]` | `#[unsafe(no_mangle)]` (también `export_name`, `link_section`) |
+| 3 | `unsafe_op_in_unsafe_fn` | el cuerpo de `unsafe fn` era un bloque unsafe | cada operación necesita su `unsafe { }` (aviso) |
+| 4 | `static_mut_refs` | aviso | **error**: no se pueden crear `&` ni `&mut` a un `static mut` |
+| 5 | funciones que pasan a ser unsafe | `env::set_var`, `env::remove_var` | se llaman dentro de `unsafe { }` |
+
+Los cambios 1 y 2 los viste en la lección de FFI, y el 3 en la primera lección. Aquí tienes el 4.
+
+## Pruébalo
+
+<NoCompila ej="m20/static-mut-ref" explicacion="Una referencia compartida a un `static mut` promete que nadie lo modifica mientras vive, algo casi imposible de garantizar en un programa con más de un hilo. El compilador lo rechaza y sugiere `&raw const`, que crea un puntero en vez de una referencia." />
+
+La versión recomendada no usa ni `static mut` ni `unsafe`: un atómico.
+
+<Ejecutar ej="m20/contador-atomico" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué `set_var`.** En muchos sistemas, la biblioteca de C guarda el entorno en una estructura global sin protección, y funciones muy usadas (por ejemplo, las que calculan la hora local) lo leen. Si un hilo llama a `set_var` mientras otro lee el entorno, hay una **carrera de datos**: UB. Hubo avisos de seguridad reales en crates de fechas por esto. Como `set_var` no puede saber qué hacen los demás hilos, la única opción honesta era marcarla `unsafe` y documentar la condición: «llámala solo cuando no haya otros hilos que lean el entorno».
+
+**Por qué `static_mut_refs`.** Con `static mut X`, cualquier función puede crear `&mut X`, y nada impide que dos existan a la vez (o que dos hilos lo hagan): aliasing con mutación, o carrera de datos. Las alternativas, de mejor a peor: un **atómico** (contadores, banderas), `Mutex`/`RwLock` (datos más grandes), `OnceLock`/`LazyLock` (inicializar una vez), y si de verdad necesitas el `static mut`, accederlo por valor o con `&raw const`/`&raw mut`, nunca con referencias.
+
+**Migrar:** `cargo fix --edition` aplica casi todos estos cambios automáticamente (añade `unsafe` donde falta) y deja comentarios para revisar. Después te toca escribir los `// SAFETY:` que justifican cada bloque nuevo.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Añadir unsafe sin pensar al migrar">
+
+❌ `cargo fix --edition` rodea `set_var` con `unsafe { }` y el programa compila. Si tu programa ya ha lanzado hilos que leen el entorno, ese bloque sigue siendo UB: la herramienta solo ha hecho visible el problema.
+
+✅ Cambia la variable de entorno **al principio de `main`**, antes de crear hilos, o pasa la configuración por parámetros en vez de por el entorno. Y escribe el `// SAFETY:` que lo explique.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m20/sin-static-mut" enunciado="El contador global usa `static mut` y unsafe. Cámbialo por un `AtomicU32` y usa `fetch_add`, de modo que no quede ningún `unsafe` en el programa. Debe imprimir `100 101 102`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuál de estos **no** es un cambio de la edición 2024?"
+  opciones={["`unsafe extern` obligatorio", "`#[unsafe(no_mangle)]`", "Los punteros crudos dejan de existir", "`set_var` pasa a ser unsafe"]}
+  correcta={2}
+  explicacion="Los punteros crudos siguen ahí. La edición no quitó capacidades: solo hizo explícitos sitios donde había una promesa escondida."
+  porque={["Es el cambio 1.", "Es el cambio 2.", "Correcto.", "Es el cambio 5."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace `cargo fix --edition` con un `set_var` antiguo?"
+  opciones={["Lo borra", "Lo envuelve en `unsafe { }` para que compile; justificar que es correcto sigue siendo cosa tuya", "Lo convierte en un atómico", "Nada"]}
+  correcta={1}
+  explicacion="La migración automática es mecánica. Si el programa tenía una carrera de datos, ahora la tiene a la vista, pero no resuelta."
+  porque={["No elimina código.", "Correcto.", "No puede adivinar el diseño correcto.", "Sí lo cambia para que compile en 2024."]}
+/>
+
+<Pregunta
+  pregunta="En la edición 2024, `let r = unsafe { &CONTADOR };` con `static mut CONTADOR`…"
+  opciones={["Compila con un aviso", "Es un error (`static_mut_refs` es deny)", "Compila sin aviso porque está dentro de unsafe", "Solo falla en release"]}
+  correcta={1}
+  explicacion="En 2021 era un aviso; en 2024 es error por defecto. `unsafe` no lo permite: el lint mira la creación de la referencia."
+  porque={["Así era en la edición 2021.", "Correcto.", "unsafe no desactiva lints.", "Es un error de compilación, en cualquier perfil."]}
+/>
+
+## Para saber más
+
+- *The Edition Guide*, capítulo «Rust 2024».
+- En este curso: [mundo 17, atómicos](../../17-concurrencia/).

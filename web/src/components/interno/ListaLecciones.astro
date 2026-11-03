@@ -1,0 +1,47 @@
+---
+// Lista de lecciones de un mundo, con duración y estado (completada) leído del progreso local.
+import { Icon } from '@astrojs/starlight/components';
+import { mundos } from '../../lib/lecciones';
+interface Props { mundo: string }
+const m = (await mundos()).find((x) => x.slug === Astro.props.mundo);
+const ls = m?.lecciones ?? [];
+const total = ls.reduce((s, l) => s + (l.duracion ?? 0), 0);
+---
+{ls.length > 0 && (
+  <section class="rdc-lista-lecciones not-content" data-lista-lecciones aria-labelledby={`lecciones-${Astro.props.mundo}`}>
+    <h2 id={`lecciones-${Astro.props.mundo}`}>Lecciones de este mundo</h2>
+    <p class="rdc-lista-resumen">{ls.length} {ls.length === 1 ? 'lección' : 'lecciones'}{total > 0 && ` · unos ${total} min en total`} · <span data-hechas>0</span> completadas</p>
+    <ol>
+      {ls.map((l, i) => (
+        <li data-leccion={l.id}>
+          <a href={l.href}>
+            <span class="rdc-ll-num" aria-hidden="true">{i + 1}</span>
+            <span class="rdc-ll-texto">
+              <span class="rdc-ll-titulo">{l.titulo}</span>
+              {l.descripcion && <span class="rdc-ll-desc">{l.descripcion}</span>}
+            </span>
+            <span class="rdc-ll-meta">
+              {l.duracion && <span>{l.duracion} min</span>}
+              <span class="rdc-ll-hecha" hidden><Icon name="approve-check" /><span>Completada</span></span>
+            </span>
+          </a>
+        </li>
+      ))}
+    </ol>
+  </section>
+)}
+<script>
+  import { leer } from '../../runtime/progreso';
+  const p = leer();
+  for (const lista of document.querySelectorAll<HTMLElement>('[data-lista-lecciones]')) {
+    let n = 0;
+    for (const li of lista.querySelectorAll<HTMLElement>('[data-leccion]')) {
+      const hecha = !!p.lecciones[li.dataset.leccion!];
+      if (hecha) n++;
+      li.dataset.hecha = String(hecha);
+      li.querySelector<HTMLElement>('.rdc-ll-hecha')!.hidden = !hecha;
+    }
+    const c = lista.querySelector('[data-hechas]');
+    if (c) c.textContent = String(n);
+  }
+</script>

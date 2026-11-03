@@ -1,0 +1,62 @@
+---
+title: "Paginación: memoria virtual"
+description: "Cada dirección que usa un programa es virtual: la CPU la traduce a una física con tablas de páginas de cuatro niveles. Cómo se parte una dirección y para qué sirve."
+sidebar:
+  order: 10
+duracion: 12
+requiere: ["23-embebido-y-tu-so/09-excepciones"]
+tarjetas:
+  - p: "¿Qué es la memoria virtual?"
+    r: "Un sistema en el que las direcciones que usa un programa no son las de la RAM: la CPU las traduce, página a página, con tablas que controla el núcleo."
+  - p: "¿Cómo se parte una dirección virtual en x86_64 (paginación de 4 niveles)?"
+    r: "Cuatro índices de 9 bits (uno por nivel de tabla: P4, P3, P2 y P1) y un desplazamiento de 12 bits dentro de la página de 4 KiB."
+  - p: "¿Para qué sirve la paginación?"
+    r: "Aísla los programas (cada uno tiene su espacio de direcciones), protege la memoria (solo lectura, no ejecutable) y permite usar trozos sueltos de RAM como si fueran seguidos."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+Las direcciones que has visto en todo el curso (`0xfffc4`, `0x7ffd…`) no son las de los chips de RAM: son **virtuales**. Quien las traduce es la CPU, siguiendo unas tablas que prepara el núcleo. Aquí ves cómo.
+
+## La idea
+
+La memoria se divide en **páginas** de 4 KiB. El núcleo mantiene unas **tablas de páginas** que dicen, para cada página virtual, en qué **marco** de memoria física está (y con qué permisos: escritura, ejecución, acceso desde programas de usuario).
+
+En x86_64 la tabla tiene **cuatro niveles**. Una dirección virtual de 48 bits se parte así:
+
+```text
+ 47      39 38      30 29      21 20      12 11          0
+┌─────────┬──────────┬──────────┬──────────┬─────────────┐
+│ P4 (9)  │  P3 (9)  │  P2 (9)  │  P1 (9)  │ desplaz.(12)│
+└─────────┴──────────┴──────────┴──────────┴─────────────┘
+```
+
+La CPU empieza en la tabla P4 (su dirección está en el registro `CR3`), usa el primer índice para encontrar la tabla P3, y así hasta la entrada de P1, que da el marco físico. El desplazamiento se suma al final. Cada tabla tiene 2⁹ = 512 entradas de 8 bytes: justo una página.
+
+## Pruébalo
+
+<Ejecutar ej="m23/paginacion" />
+
+`0x7fff_ffff_f000`, la última página de la mitad baja (donde suele estar la pila de un programa), usa la última entrada (511) de los tres niveles inferiores.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**La TLB.** Recorrer cuatro tablas en cada acceso sería lentísimo. La CPU guarda las traducciones recientes en una caché, la **TLB**. Cuando el núcleo cambia una tabla, tiene que invalidar la entrada correspondiente (`invlpg`), o la CPU seguiría usando la traducción vieja.
+
+**Qué es un fallo de página.** Si una entrada no está presente o no tiene permiso, la CPU lanza la excepción **page fault** (lección 9) con la dirección culpable en el registro `CR2`. Un sistema operativo de verdad la usa para cargar páginas bajo demanda; tu núcleo, por ahora, solo para mostrar el error. Desde Rust, desreferenciar un puntero a memoria no mapeada en un programa normal acaba precisamente aquí: el sistema operativo recibe el fallo de página y mata el proceso con *segmentation fault* o *access violation*.
+
+**Cómo accede el núcleo a las tablas.** Las tablas guardan direcciones **físicas**, pero el núcleo también trabaja con direcciones virtuales. blog_os explica varias soluciones (mapear toda la memoria física en un desplazamiento fijo, tablas recursivas) y usa la primera, que el cargador de arranque prepara.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuántas entradas tiene cada tabla de páginas de x86_64 y por qué?"
+  opciones={["256, por los 8 bits", "512, porque cada índice tiene 9 bits", "4096, por el tamaño de página", "4, por los cuatro niveles"]}
+  correcta={1}
+  explicacion="9 bits dan 2⁹ = 512 índices. Con entradas de 8 bytes, una tabla ocupa 4 096 bytes: exactamente una página."
+  porque={["Los índices tienen 9 bits, no 8.", "", "4 096 es el tamaño de la página en bytes.", "4 es el número de niveles, no de entradas."]}
+/>

@@ -1,0 +1,31 @@
+---
+title: "#![no_std] y #![no_main]"
+description: "no_std hace que el crate use solo core (y alloc si quiere), sin sistema operativo; no_main quita el punto de entrada habitual para definir uno propio."
+sidebar:
+  order: 17
+insignias: ["Desde 1.6", "Preludios"]
+---
+
+Dos atributos de crate para programas que no corren sobre un sistema operativo normal: microcontroladores, núcleos, cargadores de arranque.
+
+## Sinopsis
+
+```rust
+#![no_std]       // sin std: solo core (y alloc con `extern crate alloc;`)
+#![no_main]      // sin el punto de entrada main habitual
+```
+
+## Qué hace
+
+- **`#![no_std]`**: el crate no enlaza `std`, sino `core` (y, si lo pides, `alloc`). El preludio pasa a ser `core::prelude`. Desaparece todo lo que necesita sistema operativo: archivos, hilos, red, `println!`. Siguen estando los tipos básicos, `Option`, `Result`, iteradores, slices, `fmt`, atómicos… Con `extern crate alloc;` recuperas `Vec`, `String` y `Box`, si das un [`#[global_allocator]`](/ref/lenguaje/atributos/global_allocator/).
+- **`#![no_main]`**: el compilador no genera el símbolo `main` ni el código de arranque de `std`. Tú defines el punto de entrada (por ejemplo, `#[unsafe(no_mangle)] pub extern "C" fn _start() -> !` o el que pida tu plataforma; en microcontroladores lo pone una macro como `#[entry]`).
+
+Un binario `no_std` necesita además un [`#[panic_handler]`](/ref/lenguaje/atributos/panic_handler/). Una **biblioteca** `no_std` no: lo pondrá el binario que la use. Muchas bibliotecas son `no_std` para funcionar en todas partes.
+
+## Desde
+
+`no_std` en bibliotecas, Rust 1.6; en binarios, con `panic_handler` (1.30). `no_main`: 1.0.
+
+## Ver también
+
+[`no_std`](/curso/22-sistemas-y-ffi/) · [Mundo 23 · Embebido y tu SO](/curso/23-embebido-y-tu-so/)

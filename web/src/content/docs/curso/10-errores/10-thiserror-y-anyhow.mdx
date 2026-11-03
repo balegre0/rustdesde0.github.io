@@ -1,0 +1,122 @@
+---
+title: "Los patrones thiserror y anyhow"
+description: "Entiende qué escriben por ti las dos bibliotecas de errores más usadas del ecosistema, escribiéndolo antes a mano."
+sidebar:
+  order: 10
+duracion: 12
+desde: "1.0"
+requiere: ["10-errores/08-box-dyn-error", "10-errores/09-main-devuelve-result"]
+tarjetas:
+  - p: "¿Para qué se usa thiserror y para qué anyhow?"
+    r: "thiserror, para definir enums de error concretos en bibliotecas (genera `Display`, `Error` y `From`). anyhow, en aplicaciones: un único tipo de error «cualquiera» con contexto añadido."
+  - p: "¿Qué genera `#[from]` en un campo de una variante con thiserror?"
+    r: "Un `impl From<TipoDelCampo> for TuError` y que `source()` devuelva ese campo: así `?` convierte el error y la causa queda encadenada."
+  - p: "¿Qué hace `.context(\"…\")` de anyhow?"
+    r: "Envuelve el error en otro cuyo mensaje es tu texto y cuya causa (`source`) es el error original: «qué estaba haciendo» + «por qué falló»."
+  - p: "¿Por qué no pueden usarse crates externos en los ejemplos del navegador?"
+    r: "Porque los ejemplos se compilan solo con la biblioteca estándar. Por eso aquí se escribe a mano lo que esas bibliotecas generan."
+---
+
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a conocer las dos bibliotecas de errores que verás en casi cualquier proyecto real, entendiendo lo que hacen por dentro (porque ya sabes escribirlo tú).
+
+## Predice
+
+<Pregunta
+  pregunta="Una biblioteca de lectura de imágenes debe dejar que quien la use distinga «formato no soportado» de «archivo truncado». ¿Qué le conviene?"
+  opciones={["Un enum de error concreto (el estilo de thiserror)", "Un error «cualquiera» con mensaje (el estilo de anyhow)", "`String`", "Entrar en pánico"]}
+  correcta={0}
+  porque={["Correcto: quien llama necesita hacer `match` sobre los casos.", "Sirve para mostrar el error, no para distinguir casos con seguridad.", "Habría que comparar textos.", "Un archivo roto es una entrada normal, no un fallo del programa."]}
+/>
+
+## La idea
+
+Escribir `Display`, `Error`, `source` y un `From` por cada causa (lecciones 6–8) es siempre igual. Dos bibliotecas muy usadas, ambas de David Tolnay, lo automatizan:
+
+- **thiserror**, para **bibliotecas**: describes el enum con atributos y genera el código repetitivo. El resultado es un enum normal y concreto, exactamente como el que escribirías a mano.
+- **anyhow**, para **aplicaciones**: un tipo `anyhow::Error` que admite cualquier error (como `Box<dyn Error>`, mejorado) y el método `.context("…")` para añadir qué estabas haciendo cuando falló.
+
+En el navegador **no hay bibliotecas externas**, solo la estándar. Así que primero lo escribimos a mano (eso sí se ejecuta), y después ves el aspecto que tendría con cada biblioteca.
+
+## Pruébalo
+
+Lo que generaría thiserror, escrito a mano:
+
+<Ejecutar ej="m10/a-mano-como-thiserror" />
+
+Con thiserror, el mismo error se escribiría así.
+
+```rust
+// CONCEPTO — no ejecutable aquí: necesita el crate thiserror (Cargo.toml: thiserror = "2")
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+enum ErrorDescarga {
+    #[error("la URL «{0}» no es válida")]
+    UrlInvalida(String),
+    #[error("puerto inválido")]
+    Puerto(#[from] std::num::ParseIntError),
+}
+```
+
+Y la idea de anyhow (añadir contexto y encadenar la causa), escrita a mano:
+
+<Ejecutar ej="m10/a-mano-como-anyhow" />
+
+```rust
+// CONCEPTO — no ejecutable aquí: necesita el crate anyhow (Cargo.toml: anyhow = "1")
+use anyhow::{Context, Result};
+
+fn leer_ancho(texto: &str) -> Result<u32> {
+    let n = texto.parse::<u32>().context("leyendo el ancho de la ventana")?;
+    Ok(n)
+}
+```
+
+La idea es la misma que en nuestro ejemplo escrito a mano: el texto de `context` es el mensaje, y el error original queda como causa.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`#[derive(Error)]` es una **macro procedural** (mundo 19): un programa en Rust que el compilador ejecuta *durante la compilación* y que lee tu enum y escribe el `impl Display`, el `impl Error` (con `source`) y los `impl From`. No añade nada al ejecutar: el resultado es idéntico a tu versión a mano.
+
+`anyhow::Error` guarda, como `Box<dyn Error>`, un error de cualquier tipo en el heap, y añade el contexto. Comparte su límite: quien recibe el error no puede hacer `match` sobre él.
+
+Por qué no lo hemos podido ejecutar ni comprobar en esta máquina: los dos crates necesitan compilar y **enlazar** pequeños programas auxiliares (sus *build scripts* y la macro procedural), y aquí falta el enlazador `link.exe`. `cargo check` se detuvo con `error: linking with link.exe failed: exit code: 1` y `error: could not compile thiserror (build script) due to 1 previous error`. Es la trampa de instalación del mundo 0: con las Build Tools de Visual Studio (o la toolchain `gnullvm`) funcionan.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="anyhow en una biblioteca">
+
+❌ Si tu biblioteca devuelve `anyhow::Result`, obligas a todos tus usuarios a depender de anyhow y les quitas la posibilidad de distinguir errores.
+
+✅ La regla del ecosistema: **bibliotecas → enums concretos (thiserror o a mano); aplicaciones → anyhow (o `Box<dyn Error>`)**. Una aplicación puede usar anyhow y aun así recibir los enums concretos de sus bibliotecas: el `?` los convierte.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m10/a-mano-thiserror"
+  enunciado={'Ahora mismo no compila. Escribe a mano lo que generaría thiserror con `#[error("archivo vacío")]` para `Vacio` y `#[error("línea {0} demasiado larga")]` para `Larga(usize)`: el `impl fmt::Display` y un `impl std::error::Error` vacío. Debe imprimir `archivo vacío` y `línea 7 demasiado larga`.'}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace `#[from]` sobre el campo de una variante con thiserror?"
+  opciones={["Genera el `impl From` de ese tipo hacia tu error y lo usa como `source()`", "Copia el mensaje del error interior", "Convierte tu error en el error interior", "Nada al compilar: es un comentario"]}
+  correcta={0}
+  porque={["Correcto: es lo que escribiste a mano en la lección 7.", "El mensaje lo decide tu `#[error(\"…\")]`.", "Es la dirección contraria.", "Es un atributo que la macro procedural lee para generar código."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuesta algo al ejecutar usar thiserror en vez de escribir el código a mano?"
+  opciones={["No: genera el mismo código que escribirías tú", "Sí: añade una capa de indirección por cada error", "Sí: reserva memoria en el heap para cada error", "Depende del número de variantes"]}
+  correcta={0}
+  porque={["Correcto.", "El enum generado es un enum normal.", "Solo si tú pones una `Box` dentro.", "La macro trabaja al compilar."]}
+/>

@@ -1,0 +1,49 @@
+---
+title: "#[must_use]"
+description: "Avisa cuando se ignora el valor de una función o de un tipo, como un Result que nadie mira o un iterador que nunca se consume."
+sidebar:
+  order: 3
+insignias: ["Desde 1.27", "Diagnósticos"]
+---
+import { NoCompila } from '~/components';
+
+`#[must_use]` hace que el compilador avise si el resultado de algo se descarta sin usar.
+
+## Sinopsis
+
+```text
+#[must_use]
+#[must_use = "motivo que aparecerá en el aviso"]
+```
+
+Se aplica a funciones y métodos (desde 1.27), a tipos (`struct`, `enum`, `union`) y a traits (también en `impl Trait` y `dyn Trait`).
+
+## Qué hace
+
+- **En una función**: avisa si se llama y su valor de retorno no se usa.
+- **En un tipo**: avisa siempre que un valor de ese tipo se descarte. `Result` es `#[must_use]`: por eso olvidar un `?` o un `match` da un aviso.
+- **En un trait**: avisa si se descarta un `impl Trait` o `dyn Trait` de ese trait. `Future` e `Iterator` lo son: un iterador o un futuro que no se consume no hace nada.
+
+El aviso es el lint `unused_must_use` (nivel *warn*). Para descartar a propósito, escribe `let _ = valor;`.
+
+## Ejemplo
+
+<NoCompila ej="ref-lenguaje/at-must-use" />
+
+Con `#![deny(unused_must_use)]`, el aviso se convierte en error. El motivo escrito en el atributo aparece en el mensaje.
+
+## Bajo el capó
+
+Es solo un lint: no cambia el código generado. La biblioteca estándar lo usa muchísimo, en funciones que **devuelven** un valor nuevo sin modificar nada (`i32::wrapping_add`, `str::trim`, `Vec::len`…), para cazar el error típico de esperar que modifiquen el original.
+
+## Errores típicos
+
+- Pensar que `let _x = valor;` y `let _ = valor;` son iguales: `_x` es una variable que vive hasta el final del bloque; `_` descarta (y libera) el valor en el acto. Con un `MutexGuard`, la diferencia importa.
+
+## Desde
+
+En tipos, Rust 1.0; en funciones, 1.27; en traits, 1.32.
+
+## Ver también
+
+[Niveles de lint](/ref/lenguaje/atributos/lints/) · [`Result`](/ref/std/result/)

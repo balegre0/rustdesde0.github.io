@@ -1,0 +1,128 @@
+---
+title: "Cadenas de formato: {}, {:?} y {x}"
+description: "Rellena huecos por orden, por posición y por nombre, y distingue la vista para personas de la vista para programadores."
+sidebar:
+  order: 3
+duracion: 12
+desde: "1.58"
+requiere: ["02-tu-primer-programa/02-println-y-las-macros"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre `{}` y `{:?}`?"
+    r: "`{}` usa el formato para personas (trait `Display`); `{:?}` el formato para programadores (trait `Debug`), que por ejemplo muestra las comillas de un texto."
+  - p: "¿Cómo se escribe una llave literal `{` dentro de una cadena de formato?"
+    r: "Duplicándola: `{{` imprime `{` y `}}` imprime `}`."
+  - p: "¿Qué puede ir dentro de `{…}` en `println!(\"{x}\")`?"
+    r: "Solo un nombre (de variable o de argumento con nombre). Un cálculo como `{x + 1}` no se admite: va como argumento aparte."
+  - p: "¿Qué error da `println!(\"{}\", [1, 2, 3])`?"
+    r: "E0277: un array no implementa `Display`. Se imprime con `{:?}`."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Los huecos `{}` dan mucho más juego del que parece. Hoy aprendes a elegir **qué** valor va en cada hueco y **cómo** se muestra: para que lo lea una persona o para que lo lea quien programa.
+
+## Predice
+
+Dos líneas casi iguales: la primera usa `{}` y la segunda `{:?}`. ¿Qué imprime la segunda?
+
+<Predice
+  ej="m02/debug-comillas"
+  opciones={["`año`", "`\"año\"`", "`a\\u{f1}o`", "`[97, 241, 111]`"]}
+  correcta={1}
+  explicacion="`{:?}` es el formato de depuración: muestra el texto **tal como lo escribirías en el código**, con sus comillas. La `ñ` sale tal cual."
+  porque={["Eso es lo que imprime `{}`, la primera línea.", "", "`{:?}` no escapa las letras con tilde ni la ñ: solo caracteres especiales como comillas o saltos de línea.", "`{:?}` no muestra los bytes ni los códigos de las letras."]}
+/>
+
+## La idea
+
+Dentro de una cadena de formato hay dos tipos de cosas: **texto**, que se copia tal cual, y **huecos** entre llaves, que se rellenan. Lo que va dentro de las llaves decide dos cosas:
+
+1. **Qué valor** va en el hueco. Vacío (`{}`) toma el siguiente argumento. Con un número (`{0}`, `{1}`) eliges el argumento por su posición, empezando a contar en 0, y puedes repetirlo. Con un nombre (`{ciudad}`) usas un argumento con nombre (`ciudad = "Lima"`) o, directamente, una variable que exista en ese punto del programa.
+2. **Cómo** se muestra, detrás de dos puntos. `{}` usa la vista **para personas**; `{:?}`, la vista **de depuración** (*debug*), pensada para quien programa. Se combinan: `{nombre:?}`, `{0:?}`.
+
+Cada vista la da un **trait**, una capacidad que un tipo tiene o no tiene (los verás a fondo en el mundo 13). `{}` necesita el trait `Display`; `{:?}`, el trait `Debug`. Los números y los textos tienen los dos. Otros tipos, como las listas de valores, solo tienen `Debug`: no hay una única forma «para personas» de mostrar una lista, así que Rust no se la inventa.
+
+## Pruébalo
+
+<Ejecutar ej="m02/formato-basico" />
+
+Salida real:
+
+```text
+hola
+"hola"
+pan y vino, vino y pan
+Lima está en Perú
+{} son dos llaves
+```
+
+Y ahora con variables. `let nombre = "Ana";` guarda el texto `"Ana"` con el nombre `nombre` (lo estudiarás a fondo en el mundo 3). Escribir el nombre dentro del hueco es lo más cómodo y lo más legible:
+
+<Ejecutar ej="m02/inline" />
+
+```text
+Ana tiene 30 años
+"Ana"
+```
+
+Dentro de las llaves solo cabe un **nombre**, no un cálculo:
+
+<NoCompila ej="m02/inline-expresion" explicacion="El analizador de la cadena de formato lee `edad`, luego encuentra un `+` donde no lo esperaba y lo interpreta como una opción de formato mal colocada. El mensaje es raro, pero la regla es sencilla: dentro de `{}` va un nombre; el cálculo va como argumento." />
+
+El mensaje real es «invalid format string: the `+` sign flag must appear after `:` in a format string»: el compilador cree que querías la opción `+` (mostrar el signo), que se escribe `{:+}`. Aquí el mensaje no apunta al problema de verdad. Pasa a veces, y aprender a sospecharlo es parte del oficio. El arreglo: `println!("El año que viene tendrás {}", edad + 1);`.
+
+## Bajo el capó
+
+<BajoElCapo titulo="Los huecos se resuelven al compilar">
+Todo lo que hay entre llaves se analiza **durante la compilación**. Por eso:
+
+- `{nombre}` no busca la variable mientras el programa corre: el compilador la encuentra al compilar y, si no existe, da el error E0425 («cannot find value»). Por dentro, `{nombre}` equivale a escribir `{}` con `nombre` como argumento.
+- El compilador comprueba que el tipo de cada argumento tiene el trait que pide su hueco (`Display` para `{}`, `Debug` para `{:?}`). Si no lo tiene, error E0277, como verás abajo.
+- En el programa final no queda ninguna «búsqueda» de huecos: solo una plantilla ya analizada y la lista de valores a rellenar.
+
+Por eso el formato de Rust no puede fallar en ejecución por un hueco mal escrito: ese tipo de error simplemente no llega a existir.
+</BajoElCapo>
+
+## Trampa típica
+
+Imprimir una lista con `{}`:
+
+<NoCompila ej="m02/lista-con-llaves" explicacion="E0277: el tipo `[{integer}; 3]` (un array de 3 enteros) no implementa `Display`. La nota final te da la solución: usar `{:?}` (o `{:#?}` para verlo en varias líneas)." />
+
+Lee la última línea del error real: «in format strings you may be able to use `{:?}` (or `{:#?}` for pretty-print) instead». El compilador te dice exactamente qué escribir. Con `{:?}` el programa imprime `[1, 2, 3]`.
+
+## Tu turno
+
+Ordena las líneas de un programa que imprima `Rust nació en 2006` usando una variable y un hueco con nombre.
+
+<Ordena
+  lineas={["fn main() {", "    let anio = 2006;", "    println!(\"Rust nació en {anio}\");", "}"]}
+  distractores={["    println!(\"Rust nació en {anio + 0}\");", "    println!(\"Rust nació en {2006}\");"]}
+  explicacion="La variable tiene que existir **antes** del `println!` que la usa. Dentro de las llaves solo va el nombre; `{2006}` no compila porque un número dentro de las llaves se lee como la **posición** de un argumento, y no hay ningún argumento en la posición 2006."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta='¿Qué imprime `println!("{1} {0} {1}", "a", "b");`?'
+  opciones={["`a b a`", "`b a b`", "`1 0 1`", "No compila: no se puede repetir un argumento"]}
+  correcta={1}
+  explicacion='Las posiciones empiezan en 0: `{0}` es `"a"` y `{1}` es `"b"`. Un argumento se puede usar tantas veces como quieras.'
+  porque={["Has empezado a contar en 1. En Rust, como en casi toda la programación, se cuenta desde 0.", "", "Los números dentro de las llaves son posiciones, no texto.", "Repetir un argumento está permitido; lo que no se permite es dejar alguno sin usar."]}
+/>
+
+<Pregunta
+  pregunta="¿Cómo imprimes literalmente el texto `{x}` (con sus llaves)?"
+  opciones={["`println!(\"\\{x\\}\");`", "`println!(\"{{x}}\");`", "`println!(\"{x}\");`", "`println!('{x}');`"]}
+  correcta={1}
+  explicacion="Dentro de una cadena de formato, `{{` es una llave de apertura literal y `}}` una de cierre."
+  porque={["La barra invertida no sirve para las llaves: el formato usa su propia regla de duplicar.", "", "Eso rellena un hueco con la variable `x`.", "Las comillas simples son para un solo carácter (`char`), no para textos."]}
+/>
+
+<Pregunta
+  pregunta="Una lista de valores no se puede imprimir con `{}`. ¿Por qué?"
+  opciones={["Porque es demasiado grande", "Porque no implementa el trait `Display`: no hay una forma única «para personas» de mostrarla", "Porque las listas no se pueden imprimir en Rust", "Porque falta un `!`"]}
+  correcta={1}
+  explicacion="`{}` exige `Display`. Las listas implementan `Debug`, así que se imprimen con `{:?}`."
+  porque={["El tamaño no influye en qué formatos admite un tipo.", "", "Sí se pueden imprimir, con `{:?}`.", "El `!` de `println!` está bien puesto; el problema es el hueco."]}
+/>

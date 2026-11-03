@@ -1,0 +1,83 @@
+---
+title: "Weak<T>"
+description: "Referencia que no mantiene vivo el valor: para punteros al padre y para romper ciclos de Rc."
+sidebar:
+  order: 2
+insignias: ["Desde 1.4", "alloc"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::rc::Weak`
+
+## Sinopsis
+
+```rust
+pub struct Weak<T, A = Global>
+where
+    A: Allocator,
+    T: ?Sized,
+{ /* private fields */ }
+```
+
+## Qué hace
+
+Un `Weak<T>` apunta al valor de un `Rc` pero no cuenta como dueño. Como el valor puede haberse destruido ya, para usarlo hay que llamar a `upgrade()`, que devuelve `Some(Rc)` si sigue vivo o `None` si no.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`new`](#new) | Un `Weak` que no apunta a nada (`upgrade` siempre da `None`). | 1.10 |
+| [`upgrade`](#upgrade) | Intenta obtener un `Rc`: `Some` si el valor sigue vivo. | 1.4 |
+| [`strong_count`](#strong_count) | Cuántos dueños fuertes tiene el valor (0 si ya se destruyó). | 1.41 |
+
+### `new`
+
+```rust
+pub const fn new() -> Weak<T>
+```
+
+Un `Weak` que no apunta a nada (`upgrade` siempre da `None`).
+
+### `upgrade`
+
+```rust
+pub fn upgrade(&self) -> Option<Rc<T, A>>
+where
+    A: AllocatorClone,
+```
+
+Intenta obtener un `Rc`: `Some` si el valor sigue vivo.
+
+### `strong_count`
+
+```rust
+pub fn strong_count(&self) -> usize
+```
+
+Cuántos dueños fuertes tiene el valor (0 si ya se destruyó).
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/rc-weak" />
+
+**Salida:**
+
+```text
+fuertes 1 débiles 1
+hoja es hijo de raíz
+None
+```
+
+## Desde
+
+Rust 1.4 (estable). Métodos de esta página añadidos después: `new` (1.10), `strong_count` (1.41).
+
+## Ver también
+
+- [Rc](/ref/std/rc/rc/)
+- [RefCell](/ref/std/cell/refcell/)
+
+## Aprende esto en
+
+- [Mundo 15 · Punteros inteligentes](/curso/15-punteros-inteligentes/)

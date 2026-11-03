@@ -1,0 +1,174 @@
+---
+title: "Enteros: tamaños, rangos y literales"
+description: "Conoce los doce tipos de enteros de Rust, cuántos bytes ocupa cada uno, por qué usize mide distinto en el navegador y cómo dividen los enteros."
+sidebar:
+  order: 4
+duracion: 15
+desde: "1.0"
+requiere: ["03-valores-y-tipos/01-let-y-variables", "01-la-maquina/06-enteros-sin-signo", "01-la-maquina/07-complemento-a-dos"]
+tarjetas:
+  - p: "¿Qué tipo de entero usa Rust si no le dices ninguno?"
+    r: "`i32`."
+  - p: "¿Cuál es el rango de un `u8`? ¿Y de un `i8`?"
+    r: "`u8`: de 0 a 255. `i8`: de −128 a 127."
+  - p: "¿Cuánto mide `usize` en el navegador (wasm32) y en un PC de 64 bits?"
+    r: "4 bytes en wasm32 y 8 bytes en un PC de 64 bits: mide lo que una dirección de memoria."
+  - p: "¿Cuánto vale `-7 / 2` con enteros? ¿Y `-7 % 3`?"
+    r: "`-3` (redondea hacia el cero) y `-1` (el resto lleva el signo del dividendo)."
+  - p: "¿Qué tipo tiene el literal `5u8`?"
+    r: "`u8`: el sufijo fija el tipo."
+---
+
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+
+Hoy vas a conocer la familia completa de los enteros de Rust. En el Mundo 1 viste cómo se guardan en bits; ahora vas a elegir el tipo concreto, con su tamaño exacto y su rango, y vas a ver cómo dividen.
+
+## Predice
+
+Este programa divide y calcula restos con enteros. ¿Qué imprime para `-7 / 2`?
+
+<Predice
+  ej="m03/division"
+  opciones={["`-7 / 2 = -3`", "`-7 / 2 = -4`", "`-7 / 2 = -3.5`", "`-7 / 2 = 3`"]}
+  correcta={0}
+  explicacion="La división entre enteros descarta la parte decimal **redondeando hacia el cero**: −3,5 se queda en −3, no baja a −4."
+  porque={["", "−4 sería redondear hacia abajo (hacia menos infinito); Rust redondea hacia el cero.", "Entre enteros el resultado es entero: los decimales se pierden.", "El signo no desaparece: −7 entre 2 es negativo."]}
+/>
+
+## La idea
+
+Rust tiene doce tipos de enteros. El nombre te dice todo: la letra indica si hay signo y el número cuántos **bits** ocupa.
+
+| Bits | Sin signo (`u`, *unsigned*) | Con signo (`i`, *integer*) |
+|---|---|---|
+| 8 | `u8` | `i8` |
+| 16 | `u16` | `i16` |
+| 32 | `u32` | `i32` |
+| 64 | `u64` | `i64` |
+| 128 | `u128` | `i128` |
+| tamaño de una dirección | `usize` | `isize` |
+
+Los `u` guardan solo 0 y positivos (binario puro). Los `i` usan **complemento a dos**, así que tienen un negativo más que positivos. Si no dices nada, un literal entero es `i32`.
+
+`usize` e `isize` son especiales: miden lo que mide una **dirección de memoria** en la máquina donde corre el programa. Por eso son los tipos de los índices y de las longitudes (`len()` devuelve un `usize`). En tu PC de 64 bits miden 8 bytes; en el navegador, que ejecuta WebAssembly de 32 bits, miden **4**.
+
+Para escribir números puedes usar `_` como separador (`1_000_000`), otras bases (`0xff` hexadecimal, `0b1010` binario, `0o17` octal) y un **sufijo** que fija el tipo (`5u8`, `7_i64`). Y `b'A'` es el byte de la letra A, un `u8`.
+
+## Pruébalo
+
+Los rangos de cada tipo, con las constantes `MIN` y `MAX`:
+
+<Ejecutar ej="m03/enteros" />
+
+Salida real:
+
+```text
+u8:   0 ..= 255
+u16:  0 ..= 65535
+u32:  0 ..= 4294967295
+u64:  0 ..= 18446744073709551615
+i8:   -128 ..= 127
+i16:  -32768 ..= 32767
+i32:  -2147483648 ..= 2147483647
+i64:  -9223372036854775808 ..= 9223372036854775807
+u128: 340282366920938463463374607431768211455
+```
+
+Las formas de escribir literales:
+
+<Ejecutar ej="m03/literales" />
+
+```text
+1000000 255 10 15 5 7
+b'A' = 65
+```
+
+Y lo que ocupa cada tipo:
+
+<Ejecutar ej="m03/usize" />
+
+Salida real **en el navegador**:
+
+```text
+u8    ocupa 1 byte
+i32   ocupa 4 bytes
+u64   ocupa 8 bytes
+i128  ocupa 16 bytes
+usize ocupa 4 bytes
+usize::MAX = 4294967295
+```
+
+En tu PC de 64 bits las cuatro primeras líneas serían iguales, pero `usize` ocuparía **8 bytes** y `usize::MAX` sería 18446744073709551615 (lo hemos comprobado compilando para `x86_64-pc-windows-msvc`).
+
+## Bajo el capó
+
+<BajoElCapo titulo="La división, el resto y el bit de signo">
+Las dos reglas de la división entera vienen de una sola ecuación que Rust garantiza: **`(a / b) * b + (a % b) == a`**. Si `-7 / 2` es `-3` (redondeo hacia el cero), entonces el resto tiene que ser `-7 − (−3 × 2) = −1`. Por eso `%` lleva el signo del **dividendo** (el de la izquierda). La salida real del ejemplo:
+
+```text
+7 / 2 = 3
+-7 / 2 = -3
+7 % 3 = 1
+-7 % 3 = -1
+-7
+```
+
+La última línea comprueba la ecuación con `a = -7` y `b = 3`: da `-7`.
+
+¿Y por qué hay tantos tamaños? Porque cada uno es una caja de bytes de verdad en la memoria. Un array de un millón de `u8` ocupa 1 MB; de `u64`, 8 MB. Elegir bien el tipo es elegir cuánta memoria usas y qué rango aceptas. Como regla práctica: `i32` para números en general, `usize` para índices y tamaños, `u8` para bytes, y `u64`/`i64` cuando un `i32` se queda corto.
+
+Marca con los interruptores el patrón del mayor `u8` (todos a 1):
+
+<Bits objetivo={255} />
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Dividir entre cero">
+❌ Dividir un entero entre cero. No hay ningún número que sea «10 entre 0», así que Rust no se inventa uno. Si el compilador lo ve venir con valores fijos, se niega a compilar. Error real al compilar `let a = 10; let b = 0; println!("{}", a / b);`:
+
+```text
+error: this operation will panic at runtime
+ --> ejemplos/m03/div-cero.rs:4:20
+  |
+4 |     println!("{}", a / b);
+  |                    ^^^^^ attempt to divide `10_i32` by zero
+  |
+  = note: `#[deny(unconditional_panic)]` on by default
+```
+
+«Esta operación entrará en pánico al ejecutarse». Si el divisor llega en tiempo de ejecución (por ejemplo, lo escribe el usuario), el programa se detiene con un **pánico** (*panic*): un fallo controlado con mensaje.
+
+✅ Comprueba el divisor antes de dividir, o usa `checked_div`, que devuelve «nada» en lugar de fallar (lo verás en la lección 6).
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m03/segundos"
+  enunciado="`total` son 3725 segundos. Usa `/` y `%` para calcular horas, minutos y segundos e imprime exactamente `3725 s = 1 h 2 min 5 s`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué tipo tiene `x` en `let x = 42;`?"
+  opciones={["`u8`, porque 42 cabe en un byte", "`i32`", "`usize`", "`i64`"]}
+  correcta={1}
+  explicacion="Si nada obliga a otro tipo, un literal entero es `i32`. El compilador no elige el tipo más pequeño en el que cabe."
+  porque={["El tamaño del valor no decide el tipo: el entero por defecto es `i32`.", "", "`usize` es para índices y longitudes; no es el tipo por defecto.", "`i64` hay que pedirlo (`42i64` o `let x: i64`)."]}
+/>
+
+<Pregunta
+  pregunta="El mismo programa imprime `size_of::<usize>()`: en el navegador sale 4 y en tu PC sale 8. ¿Por qué?"
+  opciones={["Es un error del navegador", "`usize` mide lo que una dirección de memoria, y el navegador ejecuta código de 32 bits", "El navegador comprime los números", "`usize` cambia de tamaño según el valor que guarde"]}
+  correcta={1}
+  explicacion="`usize` está pensado para índices y tamaños, así que mide lo mismo que una dirección: 4 bytes en wasm32, 8 en x86-64."
+  porque={["No es un error: es la definición de `usize`.", "", "No hay compresión: cada byte de la memoria es un byte.", "El tamaño de un tipo es fijo; no depende del valor."]}
+/>
+
+<Respuesta
+  pregunta="¿Cuánto vale `17 % 5`?"
+  respuestas={["2"]}
+  explicacion="17 = 3 × 5 + 2, así que el resto es 2."
+/>

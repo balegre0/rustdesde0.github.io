@@ -1,0 +1,65 @@
+---
+title: "fn"
+description: "Palabra clave estricta: define funciones y métodos, y nombra tipos de puntero a función."
+sidebar:
+  order: 14
+desde: "1.0"
+categoria: "estricta"
+---
+
+import { Ejecutar, NoCompila } from '~/components';
+
+`fn` define una **función**: un trozo de código con nombre que recibe parámetros y devuelve un valor.
+
+## Sinopsis
+
+```text
+calificadores fn nombre<genéricos>(patrón: Tipo, …) -> TipoRetorno where … { cuerpo }
+calificadores = const? async? safe?/unsafe? (extern "ABI")?
+fn(T1, T2) -> R                   // tipo puntero a función
+for<'a> fn(&'a T) -> &'a T        // puntero a función con tiempo de vida de orden superior
+```
+
+## Qué hace
+
+- Cada parámetro es un **patrón** con tipo obligatorio: `fn f((x, y): (i32, i32))` es válido.
+- El valor devuelto es la **última expresión** del cuerpo, sin `;`. También se puede salir antes con `return`.
+- Sin `-> Tipo`, la función devuelve `()`. Con `-> !`, la función **nunca vuelve** (por ejemplo, termina el proceso).
+- Dentro de un `impl` o un `trait`, una `fn` cuyo primer parámetro es `self`, `&self` o `&mut self` es un **método**.
+- Cada función tiene su propio tipo, único y de tamaño cero (*fn item*). Se convierte automáticamente al tipo general `fn(…) -> …` (*puntero a función*) cuando hace falta. Las closures que no capturan nada también se convierten.
+- Calificadores: `const fn` (evaluable al compilar), `async fn` (devuelve un futuro), `unsafe fn` (el que la llama debe cumplir requisitos), `extern "C" fn` (otra ABI).
+- Puedes definir funciones dentro de otras; solo se ven en ese bloque y no capturan variables.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/kw-fn" />
+
+Salida:
+
+```text
+5
+hola, Ana
+1.5 y 2.5
+42
+interna
+```
+
+## Errores
+
+Un `;` de más al final cambia lo que devuelve la función:
+
+<NoCompila ej="ref-lenguaje/kw-fn-error" />
+
+`error[E0308]: mismatched types` con `expected i32, found ()` y la ayuda `remove this semicolon to return this value`.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+- [`return`](/ref/lenguaje/palabras-clave/return/) · [`impl`](/ref/lenguaje/palabras-clave/impl/) · [`const`](/ref/lenguaje/palabras-clave/const/) · [`async`](/ref/lenguaje/palabras-clave/async/) · [`unsafe`](/ref/lenguaje/palabras-clave/unsafe/) · [Elisión de lifetimes](/ref/lenguaje/elision-de-lifetimes/) · [Coerciones](/ref/lenguaje/coerciones/)
+
+## Aprende esto en
+
+- [Mundo 05 · Funciones y la pila](/curso/05-funciones-y-la-pila/)

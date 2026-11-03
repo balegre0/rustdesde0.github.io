@@ -1,0 +1,109 @@
+---
+title: "Consumidores y collect"
+description: "Cierra la tubería: resume con sum, fold, any o find, y construye colecciones con collect y el turbofish."
+sidebar:
+  order: 8
+duracion: 13
+desde: "1.0"
+requiere: ["14-closures-e-iteradores/07-adaptadores", "11-colecciones-y-texto"]
+tarjetas:
+  - p: "¿Qué es un consumidor de iterador?"
+    r: "Un método que llama a `next()` hasta el final (o hasta que tiene la respuesta) y devuelve un resultado: `sum`, `count`, `fold`, `collect`, `any`, `find`, `max`…"
+  - p: "¿Cómo sabe `collect()` qué colección construir?"
+    r: "Por el tipo que espera quien recibe el resultado: una anotación (`let v: Vec<_> = …`) o el turbofish (`collect::<Vec<_>>()`). Sin eso, E0283."
+  - p: "¿Qué hace `fold(inicial, |acc, x| …)`?"
+    r: "Empieza con `inicial` y, para cada elemento, calcula el nuevo acumulador con el closure. Devuelve el acumulador final."
+  - p: "¿Por qué `any` puede no recorrer todo el iterador?"
+    r: "Porque se para en el primer elemento que cumple la condición (cortocircuito). Igual `all` con el primero que no cumple, y `find`."
+  - p: "¿Por qué `vec_de_f64.iter().max()` no compila?"
+    r: "`max` exige `Ord` (orden total), y `f64` solo tiene `PartialOrd` porque `NaN` no es comparable (E0277)."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a **cerrar** las tuberías de la lección anterior: con un consumidor, el iterador por fin trabaja y te da un resultado, ya sea un número, un `bool`, un elemento o una colección nueva.
+
+## Predice
+
+<Predice
+  ej="m14/q-any-corto"
+  opciones={["`true 2`", "`true 4`", "`true 1`", "No compila: `any` no acepta closures que modifican"]}
+  correcta={0}
+  explicacion="`any` se para en cuanto encuentra un 9, que está en la segunda posición. El closure solo se llama dos veces. Y `any` acepta `FnMut`, así que puede modificar `miradas`."
+  porque={["Correcto.", "`any` no sigue mirando tras encontrar la respuesta.", "Primero mira el 1 (no es 9) y luego el 9.", "`any` pide `FnMut`, no `Fn`."]}
+/>
+
+## La idea
+
+Un **consumidor** (*consumer*) es el método que se come el iterador. Hay tres familias:
+
+- **Resumir** en un valor: `sum`, `product`, `count`, `max`, `min`, `last`, y el más general, **`fold`**, en el que tú decides cómo se acumula: `fold(1, |acc, x| acc * x)` multiplica todo.
+- **Preguntar**: `any` («¿alguno cumple?»), `all` («¿todos?»), `find` («dame el primero que cumpla», un `Option`), `position` («¿en qué posición?»). Se paran en cuanto saben la respuesta.
+- **Construir** una colección: **`collect`**. Puede crear un `Vec`, un `String`, un `HashMap`, un `HashSet`…
+
+`collect` necesita que le digas **qué** construir, porque el mismo iterador podría acabar en muchas colecciones. Se dice con el tipo de la variable (`let v: Vec<i32> = …collect();`) o con el **turbofish** (*turbofish*), la sintaxis `::<Tipo>` pegada al método: `.collect::<Vec<_>>()`. El `_` significa «el tipo de los elementos dedúcelo tú». Lo mismo pasa con `sum`, que puede sumar en varios tipos numéricos.
+
+## Pruébalo
+
+<Ejecutar ej="m14/consumidores" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`collect` no es magia: su firma es `fn collect<B: FromIterator<Self::Item>>(self) -> B`. Es **genérico en el tipo de salida** `B`, y cada colección implementa `FromIterator`: `Vec<T>` desde elementos `T`, `String` desde `char` o desde `&str`, `HashMap<K, V>` desde tuplas `(K, V)`… El compilador elige la implementación según `B`. Si no puede deducir `B`, no sabe qué código generar: de ahí el error E0283 «type annotations needed».
+
+Fíjate en que `collect`, `sum` y `count` reciben **`self`**: consumen el iterador (lo mueven). Después de `it.count()`, `it` ya no existe. Los que se paran antes (`any`, `find`, `position`) reciben `&mut self`: puedes seguir usando el iterador desde donde se quedó.
+
+Al construir un `Vec`, `collect` usa la pista de tamaño del iterador (`size_hint`) para reservar memoria de una vez cuando el iterador sabe cuántos elementos entregará, en lugar de crecer poco a poco.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m14/collect-sin-tipo"
+  explicacion="`collect` puede construir muchas colecciones y aquí nada dice cuál: E0283. El compilador sugiere `let v: Vec<_> = …`. También valdría `.collect::<Vec<_>>()` o `.collect::<Vec<i32>>()`."
+/>
+
+<Trampa titulo="max con números con decimales">
+
+<NoCompila
+  ej="m14/q-max-f64"
+  explicacion="`max` necesita `Ord`, un orden total. Los `f64` no lo tienen: `NaN` no es mayor, menor ni igual a nada, ni siquiera a sí mismo. El arreglo usa `fold` con `f64::max`, que sí sabe qué hacer con `NaN`."
+/>
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m14/notas"
+  enunciado="Sustituye cada `todo!()` por una cadena de iterador, sin bucles: cuántos aprobados (nota ≥ 5), la mejor nota, la media y si hay algún 10. Salida esperada: `aprobados: 4`, `mejor: Some(10)`, `media: 6.33` y `¿algún 10? true`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tienes `textos: Vec<&str>` con números en texto, como «4». Quieres un `Result<Vec<i32>, _>`. ¿Qué pones?"
+  opciones={["`textos.iter().map(|s| s.parse::<i32>()).collect::<Result<Vec<_>, _>>()`", "`textos.iter().parse::<i32>().collect()`", "`textos.iter().map(|s| s.parse::<i32>()).collect::<Vec<i32>>()`", "`textos.iter().map(|s| s.parse::<i32>().unwrap()).collect::<Result<Vec<_>, _>>()`"]}
+  correcta={0}
+  explicacion="`Result` también implementa `FromIterator`: si todos los elementos son `Ok`, da `Ok(Vec)`; si alguno es `Err`, devuelve el primer error. Lo verás en la lección 11."
+  porque={["Correcto.", "`parse` es de `str`, no de un iterador: hay que aplicarlo con `map`.", "Los elementos son `Result<i32, _>`, no `i32`: no se pueden meter en un `Vec<i32>`.", "Con `unwrap` los elementos ya son `i32`, y además el programa entraría en pánico con un texto no numérico."]}
+/>
+
+<Pregunta
+  pregunta="`let s = v.iter().sum();` con `v: Vec<i32>` — ¿qué pasa?"
+  opciones={["No compila: hay que decir el tipo de `s` (E0283)", "`s` es un `i32`", "`s` es un `&i32`", "`s` es un `i64` para evitar desbordamientos"]}
+  correcta={0}
+  explicacion="`sum` es genérico en su resultado, como `collect`. Con `let s: i32 = …` compila."
+  porque={["Correcto.", "Lo parece, pero el compilador no lo elige por ti.", "`sum` produce un valor, no una referencia.", "Rust nunca cambia el tipo por su cuenta."]}
+/>
+
+<Predice
+  ej="m14/q-fold-texto"
+  opciones={["`>abc`", "`abc>`", "`abc`", "`>a>b>c`"]}
+  correcta={0}
+  explicacion="El acumulador empieza siendo la `String` `>` y `fold` le va añadiendo cada texto, por orden, con `acc + s`."
+  porque={["Correcto.", "El valor inicial va delante: es el punto de partida.", "Falta el valor inicial.", "El valor inicial se usa una sola vez, al principio."]}
+/>

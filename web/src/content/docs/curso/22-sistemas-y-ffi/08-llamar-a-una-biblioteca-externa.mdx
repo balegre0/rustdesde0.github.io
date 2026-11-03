@@ -1,0 +1,203 @@
+---
+title: "Llamar a una biblioteca externa"
+description: "Llama desde Rust a funciones compiladas fuera de Rust con `unsafe extern \"C\"` y `repr(C)`, envuélvelas en una API segura y conoce bindgen."
+sidebar:
+  order: 8
+duracion: 15
+desde: "2024"
+requiere: ["22-sistemas-y-ffi/07-cadenas-del-sistema", "20-unsafe-y-ub"]
+tarjetas:
+  - p: "¿Qué es FFI?"
+    r: "*Foreign Function Interface*: el mecanismo para llamar a funciones de código compilado fuera de Rust (y ser llamado por él), usando una convención de llamada común, normalmente el ABI de C de la plataforma."
+  - p: "¿Por qué en la edición 2024 se escribe `unsafe extern \"C\" { ... }`?"
+    r: "Porque declarar una firma externa es una promesa que el compilador no puede comprobar: si la firma no coincide con la función real, llamarla es comportamiento indefinido."
+  - p: "¿Qué hace `safe fn` dentro de un bloque `unsafe extern`?"
+    r: "Declara que llamar a esa función es seguro con cualquier argumento, así que se puede llamar sin bloque `unsafe`. Solo es correcto si de verdad no existe ningún argumento que provoque UB."
+  - p: "¿Qué es un envoltorio seguro (*safe wrapper*)?"
+    r: "Una función de Rust normal que recibe tipos seguros (`&[i32]`, `&str`…), comprueba o garantiza los requisitos y hace la llamada `unsafe` por dentro."
+---
+
+import { NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Hay décadas de bibliotecas escritas en otros lenguajes: el sistema operativo, compresión, criptografía, gráficos. Rust puede llamarlas directamente, sin capas intermedias, mediante **FFI**. A cambio, en la frontera tú asumes las promesas que el compilador no puede comprobar.
+
+## Predice
+
+<NoCompila ej="m22/llamar-sin-unsafe" explicacion="E0133: una función declarada en un bloque `extern` es `unsafe` por defecto. El compilador no puede ver su código, así que no sabe qué requisitos tiene. El «Ver arreglo» la llama dentro de `unsafe { }` con un comentario `// SAFETY:` que explica por qué es correcto." />
+
+<Pregunta
+  pregunta="¿Por qué el compilador obliga a usar `unsafe` para llamar a `abs`, si es una función tan simple?"
+  opciones={[
+    "Porque `abs` es lenta",
+    "Porque el compilador no ve su código: no puede saber si la firma declarada es correcta ni qué argumentos son válidos",
+    "Porque `abs` modifica la memoria",
+    "Porque las funciones con números negativos son unsafe"
+  ]}
+  correcta={1}
+  explicacion="La función está compilada fuera de Rust. Lo único que tiene el compilador es la firma que **tú** escribiste. Si mientes (tipos equivocados) o si la función tiene requisitos (aquí, `abs(i32::MIN)` es UB en su definición), solo tú puedes garantizarlo."
+  porque={["La velocidad no tiene nada que ver con `unsafe`.", "", "`abs` no toca memoria; el problema es que Rust no puede verificarlo.", "`unsafe` no depende del valor de los argumentos."]}
+/>
+
+## La idea
+
+Para llamar a una función externa hacen falta tres cosas:
+
+1. **Declararla** dentro de un bloque `unsafe extern "C" { … }`, con su firma traducida a tipos de Rust. `"C"` es la **convención de llamada** (*ABI*): en qué registros van los argumentos, quién limpia la pila… La de C de cada plataforma es el idioma común entre lenguajes.
+2. **Usar tipos con el mismo layout** a los dos lados. Los enteros se corresponden directamente (`i32`, `u64`, o los alias `std::ffi::c_int`, `c_double`…). Los structs se marcan `#[repr(C)]` para que los campos vayan en el orden declarado con el relleno de la plataforma (recuerda: sin `repr(C)`, rustc reordena campos). Las cadenas van como `*const c_char` de un `CStr`, y los arrays como puntero + longitud.
+3. **Enlazar** el código de la biblioteca con el tuyo: con Cargo, normalmente con un `build.rs` (el crate `cc` compila código C y le dice a Cargo cómo enlazarlo) o con `#[link(name = "…")]` para bibliotecas del sistema.
+
+Y la regla de oro: **no dejes que el `unsafe` se escape**. Escribe envoltorios seguros que reciban tipos de Rust (`&[i32]`, `&Punto`) y que, por su firma, hagan imposible pasar algo inválido. El resto de tu programa usa los envoltorios y no ve ningún `unsafe`.
+
+En la edición 2024 puedes marcar una función del bloque como `safe fn`: entonces se llama sin `unsafe`. Úsalo solo si **ningún** argumento puede causar comportamiento indefinido. Una función que recibe un puntero crudo casi nunca cumple eso.
+
+## Pruébalo
+
+Una biblioteca pequeña escrita en C, `geometria.c` (está en `ejemplos/m22/`):
+
+```c
+#include <stdint.h>
+typedef struct { double x; double y; } Punto;
+double distancia2(const Punto *a, const Punto *b) {
+    double dx = a->x - b->x, dy = a->y - b->y;
+    return dx*dx + dy*dy;
+}
+int32_t suma_array(const int32_t *v, uintptr_t n) {
+    int32_t s = 0;
+    for (uintptr_t i = 0; i < n; i++) s += v[i];
+    return s;
+}
+typedef int32_t (*Callback)(int32_t);
+int32_t aplica_dos_veces(Callback f, int32_t x) { return f(f(x)); }
+```
+
+Y el programa de Rust que la usa (`ejemplos/m22/ffi-geometria.rs`):
+
+```rust
+use std::ffi::c_double;
+
+#[repr(C)]
+struct Punto { x: c_double, y: c_double }
+
+unsafe extern "C" {
+    fn distancia2(a: *const Punto, b: *const Punto) -> c_double;
+    fn suma_array(v: *const i32, n: usize) -> i32;
+    fn aplica_dos_veces(f: extern "C" fn(i32) -> i32, x: i32) -> i32;
+}
+
+fn distancia_al_cuadrado(a: &Punto, b: &Punto) -> f64 {
+    // SAFETY: a y b son referencias válidas a Punto durante toda la llamada.
+    unsafe { distancia2(a, b) }
+}
+
+fn suma(v: &[i32]) -> i32 {
+    // SAFETY: el slice garantiza v.len() enteros válidos a partir de v.as_ptr().
+    unsafe { suma_array(v.as_ptr(), v.len()) }
+}
+
+extern "C" fn triple(x: i32) -> i32 { x * 3 }
+
+fn main() {
+    let a = Punto { x: 0.0, y: 0.0 };
+    let b = Punto { x: 3.0, y: 4.0 };
+    println!("distancia² = {}", distancia_al_cuadrado(&a, &b));
+    println!("suma = {}", suma(&[1, 2, 3, 4]));
+    // SAFETY: triple tiene exactamente la firma que espera la biblioteca.
+    println!("triple(triple(5)) = {}", unsafe { aplica_dos_veces(triple, 5) });
+}
+```
+
+Lo compilamos y ejecutamos de verdad para este curso, a WebAssembly, con el compilador de C de Zig y rustc 1.99.1:
+
+```bash
+zig cc -target wasm32-wasi -c -O2 geometria.c -o geometria.o
+rustc --edition 2024 --target wasm32-wasip1 ffi-geometria.rs -C link-arg=geometria.o -o ffi-geometria.wasm
+```
+
+Salida real:
+
+```text
+distancia² = 25
+suma = 10
+triple(triple(5)) = 45
+```
+
+En un proyecto de Cargo en tu PC lo habitual es un `build.rs` con el crate `cc` (necesita un compilador de C instalado; en Windows, las Build Tools de Visual Studio del mundo 0). No lo hemos ejecutado aquí, porque esta máquina no tiene enlazador para el host:
+
+```rust
+// build.rs
+fn main() {
+    cc::Build::new().file("geometria.c").compile("geometria");
+}
+```
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Lo que hace `repr(C)` aquí.** `Punto` son dos `f64`: 16 bytes con `x` en el desplazamiento 0 e `y` en el 8, igual que el struct de la biblioteca. Con dos campos del mismo tipo, rustc probablemente usaría ese orden igualmente, pero **no está garantizado**: sin `repr(C)`, el día que añadas un campo de otro tamaño el orden puede cambiar y la biblioteca leería basura.
+
+**Callbacks.** `extern "C" fn triple` es una función de Rust compilada con la convención de C, así que la biblioteca puede llamarla con un simple puntero a función. El tipo `extern "C" fn(i32) -> i32` es un puntero a función de 1 palabra que **no puede ser nulo**; si la biblioteca aceptara «sin callback», la firma correcta en Rust sería `Option<extern "C" fn(i32) -> i32>`, que ocupa lo mismo gracias al nicho del puntero nulo (lección 10 del mundo 21).
+
+**bindgen.** Escribir firmas a mano es propenso a errores. La herramienta **bindgen** lee las cabeceras (`.h`) de una biblioteca y genera automáticamente el bloque `extern` y los structs `repr(C)`. Lo habitual es usarla desde `build.rs` o generar el archivo una vez. Para bibliotecas de C++ existe **cxx**, que genera los dos lados de la frontera de forma segura.
+
+**Crates `-sys`.** Por convención, un crate `algo-sys` contiene solo las declaraciones crudas de una biblioteca, y otro crate `algo` encima ofrece la API segura. `libc` es el crate de declaraciones de la biblioteca estándar de C de cada sistema.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m22/extern-sin-unsafe" explicacion="En la edición 2024 los bloques `extern` deben ir marcados `unsafe extern`: la palabra `unsafe` deja claro quién asume la promesa de que las firmas son correctas." />
+
+<Trampa titulo="Marcar como `safe` una función que recibe punteros">
+
+❌ `safe fn suma_array(v: *const i32, n: usize) -> i32;` — ahora cualquier código seguro puede llamarla con un puntero colgante o con un `n` mayor que el array, y leer memoria fuera de límites **sin escribir `unsafe`**.
+
+✅ Déjala sin `safe` y ofrece un envoltorio `fn suma(v: &[i32]) -> i32`, cuyo tipo garantiza que puntero y longitud son coherentes. `safe fn` es para funciones como «dame el número de procesadores», sin requisitos sobre sus argumentos.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué `Punto` lleva `#[repr(C)]`?"
+  opciones={[
+    "Para que sea más rápido",
+    "Para garantizar el mismo orden de campos y relleno que espera la biblioteca externa",
+    "Porque los structs con `f64` lo necesitan siempre",
+    "Para poder implementar `Debug`"
+  ]}
+  correcta={1}
+  explicacion="El layout por defecto de Rust no está especificado. Al cruzar la frontera, los dos lados deben interpretar los mismos bytes del mismo modo."
+  porque={["No cambia la velocidad.", "", "Dentro de Rust, un struct de `f64` no lo necesita.", "`Debug` no depende del layout."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué ventaja tiene `fn suma(v: &[i32]) -> i32` sobre llamar a `suma_array(ptr, n)` directamente?"
+  opciones={[
+    "Es más rápida",
+    "El tipo `&[i32]` garantiza que el puntero es válido y que la longitud coincide, así que quien la usa no puede provocar UB ni necesita `unsafe`",
+    "Evita enlazar la biblioteca",
+    "Permite pasar `Vec<u8>`"
+  ]}
+  correcta={1}
+  explicacion="Es el patrón central de FFI en Rust: concentrar el `unsafe` en un sitio pequeño y revisable, y exponer una firma que hace imposible el mal uso."
+  porque={["Tras inlinear, el coste es el mismo.", "", "Sigue llamando a la misma función externa.", "Los tipos no cambian: sigue siendo `i32`."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace bindgen?"
+  opciones={[
+    "Compila código C",
+    "Genera automáticamente las declaraciones `extern` y los tipos `repr(C)` de Rust a partir de las cabeceras de una biblioteca",
+    "Convierte código C en código Rust",
+    "Enlaza bibliotecas dinámicas en tiempo de ejecución"
+  ]}
+  correcta={1}
+  explicacion="bindgen traduce **declaraciones**, no implementaciones. La biblioteca sigue compilándose y enlazándose aparte."
+  porque={["Eso lo hace un compilador de C (o el crate `cc`, que lo invoca).", "", "No traduce la lógica, solo las firmas y los tipos.", "Para cargar bibliotecas en tiempo de ejecución existe el crate `libloading`."]}
+/>
+
+## Para saber más
+
+- Rustonomicon, «FFI»: https://doc.rust-lang.org/nomicon/ffi.html
+- *The bindgen User Guide*: https://rust-lang.github.io/rust-bindgen/

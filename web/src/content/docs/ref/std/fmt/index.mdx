@@ -1,0 +1,39 @@
+---
+title: "std::fmt"
+description: "Formatear texto: la sintaxis de {} en println! y format!, y los traits Display y Debug."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "alloc (los traits, en core)"]
+---
+**Ruta:** `std::fmt`
+
+## Para qué sirve
+
+Este módulo está detrás de `println!`, `format!`, `write!` y compañía. Define la **mini-sintaxis** de las llaves (`{}`, `{:?}`, `{:>8.2}`…) y los traits que dicen cómo se muestra cada tipo: `Display` para `{}` (para personas) y `Debug` para `{:?}` (para programadores).
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Sintaxis de formato`](/ref/std/fmt/sintaxis/) | Posiciones, nombres, ancho, alineación, precisión, bases. | — |
+| [`Display`](/ref/std/fmt/display/) | Cómo se muestra con `{}`. | 1.0 |
+| [`Debug`](/ref/std/fmt/debug/) | Cómo se muestra con `{:?}`; se puede derivar. | 1.0 |
+| `Formatter` | El destino y las opciones del formato, dentro de `fmt`. | 1.0 |
+| `Result, Error` | Lo que devuelve `fmt`. | 1.0 |
+| `Write` | Escribir texto formateado en un `String`. | 1.0 |
+| `LowerHex, Binary, Octal, LowerExp...` | Los traits de `{:x}`, `{:b}`, `{:o}`, `{:e}`… | 1.0 |
+
+## Conceptos clave
+
+- **Se comprueba al compilar**: si el texto pide `{}` y el tipo no implementa `Display`, no compila ([E0277](/errores/e0277/)). Si faltan o sobran argumentos, tampoco.
+- **`to_string()` gratis**: todo tipo con `Display` tiene `.to_string()`.
+
+## Ver también
+
+- [Macros println!, format!, write!](/ref/std/macros/)
+- [std::io::Write](/ref/std/io/write/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

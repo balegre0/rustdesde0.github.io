@@ -1,0 +1,38 @@
+---
+title: "Mundo 1 · La máquina"
+description: "Abre el ordenador por dentro: qué hace el procesador, cómo se guardan números y texto en bytes, y dónde viven los datos de un programa."
+sidebar:
+  order: 0
+---
+
+Antes de escribir programas de verdad, vas a mirar **la máquina que los ejecuta**. No hace falta saber electrónica. Basta con tres ideas, y todo lo demás del curso se apoya en ellas:
+
+- El **procesador** solo sabe hacer cosas muy simples, una detrás de otra, muy deprisa.
+- La **memoria** es una fila enorme de casillas numeradas. Cada casilla guarda un **byte**: ocho ceros y unos.
+- Un byte **no significa nada por sí solo**. Es el **tipo** el que dice si esos bits son un número, una letra o un trozo de otra cosa.
+
+En cada lección vas a ejecutar pequeños programas de Rust que **enseñan los bytes de verdad**: los bits de un número, el orden en que se guardan, los bytes de la «ñ». Todavía no tienes que entender cada línea de esos programas. Lee los comentarios, pulsa ▶ y mira la salida.
+
+## Lo que vas a conseguir
+
+| # | Lección | Al terminar sabrás… |
+|---|---|---|
+| 1 | El procesador | qué hace una CPU con cada instrucción: buscar, decodificar y ejecutar |
+| 2 | Casillas con número | qué es una dirección de memoria y cómo verla con `{:p}` |
+| 3 | Bits y bytes | qué es un bit, qué es un byte y cuántos bytes ocupa cada tipo |
+| 4 | Contar en binario | leer y escribir números con ceros y unos (`{:08b}`, `0b…`) |
+| 5 | Hexadecimal, el atajo | leer bytes en hexadecimal (`{:02x}`, `{:#x}`, `0x…`) |
+| 6 | Enteros sin signo | por qué un `u8` va de 0 a 255 y qué pasa si no cabe |
+| 7 | Complemento a dos | cómo se guardan los negativos y por qué `i8` va de −128 a 127 |
+| 8 | Coma flotante | cómo es un `f32` por dentro y por qué `0.1 + 0.2` no da `0.3` |
+| 9 | El orden de los bytes | qué es little-endian y big-endian, y cómo leer bytes ajenos |
+| 10 | Texto en bytes: UTF-8 | por qué `"año"` ocupa 4 bytes y no se puede indexar con `s[0]` |
+| 11 | La pila y el heap | dónde vive cada dato y qué es la ficha de un `String` |
+| 12 | ¿Quién libera el heap? | por qué cada dato del heap necesita un dueño (la base de la propiedad) |
+| 13 | Jefe: el detective de bytes | descifrar un volcado de memoria sin etiquetas |
+
+:::note[Tu navegador no es tu PC]
+Los ejemplos se ejecutan **en tu navegador**, que usa WebAssembly de 32 bits (`wasm32`). Allí una dirección de memoria y un `usize` miden **4 bytes**, y un `String` mide 12. En un PC de 64 bits miden **8 bytes**, y un `String` mide 24. Cuando un número dependa de la máquina, la lección te lo dirá.
+:::
+
+Requisitos: el Mundo 0 (tener Rust instalado y saber ejecutar `cargo run`). Nada más: no hace falta haber programado nunca.

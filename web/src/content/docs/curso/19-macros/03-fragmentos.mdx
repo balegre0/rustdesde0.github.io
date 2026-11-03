@@ -1,0 +1,116 @@
+---
+title: "Fragmentos: qué puede capturar una macro"
+description: "Conoce expr, ident, ty, tt y compañía, por qué una expr se captura entera y qué tokens pueden seguirla."
+sidebar:
+  order: 3
+duracion: 13
+desde: "1.0"
+requiere: ["19-macros/02-macro-rules"]
+tarjetas:
+  - p: "¿Qué da doble!(3 + 1) si la regla es ($x:expr) => { $x * 2 }?"
+    r: "8: la expresión capturada se comporta como un solo bloque, como si llevara paréntesis."
+  - p: "¿Qué tokens pueden seguir a un fragmento $x:expr en un patrón?"
+    r: "Solo =>, , y ; (el follow-set de expr)."
+  - p: "¿Qué cambió en la edición 2024 en el fragmento expr?"
+    r: "Ahora también acepta _ y bloques const { ... }; expr_2021 conserva el comportamiento anterior."
+  - p: "¿Qué fragmento acepta cualquier token suelto o grupo entre delimitadores?"
+    r: "tt (token tree)."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a aprender qué clases de código puede capturar una metavariable y por qué las macros de Rust no tienen los problemas de precedencia de una simple sustitución de texto.
+
+## Predice
+
+<Predice
+  ej="m19/precedencia"
+  opciones={["5", "8", "7", "No compila"]}
+  correcta={1}
+  explicacion="`$x:expr` captura `3 + 1` como **una expresión entera**. Al pegarla en `$x * 2` sigue siendo un bloque: `(3 + 1) * 2 = 8`."
+  porque={["Eso pasaría si la macro pegara el texto tal cual: `3 + 1 * 2`. Las macros de Rust no pegan texto.", "Correcto.", "No hay ninguna cuenta que dé 7 aquí.", "La macro es válida."]}
+/>
+
+## La idea
+
+En `$nombre:clase`, la clase se llama **fragmento** (*fragment specifier*). Le dice al compilador qué tipo de trozo de código leer. Los principales:
+
+| Fragmento | Captura | Ejemplo |
+|---|---|---|
+| `expr` | una expresión | `3 + 1`, `f(x)`, `if a { 1 } else { 2 }` |
+| `ident` | un nombre | `x`, `contar`, `Punto` |
+| `ty` | un tipo | `u32`, `Vec<String>`, `&'static str` |
+| `literal` | un literal | `7`, `"hola"`, `'ñ'`, `true` |
+| `block` | un bloque `{ … }` | `{ println!("hi"); }` |
+| `pat` | un patrón | `Some(x)`, `1..=5`, `A \| B` |
+| `path` | una ruta | `std::mem::swap` |
+| `stmt` | una sentencia | `let x = 1` |
+| `item` | un item | `fn f() {}`, `struct S;` |
+| `lifetime` | un tiempo de vida | `'a` |
+| `meta` | el interior de un atributo | `derive(Debug)` |
+| `vis` | una visibilidad (puede estar vacía) | `pub`, `pub(crate)` |
+| `tt` | un árbol de tokens: un token suelto o un grupo `( … )`, `[ … ]`, `{ … }` | `+`, `(a b c)` |
+
+Una vez capturado, un fragmento (salvo `ident`, `lifetime` y `tt`) es **opaco**: se pega en la plantilla como una sola pieza ya analizada. Por eso `doble!(3 + 1)` respeta la precedencia.
+
+## Pruébalo
+
+<Ejecutar ej="m19/fragmentos" />
+
+1. Con `ident` y `ty` la macro **declara una función** con el nombre y el tipo que tú elijas.
+2. `literal` solo acepta literales (prueba a pasar `2 + 1` en `repite!` y verás el error) y `block` exige llaves.
+
+### La edición 2024 cambió `expr`
+
+<Ejecutar ej="m19/expr-2024" titulo="expr frente a expr_2021" />
+
+Desde la edición 2024, `expr` también acepta `_` y los bloques `const { … }`, porque ahora son expresiones válidas. Para no romper macros antiguas existe `expr_2021`, que se comporta como antes. Si migras una macro y algo deja de encajar como esperabas, ese es el motivo.
+
+## Bajo el capó
+
+<BajoElCapo>
+**Lo que ve el compilador.** La expansión real de `precedencia.rs` (Rust 1.99.1, `-Zunpretty=expanded`) es `let r = (3 + 1) * 2;`. El impresor añade los paréntesis para mostrarte algo que, en el árbol interno, ya era así: la expresión capturada es un nodo único.
+
+**El *follow-set*.** Rust se compromete a que las macros que escribes hoy sigan funcionando cuando el lenguaje gane sintaxis nueva. Para ello limita qué puede ir **justo detrás** de ciertos fragmentos: si detrás de una `expr` pudiera ir cualquier cosa, una futura sintaxis de expresiones podría «comerse» esos tokens y cambiar el significado de tu macro. Detrás de `expr` y `stmt` solo puede ir `=>`, `,` o `;`. Detrás de `ty` y `path` hay más opciones; el compilador te las lista (salida real):
+
+```text
+error: `$t:ty` is followed by `+`, which is not allowed for `ty` fragments
+  = note: allowed there are: `{`, `[`, `=>`, `,`, `>`, `=`, `:`, `;`, `|`, `as` or `where`
+```
+
+`ident`, `tt`, `literal`, `lifetime` y `block` pueden ir seguidos de cualquier cosa. La especificación formal está en el apéndice «Macro follow-set ambiguity» de la Reference.
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m19/follow-set" explicacion="Dos expresiones seguidas sin separador no están permitidas: el compilador te dice que detrás de `expr` solo pueden ir `=>`, `,` o `;`. Pon una coma entre las dos metavariables." />
+
+## Tu turno
+
+<Reto ej="m19/reto-getter" enunciado="Escribe la macro `campo!` para que `campo!(edad, u8, 30);` genere `fn edad() -> u8 { 30 }`. Usa los fragmentos ident, ty y expr, y descomenta las líneas de main." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué fragmento usarías para que la macro reciba el nombre de una función nueva que va a crear?"
+  opciones={["`expr`", "`ident`", "`path`", "`literal`"]}
+  correcta={1}
+  explicacion="Un nombre suelto es un `ident`. Además, `ident` no es opaco: se puede usar para declarar cosas (`fn $nombre()`)."
+  porque={["Un nombre aislado es una expresión, pero no puedes usar una `expr` como nombre de función.", "Correcto.", "Una ruta como `a::b` no sirve como nombre de una declaración.", "Un nombre no es un literal."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `($a:expr $b:expr)` no compila?"
+  opciones={["Porque una macro solo puede tener una metavariable", "Porque detrás de `expr` solo pueden ir `=>`, `,` o `;`", "Porque falta la plantilla", "Porque `$b` es un nombre reservado"]}
+  correcta={1}
+  explicacion="Es la regla del follow-set: protege tus macros de cambios futuros en la sintaxis de las expresiones."
+  porque={["Puedes tener todas las que quieras.", "Correcto.", "El error es sobre el patrón, no sobre la plantilla.", "`$b` es un nombre normal."]}
+/>
+
+<Pregunta
+  pregunta="En la edición 2024, ¿con qué regla encaja `m!(_)` si la macro es `($e:expr) => {...}; ($t:tt) => {...}`?"
+  opciones={["Con `$t:tt`, porque `_` no es una expresión", "Con `$e:expr`, porque en 2024 `expr` acepta `_`", "Con ninguna: error", "Depende del tipo de `_`"]}
+  correcta={1}
+  explicacion="En 2024, `_` cuenta como expresión (se usa en asignaciones con desestructuración). Con `expr_2021` caería en la segunda regla."
+  porque={["Eso era cierto en 2021 y sigue siéndolo con `expr_2021`.", "Correcto.", "Las dos reglas aceptarían `_`; gana la primera.", "Las macros no ven tipos."]}
+/>

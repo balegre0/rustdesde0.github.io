@@ -1,0 +1,115 @@
+---
+title: "Cómo captura un closure"
+description: "Descubre si tu closure presta, presta en exclusiva o se lleva cada variable, y cuándo usar move."
+sidebar:
+  order: 2
+duracion: 13
+desde: "2021"
+requiere: ["14-closures-e-iteradores/01-closures", "07-prestamos"]
+tarjetas:
+  - p: "¿De qué tres formas puede capturar un closure una variable?"
+    r: "Por préstamo compartido (`&`, si solo la lee), por préstamo exclusivo (`&mut`, si la modifica) o por valor (la mueve, si la consume o si usas `move`)."
+  - p: "¿Qué hace la palabra `move` delante de un closure?"
+    r: "Obliga a capturar por valor: cada variable usada se mueve dentro del closure (o se copia, si es `Copy`)."
+  - p: "¿Por qué no compila `let mut f = || c += 1; println!(\"{c}\"); f();`?"
+    r: "El closure tiene un préstamo exclusivo de `c` mientras siga vivo; leer `c` en medio es aliasing con mutación (E0502)."
+  - p: "¿Qué es la captura disjunta de la edición 2021?"
+    r: "Un closure que usa `j.nombre` captura solo ese campo, no el struct `j` entero; puedes seguir modificando otros campos."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Vas a saber, mirando el cuerpo de un closure, **cómo** se queda con cada variable: prestada, prestada en exclusiva o movida. Y vas a entender los errores que salen cuando lo olvidas.
+
+## Predice
+
+<Predice
+  ej="m14/q-move-copia"
+  opciones={["`1 5`", "`5 5`", "`1 1`", "No compila: `x` se movió al closure"]}
+  correcta={0}
+  explicacion="`move` mete en el closure **una copia** de `x` (los enteros son `Copy`) en el momento de crearlo: valía 1. Cambiar `x` después no toca la copia."
+  porque={["Correcto.", "El closure no mira la variable de fuera: tiene la suya.", "`x` de fuera sí cambió a 5.", "Un `i32` es `Copy`: se copia, no se mueve, y el original sigue usable."]}
+/>
+
+## La idea
+
+El compilador mira **qué hace el cuerpo** con cada variable capturada y elige la forma más suave que funcione:
+
+| El cuerpo… | Captura | Igual que |
+|---|---|---|
+| solo lee la variable | préstamo compartido | `&x` |
+| la modifica | préstamo exclusivo | `&mut x` |
+| la consume (la mueve fuera, la destruye…) | por valor | mover `x` |
+
+Mientras el closure existe, **ese préstamo existe**. Y entonces se aplican las reglas que ya conoces: muchos lectores **o** un solo escritor. Si un closure tiene `&mut contador`, no puedes leer `contador` por fuera hasta que el closure deje de usarse. Es la misma regla que evita el aliasing con mutación en el mundo 7, no una regla nueva.
+
+La palabra **`move`** cambia la elección: captura **todo por valor**. Se usa cuando el closure tiene que vivir más que la función que lo crea (devolverlo, o mandarlo a otro hilo en el mundo 17). Ojo: con `move`, un tipo `Copy` se copia, pero una `String` o un `Vec` se mueven y ya no los puedes usar fuera.
+
+## Pruébalo
+
+<Ejecutar ej="m14/captura-tres" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Para `let mut visitar = || visitas += 1;` el compilador genera, aproximadamente, esto (no es código que puedas escribir tal cual):
+
+```rust
+struct ClosureVisitar<'a> {
+    visitas: &'a mut i32,     // captura por préstamo exclusivo
+}
+// …y una implementación de FnMut cuyo cuerpo hace: *self.visitas += 1
+```
+
+El struct guarda un **`&mut i32`** con un tiempo de vida `'a`: por eso, mientras exista `visitar`, `visitas` está prestada en exclusiva. Con `move`, el campo sería un `i32` (la copia) y no habría préstamo ninguno.
+
+**Captura disjunta** (*disjoint capture*, edición 2021): el closure captura la **ruta exacta** que usa, por ejemplo `j.nombre`, no la variable entera `j`. Por eso esto compila:
+
+<Ejecutar ej="m14/captura-disjunta" />
+
+El closure tiene un préstamo compartido de `j.nombre` y nada más, así que `j.puntos += 10` no choca con él.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m14/captura-mut-conflicto"
+  explicacion="`sumar` tiene un préstamo exclusivo de `contador` desde que se crea (línea 3) hasta su último uso (línea 5). Leer `contador` en medio (línea 4) sería leer algo que otro está modificando (E0502). Arreglo: usa el closure antes de leer, o crea el closure justo cuando lo necesitas."
+/>
+
+<Trampa titulo="move se lleva las String para siempre">
+
+<NoCompila
+  ej="m14/move-string"
+  explicacion="Con `move`, la `String` `s` pasa a ser del closure (E0382 al usarla fuera). Si necesitas las dos cosas, clona antes de crear el closure y mueve la copia: es lo que hace el arreglo y lo que sugiere el propio compilador."
+/>
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["let mut contador = 0;", "let mut sumar = || contador += 1;", "sumar();", "sumar();", 'println!("{contador}");']}
+  distractores={["let sumar = || contador += 1;", "let sumar = move || contador;"]}
+  explicacion="El closure modifica `contador`, así que lo presta en exclusiva y la variable del closure tiene que ser `mut` (llamarlo cambia su estado). Leemos `contador` solo después del último uso de `sumar`, cuando el préstamo ya terminó. Imprime 2."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué el compilador prohíbe leer `contador` mientras vive un closure que lo incrementa?"
+  opciones={["Porque sería aliasing con mutación: un préstamo exclusivo y una lectura a la vez", "Porque los closures bloquean la variable con un candado", "Porque `contador` se ha movido dentro del closure", "Por una regla especial de los closures"]}
+  correcta={0}
+  explicacion="Es la regla de siempre de los préstamos. El closure guarda un `&mut contador` dentro."
+  porque={["Correcto.", "No hay candados en tiempo de ejecución: todo se comprueba al compilar.", "Sin `move`, se presta, no se mueve.", "No es especial: es la misma regla de exclusividad del mundo 7."]}
+/>
+
+<Pregunta
+  pregunta="Un struct `j` tiene campos `nombre` y `puntos`. Un closure (sin `move`) solo lee `j.nombre`. En edición 2024, ¿puedes hacer `j.puntos += 1` mientras el closure vive?"
+  opciones={["Sí: el closure solo captura `j.nombre`", "No: el closure presta `j` entero", "Solo si el closure es `move`", "Solo si `puntos` es `Copy`"]}
+  correcta={0}
+  explicacion="Desde la edición 2021 la captura es disjunta: se presta la ruta exacta `j.nombre`."
+  porque={["Correcto.", "Así era antes de 2021.", "Con `move` sería peor: movería `j.nombre` fuera de `j`.", "El tipo de `puntos` no influye: lo que importa es que el closure no lo toca."]}
+/>

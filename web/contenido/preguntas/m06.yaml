@@ -1,0 +1,895 @@
+# Banco de preguntas del mundo 06 — Ownership (CONTENIDO.md §7.1).
+# Todo código citado está en ejemplos/m06/p-*.rs y se ha compilado/ejecutado con rustc 1.99.1, edición 2024.
+
+- id: m06-usar-tras-mover
+  titulo: "El dueño que ya no lo es"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este programa?"
+  ej: m06/p-usar-tras-mover
+  opciones:
+    - "`let b = a;` **mueve** el `String`: `a` deja de ser dueña y ya no se puede usar (E0382)"
+    - "`let b = a;` copia el texto, pero Rust prohíbe tener dos copias iguales"
+    - "Falta `mut` en `a`"
+    - "`println!` no puede imprimir dos variables a la vez"
+  correcta: 0
+  solucion: |
+    rustc dice: `error[E0382]: borrow of moved value: a` y añade «move occurs because `a` has type `String`, which does not implement the `Copy` trait».
+    Al asignar, la propiedad pasa de `a` a `b`. Se copian solo los 3 campos de la pila (puntero, capacidad, longitud); el texto del heap no se toca. Si `a` siguiera valiendo, habría **dos dueños** del mismo bloque del heap y al final se liberaría dos veces (doble liberación).
+    - No se copia el texto: por eso no hay «dos copias».
+    - `mut` no tiene nada que ver: no estamos modificando nada.
+    - `println!` admite tantas variables como quieras.
+    Arreglo mínimo: si solo quieres mirar, `let b = &a;` (un préstamo; mundo 07).
+  etiquetas: ["E0382", "mover", "String"]
+
+- id: m06-mover-a-funcion
+  titulo: "Pasar es asignar"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué falla la **segunda** llamada a `imprimir`?"
+  ej: m06/p-mover-a-fn
+  opciones:
+    - "Pasar `saludo` como argumento es como hacer `let s = saludo;`: la primera llamada se lleva la propiedad (E0382)"
+    - "Una función no se puede llamar dos veces seguidas con el mismo argumento"
+    - "`imprimir` libera `saludo` a mano y por eso no existe"
+    - "Falta `return` en `imprimir`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: use of moved value: saludo`. Pasar un argumento **es** asignarlo al parámetro: `s` se convierte en el dueño, y al terminar `imprimir` el texto se libera. La segunda llamada intentaría usar memoria ya liberada.
+    - Llamar dos veces a una función es normal; el problema es el tipo del parámetro (`String`, que se mueve).
+    - Nadie libera «a mano»: se libera solo, al acabar el ámbito de `s` (RAII).
+    - `imprimir` no devuelve nada; `return` no cambiaría la propiedad.
+    El arreglo verificado cambia el parámetro a `&String` y llama con `imprimir(&saludo)`: se presta en vez de mover.
+  etiquetas: ["E0382", "funciones", "mover"]
+
+- id: m06-mover-en-bucle
+  titulo: "La segunda vuelta"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila? Fíjate en la frase exacta del error."
+  ej: m06/p-mover-en-bucle
+  opciones:
+    - "En la primera vuelta `push` se queda con `nombre`; en la segunda ya no hay nada que mover: «value moved here, in previous iteration of loop»"
+    - "Un `Vec` no puede contener dos `String` iguales"
+    - "`lista` necesita un tipo explícito `Vec<String>`"
+    - "`for _ in 0..2` no es válido: falta un nombre de variable"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: use of moved value: nombre`, con la etiqueta «value moved here, in previous iteration of loop». El compilador razona sobre **todas** las vueltas: la primera mueve, la segunda usaría un valor movido.
+    - Un `Vec` acepta duplicados sin problema.
+    - El tipo de `lista` se infiere del `push`.
+    - `_` es un nombre válido para «no me interesa la variable».
+    Aquí `nombre.clone()` (lo que sugiere rustc) es un arreglo **legítimo**: si quieres dos `String` propios en el vector, necesitas dos copias.
+  etiquetas: ["E0382", "bucles", "mover"]
+
+- id: m06-mover-vec
+  titulo: "Un Vec también se mueve"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m06/p-mover-vec
+  opciones:
+    - "`Vec<i32>` no es `Copy` aunque sus elementos sí lo sean: `let w = v;` mueve el vector (E0382)"
+    - "Como los `i32` son `Copy`, `let w = v;` copia el vector; el error es otro"
+    - "`v.len()` necesita `mut`"
+    - "No se puede llamar a `len()` dentro de `println!`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of moved value: v`. Un `Vec` es dueño de un bloque del heap; copiarlo bit a bit crearía dos dueños del mismo bloque. Que sus elementos sean `Copy` no cambia nada: lo que importa es el tipo del valor que asignas (`Vec<i32>`).
+    - `len()` solo lee: no necesita `mut`.
+    - En `println!` se puede llamar a métodos sin problema.
+  etiquetas: ["E0382", "Vec", "Copy"]
+
+- id: m06-sacar-de-vec
+  titulo: "Sacar sin quitar"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila `let primero = v[0];`?"
+  ej: m06/p-sacar-de-vec
+  opciones:
+    - "Mover el elemento dejaría un hueco dentro del vector, que sigue siendo su dueño: «cannot move out of index of `Vec<String>`» (E0507)"
+    - "Los índices empiezan en 1"
+    - "`v` no es `mut`"
+    - "Un `Vec<String>` no se puede indexar con `[]`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0507]: cannot move out of index of Vec<String>`. Si se permitiera, `primero` y el vector serían dueños del mismo `String` y se liberaría dos veces (cuando muere `primero` y cuando muere `v`).
+    Salidas correctas: mirar con `&v[0]` (arreglo verificado, imprime `a`), sacarlo de verdad con `v.remove(0)` o `v.pop()`, cambiarlo por otro con `std::mem::take(&mut v[0])`, o `v[0].clone()` si de verdad necesitas una copia.
+    - Los índices empiezan en 0.
+    - `mut` no arregla nada: el problema es mover, no modificar.
+    - Indexar con `[]` sí funciona (para mirar o para tipos `Copy`).
+  etiquetas: ["E0507", "Vec", "mover"]
+
+- id: m06-for-consume
+  titulo: "El for que se lo come todo"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede usar `v.len()` después del bucle?"
+  ej: m06/p-for-consume
+  opciones:
+    - "`for s in v` llama por debajo a `into_iter()`, que se queda con `v`; tras el bucle `v` ya no existe (E0382)"
+    - "`v.len()` es 0 después del bucle y Rust prohíbe leer vectores vacíos"
+    - "Dentro del `for` no se puede imprimir"
+    - "`s` sigue viva fuera del bucle y bloquea `v`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of moved value: v`, con «`v` moved due to this implicit call to `.into_iter()`» y la ayuda «consider iterating over a slice of the `Vec<String>`'s content to avoid moving into the `for` loop»: `for s in &v`.
+    `for x in v` consume el vector: cada `String` pasa a `s` y se libera al final de su vuelta.
+    - Un vector vacío se puede leer; además no queda vacío: deja de existir.
+    - Imprimir dentro del bucle es normal.
+    - `s` solo existe dentro de cada vuelta.
+  etiquetas: ["E0382", "for", "into_iter"]
+
+- id: m06-copy-y-drop
+  titulo: "Copy y Drop no se llevan"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila este tipo?"
+  ej: m06/p-copy-drop
+  opciones:
+    - "Un tipo `Copy` se duplica bit a bit en silencio; si además tuviera destructor, cada copia lo ejecutaría (doble liberación). Rust lo prohíbe: E0184"
+    - "`#[derive(Copy)]` exige también `#[derive(Debug)]`"
+    - "Un struct con un `u8` nunca puede ser `Copy`"
+    - "`drop` tiene que devolver algo"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0184]: the trait Copy cannot be implemented for this type; the type has a destructor`, con la nota «`Copy` not allowed on types with destructors».
+    Regla práctica: **si un tipo tiene que hacer algo al morir (liberar memoria, cerrar un archivo), no puede ser `Copy`**. Por eso `String`, `Vec` y `Box` no lo son.
+    - `Copy` exige `Clone`, no `Debug`.
+    - Sin el `impl Drop`, `struct Ficha(u8)` sí podría ser `Copy`.
+    - `drop` recibe `&mut self` y no devuelve nada.
+  etiquetas: ["E0184", "Copy", "Drop"]
+
+- id: m06-mover-en-if
+  titulo: "Quizá movido"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: no-compila
+  enunciado: "`usar` vale `true`, pero imagina que viniera del teclado. ¿Por qué no compila?"
+  ej: m06/p-mover-en-if
+  opciones:
+    - "El compilador no sabe qué rama se ejecutará: si en **alguna** ruta `s` se movió, no se puede usar después (E0382)"
+    - "Rust ejecuta las dos ramas del `if` por seguridad"
+    - "Dentro de un `if` no se pueden declarar variables"
+    - "Compila: como `usar` es `true`, Rust sabe que `s` se movió y avisa solo con un warning"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of moved value: s`. El borrow checker mira **todas las rutas posibles**, no los valores concretos. Un valor «quizá movido» cuenta como movido para usarlo; al liberarlo, Rust lleva una bandera oculta (drop flag) para saber si le toca liberarlo o no.
+    - Solo se ejecuta una rama.
+    - Dentro de cualquier bloque se pueden declarar variables.
+    - No es un warning: es un error, aunque el valor de `usar` se conozca.
+  etiquetas: ["E0382", "if", "drop flags"]
+
+- id: m06-reasignar-tras-mover
+  titulo: "Revivir una variable"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m06/p-reasignar-tras-mover
+  opciones:
+    - "`nuevo viejo`"
+    - "No compila: `s` se movió y no se puede volver a usar nunca"
+    - "`viejo nuevo`"
+    - "`nuevo nuevo`"
+  correcta: 0
+  solucion: |
+    Imprime `nuevo viejo`. Tras `let t = s;`, `s` está vacía de permisos, pero como es `mut` puedes **asignarle un valor nuevo**: vuelve a ser dueña (de otro `String`). Lo prohibido es *leer* un valor movido, no darle uno nuevo.
+    - «Nunca» es demasiado: solo hasta que reciba un valor nuevo.
+    - `t` se quedó con «viejo» y `s` con «nuevo»: el orden del `println!` es `s`, `t`.
+  etiquetas: ["mover", "asignación"]
+
+- id: m06-copia-entero
+  titulo: "Los números se copian"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m06/p-copia-entero
+  opciones:
+    - "`5 6`"
+    - "`6 6`"
+    - "No compila: `x` se movió a `y`"
+    - "`5 5`"
+  correcta: 0
+  solucion: |
+    Imprime `5 6`. `i32` es `Copy`: `let mut y = x;` duplica los 4 bytes y cada variable tiene su propio número. Cambiar `y` no toca `x`.
+    - `6 6` supondría que `y` es otro nombre para `x`; no lo es.
+    - Los tipos `Copy` no se mueven: se copian.
+  etiquetas: ["Copy", "i32"]
+
+- id: m06-clone-independiente
+  titulo: "Dos dueños, dos textos"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m06/p-clone-independiente
+  opciones:
+    - "`pan | pan y queso`"
+    - "`pan y queso | pan y queso`"
+    - "No compila: `a` se movió a `b`"
+    - "`pan | pan`"
+  correcta: 0
+  solucion: |
+    `clone()` reserva un bloque nuevo en el heap y copia los bytes: `b` es dueño de **otro** texto. Modificar `b` no afecta a `a`, y `a` sigue siendo válida (clonar no mueve).
+  etiquetas: ["Clone", "String"]
+
+- id: m06-orden-drop
+  titulo: "¿Quién se va primero?"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: predice
+  enunciado: "`Ruidoso` imprime `drop <nombre>` al liberarse. ¿En qué orden aparecen las líneas?"
+  ej: m06/p-orden-drop
+  opciones:
+    - "`drop y`, `fin`, `drop z`, `drop x`"
+    - "`fin`, `drop x`, `drop y`, `drop z`"
+    - "`drop y`, `fin`, `drop x`, `drop z`"
+    - "`fin`, `drop z`, `drop y`, `drop x`"
+  correcta: 0
+  solucion: |
+    `_y` muere al cerrarse su bloque, antes de `fin`. Al acabar `main`, las variables que quedan se liberan en **orden inverso** a su declaración: primero `_z`, luego `_x`.
+    - Nada espera a `fin` si su ámbito ya terminó: `_y` se va antes.
+    - El orden inverso es a propósito: lo creado después puede depender de lo creado antes.
+  etiquetas: ["Drop", "ámbito", "orden"]
+
+- id: m06-sombra-no-libera
+  titulo: "La sombra no mata"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: dificil
+  tipo: predice
+  enunciado: "Se declara `_x` dos veces (shadowing). ¿Qué imprime?"
+  ej: m06/p-sombra-no-libera
+  opciones:
+    - "`fin`, `drop segundo`, `drop primero`"
+    - "`drop primero`, `fin`, `drop segundo`"
+    - "`fin`, `drop segundo` (el primero no se libera nunca)"
+    - "`fin`, `drop primero`, `drop segundo`"
+  correcta: 0
+  solucion: |
+    Ocultar una variable (*shadowing*) **no** la libera: solo deja de tener nombre. Sigue viva hasta el final del ámbito, y como se declaró antes, se libera después.
+    - Liberar en el momento de ocultar es lo que pasa al **asignar** (`x = ...`), no al redeclarar con `let`.
+    - En Rust seguro todo valor con dueño se libera al final (salvo fugas explícitas como `mem::forget`).
+  etiquetas: ["Drop", "shadowing"]
+
+- id: m06-asignar-libera
+  titulo: "Asignar sí libera"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: dificil
+  tipo: predice
+  enunciado: "Ahora no redeclaramos: asignamos a una variable `mut`. ¿Qué imprime?"
+  ej: m06/p-asignar-libera
+  opciones:
+    - "`antes primero`, `drop primero`, `fin segundo`, `drop segundo`"
+    - "`antes primero`, `fin segundo`, `drop segundo`, `drop primero`"
+    - "`antes primero`, `fin segundo`, `drop segundo`"
+    - "No compila: no se puede asignar a una variable que ya tiene dueño"
+  correcta: 0
+  solucion: |
+    Al asignar `x = Ruidoso("segundo")`, el valor antiguo pierde a su único dueño y se libera **en ese momento**. Si no, se perdería memoria (fuga). Compara con la pregunta del shadowing: con `let` el valor viejo sobrevive hasta el final.
+  etiquetas: ["Drop", "asignación"]
+
+- id: m06-guion-bajo
+  titulo: "`_` frente a `_b`"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m06/p-guion-bajo
+  opciones:
+    - "`drop a`, `fin`, `drop b`"
+    - "`fin`, `drop b`, `drop a`"
+    - "`fin`, `drop a`, `drop b`"
+    - "No compila: `_` no es un nombre de variable"
+  correcta: 0
+  solucion: |
+    `let _ = valor;` **no crea ninguna variable**: el patrón `_` no enlaza nada, así que nadie se queda como dueño y el valor temporal se libera al final de esa sentencia. `let _b = valor;` sí crea una variable (el `_` inicial solo calla el aviso de «variable sin usar») que vive hasta el final de `main`.
+    Trampa real: `let _ = cerrojo.lock();` suelta el cerrojo al instante.
+  etiquetas: ["Drop", "patrones", "_"]
+
+- id: m06-drop-temprano
+  titulo: "Liberar antes de tiempo"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m06/p-drop-temprano
+  opciones:
+    - "`drop a`, `fin`, `drop b`"
+    - "`fin`, `drop b`, `drop a`"
+    - "`drop a`, `fin`, `drop b`, `drop a`"
+    - "`fin`, `drop a`, `drop b`"
+  correcta: 0
+  solucion: |
+    `drop(a)` es una función corriente que **recibe la propiedad** y no la devuelve; al terminar, su parámetro sale de ámbito y se libera. Al final de `main` solo queda `_b`. `a` no se libera dos veces: ya no tiene dueño en `main`.
+  etiquetas: ["drop", "mover"]
+
+- id: m06-usar-tras-drop
+  titulo: "Uso tras liberar, detenido"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da y qué fallo de memoria evita?"
+  ej: m06/p-usar-tras-drop
+  opciones:
+    - "E0382: `drop(v)` movió `v`; leer `v.len()` sería un **uso tras liberar**"
+    - "E0382, y evita una carrera de datos"
+    - "No hay error: `v.len()` devuelve 0"
+    - "E0599: `Vec` no tiene método `len` tras un `drop`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of moved value: v`. Para el compilador, `drop` no es especial: es mover. Y gracias a eso el **uso tras liberar** (leer memoria ya devuelta al sistema) queda prohibido sin reglas extra.
+    - Carrera de datos es otra cosa: dos hilos a la vez.
+    - Tras `drop` el vector ya no existe; no hay «0».
+  etiquetas: ["E0382", "drop", "uso tras liberar"]
+
+- id: m06-tupla-no-copy
+  titulo: "Una tupla con un String dentro"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: no-compila
+  enunciado: "`a.0` es un `i32`, que es `Copy`. ¿Por qué no compila?"
+  ej: m06/p-tupla-no-copy
+  opciones:
+    - "Una tupla es `Copy` solo si **todos** sus campos lo son; `(i32, String)` no lo es, así que `let b = a;` movió toda la tupla (E0382)"
+    - "Las tuplas nunca son `Copy`"
+    - "No se puede acceder a `a.0` y `b.1` en el mismo `println!`"
+    - "Falta `mut`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of moved value: a`. Al mover la tupla entera, ninguno de sus campos queda accesible por `a`, ni siquiera el `i32`.
+    - Las tuplas de tipos `Copy`, como `(i32, bool)`, sí son `Copy`.
+    - Acceder a campos de varias tuplas en un `println!` es normal.
+  etiquetas: ["E0382", "tuplas", "Copy"]
+
+- id: m06-movimiento-parcial
+  titulo: "Mover solo una parte"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué pasa?"
+  ej: m06/p-movimiento-parcial
+  opciones:
+    - "Compila e imprime `izq der`"
+    - "No compila: `par` se movió entera"
+    - "Compila e imprime `izq izq`"
+    - "Pánico al ejecutar"
+  correcta: 0
+  solucion: |
+    `let izq = par.0;` es un **movimiento parcial**: solo sale el primer campo. `par.1` sigue siendo de `par` y se puede usar. Lo que ya no se puede es usar `par` **entera** (mira la pregunta siguiente). Al final, Rust libera solo lo que sigue teniendo dueño.
+  etiquetas: ["movimiento parcial", "tuplas"]
+
+- id: m06-movimiento-parcial-mal
+  titulo: "Una tupla incompleta"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "Igual que antes, pero imprimimos `par` entera con `{:?}`. ¿Por qué ya no compila?"
+  ej: m06/p-movimiento-parcial-mal
+  opciones:
+    - "`par.0` ya no está dentro: la tupla está «parcialmente movida» y no se puede usar como un todo (E0382)"
+    - "Las tuplas no se pueden imprimir con `{:?}`"
+    - "`izq` y `par` no pueden aparecer en el mismo `println!`"
+    - "Un movimiento parcial siempre es un error"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of partially moved value: par`. Imprimir `par` entera supone leer `par.0`, que ya es de `izq`: sería leer memoria cuyo dueño es otro (y que podría haberse liberado).
+    - `{:?}` funciona con tuplas de tipos `Debug`.
+    - El movimiento parcial es válido; lo inválido es usar después el todo.
+  etiquetas: ["E0382", "movimiento parcial"]
+
+- id: m06-literal-copy
+  titulo: "Un literal no se mueve"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: predice
+  enunciado: "`a` es un `&str`. ¿Qué pasa?"
+  ej: m06/p-literal-copy
+  opciones:
+    - "Compila e imprime `hola hola`"
+    - "No compila: `a` se movió a `b`, como con `String`"
+    - "Imprime `hola` una sola vez"
+    - "No compila: los literales no se pueden asignar"
+  correcta: 0
+  solucion: |
+    `&str` es una **referencia compartida**, y las referencias compartidas son `Copy`: se copia el puntero y la longitud, no el texto (que vive en el propio programa). Nadie es dueño del texto a través de `a` o `b`, así que no hay nada que liberar dos veces.
+  etiquetas: ["Copy", "&str"]
+
+- id: m06-mut-requerido
+  titulo: "Dueño, pero no escritor"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m06/p-mut-requerido
+  opciones:
+    - "`s` no es `mut`: tiene permisos de lectura y propiedad (R y O) pero no de escritura (W) (E0596)"
+    - "`push_str` solo funciona con literales"
+    - "Un `String` creado con `from` es de solo lectura para siempre"
+    - "Falta `&` delante de `\", mundo\"`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0596]: cannot borrow s as mutable, as it is not declared as mutable`. `push_str` pide prestado `s` en exclusiva (`&mut`) para escribir, y eso exige el permiso W, que solo da `let mut`.
+    - `push_str` recibe cualquier `&str`.
+    - Basta con `let mut s` para poder modificarlo.
+    - `", mundo"` ya es un `&str`.
+  etiquetas: ["E0596", "mut", "permisos"]
+
+- id: m06-asignar-inmutable
+  titulo: "Dos veces no"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Qué error da?"
+  ej: m06/p-asignar-inmutable
+  opciones:
+    - "E0384: «cannot assign twice to immutable variable `x`»"
+    - "E0382: `x` se movió al imprimirla"
+    - "E0596: no se puede pedir prestado `x`"
+    - "Ninguno: compila e imprime `5` y `6`"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0384]: cannot assign twice to immutable variable x`. Sin `mut`, una variable no tiene permiso de escritura (W).
+    - `println!` solo **toma prestado** lo que imprime; no mueve.
+    - E0596 aparece al pedir `&mut`; aquí asignamos directamente.
+  etiquetas: ["E0384", "mut"]
+
+- id: m06-push-y-usar
+  titulo: "Lo que entra en el Vec"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no se puede imprimir `s` tras el `push`?"
+  ej: m06/p-push-y-usar
+  opciones:
+    - "`push` recibe el `String` por valor: la propiedad pasa al vector (E0382)"
+    - "`push` copia el texto, pero borra el original"
+    - "`v` necesita tipo explícito"
+    - "`s` es demasiado larga para un Vec"
+  correcta: 0
+  solucion: |
+    rustc: `error[E0382]: borrow of moved value: s`. El vector es ahora el dueño de ese `String` y lo liberará cuando él muera. Para leerlo: `&v[0]`.
+    - `push` no copia el texto: copia los 3 campos de la pila dentro del bloque del vector.
+  etiquetas: ["E0382", "Vec", "push"]
+
+- id: m06-devolver-propiedad
+  titulo: "Ida y vuelta"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m06/p-devolver-propiedad
+  opciones:
+    - "`hola!!`"
+    - "`hola!`"
+    - "No compila: `s` se movió a `agregar`"
+    - "`hola`"
+  correcta: 0
+  solucion: |
+    `agregar` recibe la propiedad, modifica (su parámetro es `mut s`) y la **devuelve**. Cada `let s = agregar(s);` recupera al dueño con un `!` más. Funciona, pero es incómodo: los préstamos (`&mut String`) lo hacen sin ida y vuelta.
+  etiquetas: ["mover", "funciones", "retorno"]
+
+- id: m06-remove-pop
+  titulo: "Sacar de verdad"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m06/p-mover-a-campo-vec
+  opciones:
+    - "`b Some(\"c\") [\"a\"]`"
+    - "`a Some(\"c\") [\"b\"]`"
+    - "`b c [\"a\"]`"
+    - "No compila: E0507, no se puede mover fuera de un Vec"
+  correcta: 0
+  solucion: |
+    `remove(1)` saca el elemento del índice 1 (`"b"`) y te entrega su propiedad; `pop()` saca el último y devuelve `Option<String>` (`None` si estuviera vacío). Ambos **quitan** el elemento del vector, así que no hay doble dueño: por eso compilan, a diferencia de `let x = v[1];`.
+  etiquetas: ["Vec", "remove", "pop"]
+
+- id: m06-mem-take
+  titulo: "Cambiazo"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m06/p-mem-take
+  opciones:
+    - "`a [\"\", \"b\"]`"
+    - "`a [\"b\"]`"
+    - "`a [\"a\", \"b\"]`"
+    - "No compila: E0507"
+  correcta: 0
+  solucion: |
+    `std::mem::take(&mut v[0])` saca el `String` y deja en su lugar el valor por defecto (`String::new()`, vacío). El vector nunca queda con un hueco, así que es seguro. No reduce la longitud (para eso, `remove`).
+  etiquetas: ["mem::take", "Vec"]
+
+- id: m06-tamano-string
+  titulo: "¿Cuánto mide un String?"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: opcion
+  enunciado: "En un PC de 64 bits, ¿cuántos bytes ocupa en la **pila** la variable `s` de `let s = String::from(\"hola mundo, ¿qué tal?\");`?"
+  opciones:
+    - "24: puntero, capacidad y longitud, 8 bytes cada uno, sea cual sea el texto"
+    - "Lo que mida el texto en UTF-8"
+    - "8: solo un puntero"
+    - "Depende de si el texto tiene tildes"
+  correcta: 0
+  solucion: |
+    Un `String` mide lo mismo que 3 `usize` (comprobado: `size_of::<String>() == 3 * size_of::<usize>()` imprime `true`, ejemplo `m06/p-tamano-string`). En 64 bits son 24 bytes; en el navegador (wasm32) son 12. El texto va aparte, en el heap.
+    Por eso mover un `String` es barato: se copian esos 24 bytes, no el texto.
+  etiquetas: ["String", "layout", "pila", "heap"]
+
+- id: m06-drop-vec-elementos
+  titulo: "El Vec libera a los suyos"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m06/p-drop-vec-elementos
+  opciones:
+    - "`antes de soltar`, `drop uno`, `drop dos`, `fin`"
+    - "`antes de soltar`, `fin`, `drop uno`, `drop dos`"
+    - "`antes de soltar`, `drop dos`, `drop uno`, `fin`"
+    - "`antes de soltar`, `fin` (los elementos no se liberan)"
+  correcta: 0
+  solucion: |
+    El vector es dueño de sus elementos: al liberarlo (`drop(v)`), libera cada uno, **en orden** (del primero al último), y después su propio bloque del heap. Ojo: el orden inverso es para *variables* de un ámbito; los elementos de un vector se liberan en orden.
+  etiquetas: ["Drop", "Vec", "orden"]
+
+- id: m06-mover-a-fn-drop
+  titulo: "Muere dentro"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m06/p-mover-a-fn-devuelve
+  opciones:
+    - "`dentro de pasar: caja`, `drop caja`, `fin de main`"
+    - "`dentro de pasar: caja`, `fin de main`, `drop caja`"
+    - "`drop caja`, `dentro de pasar: caja`, `fin de main`"
+    - "No compila: `r` se usa después de moverla"
+  correcta: 0
+  solucion: |
+    `pasar` recibe la propiedad. Su parámetro `r` muere al terminar la función, y ahí se libera, antes de volver a `main`. `main` ya no es dueña, así que no libera nada al final.
+  etiquetas: ["Drop", "funciones", "mover"]
+
+- id: m06-ub-doble-liberacion
+  titulo: "¿Y si se copiara?"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Imagina que `let b = a;` (con `a: String`) copiara los 3 campos de la pila y **las dos** variables siguieran siendo dueñas. ¿Qué fallo de memoria habría al final de `main`?"
+  opciones:
+    - "Doble liberación: `a` y `b` liberarían el mismo bloque del heap"
+    - "Una carrera de datos"
+    - "Un desbordamiento de entero"
+    - "Ninguno: liberar dos veces es inofensivo"
+  correcta: 0
+  solucion: |
+    Las dos copias apuntarían al mismo bloque. Al morir `b` se liberaría; al morir `a`, otra vez. Liberar dos veces corrompe el asignador de memoria: es comportamiento indefinido. Mover (invalidar `a`) lo evita sin coste.
+    - Carrera de datos exige dos hilos.
+    - Liberar dos veces nunca es inofensivo.
+  etiquetas: ["doble liberación", "UB", "mover"]
+
+- id: m06-ub-uso-tras-liberar
+  titulo: "¿Y si se pudiera usar?"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Si Rust dejara usar una variable después de pasarla a una función que la libera, ¿qué fallo habría?"
+  opciones:
+    - "Uso tras liberar: leeríamos memoria que ya no es nuestra"
+    - "Doble liberación, y nada más"
+    - "Una fuga de memoria"
+    - "Un error de tipos"
+  correcta: 0
+  solucion: |
+    La función, como dueña, libera el bloque al terminar. Leerlo después es **uso tras liberar**: esa memoria puede estar reutilizada por otra cosa. Además, al final del ámbito original se liberaría otra vez (doble liberación), pero el primer problema llega antes.
+    - Una fuga es lo contrario: no liberar nunca.
+  etiquetas: ["uso tras liberar", "UB"]
+
+- id: m06-mover-coste
+  titulo: "Lo que cuesta mover"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué se copia de verdad en memoria al mover un `String` de 1 MB?"
+  opciones:
+    - "Solo puntero, capacidad y longitud (24 bytes en 64 bits); el megabyte del heap no se toca"
+    - "El megabyte entero, y luego se borra el original"
+    - "Nada en absoluto: mover es solo cambiar un nombre"
+    - "Depende del optimizador: a veces el megabyte, a veces no"
+  correcta: 0
+  solucion: |
+    Mover es una copia **superficial** de la parte de la pila más la regla de que el origen deja de valer. Es tan barato como copiar 3 números. (El optimizador puede incluso evitar esa copia, pero nunca copia el heap.)
+    - «Nada» no es exacto: los 24 bytes sí se copian (cuando no se optimiza).
+    - Copiar el heap es lo que hace `clone()`, nunca un movimiento.
+  etiquetas: ["mover", "coste", "heap"]
+
+- id: m06-que-es-copy
+  titulo: "¿Cuál no es Copy?"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Cuál de estos tipos **no** es `Copy`?"
+  opciones:
+    - "`Vec<u8>`"
+    - "`(i32, bool)`"
+    - "`&str`"
+    - "`[char; 3]`"
+  correcta: 0
+  solucion: |
+    `Vec<u8>` es dueño de memoria en el heap: si se copiara bit a bit habría dos dueños. Los otros no poseen nada que liberar: una tupla y un array de tipos `Copy` son `Copy`, y una referencia compartida `&T` también.
+  etiquetas: ["Copy"]
+
+- id: m06-copy-vs-clone
+  titulo: "Copy frente a Clone"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué frase es correcta?"
+  opciones:
+    - "`Copy` es una copia implícita bit a bit, siempre barata; `Clone` es una copia explícita (`.clone()`) que puede reservar memoria y ser cara"
+    - "`Copy` y `Clone` son lo mismo con distinto nombre"
+    - "`Clone` es implícito y `Copy` hay que llamarlo"
+    - "Todo tipo `Clone` es también `Copy`"
+  correcta: 0
+  solucion: |
+    `Copy` lo hace el compilador solo, al asignar o pasar: duplica los bytes y ya. `Clone` es un método que tú llamas, y puede hacer lo que haga falta (por ejemplo, pedir memoria nueva y copiar un texto). Todo `Copy` es `Clone` (es requisito), pero no al revés: `String` es `Clone` y no `Copy`.
+  etiquetas: ["Copy", "Clone"]
+
+- id: m06-clone-arreglo-minimo
+  titulo: "El arreglo mínimo"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: opcion
+  enunciado: "En `m06/p-mover-a-fn`, `imprimir(s: String)` solo **lee** el texto, y se llama dos veces. ¿Cuál es el mejor arreglo?"
+  ej: m06/p-mover-a-fn
+  opciones:
+    - "Que `imprimir` reciba una referencia (`&String`, o mejor `&str`) y llamar con `imprimir(&saludo)`"
+    - "Llamar con `imprimir(saludo.clone())` las dos veces"
+    - "Declarar `saludo` como `static`"
+    - "Hacer `let mut saludo`"
+  correcta: 0
+  solucion: |
+    Si la función solo mira, no necesita la propiedad: con un préstamo no se copia nada y `saludo` sigue siendo dueña. El arreglo verificado (`p-mover-a-fn.arreglo.rs`) imprime `hola` dos veces.
+    - `clone()` compila, pero copia el texto en el heap en cada llamada sin necesidad.
+    - `static` cambia el diseño entero del programa para tapar un problema pequeño.
+    - `mut` no tiene relación con mover.
+  etiquetas: ["arreglo mínimo", "clone", "préstamo"]
+
+- id: m06-pasar-es-asignar
+  titulo: "La frase que hace clic"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Para la propiedad, llamar a `f(x)` con `fn f(p: String)` es exactamente lo mismo que…"
+  opciones:
+    - "`let p = x;`"
+    - "`let p = x.clone();`"
+    - "`let p = &x;`"
+    - "Nada: pasar a funciones no afecta a la propiedad"
+  correcta: 0
+  solucion: |
+    Pasar un argumento **es** asignarlo al parámetro. Si el tipo se mueve, se mueve; si es `Copy`, se copia. Rust nunca clona ni presta por su cuenta: lo decide el tipo del parámetro.
+  etiquetas: ["mover", "funciones"]
+
+- id: m06-cuantos-duenos
+  titulo: "¿Cuántos dueños?"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "¿Cuántos dueños puede tener un valor a la vez en Rust seguro (sin `Rc`/`Arc`)? Escribe el número."
+  respuestas: ["1", "uno"]
+  solucion: |
+    Exactamente **uno**. Cuando ese dueño sale de ámbito, el valor se libera. Mover cambia de dueño; nunca hay dos a la vez. (`Rc` y `Arc`, del mundo 15, simulan varios dueños con un contador.)
+  etiquetas: ["dueño"]
+
+- id: m06-quien-libera-elementos
+  titulo: "¿Quién libera los nombres?"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "Tienes `let v = vec![String::from(\"Ana\"), String::from(\"Luis\")];`. ¿Quién libera los dos textos? (una palabra)"
+  respuestas: ["v", "el vector", "vector", "el vec", "vec"]
+  solucion: |
+    El vector `v`. Es dueño de sus elementos: cuando `v` muere, libera cada `String` y después su propio bloque. Nadie más tiene que acordarse.
+  etiquetas: ["Vec", "Drop"]
+
+- id: m06-cuantos-drops
+  titulo: "Contar liberaciones"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: respuesta
+  enunciado: "En `m06/p-drop-vec-elementos`, ¿cuántas líneas que empiezan por `drop` se imprimen?"
+  ej: m06/p-drop-vec-elementos
+  respuestas: ["2", "dos"]
+  solucion: |
+    Dos: `drop uno` y `drop dos`. Cada elemento se libera **una sola vez**, cuando se libera el vector que los posee. El propio `Vec` no imprime nada porque `Vec` no es `Ruidoso`.
+  etiquetas: ["Drop", "Vec"]
+
+- id: m06-permisos-tras-mover
+  titulo: "Permisos tras mover"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: opcion
+  enunciado: "Con el modelo de permisos R (leer), W (escribir), O (propiedad): tras `let s = String::from(\"x\"); let t = s;`, ¿qué permisos tienen `s` y `t`?"
+  opciones:
+    - "`s`: ninguno (`---`); `t`: `R-O`"
+    - "`s`: `R--`; `t`: `RWO`"
+    - "Los dos: `R-O`"
+    - "`s`: `R-O`; `t`: ninguno"
+  correcta: 0
+  solucion: |
+    Mover quita **todos** los permisos al origen: `s` no se puede leer, ni escribir, ni volver a mover. `t` recibe R y O; no W, porque `t` no se declaró `mut`. (Si `s` fuera `mut`, se le podría volver a asignar un valor y recuperaría sus permisos.)
+  etiquetas: ["permisos", "mover"]
+
+- id: m06-permisos-let-mut
+  titulo: "Los tres permisos"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué permisos tiene `v` justo después de `let mut v = vec![1, 2];`?"
+  opciones:
+    - "`RWO`: leer, escribir y propiedad"
+    - "`R-O`: `mut` no da nada nuevo"
+    - "`RW-`: un vector no tiene dueño"
+    - "`R--`"
+  correcta: 0
+  solucion: |
+    Una variable recién creada es dueña (O) y se puede leer (R). `mut` añade W. Sin `mut`, serían `R-O`.
+  etiquetas: ["permisos", "mut"]
+
+- id: m06-regla-orden-drop
+  titulo: "La regla del orden"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Al final de un bloque, ¿en qué orden se liberan sus variables locales?"
+  opciones:
+    - "En orden inverso al de declaración: la última declarada, primero"
+    - "En el orden en que se declararon"
+    - "En orden alfabético"
+    - "En un orden que decide el sistema operativo"
+  correcta: 0
+  solucion: |
+    Orden inverso, como una pila de platos. Así, algo creado después (que podría depender de lo anterior) desaparece antes. Comprobado en `m06/p-orden-drop` y `m06/p-sombra-no-libera`.
+  etiquetas: ["Drop", "orden"]
+
+- id: m06-raii
+  titulo: "¿Quién llama a free?"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: opcion
+  enunciado: "En Rust seguro, ¿cuándo se devuelve al sistema la memoria del heap de un `String`?"
+  opciones:
+    - "Automáticamente, cuando su dueño sale de ámbito (el compilador inserta la llamada a `drop`)"
+    - "Cuando pasa el recolector de basura"
+    - "Cuando el programador llama a una función de liberar"
+    - "Nunca: el sistema la recupera al terminar el programa"
+  correcta: 0
+  solucion: |
+    Es la idea de RAII: el recurso va atado a la vida de su dueño. El compilador sabe exactamente dónde muere cada dueño y ahí inserta la liberación. No hay recolector de basura ni hace falta liberar a mano (puedes adelantarlo con `drop(x)`, que solo es mover).
+  etiquetas: ["RAII", "Drop"]
+
+- id: m06-clone-semantica
+  titulo: "Clonar para que compile"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: opcion
+  enunciado: "Querías añadir un elemento a `compra` (un `Vec`), pero «para que compile» escribiste `let mut lista = compra.clone(); lista.push(x);`. ¿Qué pasa?"
+  opciones:
+    - "Compila, pero `compra` no cambia: modificaste una copia. Clonar cambió lo que hace el programa"
+    - "Funciona igual que `compra.push(x)`, solo que más lento"
+    - "No compila: no se puede clonar un `Vec`"
+    - "`compra` y `lista` comparten memoria, así que los dos cambian"
+  correcta: 0
+  solucion: |
+    `clone()` crea un vector independiente (como en `m06/p-clone-independiente`). El original sigue igual. Clonar es una herramienta válida, pero no es un «hazlo compilar» gratis: a veces cambia el significado del programa.
+  etiquetas: ["clone", "malentendidos"]
+
+- id: m06-guion-bajo-teoria
+  titulo: "El patrón que no enlaza"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Cuál es la diferencia entre `let _ = crear();` y `let _x = crear();`?"
+  opciones:
+    - "`_` no crea variable: el valor se libera al terminar la sentencia. `_x` es una variable de verdad que vive hasta el final del ámbito"
+    - "Ninguna: los dos ignoran el valor"
+    - "`_x` se libera al instante y `_` al final del ámbito"
+    - "`let _ = ...` no compila"
+  correcta: 0
+  solucion: |
+    El `_` inicial de `_x` solo silencia el aviso de variable sin usar; `_x` sigue siendo dueña. El patrón `_` a secas no enlaza nada. Comprobado en `m06/p-guion-bajo`: imprime `drop a` antes de `fin`.
+  etiquetas: ["Drop", "patrones"]
+
+- id: m06-clone-legitimo
+  titulo: "Cuando clonar es lo correcto"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: media
+  tipo: opcion
+  enunciado: "En `m06/p-mover-en-bucle` se quiere un `Vec<String>` con dos copias del nombre. ¿Qué arreglo respeta la intención?"
+  ej: m06/p-mover-en-bucle
+  opciones:
+    - "`lista.push(nombre.clone());`: hacen falta dos `String` propios, así que hay que copiar"
+    - "`lista.push(&nombre);`, sin cambiar nada más"
+    - "Sacar el `push` fuera del bucle"
+    - "No se puede: un Vec no admite repetidos"
+  correcta: 0
+  solucion: |
+    Si el vector debe *poseer* dos textos, necesitas dos bloques en el heap: clonar es justo lo que pides. Es lo que sugiere rustc. `push(&nombre)` cambiaría el tipo del vector a `Vec<&String>` (otro diseño). Sacar el `push` cambiaría el resultado (un solo elemento).
+  etiquetas: ["clone", "E0382", "arreglo mínimo"]
+
+- id: m06-mover-vs-copiar-numero
+  titulo: "¿Mover un número?"
+  mundo: 06-ownership
+  tema: ownership
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Por qué `let y = x;` con `x: i32` no invalida `x`, pero con `x: String` sí?"
+  opciones:
+    - "Un `i32` no posee nada en el heap: copiarlo no crea dos dueños de ningún recurso"
+    - "Porque los números son más pequeños que los textos"
+    - "Porque los números viven para siempre"
+    - "Es una excepción arbitraria del lenguaje"
+  correcta: 0
+  solucion: |
+    El tamaño no es el criterio (un array `[u8; 1000]` también es `Copy`). Lo que importa es si copiar los bytes duplicaría la **responsabilidad de liberar** algo. Un `i32` es solo su valor; un `String` es un puntero a memoria que alguien tiene que liberar una vez.
+  etiquetas: ["Copy", "mover"]

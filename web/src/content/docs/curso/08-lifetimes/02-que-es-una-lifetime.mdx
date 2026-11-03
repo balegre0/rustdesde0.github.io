@@ -1,0 +1,101 @@
+---
+title: "Qué es una lifetime"
+description: "Una lifetime es la región del programa donde una referencia tiene que ser válida. Se calcula al compilar, cubre todos los caminos posibles y no alarga la vida de nada."
+sidebar:
+  order: 2
+duracion: 12
+desde: "1.0"
+requiere: ["08-lifetimes/01-referencias-colgantes"]
+tarjetas:
+  - p: "¿Qué es una lifetime?"
+    r: "Una región: el conjunto de puntos del programa donde una referencia tiene que ser válida. El compilador la calcula al compilar."
+  - p: "¿Una lifetime existe al ejecutar?"
+    r: "No. Es información para el compilador. En el programa final no queda rastro: una referencia es una dirección y nada más."
+  - p: "Si una rama de un `if` que nunca se ejecuta hace que una referencia apunte a algo de vida corta, ¿compila?"
+    r: "No. El compilador no sabe qué ramas se ejecutarán: comprueba todos los caminos posibles."
+  - p: "¿Puede una anotación `'a` hacer que un valor viva más?"
+    r: "No. Las anotaciones describen relaciones entre lifetimes; nunca cambian cuándo se libera un valor."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Has visto lo que una lifetime **impide**. Ahora vas a ver lo que **es**. La idea correcta es sencilla, y entenderla bien evita casi todos los malentendidos que verás en la lección 10.
+
+## Predice
+
+<NoCompila ej="m08/p-rama-nunca" explicacion={"`a` mide 1 byte, así que `a.len() > 100` nunca se cumple y `r` nunca apunta a `b`. Entonces, ¿por qué protesta el compilador? Piensa en qué sabe el compilador del texto que tendrá `a` cuando el programa se ejecute."} />
+
+## La idea
+
+Una **lifetime** es una **región**: el conjunto de puntos del programa en los que una referencia tiene que seguir siendo válida.
+
+- Empieza donde se **crea** la referencia.
+- Llega hasta su **último uso**, siguiendo **todos los caminos** posibles (todas las ramas de cada `if`, todas las vueltas de cada bucle).
+- Tiene que caber **dentro** de la vida del valor prestado.
+
+Las palabras clave son «todos los caminos». El compilador no ejecuta tu programa: no sabe qué texto tendrá `a` ni qué rama del `if` se tomará. Por eso trata el programa como un mapa de caminos y exige que **ninguno** lleve a un uso colgante. En el ejemplo de arriba, hay un camino (aunque nunca se recorra) en el que `r` apunta a `b` y se usa después de que `b` muera. Con eso basta para rechazarlo.
+
+Y una cosa que **no** es: una lifetime **no es** cuánto vive un valor. Un valor vive desde que se crea hasta que se mueve o termina su ámbito, y eso no lo cambia ninguna anotación:
+
+<NoCompila ej="m08/p-lifetimes-no-alargan" explicacion="`alargar` promete devolver una referencia con la misma lifetime que la que recibe. No puede hacer más: `s` sigue muriendo al final del bloque, y `r` se usa después." />
+
+## Pruébalo
+
+Cuando el uso cae dentro de la vida del valor, todo encaja:
+
+<Ejecutar ej="m08/p-mas-larga-ok" />
+
+Haz el dibujo mentalmente: `a` vive todo `main`; `b`, solo el bloque; `r` se crea y se usa **dentro** del bloque. La región de `r` cabe dentro de las vidas de `a` y de `b`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El dibujo de regiones.** Así ve el compilador el programa que no compilaba (puntos = líneas):
+
+```text
+                         a      b      r (región que necesita)
+let a = …;               ●
+let mut r = &a;          │             ●
+{                        │             │
+  let b = …;             │      ●      │
+  if … { r = &b; }       │      │      │   ← camino donde r pasa a apuntar a b
+}                        │      ✝      │   ← b muere aquí
+println!("{r}");         │             ●   ← r se usa: si apunta a b, cuelga
+```
+
+La región que necesita `r` llega hasta el `println!`. En el camino donde `r = &b`, esa región tiene que caber dentro de la vida de `b`, y no cabe.
+
+**Restricciones.** Por dentro, el comprobador convierte cada `&` y cada asignación en una restricción del tipo «la región de esta referencia está contenida en la vida de aquel valor», o «la región `'x` contiene a `'y`» (se escribe `'x: 'y` y se lee «`'x` dura al menos lo que `'y`»). Después busca regiones que cumplan todas las restricciones. Si no hay, error. Es un problema de **conjuntos**, no de tiempo al ejecutar.
+
+**Coste al ejecutar: cero.** En el programa compilado las lifetimes no existen. El análisis termina antes de generar código.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Leer «lifetime» como «tiempo que vive la referencia»">
+
+❌ Pensar que `'a` es un temporizador que corre mientras el programa se ejecuta, o que «la referencia vive `'a`».
+
+✅ `'a` es una **etiqueta para una región del código**, que el compilador usa para comprobar, antes de ejecutar, que todos los usos son seguros. Si te ayuda, lee `&'a str` como «un `&str` válido al menos en la región `'a`».
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué el compilador rechaza `p-rama-nunca` si la rama peligrosa nunca se ejecuta?"
+  opciones={["Por un error del compilador", "Porque comprueba todos los caminos posibles sin saber qué valores habrá al ejecutar", "Porque `b` es `mut`", "Porque `if` siempre ejecuta las dos ramas"]}
+  correcta={1}
+  explicacion="El compilador no ejecuta el programa. Para garantizar la seguridad de **cualquier** ejecución, exige que todos los caminos sean seguros."
+  porque={["Es el comportamiento previsto.", "", "`b` no es `mut` y eso no influye.", "Solo se ejecuta una rama, pero el compilador comprueba las dos."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué queda de las lifetimes en el programa ejecutable?"
+  opciones={["Un contador por referencia", "Una marca de tiempo en cada referencia", "Nada", "Una comprobación al salir de cada bloque"]}
+  correcta={2}
+  explicacion="Las lifetimes solo existen durante la compilación. Una `&'a str` y una `&'static str` son, en el ejecutable, exactamente lo mismo: dirección y longitud."
+  porque={["No hay contadores; eso sería recuento de referencias (mundo 15).", "No hay marcas de tiempo.", "", "No se comprueba nada al ejecutar: ya se comprobó al compilar."]}
+/>

@@ -1,0 +1,942 @@
+# Banco de preguntas — Mundo 05 · Funciones y la pila
+# Todo código y todo error citados están verificados con rustc 1.99.1 (edición 2024).
+
+- id: m05-orden-definicion
+  titulo: "¿Antes o después de main?"
+  mundo: 05-funciones-y-la-pila
+  tema: funciones
+  dificultad: facil
+  tipo: predice
+  enunciado: "La función `saludar` está escrita DESPUÉS de `main`. ¿Qué imprime el programa?"
+  ej: m05/primera-funcion
+  opciones:
+    - "`empieza main`, dos veces `¡hola desde saludar!`, `termina main`"
+    - "Solo `empieza main` y `termina main`"
+    - "No compila: hay que definir `saludar` antes"
+    - "`¡hola desde saludar!` dos veces y luego lo de `main`"
+  correcta: 0
+  solucion: |
+    El programa empieza en `main` y cada `saludar();` salta a la función y vuelve. El orden en el archivo **no importa**: el compilador conoce todos los ítems antes de comprobar las llamadas.
+
+    - Definir no es ejecutar, pero aquí sí se llama, dos veces.
+    - No hay que declarar antes de usar.
+    - Lo primero que se ejecuta siempre es `main`.
+  etiquetas: ["fn", "main"]
+
+- id: m05-funcion-no-existe
+  titulo: "Saluda o saludar"
+  mundo: 05-funciones-y-la-pila
+  tema: funciones
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/funcion-no-existe
+  opciones:
+    - "Porque se llama a `saluda`, que no existe: la función es `saludar`"
+    - "Porque `saludar` está definida después de `main`"
+    - "Porque `saludar` no devuelve nada"
+    - "Porque falta `pub`"
+  correcta: 0
+  solucion: |
+    Error **E0425**: «cannot find function `saluda` in this scope». El compilador señala la función de nombre parecido y sugiere `saludar();`.
+
+    - El orden de definición no importa.
+    - Una función puede no devolver nada (devuelve `()`).
+    - `pub` sirve para otros módulos (mundo 12); aquí todo está en el mismo archivo.
+  etiquetas: ["E0425"]
+
+- id: m05-nombre-repetido
+  titulo: "Dos funciones, un nombre"
+  mundo: 05-funciones-y-la-pila
+  tema: funciones
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila, si las dos funciones tienen tipos distintos?"
+  ej: m05/p-nombre-repetido
+  opciones:
+    - "Porque en Rust no puede haber dos funciones con el mismo nombre en el mismo módulo, aunque cambien los tipos"
+    - "Porque `x * 2.0` está mal"
+    - "Porque `doble(4)` es ambiguo, pero se arreglaría escribiendo `doble(4.0)`"
+    - "Porque falta `-> f64` en la segunda"
+  correcta: 0
+  solucion: |
+    Error **E0428**: «the name `doble` is defined multiple times». Rust no permite varias funciones con el mismo nombre distinguidas por sus parámetros. Cada nombre, una función; si necesitas versiones distintas, ponles nombres distintos (`doble_entero`, `doble_decimal`) o usa genéricos y traits (mundo 13).
+
+    - `x * 2.0` es correcto para un `f64`.
+    - No es un problema de la llamada: el error está en la segunda definición.
+    - La segunda sí tiene `-> f64`.
+  etiquetas: ["E0428"]
+
+- id: m05-que-es-firma
+  titulo: "La firma"
+  mundo: 05-funciones-y-la-pila
+  tema: funciones
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué es la **firma** de una función?"
+  opciones:
+    - "Su primera línea: nombre, parámetros con sus tipos y tipo de retorno"
+    - "El comentario que va encima"
+    - "Su última expresión"
+    - "La dirección de memoria donde está"
+  correcta: 0
+  solucion: |
+    La firma, por ejemplo `fn presentar(nombre: &str, edad: u32) -> bool`, es el **contrato** de la función: dice qué recibe y qué devuelve. Cada llamada se comprueba contra ella sin mirar el cuerpo.
+
+    - Los comentarios no forman parte del contrato que comprueba el compilador.
+    - La última expresión es el valor de retorno, dentro del cuerpo.
+    - La dirección existe, pero no es la firma.
+  etiquetas: ["firma"]
+
+- id: m05-parametro-sin-tipo
+  titulo: "Un parámetro sin tipo"
+  mundo: 05-funciones-y-la-pila
+  tema: parametros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/parametro-sin-tipo
+  opciones:
+    - "Porque los parámetros de una función siempre necesitan tipo"
+    - "Porque `doble` no devuelve nada"
+    - "Porque 21 es impar"
+    - "Porque `x` debería llamarse de otra forma"
+  correcta: 0
+  solucion: |
+    Error de sintaxis: «expected one of `:`, `@`, or `|`, found `)`», con la pista «if this is a parameter name, give it a type». Rust deduce muchos tipos, pero **nunca** en las firmas: son el contrato.
+
+    - Puede no devolver nada; imprime el resultado.
+    - El valor del argumento no importa.
+    - El nombre `x` es válido.
+  etiquetas: ["sintaxis", "parámetros"]
+
+- id: m05-argumentos-de-menos
+  titulo: "Falta un argumento"
+  mundo: 05-funciones-y-la-pila
+  tema: parametros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/argumentos-de-mas
+  opciones:
+    - "Porque `presentar` necesita dos argumentos y se le pasa uno"
+    - "Porque Rust pone 0 a los argumentos que faltan, pero solo en `u32`"
+    - "Porque `&str` no puede ser parámetro"
+    - "Porque `presentar` no devuelve nada"
+  correcta: 0
+  solucion: |
+    Error **E0061**: «this function takes 2 arguments but 1 argument was supplied», y señala «argument #2 of type `u32` is missing». En Rust no hay argumentos por defecto: se pasa uno por cada parámetro.
+
+    - Rust nunca rellena argumentos por su cuenta.
+    - `&str` es un tipo de parámetro muy habitual.
+    - No devolver nada es válido.
+  etiquetas: ["E0061"]
+
+- id: m05-argumentos-de-mas
+  titulo: "Sobra un argumento"
+  mundo: 05-funciones-y-la-pila
+  tema: parametros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/p-argumento-sobra
+  opciones:
+    - "Porque `doble` tiene un parámetro y se llama con dos argumentos"
+    - "Porque `4` no es `i32`"
+    - "Porque no se puede llamar a una función dentro de `println!`"
+    - "Porque Rust ignora el segundo argumento, pero avisa"
+  correcta: 0
+  solucion: |
+    Error **E0061**: «this function takes 1 argument but 2 arguments were supplied», con «unexpected argument #2» y la pista «remove the extra argument».
+
+    - El tipo del 4 no es el problema: el problema es que sobra.
+    - Llamar dentro de `println!` es normal.
+    - No es un aviso: es un error, Rust no ignora nada.
+  etiquetas: ["E0061"]
+
+- id: m05-tipo-argumento
+  titulo: "El texto 31"
+  mundo: 05-funciones-y-la-pila
+  tema: parametros
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/tipo-de-argumento
+  opciones:
+    - "Porque `\"31\"` es un `&str` y el parámetro `edad` es `u32`"
+    - "Porque los números no pueden ir entre comillas nunca"
+    - "Porque Rust convierte el texto, pero solo si es positivo"
+    - "Porque falta un tercer argumento"
+  correcta: 0
+  solucion: |
+    Error **E0308**: `expected u32, found &str`, señalando «arguments to this function are incorrect». Para Rust, el texto «31» y el número 31 son cosas distintas; convertir texto en número se hace a propósito (`"31".parse()`, mundo 10).
+
+    - Entre comillas puede ir cualquier texto, incluidas cifras; lo que pasa es que entonces es texto.
+    - Rust no convierte nada implícitamente.
+    - Son dos parámetros y hay dos argumentos.
+  etiquetas: ["E0308", "parámetros"]
+
+- id: m05-parametro-inmutable
+  titulo: "Cambiar un parámetro"
+  mundo: 05-funciones-y-la-pila
+  tema: parametros
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/p-parametro-inmutable
+  opciones:
+    - "Porque los parámetros son inmutables salvo que se declaren `mut nivel: u32`"
+    - "Porque no se puede modificar nada dentro de una función"
+    - "Porque hay que pasar `mut 1` en la llamada"
+    - "Porque `u32` no admite `+=`"
+  correcta: 0
+  solucion: |
+    Error **E0384**: «cannot assign to immutable argument `nivel`», con la pista `fn subir(mut nivel: u32)`. Un parámetro es una variable más, inmutable por defecto.
+
+    - Dentro de una función puedes cambiar cualquier variable `mut`.
+    - `mut` va en el parámetro, no en el argumento: para quien llama no cambia nada.
+    - `+=` funciona con `u32`.
+  etiquetas: ["E0384", "mut", "parámetros"]
+
+- id: m05-copia-parametro
+  titulo: "Subir de nivel"
+  mundo: 05-funciones-y-la-pila
+  tema: parametros
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime la última línea?"
+  ej: m05/copia-parametro
+  opciones: ["`en main: nivel = 1`", "`en main: nivel = 11`", "`en main: nivel = 10`", "No compila"]
+  correcta: 0
+  solucion: |
+    `subir` recibe **una copia** del número y cambia su propia variable. La `nivel` de `main` es otra variable y sigue valiendo 1.
+
+    - 11 es el valor del parámetro dentro de `subir`, no el de `main`.
+    - 10 es lo que se suma, no el resultado.
+    - Compila: `mut` está en el parámetro, donde hace falta.
+  etiquetas: ["copia", "parámetros"]
+
+- id: m05-parametro-sombra
+  titulo: "La x de cada uno"
+  mundo: 05-funciones-y-la-pila
+  tema: parametros
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m05/p-parametro-sombra
+  opciones: ["`5 11`", "`10 11`", "`5 10`", "`11 11`"]
+  correcta: 0
+  solucion: |
+    Dentro de `doblar`, `let x = x * 2;` crea una `x` nueva (10) que sombrea al parámetro, y la función devuelve 10 + 1 = **11**. La `x` de `main` no se toca: **5**.
+
+    - Las variables de una función no afectan a las de otra, aunque se llamen igual.
+    - La función devuelve `x + 1`, no `x`.
+  etiquetas: ["shadowing", "ámbito"]
+
+- id: m05-capturar-variable
+  titulo: "La función que quería ver fuera"
+  mundo: 05-funciones-y-la-pila
+  tema: funciones
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "La función `decir` está escrita DENTRO de `main`, después de `saludo`. ¿Por qué no compila?"
+  ej: m05/p-capturar-variable
+  opciones:
+    - "Porque una función (`fn`) no puede usar las variables locales de otra función, aunque esté escrita dentro"
+    - "Porque `saludo` no es `mut`"
+    - "Porque no se pueden definir funciones dentro de `main`"
+    - "Porque `decir` se llama antes de definirse"
+  correcta: 0
+  solucion: |
+    Error **E0434**: «can't capture dynamic environment in a fn item». Una función es independiente: solo ve sus parámetros, sus variables y los ítems globales. Las variables locales de `main` viven en el **marco de `main`**, y `decir` tiene el suyo. La pista sugiere una *closure* (`|| { ... }`), que sí puede capturar su entorno: la verás en el mundo 14.
+
+    - `mut` no tiene que ver: solo se lee.
+    - Sí se pueden definir funciones dentro de otras; lo que no pueden es ver sus variables.
+    - Se llama después de definirse.
+  etiquetas: ["E0434", "ámbito"]
+
+- id: m05-devolver-tipo-mal
+  titulo: "Un nombre que no es número"
+  mundo: 05-funciones-y-la-pila
+  tema: retorno
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/p-retorno-tipo-mal
+  opciones:
+    - "Porque la firma dice `-> i32` y el cuerpo devuelve un `&str`"
+    - "Porque falta `return`"
+    - "Porque una función no puede devolver texto"
+    - "Porque falta `;` después de `\"Ana\"`"
+  correcta: 0
+  solucion: |
+    Error **E0308**: «expected `i32` because of return type», `expected i32, found &str`. La firma manda: arregla la firma (`-> &'static str`, lo entenderás en el mundo 08) o lo que devuelves.
+
+    - No hace falta `return`: la última expresión ya es el valor.
+    - Una función puede devolver texto.
+    - Con `;` sería peor: devolvería `()`.
+  etiquetas: ["E0308", "retorno"]
+
+- id: m05-return-tipo
+  titulo: "Un return que no encaja"
+  mundo: 05-funciones-y-la-pila
+  tema: retorno
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/p-return-tipo
+  opciones:
+    - "Porque `return \"no\"` devuelve un `&str` y la función promete un `bool`"
+    - "Porque no se puede usar `return` dentro de un `if`"
+    - "Porque `edad < 150` no es un `bool`"
+    - "Porque hay dos formas de devolver en la misma función"
+  correcta: 0
+  solucion: |
+    Error **E0308**: `expected bool, found &str` en la línea del `return`. **Cada** camino de salida (cada `return` y la expresión final) debe dar el tipo de la firma.
+
+    - `return` dentro de un `if` es el uso típico (salida temprana).
+    - `edad < 150` es un `bool`.
+    - Mezclar `return` temprano y expresión final es lo normal.
+  etiquetas: ["E0308", "return"]
+
+- id: m05-punto-y-coma-final
+  titulo: "El clásico punto y coma final"
+  mundo: 05-funciones-y-la-pila
+  tema: retorno
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/punto-y-coma-final
+  opciones:
+    - "Porque `x * x;` con `;` es una sentencia: el cuerpo no tiene expresión final y devuelve `()`"
+    - "Porque falta `return`, que es obligatorio"
+    - "Porque `x * x` puede desbordar"
+    - "Porque `cuadrado` debería ser `mut`"
+  correcta: 0
+  solucion: |
+    Error **E0308**: `expected i32, found ()`, con «implicitly returns `()` as its body has no tail or `return` expression» y la pista «remove this semicolon to return this value».
+
+    - `return` no es obligatorio; basta con quitar el `;`.
+    - El desbordamiento se comprueba al ejecutar, no da este error.
+    - Las funciones no llevan `mut`.
+  etiquetas: ["E0308", ";"]
+
+- id: m05-ultima-let
+  titulo: "Terminar en let"
+  mundo: 05-funciones-y-la-pila
+  tema: retorno
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/p-ultima-let
+  opciones:
+    - "Porque el cuerpo termina en una sentencia `let`: no hay expresión final y la función devuelve `()`"
+    - "Porque `r` no es `mut`"
+    - "Porque 5 no cabe en un `i32`"
+    - "Porque una función no puede tener variables"
+  correcta: 0
+  solucion: |
+    Error **E0308**: `expected i32, found ()`. La pista es precisa: «consider returning the local binding `r`», es decir, añade una línea final `r`.
+
+    - `r` no cambia.
+    - 5 cabe sobrado.
+    - Las funciones pueden tener todas las variables que quieran.
+  etiquetas: ["E0308", "let"]
+
+- id: m05-falta-tipo-retorno
+  titulo: "Devolver sin flecha"
+  mundo: 05-funciones-y-la-pila
+  tema: retorno
+  dificultad: facil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/falta-tipo-retorno
+  opciones:
+    - "Porque sin `->`, la función promete devolver `()`, pero su cuerpo termina en un `i32`"
+    - "Porque `x * 2` debería llevar `;`"
+    - "Porque `d` no tiene tipo"
+    - "Porque `{d:?}` está mal"
+  correcta: 0
+  solucion: |
+    Error **E0308**: `expected (), found i32`, con la pista «try adding a return type: `-> i32`».
+
+    - Con `;` compilaría... pero devolvería `()`, que no es lo que querías.
+    - El tipo de `d` se deduce de la firma; el problema es la firma.
+    - `{d:?}` es formato de depuración válido.
+  etiquetas: ["E0308", "->"]
+
+- id: m05-rama-sin-valor
+  titulo: "¿Y el cero?"
+  mundo: 05-funciones-y-la-pila
+  tema: retorno
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/rama-sin-valor
+  opciones:
+    - "Porque si `n` es 0 ninguna rama se cumple y la función llegaría al final sin valor"
+    - "Porque no se puede usar `return` dos veces"
+    - "Porque `-1` no es un `i32`"
+    - "Porque `signo(-5)` está mal llamado"
+  correcta: 0
+  solucion: |
+    Error **E0317**: «`if` may be missing an `else` clause», `expected i32, found ()`. El compilador revisa **todos** los caminos: con `n == 0` el `if` vale `()`.
+
+    - Puede haber todos los `return` que quieras.
+    - `-1` es un `i32`.
+    - La llamada es correcta; el problema está en la función.
+  etiquetas: ["E0317", "caminos"]
+
+- id: m05-match-retorno
+  titulo: "Días de cada mes"
+  mundo: 05-funciones-y-la-pila
+  tema: retorno
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/p-match-retorno
+  opciones:
+    - "Porque el `match` no cubre todos los `u32`: faltan el 0 y del 3 en adelante"
+    - "Porque una función no puede terminar en un `match`"
+    - "Porque 28 no es un `u32`"
+    - "Porque falta `return` en cada brazo"
+  correcta: 0
+  solucion: |
+    Error **E0004**: «non-exhaustive patterns: `0_u32` and `3_u32..=u32::MAX` not covered». Que el `match` sea la expresión final de una función no cambia la regla: debe ser exhaustivo.
+
+    - Terminar en `match` es muy habitual: su valor es el valor de retorno.
+    - 28 es un `u32`.
+    - Los brazos son expresiones; no necesitan `return`.
+  etiquetas: ["E0004", "match"]
+
+- id: m05-tupla-punto-y-coma
+  titulo: "La tupla tragada"
+  mundo: 05-funciones-y-la-pila
+  tema: retorno
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/p-tupla-sin-parentesis
+  opciones:
+    - "Porque `(1, 2);` lleva `;`: el cuerpo devuelve `()` en vez de `(i32, i32)`"
+    - "Porque una función no puede devolver dos valores"
+    - "Porque hay que escribir `return (1, 2)`"
+    - "Porque `let (a, b)` no es válido"
+  correcta: 0
+  solucion: |
+    Error **E0308**: `expected (i32, i32), found ()`. Fíjate en la nota: «expected tuple `(i32, i32)` / found unit type `()`». La unidad `()` es literalmente la tupla vacía, y el `;` hizo que el cuerpo valiera eso.
+
+    - Una tupla es justo la forma de devolver varios valores.
+    - `return` no hace falta; basta quitar el `;`.
+    - `let (a, b) = par();` es un patrón válido.
+  etiquetas: ["E0308", "tuplas"]
+
+- id: m05-imprimir-unidad
+  titulo: "Imprimir la nada"
+  mundo: 05-funciones-y-la-pila
+  tema: retorno
+  dificultad: media
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/p-imprimir-unidad
+  opciones:
+    - "Porque `saludar()` devuelve `()`, y `()` no se puede imprimir con `{}`"
+    - "Porque no se puede guardar el resultado de una función que no devuelve nada"
+    - "Porque `saludar` imprime dos veces"
+    - "Porque `r` no tiene tipo"
+  correcta: 0
+  solucion: |
+    Error **E0277**: «`()` doesn't implement `std::fmt::Display`». `{}` necesita una forma «bonita» de escribir el valor, y `()` no la tiene. La nota sugiere `{:?}`, el formato de depuración, que imprimiría `()`.
+
+    - Guardar `()` en una variable es válido (aunque no muy útil).
+    - `saludar` imprime una vez.
+    - `r` tiene tipo: `()`.
+  etiquetas: ["E0277", "()"]
+
+- id: m05-main-entero
+  titulo: "main que devuelve 0"
+  mundo: 05-funciones-y-la-pila
+  tema: funciones
+  dificultad: dificil
+  tipo: no-compila
+  enunciado: "¿Por qué no compila?"
+  ej: m05/p-main-devuelve-entero
+  opciones:
+    - "Porque `main` solo puede devolver ciertos tipos (`()` o un `Result`), no un `i32`"
+    - "Porque `main` nunca puede tener `->`"
+    - "Porque `0` significa error"
+    - "Porque falta un `return`"
+  correcta: 0
+  solucion: |
+    Error **E0277**: «`main` has invalid return type `i32`»: «`main` can only return types that implement `Termination`» (un trait que dice cómo convertir el resultado en el código de salida del programa). La ayuda: «consider using `()`, or a `Result`». Verás `fn main() -> Result<...>` en el mundo 10.
+
+    - `main` sí puede tener `->`, con un tipo permitido.
+    - El 0 no es el problema; el tipo lo es.
+    - La expresión final ya devuelve el valor.
+  etiquetas: ["E0277", "main"]
+
+- id: m05-return-temprano
+  titulo: "Salir a mitad de bucle"
+  mundo: 05-funciones-y-la-pila
+  tema: retorno
+  dificultad: media
+  tipo: predice
+  enunciado: "`desde..` es un rango sin final. ¿Qué imprime?"
+  ej: m05/p-return-en-bucle
+  opciones: ["`56`", "`49`", "`0`", "No termina nunca"]
+  correcta: 0
+  solucion: |
+    El bucle prueba 50, 51, ..., y en 56 (= 7 × 8) ejecuta `return 56`, que sale **de la función entera**, no solo del bucle.
+
+    - 49 es múltiplo de 7, pero es menor que 50.
+    - El `0` final solo se alcanzaría si el bucle terminara, cosa que no ocurre.
+    - El `return` corta el rango infinito.
+  etiquetas: ["return", "rangos"]
+
+- id: m05-return-vs-break
+  titulo: "return o break"
+  mundo: 05-funciones-y-la-pila
+  tema: retorno
+  dificultad: facil
+  tipo: opcion
+  enunciado: "Dentro de un `for` dentro de una función, ¿qué diferencia hay entre `break` y `return`?"
+  opciones:
+    - "`break` sale solo del bucle; `return` sale de la función entera"
+    - "Son iguales"
+    - "`return` sale solo del bucle"
+    - "`break` sale del programa"
+  correcta: 0
+  solucion: |
+    `break` termina el bucle y la función sigue después de él; `return` termina la función, con todos sus bucles, y vuelve a quien la llamó.
+  etiquetas: ["return", "break"]
+
+- id: m05-orden-evaluacion
+  titulo: "¿Quién va primero?"
+  mundo: 05-funciones-y-la-pila
+  tema: funciones
+  dificultad: media
+  tipo: predice
+  enunciado: "¿En qué orden aparecen `uno`, `dos` y `suma`?"
+  ej: m05/p-orden-evaluacion
+  opciones:
+    - "`dos`, `uno`, `suma`"
+    - "`suma`, `dos`, `uno`"
+    - "`uno`, `dos`, `suma`"
+    - "`suma`, `uno`, `dos`"
+  correcta: 0
+  solucion: |
+    Antes de entrar en `suma` hay que calcular sus argumentos, y Rust los evalúa **de izquierda a derecha**: primero `dos()`, luego `uno()`. Solo entonces se ejecuta `suma`. El resultado: `r = 3`.
+
+    - `suma` no puede empezar sin sus argumentos.
+    - El orden es el de los argumentos en la llamada (`dos(), uno()`), no el de definición.
+  etiquetas: ["evaluación", "argumentos"]
+
+- id: m05-llamadas-anidadas
+  titulo: "De dentro afuera"
+  mundo: 05-funciones-y-la-pila
+  tema: funciones
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m05/p-llamadas-anidadas
+  opciones: ["`14`", "`13`", "`8`", "`16`"]
+  correcta: 0
+  solucion: |
+    De dentro afuera: `por_dos(3)` = 6, `mas_uno(6)` = 7, `por_dos(7)` = **14**.
+
+    - 13 sería sumar 1 después de duplicar dos veces el 3 de otra forma (3 × 2 × 2 + 1).
+    - 8 sería (3 + 1) × 2: empezar por `mas_uno`.
+    - 16 sería (3 × 2 + 2) × 2.
+  etiquetas: ["llamadas"]
+
+- id: m05-recursion-base
+  titulo: "Las dos piezas"
+  mundo: 05-funciones-y-la-pila
+  tema: recursion
+  dificultad: facil
+  tipo: opcion
+  enunciado: "¿Qué dos piezas necesita toda función recursiva que termina?"
+  opciones:
+    - "Un caso base y un caso recursivo que se acerca a él"
+    - "Un `loop` y un `break`"
+    - "Un `return` y un `;`"
+    - "Dos parámetros"
+  correcta: 0
+  solucion: |
+    El **caso base** se responde sin volver a llamarse; el **caso recursivo** se llama con un problema más pequeño. Sin la primera pieza, o si la segunda no se acerca a ella, la recursión no termina.
+  etiquetas: ["recursión"]
+
+- id: m05-recursion-espejo
+  titulo: "El espejo"
+  mundo: 05-funciones-y-la-pila
+  tema: recursion
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m05/p-recursion-espejo
+  opciones: ["`3 2 1 1 2 3 `", "`3 2 1 `", "`1 2 3 3 2 1 `", "`3 2 1 0 0 1 2 3 `"]
+  correcta: 0
+  solucion: |
+    Cada llamada imprime su `n` **antes** de llamarse (ida: 3 2 1) y **después** de que vuelva la llamada interior (vuelta, en orden inverso: 1 2 3). La llamada con 0 sale con `return` sin imprimir.
+
+    - Faltaría la vuelta: cada llamada imprime otra vez al volver.
+    - La ida empieza por el número mayor.
+    - El caso base (0) no imprime nada.
+  etiquetas: ["recursión", "pila"]
+
+- id: m05-suma-cifras
+  titulo: "Sumar cifras recursivamente"
+  mundo: 05-funciones-y-la-pila
+  tema: recursion
+  dificultad: media
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m05/p-suma-cifras
+  opciones: ["`19`", "`4096`", "`10`", "`6`"]
+  correcta: 0
+  solucion: |
+    `suma_cifras(4096)` = 6 + `suma_cifras(409)` = 6 + 9 + `suma_cifras(40)` = 6 + 9 + 0 + `suma_cifras(4)` = 6 + 9 + 0 + 4 = **19**. `n % 10` es la última cifra y `n / 10` quita la última cifra.
+
+    - 4096 es la entrada.
+    - 10 sería solo 4 + 6.
+    - 6 es solo la última cifra (el primer paso).
+  etiquetas: ["recursión", "%"]
+
+- id: m05-recursion-llamadas
+  titulo: "Mitades"
+  mundo: 05-funciones-y-la-pila
+  tema: recursion
+  dificultad: dificil
+  tipo: predice
+  enunciado: "¿Qué imprime?"
+  ej: m05/p-recursion-llamadas
+  opciones: ["`7`", "`6`", "`50`", "`100`"]
+  correcta: 0
+  solucion: |
+    100 → 50 → 25 → 12 → 6 → 3 → 1. Son 7 valores; cada uno suma 1 (el último es el caso base, que devuelve 1). Resultado **7**: es, en el fondo, cuántas veces se puede dividir entre 2 (más uno).
+
+    - 6 olvida el caso base.
+    - 50 y 100 confunden valores con número de llamadas.
+  etiquetas: ["recursión"]
+
+- id: m05-factorial-llamadas
+  titulo: "¿Cuántas llamadas?"
+  mundo: 05-funciones-y-la-pila
+  tema: recursion
+  dificultad: facil
+  tipo: respuesta
+  enunciado: "Con `fn factorial(n: u64) -> u64 { if n == 0 { 1 } else { n * factorial(n - 1) } }`, ¿cuántas veces se llama a `factorial` en total al calcular `factorial(5)`? Escribe solo el número."
+  respuestas: ["6"]
+  solucion: |
+    factorial(5), (4), (3), (2), (1) y (0), que es el caso base: **6** llamadas, y en el momento más profundo hay 6 marcos de `factorial` en la pila a la vez.
+  etiquetas: ["recursión", "pila"]
+
+- id: m05-factorial-21
+  titulo: "21 factorial"
+  mundo: 05-funciones-y-la-pila
+  tema: recursion
+  dificultad: media
+  tipo: predice
+  enunciado: "En modo debug, ¿qué pasa al calcular `factorial(21)` con `u64`?"
+  ej: m05/factorial-desborda
+  opciones:
+    - "Imprime `20!` y luego entra en pánico: «attempt to multiply with overflow»"
+    - "Imprime un número negativo"
+    - "Se queda sin pila"
+    - "Imprime `21! = 51090942171709440000`"
+  correcta: 0
+  solucion: |
+    20! = 2 432 902 008 176 640 000 cabe en un `u64` (máximo ≈ 1,8 × 10¹⁹), pero 21! ≈ 5,1 × 10¹⁹ no. En debug, Rust comprueba la multiplicación y entra en pánico (mundo 03).
+
+    - Un `u64` no tiene negativos; y en debug no «da la vuelta».
+    - 22 llamadas no agotan la pila.
+    - Ese número no cabe en 64 bits.
+  etiquetas: ["overflow", "pánico"]
+
+- id: m05-fib-coste
+  titulo: "El coste de Fibonacci"
+  mundo: 05-funciones-y-la-pila
+  tema: recursion
+  dificultad: media
+  tipo: opcion
+  enunciado: "La versión recursiva ingenua `fib(n) = fib(n-1) + fib(n-2)` hace 242 785 llamadas para `fib(25)`. ¿Por qué tantas?"
+  opciones:
+    - "Porque cada llamada hace dos llamadas más y recalcula los mismos valores muchas veces"
+    - "Porque Rust es lento con la recursión"
+    - "Porque el resultado es muy grande"
+    - "Porque cada llamada copia toda la pila"
+  correcta: 0
+  solucion: |
+    `fib(25)` llama a `fib(24)` y `fib(23)`; `fib(24)` vuelve a llamar a `fib(23)`... El número de llamadas crece exponencialmente. Un bucle que va guardando los dos últimos valores lo resuelve en 25 pasos.
+
+    - Una llamada en Rust es barata; el problema es cuántas se hacen.
+    - El resultado (75 025) es pequeño.
+    - Cada llamada solo añade su propio marco.
+  etiquetas: ["recursión", "coste"]
+
+- id: m05-sin-caso-base
+  titulo: "Bajar sin fin"
+  mundo: 05-funciones-y-la-pila
+  tema: recursion
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Qué ocurre al compilar `fn bajar(n: u64) -> u64 { 1 + bajar(n + 1) }`?"
+  opciones:
+    - "Compila con el aviso «function cannot return without recursing»; al ejecutarla, se agota la pila"
+    - "No compila: E0004"
+    - "Compila sin avisos y devuelve infinito"
+    - "Compila y devuelve 0"
+  correcta: 0
+  solucion: |
+    El compilador detecta que **ningún camino** termina sin volver a llamarse y avisa («cannot return without recursing»). No es un error, pero al ejecutarse cada llamada apila un marco hasta que la pila se agota (en el navegador: «Maximum call stack size exceeded»).
+
+    - E0004 es de `match` no exhaustivo.
+    - No existe un valor «infinito» para un `u64`.
+  etiquetas: ["recursión", "stack overflow"]
+
+- id: m05-marcos-recursion
+  titulo: "Cinco llamadas, cinco variables"
+  mundo: 05-funciones-y-la-pila
+  tema: pila
+  dificultad: media
+  tipo: opcion
+  enunciado: "Una función recursiva tiene una variable local `x`. En un momento hay 5 llamadas activas (esperando unas a otras). ¿Cuántas `x` existen?"
+  opciones: ["5", "1", "0", "Depende de si `x` es `mut`"]
+  correcta: 0
+  solucion: |
+    Cada llamada activa tiene su propio **marco de pila** con su propia `x`. Cinco llamadas, cinco marcos, cinco `x`, en direcciones distintas.
+  etiquetas: ["pila", "marcos"]
+
+- id: m05-pila-crece
+  titulo: "Hacia dónde crece"
+  mundo: 05-funciones-y-la-pila
+  tema: pila
+  dificultad: media
+  tipo: predice
+  enunciado: "El programa imprime la dirección de una variable local en cada nivel de recursión. ¿Qué pasa con las direcciones?"
+  ej: m05/marcos-de-pila
+  opciones:
+    - "Bajan: cada marco nuevo se coloca por debajo del anterior"
+    - "Suben"
+    - "Son todas iguales"
+    - "Son aleatorias"
+  correcta: 0
+  solucion: |
+    En el navegador salen 0xfffc0 (main), 0xfff98, 0xfff68 y 0xfff38: la pila **crece hacia abajo**, y cada marco de `nivel` ocupa 48 bytes (0x30). En un PC las direcciones son otras, pero también bajan.
+  etiquetas: ["pila", "direcciones"]
+
+- id: m05-marco-hex
+  titulo: "Un marco más"
+  mundo: 05-funciones-y-la-pila
+  tema: pila
+  dificultad: dificil
+  tipo: respuesta
+  enunciado: "Un marco de pila ocupa 0x30 bytes y la variable de la llamada actual está en 0xfff38. Si se hace una llamada más igual, ¿dónde estará su variable? Responde en hexadecimal (`0x...`)."
+  respuestas: ["0xfff08", "0xFFF08"]
+  solucion: |
+    La pila crece hacia abajo: 0xfff38 − 0x30 = **0xfff08**.
+  etiquetas: ["pila", "hexadecimal"]
+
+- id: m05-liberar-pila
+  titulo: "Liberar es restar... o sumar"
+  mundo: 05-funciones-y-la-pila
+  tema: pila
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Por qué liberar un marco de pila es casi gratis?"
+  opciones:
+    - "Porque solo hay que mover el puntero de pila: los marcos se liberan siempre en orden inverso"
+    - "Porque Rust tiene un recolector de basura"
+    - "Porque los marcos no se liberan nunca"
+    - "Porque la pila está dentro de la CPU"
+  correcta: 0
+  solucion: |
+    La pila se usa solo por la cima: el último marco en llegar es el primero en irse. Liberar es ajustar un registro (el puntero de pila). No hay que buscar huecos ni llevar cuentas, al contrario que en el heap.
+
+    - Rust no tiene recolector de basura.
+    - Se liberan al volver de cada función.
+    - La pila está en la memoria; en la CPU solo está el puntero a su cima.
+  etiquetas: ["pila"]
+
+- id: m05-tamano-tupla
+  titulo: "El relleno"
+  mundo: 05-funciones-y-la-pila
+  tema: pila
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Cuántos bytes ocupa una tupla `(u8, u32)`?"
+  opciones: ["8", "5", "4", "16"]
+  correcta: 0
+  solucion: |
+    Un `u32` debe estar en una dirección múltiplo de 4 (**alineamiento**), así que se añaden 3 bytes de **relleno**: 1 + 3 + 4 = **8** (verificado con `size_of_val`).
+
+    - 5 sería sin relleno, pero el `u32` quedaría desalineado.
+    - 4 no cabe: solo el `u32` ya ocupa 4.
+    - 16 sería si el alineamiento fuera de 8.
+  etiquetas: ["tamaños", "alineamiento"]
+
+- id: m05-usize
+  titulo: "¿Cuánto mide un usize?"
+  mundo: 05-funciones-y-la-pila
+  tema: pila
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuánto mide un `usize`?"
+  opciones:
+    - "Lo que mide una dirección de memoria: 4 bytes en el navegador (wasm32) y 8 en un PC de 64 bits"
+    - "Siempre 8 bytes"
+    - "Siempre 4 bytes"
+    - "Depende del número que guarde"
+  correcta: 0
+  solucion: |
+    `usize` es el tipo de los tamaños y posiciones, y mide lo mismo que un puntero de la plataforma. Por eso los ejemplos del navegador dicen 4, y en tu PC (64 bits) serían 8.
+
+    - Un tipo tiene siempre el mismo tamaño en una plataforma, sin importar el valor que guarde.
+  etiquetas: ["usize", "plataforma"]
+
+- id: m05-ficha-string
+  titulo: "La ficha de un String"
+  mundo: 05-funciones-y-la-pila
+  tema: memoria
+  dificultad: media
+  tipo: opcion
+  enunciado: "En un PC de 64 bits, ¿cuánto ocupa en la pila un `String` que contiene 1 000 000 de letras?"
+  opciones: ["24 bytes", "1 000 000 bytes", "12 bytes", "8 bytes"]
+  correcta: 0
+  solucion: |
+    En la pila solo está la **ficha**: puntero + capacidad + longitud, 3 × 8 = **24 bytes**. El millón de bytes está en el heap.
+
+    - Eso es lo que ocupa en el heap.
+    - 12 bytes es la ficha en el navegador (3 × 4).
+    - 8 bytes sería solo el puntero.
+  etiquetas: ["String", "pila", "heap"]
+
+- id: m05-literal-donde
+  titulo: "¿Dónde vive un literal?"
+  mundo: 05-funciones-y-la-pila
+  tema: memoria
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Dónde están los bytes de `\"hola\"` en `let s: &str = \"hola\";`?"
+  opciones:
+    - "Grabados en el propio programa, en memoria de solo lectura"
+    - "En el heap"
+    - "En el marco de pila de la función"
+    - "En ningún sitio hasta que se imprimen"
+  correcta: 0
+  solucion: |
+    Los literales vienen dentro del programa. `s` (en la pila) es solo un puntero y una longitud que los señalan. En el ejemplo del navegador, los bytes del literal estaban en 0x1009a8, justo por encima de la pila, y los de un `String` en 0x102200, en el heap.
+  etiquetas: ["&str", "literales"]
+
+- id: m05-string-crece
+  titulo: "La mudanza"
+  mundo: 05-funciones-y-la-pila
+  tema: memoria
+  dificultad: dificil
+  tipo: predice
+  enunciado: "Un `String` va creciendo con `push_str` y, justo detrás de él en el heap, hay otro `String`. ¿Qué pasa con la dirección de sus bytes?"
+  ej: m05/string-crece
+  opciones:
+    - "Llega un momento en que cambia: se reserva un hueco nuevo, se copian los bytes y se libera el antiguo"
+    - "Nunca cambia"
+    - "Cambia en cada `push_str`"
+    - "El vecino se mueve para dejarle sitio"
+  correcta: 0
+  solucion: |
+    Mientras cabe en su hueco, la dirección se mantiene (0x102400). Al pasar a 22 bytes ya no cabe y se **muda** (0x102830). La capacidad crece a saltos (4 → 11 → 22 → 44) para no mudarse en cada `push_str`. El hueco viejo queda **liberado**: cualquier dirección que alguien hubiera guardado de él ya no es válida. Esa es exactamente la clase de error que el mundo 07 enseña a evitar.
+
+    - Sí cambia cuando no cabe.
+    - Gracias a la capacidad de reserva, no en cada `push_str`.
+    - El asignador nunca mueve otros datos.
+  etiquetas: ["heap", "capacidad", "realloc"]
+
+- id: m05-por-que-heap
+  titulo: "¿Para qué el heap?"
+  mundo: 05-funciones-y-la-pila
+  tema: memoria
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuál es una razón real para guardar datos en el heap en lugar de en la pila?"
+  opciones:
+    - "Que su tamaño no se conoce al compilar o puede crecer"
+    - "Que el heap es más rápido que la pila"
+    - "Que la pila solo admite números"
+    - "Que el heap se libera solo al volver de la función"
+  correcta: 0
+  solucion: |
+    El tamaño de cada marco se fija al compilar, así que lo que crece o tiene tamaño desconocido (el texto que escribe el usuario, una lista) va al heap. La otra razón: datos que deben sobrevivir a la función que los creó.
+
+    - El heap es **más lento**: hay que buscar huecos.
+    - En la pila caben valores de cualquier tipo de tamaño conocido.
+    - Es la pila la que se libera sola; el heap necesita que alguien libere cada trozo. ¿Quién? Mundo 06.
+  etiquetas: ["heap", "pila"]
+
+- id: m05-tres-bugs
+  titulo: "Los tres peligros del heap"
+  mundo: 05-funciones-y-la-pila
+  tema: memoria
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "Si un programa libera dos veces el mismo trozo del heap, ¿cómo se llama ese error?"
+  opciones:
+    - "Doble liberación (*double free*), un comportamiento indefinido"
+    - "Fuga de memoria (*leak*)"
+    - "Desbordamiento de pila"
+    - "Uso tras liberar (*use after free*)"
+  correcta: 0
+  solucion: |
+    **Doble liberación**: corrompe las cuentas del asignador y es comportamiento indefinido. La **fuga** es lo contrario (no liberar nunca). El **uso tras liberar** es leer o escribir un trozo ya devuelto. El desbordamiento de pila no tiene que ver con el heap. Rust evita la doble liberación y el uso tras liberar al compilar, con el *ownership* (mundo 06).
+  etiquetas: ["UB", "double free", "heap"]
+
+- id: m05-funcion-como-valor
+  titulo: "Aplicar dos veces"
+  mundo: 05-funciones-y-la-pila
+  tema: funciones
+  dificultad: facil
+  tipo: predice
+  enunciado: "¿Qué imprimen las dos primeras líneas?"
+  ej: m05/fn-como-valor
+  opciones: ["`12` y `81`", "`6` y `9`", "`12` y `9`", "No compila"]
+  correcta: 0
+  solucion: |
+    `aplicar_dos_veces(f, x)` calcula `f(f(x))`: doble(doble(3)) = 12 y cuadrado(cuadrado(3)) = 81. El parámetro tiene tipo `fn(i32) -> i32`.
+  etiquetas: ["fn", "punteros a función"]
+
+- id: m05-fn-item-cero
+  titulo: "Una función que no ocupa nada"
+  mundo: 05-funciones-y-la-pila
+  tema: funciones
+  dificultad: media
+  tipo: opcion
+  enunciado: "¿Cuánto ocupa `let f = doble;` (sin anotar su tipo)?"
+  opciones: ["0 bytes: es un elemento función, un tipo propio que ya sabe qué función es", "4 u 8 bytes: una dirección", "Lo que ocupe el código de la función", "No compila"]
+  correcta: 0
+  solucion: |
+    Solo al convertirlo a `fn(i32) -> i32` pasa a ser un puntero (una dirección). El ejemplo `m05/fn-item-tamano` lo muestra.
+  etiquetas: ["fn", "tamaño cero"]
+
+- id: m05-desbordar-pila
+  titulo: "Demasiadas llamadas"
+  mundo: 05-funciones-y-la-pila
+  tema: pila
+  dificultad: media
+  tipo: opcion
+  enunciado: "Una función recursiva se llama a sí misma mil millones de veces anidadas. ¿Qué pasa?"
+  opciones: ["La pila se desborda y Rust aborta con «has overflowed its stack»", "Funciona, pero lento", "Pánico que se puede capturar", "Comportamiento indefinido"]
+  correcta: 0
+  solucion: |
+    Cada llamada ocupa un marco, y la pila tiene un tamaño fijo (unos 8 MB en Linux, 1 MB en Windows para el hilo principal). Una página de guarda detecta el desbordamiento y Rust aborta de forma segura.
+  etiquetas: ["pila", "recursión"]
+
+- id: m05-tamano-pila-hilo
+  titulo: "La pila de un hilo"
+  mundo: 05-funciones-y-la-pila
+  tema: pila
+  dificultad: dificil
+  tipo: opcion
+  enunciado: "¿Qué tamaño de pila tiene por defecto un hilo creado con `std::thread::spawn`?"
+  opciones: ["2 MB (se cambia con `thread::Builder::stack_size`)", "8 MB", "Ilimitado", "1 KB"]
+  correcta: 0
+  solucion: |
+    El hilo principal lo crea el sistema operativo (8 MB en Linux, 1 MB en Windows); los que crea Rust usan 2 MB salvo que se indique otra cosa (también con la variable de entorno `RUST_MIN_STACK`).
+  etiquetas: ["pila", "hilos"]

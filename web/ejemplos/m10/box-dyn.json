@@ -1,0 +1,1 @@
+{ "nota": "En wasm32 un puntero mide 4 bytes: la caja ocupa 8 (puntero + vtable)." }

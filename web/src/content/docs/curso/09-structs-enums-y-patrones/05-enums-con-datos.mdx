@@ -1,0 +1,100 @@
+---
+title: "Enums con datos"
+description: "Modela «una cosa u otra» con enums cuyas variantes llevan sus propios datos."
+sidebar:
+  order: 5
+duracion: 12
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones/03-metodos-e-impl", "04-expresiones-y-control"]
+tarjetas:
+  - p: "¿Cuál es la diferencia de fondo entre un struct y un enum?"
+    r: "Un struct tiene TODOS sus campos a la vez («y»). Un enum es UNA de sus variantes cada vez («o»)."
+  - p: "¿Qué formas puede tener una variante de enum?"
+    r: "Sin datos (`Punto`), con datos por posición (`Rectangulo(f64, f64)`) o con campos con nombre (`Circulo { radio: f64 }`)."
+  - p: "¿Por qué `f.radio` no compila si `f` es un `Forma`?"
+    r: "Porque no todas las variantes tienen `radio` (E0609). Primero hay que preguntar qué variante es, con `match` o `if let`."
+  - p: "¿De qué tipo es `Forma::Circulo { radio: 1.0 }`?"
+    r: "De tipo `Forma`. Las variantes no son tipos propios: todas son valores del mismo tipo enum, y por eso caben juntas en un `Vec<Forma>`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a usar el tipo más característico de Rust: el **enum con datos**, para decir «esto es *o* un círculo *o* un rectángulo *o* un punto», cada uno con lo suyo.
+
+## Predice
+
+<Predice
+  ej="m09/enums-predice"
+  opciones={["`ir a 2,-1`, `hola`, `adiós`", "`Mover`, `Escribir`, `Salir`", "No compila: las variantes tienen datos de tipos distintos", "`adiós`, `hola`, `ir a 2,-1`"]}
+  correcta={0}
+  explicacion="Cada mensaje entra en el brazo de su variante, y el brazo saca los datos que lleva dentro (`x` e `y`, o `texto`). El orden es el del array."
+  porque={["Correcto.", "`procesar` no imprime el nombre de la variante, sino lo que devuelve cada brazo.", "Que cada variante lleve datos distintos es justo lo que permite un enum.", "El `for` recorre el array en orden."]}
+/>
+
+## La idea
+
+Un struct dice «**y**»: un libro tiene título *y* páginas *y* … Un **enum** (*enumeration*) dice «**o**»: un mensaje es `Salir` *o* `Mover` *o* `Escribir`. Cada caso se llama **variante** (*variant*), y cada variante puede llevar **sus propios datos**:
+
+```rust
+enum Mensaje {
+    Salir,                      // sin datos
+    Mover { x: i32, y: i32 },   // campos con nombre
+    Escribir(String),           // datos por posición
+}
+```
+
+La gran ventaja: **no hay combinaciones absurdas**. Un `Mensaje::Salir` no tiene `x` ni `texto` «vacíos» que alguien pueda leer por error; simplemente no los tiene. Y para llegar a los datos tienes que preguntar antes qué variante es, normalmente con `match`. El compilador se encarga de que no te olvides de ninguna (lo verás a fondo en la lección 7).
+
+## Pruébalo
+
+<Ejecutar ej="m09/enums" />
+
+`#[derive(Debug)]` le pide al compilador que escriba por ti el código para imprimir el valor con `{:?}`. Lo usaremos mucho; en el mundo 13 verás qué es un `derive` por dentro.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Un enum con datos se guarda como una **etiqueta** (*tag* o *discriminante*: un número que dice qué variante es) más **espacio para la variante más grande**. Todas las variantes comparten ese espacio; solo una lo usa cada vez.
+
+```text
+Forma (24 bytes en wasm32):
+   [etiqueta][relleno][ espacio de datos: 16 bytes             ]
+Circulo:    0          radio (8)        ··· sin usar ···
+Rectangulo: 1          ancho (8)        alto (8)
+Punto:      2          ··· sin usar ···
+```
+
+Por eso `Forma` ocupa lo que su variante más grande (`Rectangulo`, 16 bytes) más la etiqueta, redondeado al alineamiento de `f64` (8): **24 bytes** en wasm32 (medido con `size_of` en la lección 10). Un `Punto` ocupa lo mismo que un `Rectangulo`: es el precio de poder guardarlos juntos en un `Vec<Forma>`. El `match` lee la etiqueta y salta al brazo correcto.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m09/campo-de-enum"
+  explicacion="`f` es un `Forma`, y no toda `Forma` tiene radio: un `Cuadrado` no lo tiene (E0609). Rust no te deja leer un dato que podría no existir. El arreglo pregunta primero con `match`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m09/semaforo"
+  enunciado="Completa el método `siguiente` del enum `Semaforo` con un `match`: `Verde` → `Ambar`, `Ambar` → `Rojo`, `Rojo` → `Verde`. Debe imprimir `Verde`, `Ambar`, `Rojo`, `Verde`, uno por línea."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Quieres representar un pago que puede ser en efectivo (sin datos), con tarjeta (con los 4 últimos dígitos) o por transferencia (con un IBAN). ¿Qué es mejor?"
+  opciones={["Un enum con tres variantes, cada una con sus datos", "Un struct con los campos `tipo: u8`, `digitos: u16` e `iban: String`", "Tres variables sueltas", "Un `String` con el texto «efectivo», «tarjeta» o «transferencia»"]}
+  correcta={0}
+  porque={["Correcto: cada caso lleva justo lo que necesita.", "Así puedes tener un «efectivo con IBAN» o un `tipo` = 7 que no significa nada: estados absurdos.", "No hay nada que diga cuál de las tres vale.", "Un error de tecleo («tarjta») compila, y los datos del pago no tienen dónde ir."]}
+/>
+
+<Pregunta
+  pregunta="`enum Forma { Circulo { radio: f64 }, Rectangulo(f64, f64), Punto }`. ¿Cuánto ocupa un `Forma::Punto`?"
+  opciones={["Lo mismo que cualquier `Forma`: el tamaño es del tipo, no de la variante", "0 bytes, porque no tiene datos", "1 byte, solo la etiqueta", "8 bytes, como un `f64`"]}
+  correcta={0}
+  porque={["Correcto: todas las variantes comparten el mismo espacio.", "Un tipo tiene un único tamaño; si no, no podría ir en un `Vec<Forma>`.", "La etiqueta se guarda, pero el espacio de los datos también.", "Tiene que caber la variante más grande, `Rectangulo`, más la etiqueta."]}
+/>

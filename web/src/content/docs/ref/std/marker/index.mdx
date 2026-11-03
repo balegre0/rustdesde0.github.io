@@ -1,0 +1,37 @@
+---
+title: "std::marker"
+description: "Traits marcador: Send, Sync, Copy, Sized, Unpin y el tipo PhantomData."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+**Ruta:** `std::marker`
+
+## Para qué sirve
+
+Los **traits marcador** no tienen métodos: marcan una **propiedad** de un tipo que el compilador usa para comprobar el programa. Varios son **automáticos** (*auto traits*): el compilador los implementa solo si todos los campos los implementan.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Send, Sync`](/ref/std/marker/send-sync/) | Se puede mandar / compartir entre hilos. | 1.0 |
+| [`Copy`](/ref/std/marker/copy/) | Se copia en lugar de moverse. | 1.0 |
+| [`Sized`](/ref/std/marker/sized/) | Su tamaño se conoce al compilar. | 1.0 |
+| [`PhantomData`](/ref/std/marker/phantomdata/) | Hace como que guarda un `T`, sin ocupar espacio. | 1.0 |
+| [`Unpin, PhantomPinned`](/ref/std/pin/) | Se puede mover aunque esté fijado. | 1.33 |
+
+## Conceptos clave
+
+- **Son promesas**: implementar `Send` o `Sync` a mano es `unsafe`, porque si la promesa es falsa hay carreras de datos.
+- **Se comprueban al compilar**: no cuestan nada al ejecutar.
+
+## Ver también
+
+- [std::sync](/ref/std/sync/)
+- [std::pin](/ref/std/pin/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

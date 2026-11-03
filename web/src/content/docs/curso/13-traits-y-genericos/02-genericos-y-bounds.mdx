@@ -1,0 +1,108 @@
+---
+title: "Genéricos y bounds"
+description: "Escribe una función o un struct que sirva para muchos tipos, y pide a esos tipos justo las capacidades que necesitas."
+sidebar:
+  order: 2
+duracion: 13
+desde: "1.0"
+requiere: ["13-traits-y-genericos/01-traits"]
+tarjetas:
+  - p: "¿Qué significa `fn f<T: PartialOrd>(x: T)`?"
+    r: "`f` es genérica: funciona para cualquier tipo `T`, con la condición (bound) de que `T` implemente `PartialOrd`, es decir, que se pueda comparar con `<` y `>`."
+  - p: "¿Para qué sirve `where`?"
+    r: "Para escribir los bounds después de la firma, uno por línea. Es lo mismo que ponerlos dentro de `<…>`, pero más legible cuando hay varios."
+  - p: "¿Por qué `fn mayor<T>(a: T, b: T)` no puede usar `a > b`?"
+    r: "Porque `T` podría ser cualquier tipo, incluso uno que no se puede comparar. Sin el bound `T: PartialOrd` el compilador da E0369."
+  - p: "¿Qué es el turbofish?"
+    r: "La sintaxis `::<Tipo>` para decir a mano qué tipo usar en un genérico: `vacia::<String>()`, `\"5\".parse::<i32>()`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir **una** función que encuentra el mayor de una lista, y que funciona igual con enteros, decimales y letras.
+
+## Predice
+
+<Predice
+  ej="m13/mayor-generico"
+  opciones={["`9`, `1.5` y `u`", "`9`, `-2` y `t`", "No compila: no se puede usar la misma función con `i32` y con `f64`", "`9`, `1.5` y `t`"]}
+  correcta={0}
+  explicacion="`mayor` funciona para **cualquier** `T` que se pueda comparar y copiar. Los `char` se comparan por su número Unicode: `'u'` va después de `'t'`, `'s'` y `'r'`."
+  porque={["Correcto.", "`1.5 > -2.0`, así que gana `1.5`.", "Precisamente eso permite un genérico: un código, muchos tipos.", "En el alfabeto (y en Unicode) `u` va después de `t`."]}
+/>
+
+## La idea
+
+Una función normal tiene parámetros de **valor**: `fn doble(x: i32)`. Una función **genérica** tiene además parámetros de **tipo**, entre ángulos: `fn mayor<T>(lista: &[T]) -> T`. Ese `T` es un hueco; cada vez que llamas a `mayor`, el compilador lo rellena con el tipo de verdad (`i32`, `f64`, `char`…).
+
+Pero dentro de la función, ¿qué puedes hacer con un `T`? **Nada que no hayas pedido.** El compilador comprueba el cuerpo de `mayor` **una sola vez**, para todos los `T` posibles, así que solo te deja usar lo que todos ellos garantizan. Para comparar con `>` pides `T: PartialOrd`; para copiar un elemento fuera del slice, `T: Copy`. Esas condiciones son los **bounds** (*trait bounds*): `<T: PartialOrd + Copy>`.
+
+Cuando hay muchos bounds, la firma se vuelve ilegible. Entonces se escriben aparte, con **`where`**, uno por línea. Y lo mismo sirve para structs: `struct Par<T>` guarda dos valores de cualquier tipo, y `impl<T: PartialOrd + Display> Par<T>` añade métodos **solo** para los `Par` cuyo `T` cumple esos bounds.
+
+## Pruébalo
+
+<Ejecutar ej="m13/genericos-where" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Los bounds son un **contrato en dos direcciones**:
+
+- **Hacia dentro**: el cuerpo de la función solo puede usar lo que dicen los bounds. Por eso el compilador revisa `mayor` sin conocer `T` y te avisa *en la definición* si usas algo que no pediste.
+- **Hacia fuera**: quien llama tiene que pasar un tipo que los cumpla. `mayor(&[vec![1]])` falla *en la llamada* con E0277 («the trait bound … is not satisfied»), porque `Vec` no es `Copy`.
+
+Gracias a eso, los errores de genéricos en Rust siempre apuntan al sitio correcto: o a la función, o a la llamada. Nunca «a mitad» de una copia del código.
+
+Los bounds se pueden poner en cuatro sitios: en la función (`fn f<T: X>`), en `where`, en un `impl<T: X>` y en un struct (`struct S<T: X>`, poco recomendable: obliga a repetir el bound en todos sus `impl`). Y `impl<T> Par<T>` sin bounds da métodos para **todos** los `Par`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m13/sin-bound"
+  explicacion="Sin bound, `T` puede ser *cualquier* tipo, incluso uno que no se puede comparar. El compilador no espera a ver con qué la llamas: rechaza el cuerpo (E0369) y te sugiere exactamente el bound que falta, `T: PartialOrd`."
+/>
+
+<Trampa titulo="Cuando el compilador no adivina el tipo">
+
+<NoCompila
+  ej="m13/sin-inferir"
+  explicacion="`vacia` devuelve un `Vec<T>`, pero nada en `main` dice qué es `T` (E0282). Hay dos arreglos: anotar la variable (`let w: Vec<i32>`) o usar el **turbofish** `vacia::<String>()`."
+/>
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m13/reto-maximo"
+  enunciado="Escribe `mostrar_lista`, una función genérica que recibe un `&[T]` y devuelve un `String` con los elementos separados por ` | `. Piensa qué bound necesita `T` para convertir cada elemento en texto. Después descomenta las líneas de `main`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`fn suma<T>(a: T, b: T) -> T { a + b }` no compila. ¿Por qué?"
+  opciones={["`T` no tiene un bound que garantice que se puede sumar", "Las funciones genéricas no pueden devolver `T`", "Hay que llamar a la función con turbofish", "Falta escribir `where` al final"]}
+  correcta={0}
+  explicacion="Hace falta `T: std::ops::Add<Output = T>` (lo verás en la lección 10). Sin bound, `T` no garantiza nada."
+  porque={["Correcto.", "Devolver `T` es perfectamente válido.", "El turbofish elige el tipo en la llamada; no arregla el cuerpo.", "`where` es solo otra forma de escribir los bounds: hace falta el bound, no la palabra."]}
+/>
+
+<Pregunta
+  pregunta="¿En qué se diferencian `fn f<T: Clone + Debug>(x: T)` y `fn f<T>(x: T) where T: Clone + Debug`?"
+  opciones={["En nada: son la misma función escrita de dos formas", "La versión con `where` es más lenta", "La versión con `where` acepta más tipos", "Solo la primera permite llamar a `x.clone()`"]}
+  correcta={0}
+  explicacion="`where` es una forma de escribir los mismos bounds. Se usa por legibilidad."
+  porque={["Correcto.", "Los bounds no existen al ejecutar: no hay diferencia de velocidad.", "Aceptan exactamente los mismos tipos.", "Las dos garantizan `Clone`."]}
+/>
+
+<Pregunta
+  pregunta="Tienes `impl<T: Display> Par<T> { fn mostrar(&self) … }`. ¿Puedes llamar a `mostrar` sobre un `Par<Vec<i32>>`?"
+  opciones={["No: `Vec<i32>` no implementa `Display`, así que ese `Par` no tiene el método", "Sí: el bound solo se comprueba al ejecutar", "Sí, pero imprime la dirección del vector", "No: `Par<Vec<i32>>` ni siquiera se puede crear"]}
+  correcta={0}
+  explicacion="El `impl` con bound solo da métodos a los `Par` que lo cumplen. Crear el `Par` sí se puede, porque `struct Par<T>` no tiene bounds."
+  porque={["Correcto.", "Los bounds se comprueban siempre al compilar.", "No hay ninguna conversión mágica: el método simplemente no existe para ese tipo.", "El struct no pide nada a `T`; lo que tiene condiciones es el bloque `impl`."]}
+/>

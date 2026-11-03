@@ -1,0 +1,171 @@
+---
+title: "Medir el rendimiento"
+description: "Mide cuánto tarda tu código sin engañarte: el optimizador, el ruido y las herramientas que lo resuelven."
+sidebar:
+  order: 9
+duracion: 12
+desde: "1.66"
+requiere: ["16-pruebas-y-herramientas/08-rustfmt"]
+tarjetas:
+  - p: "¿Por qué no sirve medir el rendimiento en el perfil debug?"
+    r: "Porque debug no optimiza y añade comprobaciones (de desbordamiento, de `debug_assert!`…). Mides un programa que no es el que vas a usar. Se mide siempre con `--release`."
+  - p: "¿Para qué sirve `std::hint::black_box`?"
+    r: "Para que el optimizador no pueda ver a través de un valor: lo trata como si viniera de fuera y como si se usara después. Así no puede precalcular ni eliminar el trabajo que quieres medir."
+  - p: "¿Qué aporta un crate como criterion o divan frente a cronometrar con `Instant`?"
+    r: "Repiten la medición muchas veces, calientan antes de medir, calculan estadísticas (media, dispersión, valores atípicos) y comparan con la ejecución anterior para decirte si algo se ha vuelto más lento."
+---
+
+import { Ejecutar, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+«Esto es más rápido» es una de las frases que más se dicen y menos se comprueban. Vas a medir de verdad y a descubrir por qué medir bien es más difícil de lo que parece.
+
+## Predice
+
+<Pregunta
+  pregunta="Quieres saber cuánto tarda una función que suma de 0 a 999. La llamas diez veces en un bucle, compilas con `--release` y cronometras. Te sale un tiempo de casi cero. ¿Qué es lo más probable?"
+  opciones={["Que tu procesador es rapidísimo", "Que el optimizador ha calculado el resultado al compilar y en el programa ya no queda ningún bucle", "Que `Instant` no funciona en release", "Que el bucle se ha ejecutado en paralelo"]}
+  correcta={1}
+  explicacion="Si todos los datos se conocen al compilar, el optimizador puede hacer el cálculo él mismo y dejar solo el resultado. Lo verás en el ensamblador real de esta lección: la función entera se queda en una instrucción que carga `4995000`."
+  porque={["Ningún procesador hace mil sumas en «cero».", "Correcto.", "`Instant` funciona igual en debug y en release.", "Rust no paraleliza tus bucles por su cuenta."]}
+/>
+
+## La idea
+
+Un **benchmark** es una prueba que en vez de comprobar *qué* da tu código, mide *cuánto tarda*. Hay tres enemigos que debes conocer:
+
+1. **El perfil equivocado.** En debug no hay optimización: puedes llegar a medir un programa decenas de veces más lento que el real. Se mide **siempre en release**.
+2. **El optimizador.** En release, el compilador es muy listo: si ve que un resultado no se usa, borra el cálculo; si conoce los datos, lo hace él al compilar. Tu medida dice «0 segundos» y es mentira.
+3. **El ruido.** Otros programas, la temperatura del procesador, la caché… Una sola medida no significa nada. Hay que repetir y mirar estadísticas.
+
+Contra el segundo enemigo, la biblioteca estándar tiene **`std::hint::black_box`** (estable desde Rust 1.66): una función que devuelve su argumento sin cambiarlo, pero que el optimizador trata como una «caja negra». No sabe qué entra ni qué se hace con lo que sale, así que no puede precalcular ni borrar nada.
+
+## Pruébalo
+
+Un cronómetro casero con `Instant` que compara dos formas de sumar de 0 a n−1: un bucle y la fórmula de Gauss. Fíjate en el paso 3: **antes de comparar velocidades, comprueba que las dos versiones dan lo mismo**. Una función rapidísima que da un resultado incorrecto no vale nada.
+
+<Ejecutar ej="m16/cronometro" />
+
+Los tiempos cambian en cada ejecución y dependen de la máquina; aquí se ejecuta en WebAssembly dentro de tu navegador, que no es el entorno de tu programa final. Lo que importa es la **proporción**: la fórmula hace tres operaciones y el bucle, un millón de vueltas. Ningún truco de compilador cambia eso… salvo uno que vas a ver ahora.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Estas dos funciones, compiladas con `rustc -O --emit=asm` para x86-64 (Windows), sin `black_box`:
+
+```rust
+#[unsafe(no_mangle)]
+pub fn suma_bucle(n: u64) -> u64 {
+    let mut s = 0;
+    let mut i = 0;
+    while i < n {
+        s += i;
+        i += 1;
+    }
+    s
+}
+
+#[unsafe(no_mangle)]
+pub fn diez_veces() -> u64 {
+    let mut t = 0;
+    for _ in 0..10 {
+        t += suma_bucle(1000);
+    }
+    t
+}
+```
+
+Producen este ensamblador (real, quitando las directivas):
+
+```text title="ensamblador real (x86-64, -O)"
+diez_veces:
+	mov	eax, 4995000
+	ret
+
+suma_bucle:
+	test	rcx, rcx
+	je	.LBB1_1
+	lea	rax, [rcx - 1]
+	lea	rdx, [rcx - 2]
+	mul	rdx
+	shld	rdx, rax, 63
+	lea	rax, [rcx + rdx]
+	dec	rax
+	ret
+.LBB1_1:
+	xor	eax, eax
+	ret
+```
+
+Dos sorpresas. **`suma_bucle` ya no tiene bucle**: LLVM (el optimizador que usa Rust) reconoció el patrón «sumar de 0 a n−1» y lo sustituyó por una fórmula con una multiplicación (`mul`) y un desplazamiento (`shld … 63`, que divide entre 2). Y **`diez_veces` es una sola instrucción**: como los datos (`1000`, diez veces) se conocen al compilar, calculó `10 × 499 500 = 4 995 000` él mismo. Si cronometraras `diez_veces`, medirías el tiempo de devolver un número.
+
+Por eso el ejemplo de arriba envuelve `n` en `black_box(n)` (el optimizador ya no sabe cuánto vale) y el resultado en `black_box(…)` (no sabe si se usa). Y aun así, fíjate: en tu PC con `--release`, el «bucle» de `suma_bucle` podría acabar siendo también una fórmula. Medir te dice **qué pasa de verdad**, que no siempre es lo que el código fuente parece decir.
+
+</BajoElCapo>
+
+## Herramientas de verdad: criterion y divan
+
+Para medir en serio se usan crates del ecosistema. Los dos más conocidos son **criterion** y **divan**. Se descargan de crates.io, así que **no están instalados en el entorno de este curso: el código de abajo no se ha compilado aquí** y no te enseñamos su salida. Sirve para que reconozcas la forma.
+
+Con criterion, los benchmarks van en `benches/`, y en `Cargo.toml` se desactiva el arnés por defecto:
+
+```toml title="Cargo.toml (esquema)"
+[dev-dependencies]
+criterion = "…"   # la versión que indique crates.io
+
+[[bench]]
+name = "sumas"
+harness = false
+```
+
+```rust title="benches/sumas.rs (esquema, no compilado aquí)"
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
+
+fn medir(c: &mut Criterion) {
+    c.bench_function("suma_bucle 1e6", |b| b.iter(|| mi_crate::suma_bucle(black_box(1_000_000))));
+}
+
+criterion_group!(benches, medir);
+criterion_main!(benches);
+```
+
+Se ejecuta con `cargo bench`, que compila en un perfil optimizado. Lo que aportan sobre tu cronómetro casero: un **calentamiento** antes de medir (para que la caché y el procesador estén en régimen normal), **muchas repeticiones** elegidas automáticamente, **estadísticas** (media, intervalo de confianza, valores atípicos) y **comparación con la ejecución anterior**, que te avisa si un cambio ha empeorado el tiempo. divan ofrece lo mismo con una sintaxis más corta, un atributo `#[divan::bench]` encima de cada función.
+
+(Existe también un atributo `#[bench]` en la propia biblioteca de pruebas, pero solo funciona en la toolchain nightly.)
+
+## Trampa típica
+
+<Trampa titulo="Medir en debug">
+
+❌ `cargo run` y cronometrar. Debug no optimiza y comprueba cada suma por si desborda: mides algo que tu usuario nunca ejecutará, y puedes «optimizar» lo que en release ya era rápido.
+
+✅ `cargo run --release` para cronómetros caseros, `cargo bench` para benchmarks con criterion o divan. Y antes de comparar dos versiones, comprueba con un `assert_eq!` que hacen lo mismo.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["let inicio = Instant::now();", "for _ in 0..1000 {", "    black_box(mi_funcion(black_box(dato)));", "}", "let tiempo = inicio.elapsed() / 1000;"]}
+  distractores={["mi_funcion(dato);", "let tiempo = inicio.elapsed() * 1000;"]}
+  explicacion="Se toma el instante inicial, se repite muchas veces protegiendo entrada y salida con `black_box` (sin él, el optimizador podría borrar las llamadas) y se divide el tiempo total entre las repeticiones para obtener el tiempo medio de una."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace exactamente `black_box(x)`?"
+  opciones={["Ejecuta `x` en un hilo aparte", "Devuelve `x` sin cambiarlo, pero impide que el optimizador razone sobre su valor o lo elimine", "Mide cuánto tarda en calcularse `x`", "Desactiva todas las optimizaciones del programa"]}
+  correcta={1}
+  explicacion="Es una barrera para el optimizador, no un cronómetro. El resto del programa sigue optimizado; solo ese valor queda «opaco»."
+  porque={["No crea hilos.", "Correcto.", "El cronómetro es `Instant`.", "Solo afecta al valor que envuelve."]}
+/>
+
+<Pregunta
+  pregunta="En el ensamblador real, `diez_veces` quedó en `mov eax, 4995000` y `ret`. ¿Por qué?"
+  opciones={["Porque Rust guarda en caché los resultados de las funciones", "Porque todos los datos se conocían al compilar y el optimizador hizo el cálculo él mismo", "Porque el bucle `for` nunca se ejecuta", "Porque `u64` no puede guardar números más grandes"]}
+  correcta={1}
+  explicacion="Con `1000` y `10` fijos en el código, el resultado es siempre el mismo. LLVM lo calcula al compilar y deja solo el número."
+  porque={["No hay ninguna caché: el cálculo desapareció al compilar.", "Correcto.", "El bucle se ejecutaría; simplemente ya no hace falta.", "4 995 000 cabe de sobra en un `u64`."]}
+/>

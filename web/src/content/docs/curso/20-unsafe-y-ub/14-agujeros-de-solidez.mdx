@@ -1,0 +1,127 @@
+---
+title: "Agujeros de solidez famosos"
+description: "Distingues un diseño sound de una implementación con bugs, a través del issue #25860, la leakpocalypse y RustBelt."
+sidebar:
+  order: 14
+duracion: 14
+desde: "1.0"
+requiere: ["20-unsafe-y-ub/10-varianza-y-phantomdata", "20-unsafe-y-ub/11-drop-check"]
+tarjetas:
+  - p: "¿Qué es el issue #25860?"
+    r: "Un agujero de solidez del compilador abierto desde 2015: combinando los «implied bounds» de &'a &'b () con la conversión a punteros a función, se puede alargar un tiempo de vida en código seguro. La forma simple ya se rechaza; una variante de orden superior aún compila en 1.99.1."
+  - p: "¿Qué decidió la «leakpocalypse» (2015)?"
+    r: "Que filtrar memoria es seguro: mem::forget dejó de ser unsafe y ninguna API sound puede depender de que se ejecute un destructor."
+  - p: "¿Qué demostró RustBelt (POPL 2018)?"
+    r: "Una prueba formal de que el sistema de tipos de Rust y bibliotecas con unsafe (Arc, Rc, Cell, RefCell, Mutex…) son sound; encontró un bug real en MutexGuard."
+  - p: "¿Por qué thread::scope es sound y el antiguo thread::scoped no?"
+    r: "scoped confiaba en el Drop de un guard (que se podía filtrar); scope recibe un closure y espera a todos los hilos antes de volver, sin depender de ningún destructor."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa, Historia } from '~/components';
+
+Vas a conocer los agujeros más famosos de la historia de Rust, y a sacar de ellos la lección de diseño más importante: **el diseño puede ser sound y la implementación tener bugs**.
+
+## Predice
+
+Este programa intenta convertir un `&'a T` en un `&'static T` sin `unsafe`, a través de un puntero a función. Es la forma «clásica» del agujero #25860. ¿Qué dice `rustc` 1.99.1?
+
+<NoCompila ej="m20/agujero-cerrado" explicacion="Hoy el compilador comprueba, al convertir `traductor` en el puntero a función, que la presunción de su firma (`'b: 'a`, que viene del argumento `&'a &'b ()`) se sigue cumpliendo con los tiempos de vida elegidos. Aquí exigiría `'a: 'static`, así que lo rechaza." />
+
+## La idea
+
+**Rust seguro promete: si compila sin `unsafe`, no hay UB.** Esa promesa descansa en dos cosas: que las **reglas** del lenguaje sean sound y que el **compilador** las implemente bien. Lo primero se ha demostrado matemáticamente (RustBelt, más abajo). Lo segundo es software, y el software tiene bugs. Los bugs del compilador o de la biblioteca estándar que permiten UB desde código seguro se llaman **agujeros de solidez** y se etiquetan `I-unsound` en el repositorio de Rust.
+
+El más famoso es el **#25860**, abierto en 2015. La idea, en tres ingredientes:
+
+1. **Presunciones implícitas** (*implied bounds*): si una función recibe `&'a &'b ()`, el compilador deduce que `'b` vive al menos tanto como `'a` (si no, ese tipo no podría existir). Dentro de la función puede usarlo.
+2. **Varianza**: al convertir esa función en un puntero a función, sus tiempos de vida se pueden ajustar.
+3. El fallo: en ciertas conversiones, el compilador **olvida** volver a comprobar la presunción con los tiempos de vida nuevos. Así, una función que solo es correcta si `'b: 'a` acaba llamándose con un `'b` que muere antes: un `&'a T` sale convertido en `&'static T`, y con él un uso tras liberar.
+
+La forma simple (la de *Predice*) se arregló. Pero una **variante de orden superior** (un puntero a función con un tiempo de vida genérico más, del tipo `for<'x>`) **todavía compila** con `rustc` 1.99.1; lo hemos comprobado. Según el equipo de tipos, el arreglo completo depende del nuevo *trait solver*.
+
+## Pruébalo
+
+La leakpocalypse dejó una regla que puedes comprobar tú: **filtrar memoria es seguro**.
+
+<Ejecutar ej="m20/forget-seguro" />
+
+`mem::forget(a)` no necesita `unsafe` y el destructor de `a` no se ejecuta nunca (no aparece «drop de a»). `Box::leak` también es seguro: te da un `&'static mut` a memoria que ya nadie liberará. Que el destructor se ejecute **no está garantizado**, y ningún código unsafe puede depender de ello.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué #25860 no es un motivo para desconfiar de Rust.** Hace falta escribir a propósito una combinación muy rebuscada de tipos (`&'a &'b ()` como argumento sin uso, punteros a función de orden superior, un `static` auxiliar). No aparece en código normal ni por accidente. Existe un proyecto humorístico, `cve-rs`, que lo usaba para escribir «vulnerabilidades en Rust 100 % seguro»; su forma original ya no compila con 1.99.1. Aquí no reproducimos la variante que aún funciona: lo importante es el mecanismo, no la receta.
+
+**Defensa práctica:** los agujeros del compilador no son lo que rompe programas reales; el `unsafe` incorrecto en bibliotecas, sí. Para eso sirve todo lo que ves en la lección siguiente.
+
+**RustBelt** (Jung, Jourdan, Krebbers y Dreyer, POPL 2018) dio la primera **prueba formal** de que el sistema de tipos de un subconjunto realista de Rust es sound, **incluidas** bibliotecas con `unsafe` como `Arc`, `Rc`, `Cell`, `RefCell`, `Mutex` y `thread::spawn`. Cada tipo se interpreta como una propiedad lógica sobre la memoria (lógica de separación, en el marco Iris); una biblioteca con unsafe es correcta si su API respeta esas propiedades. Por el camino encontró un bug real: `MutexGuard` era `Sync` en casos en que no debía, y se corrigió en la biblioteca estándar.
+
+La lección para quien diseña: el **diseño** está demostrado; la **implementación** se prueba, se audita y se arregla.
+
+</BajoElCapo>
+
+<Historia titulo="La leakpocalypse (abril de 2015)">
+
+Semanas antes de Rust 1.0, la biblioteca estándar tenía `thread::scoped`: lanzaba un hilo que podía tomar prestados datos locales, y devolvía un *guard* cuyo `Drop` esperaba a que el hilo terminase. La seguridad dependía de que ese `Drop` se ejecutara.
+
+Alguien demostró que, con un ciclo de `Rc`, se podía **filtrar** el guard: su `Drop` nunca se ejecutaba, la función volvía, los datos locales se destruían… y el hilo seguía usándolos. Uso tras liberar en código seguro.
+
+La comunidad tuvo que elegir: o garantizar que los destructores siempre se ejecutan (imposible con `Rc`), o aceptar que **filtrar es seguro**. Se eligió lo segundo: `mem::forget` dejó de ser `unsafe`, `thread::scoped` se retiró, y quedó como principio que ninguna API sound puede depender de un destructor.
+
+La idea volvió en Rust 1.63 con un diseño a prueba de fugas: `thread::scope` recibe un closure y **espera a todos los hilos antes de volver**. No hay guard que filtrar.
+
+<Ejecutar ej="m20/scope-hilos" />
+
+</Historia>
+
+## Trampa típica
+
+<Trampa titulo="«El destructor siempre se ejecuta, así que puedo confiar en él»">
+
+❌ Diseñar una API cuya solidez depende de que el usuario no filtre un valor (por ejemplo, un guard que «restaura» un estado peligroso en su `Drop`). El usuario puede llamar a `mem::forget` desde código seguro.
+
+✅ Si un `Drop` restaura invariantes, el diseño debe ser seguro **también** si no se ejecuta: como mucho, una fuga. La biblioteca estándar lo hace así, por ejemplo poniendo la longitud a 0 antes de una operación delicada y restaurándola al final («amplificar la fuga» en vez de arriesgar un doble drop).
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Un crate expone `fn bloquear(&self) -> Guardia` y su documentación dice: «si filtras la Guardia, se produce UB». ¿Cómo lo clasificas?"
+  opciones={["Correcto: está documentado", "Unsound: filtrar es seguro (mem::forget), así que código seguro podría causar UB", "Correcto si Guardia implementa Drop", "Depende de si usa hilos"]}
+  correcta={1}
+  explicacion="La documentación no salva una API segura: si un programa seguro (que llama a `mem::forget`) puede causar UB, es un bug de solidez. Es justo la lección de la leakpocalypse."
+  porque={["Una advertencia no convierte en sound lo que no lo es.", "Correcto.", "Que tenga Drop es justo el problema: no se garantiza que se ejecute.", "La regla vale con o sin hilos."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué afirma correctamente sobre el issue #25860 en Rust 1.99.1?"
+  opciones={["Está completamente arreglado", "La forma simple se rechaza, pero una variante de orden superior aún compila", "Solo afecta a código unsafe", "Permite ejecutar código remoto"]}
+  correcta={1}
+  explicacion="Es lo que hemos comprobado con rustc 1.99.1: la versión de *Predice* da error y la variante con un puntero a función de orden superior compila."
+  porque={["Sigue abierto.", "Correcto.", "Al contrario: es grave justo porque es código seguro.", "Es un fallo de comprobación de tiempos de vida, no un ataque remoto."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `mem::forget` es una función segura?"
+  opciones={["Porque no hace nada", "Porque filtrar memoria no es UB, y desde 2015 ninguna API sound puede depender de que se ejecute un destructor", "Porque solo funciona con tipos Copy", "Porque libera la memoria"]}
+  correcta={1}
+  explicacion="Es la decisión de la leakpocalypse. Filtrar puede ser un error (memoria desperdiciada), pero no rompe la seguridad de memoria."
+  porque={["Sí hace algo: impide el destructor.", "Correcto.", "Funciona con cualquier tipo (el ejemplo usa uno con Drop).", "No libera nada: justo lo contrario."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué distingue a RustBelt de un test?"
+  opciones={["Es más rápido", "Es una prueba matemática de solidez para todos los programas del modelo, no una comprobación de casos concretos", "Encuentra todos los bugs del compilador", "Solo cubre código sin unsafe"]}
+  correcta={1}
+  explicacion="Un test prueba una ejecución; RustBelt demuestra una propiedad para cualquier programa del subconjunto modelado, incluidas bibliotecas con unsafe. No verifica la implementación de rustc."
+  porque={["La velocidad no es la diferencia.", "Correcto.", "Modela el diseño, no el código del compilador.", "Precisamente incluye bibliotecas con unsafe."]}
+/>
+
+## Para saber más
+
+- Issue #25860 en el repositorio rust-lang/rust y la etiqueta `I-unsound`.
+- Ralf Jung y otros, «RustBelt: Securing the Foundations of the Rust Programming Language», POPL 2018 (en inglés).

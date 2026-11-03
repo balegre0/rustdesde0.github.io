@@ -1,0 +1,63 @@
+---
+title: "dbg!"
+description: "Imprime en stderr una expresión, su valor y dónde está, y devuelve el valor: depurar sin cambiar el programa."
+sidebar:
+  order: 6
+insignias: ["Desde 1.32", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::dbg`
+
+## Sinopsis
+
+```rust
+macro_rules! dbg {
+    () => { ... };
+    ($val:expr $(,)?) => { ... };
+    ($($val:expr),+ $(,)?) => { ... };
+}
+```
+
+## Qué hace
+
+`dbg!(expr)` escribe en la salida de errores `[archivo:línea:columna] expr = valor` (con formato `{:#?}`) y **devuelve** el valor, así que puedes envolver cualquier expresión sin cambiar lo que hace. Toma la propiedad del valor: usa `dbg!(&x)` si quieres seguir usando `x`. Quítalo antes de publicar tu código.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-dbg" />
+
+**Salida:**
+
+```text
+6 [1, 2]
+```
+
+**Salida de error** (*stderr*):
+
+```text
+[macros-dbg.rs:2:8] n <= 1 = false
+[macros-dbg.rs:2:8] n <= 1 = false
+[macros-dbg.rs:2:8] n <= 1 = true
+[macros-dbg.rs:3:9] 1 = 1
+[macros-dbg.rs:5:9] n * factorial(n - 1) = 2
+[macros-dbg.rs:5:9] n * factorial(n - 1) = 6
+[macros-dbg.rs:10:13] factorial(3) = 6
+[macros-dbg.rs:12:5] &v = [
+    1,
+    2,
+]
+```
+
+## Desde
+
+Rust 1.32 (estable).
+
+## Ver también
+
+- [Debug](/ref/std/fmt/debug/)
+- [eprintln!](/ref/std/macros/println/)
+
+## Aprende esto en
+
+- [Mundo 16 · Pruebas y herramientas](/curso/16-pruebas-y-herramientas/)

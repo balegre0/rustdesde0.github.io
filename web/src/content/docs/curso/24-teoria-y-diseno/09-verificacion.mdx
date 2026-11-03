@@ -1,0 +1,77 @@
+---
+title: "Verificar programas en Rust"
+description: "Más allá de los tests: herramientas que demuestran propiedades de un programa para todas las entradas. Kani, Prusti, Creusot, Verus, Aeneas y Flux, y por qué Rust es especialmente fácil de verificar."
+sidebar:
+  order: 9
+duracion: 13
+requiere: ["24-teoria-y-diseno/08-rustbelt"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre un test y una verificación formal?"
+    r: "Un test comprueba algunas entradas. Una verificación demuestra la propiedad para todas las entradas (dentro de los límites de la herramienta)."
+  - p: "¿Qué es Kani?"
+    r: "Un comprobador de modelos acotado (*bounded model checker*) para Rust: explora todas las entradas posibles hasta un límite y encuentra pánicos, desbordamientos, UB y fallos de `assert!`."
+  - p: "¿Por qué el ownership facilita verificar Rust?"
+    r: "Porque garantiza que no hay aliasing con mutación: el verificador sabe que un `&mut` es el único camino al valor, y puede razonar sobre él como si fuera un valor normal."
+  - p: "¿Qué es una especificación (contrato) de una función?"
+    r: "Precondiciones (lo que exige a quien llama) y postcondiciones (lo que garantiza al terminar), escritas de forma que una herramienta pueda comprobarlas."
+---
+
+import { Pregunta, BajoElCapo } from '~/components';
+
+Los tests comprueban **algunos** casos. A veces eso no basta: el software de un avión, de un marcapasos o de una biblioteca criptográfica tiene que funcionar **siempre**. Para eso existe la **verificación formal**, y Rust es uno de los lenguajes donde mejor funciona.
+
+## La idea
+
+Verificar es **demostrar** que un programa cumple una propiedad para **todas** las entradas. La propiedad se escribe como un **contrato**:
+
+- **Precondición**: lo que la función exige (`b != 0`).
+- **Postcondición**: lo que garantiza (`resultado * b + resto == a`).
+- **Invariantes**: lo que se mantiene en cada vuelta de un bucle.
+
+Herramientas para Rust, de menos a más esfuerzo:
+
+| Herramienta | Cómo funciona | Para qué |
+|---|---|---|
+| **Kani** | comprobación de modelos acotada (explora todas las entradas hasta un límite, con un resolutor SAT) | pánicos, desbordamientos, UB, `assert!`; también código `unsafe` |
+| **Flux** | tipos de refinamiento (`i32{v: v > 0}`) | invariantes sencillos en los tipos |
+| **Prusti** | verificación deductiva sobre la infraestructura Viper | contratos en código seguro |
+| **Creusot** | traduce a Why3 y usa demostradores automáticos | contratos ricos; usa «profecías» para modelar `&mut` |
+| **Verus** | lenguaje de especificación junto al código, con Z3 | sistemas complejos y concurrentes |
+| **Aeneas** | traduce Rust seguro a un programa funcional en Lean | demostraciones completas (por ejemplo, criptografía) |
+
+Un ejemplo con Kani (en tu PC necesita instalar la herramienta; aquí es solo para leer):
+
+```rust
+#[cfg(kani)]
+#[kani::proof]
+fn la_media_no_desborda() {
+    let a: u32 = kani::any();   // CUALQUIER u32
+    let b: u32 = kani::any();
+    let m = a / 2 + b / 2 + (a % 2 + b % 2) / 2;
+    assert!(m >= a.min(b) && m <= a.max(b));
+}
+```
+
+`kani::any()` no es un valor aleatorio: representa **todos** los valores a la vez. Si existe alguna pareja que rompa el `assert!`, Kani la encuentra y te la enseña.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué Rust es fácil de verificar.** El mayor problema al verificar código de sistemas es el **aliasing**: si dos punteros pueden apuntar al mismo sitio, cada escritura puede cambiar cualquier cosa, y las demostraciones se vuelven inmanejables. En Rust seguro, un `&mut` es el **único** camino a su valor, así que el verificador puede tratarlo casi como una variable normal. Prusti fue de los primeros en aprovecharlo (*Leveraging Rust Types for Modular Specification and Verification*, OOPSLA 2019).
+
+**Verificar la biblioteca estándar.** Desde finales de 2024, un desafío abierto (AWS y la Rust Foundation) invita a verificar las funciones `unsafe` de `core` y `std` con Kani y otras herramientas. Es un trabajo enorme: en 2025 solo una pequeña parte de las funciones `unsafe` de `core` tenía contratos verificados. Es una buena forma de contribuir a Rust con lo que aprendiste en los mundos 20 y 24.
+
+**Los límites.** Toda verificación demuestra el programa **respecto a una especificación** y bajo unas suposiciones (la semántica del lenguaje, el compilador, el hardware). Una especificación equivocada se verifica igual de bien. Por eso la verificación complementa los tests, no los sustituye.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué representa `kani::any::<u32>()` en una prueba de Kani?"
+  opciones={["Un número aleatorio", "Todos los valores posibles de `u32` a la vez", "El valor 0", "Un valor que elige el usuario"]}
+  correcta={1}
+  explicacion="Kani razona simbólicamente: el `assert!` tiene que cumplirse para cualquier valor. Si no, devuelve un contraejemplo concreto."
+  porque={["Eso sería fuzzing (mundo 16): prueba muchos valores, no todos.", "", "No es un valor concreto.", "Kani no pregunta: explora todo el espacio."]}
+/>

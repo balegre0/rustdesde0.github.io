@@ -1,0 +1,43 @@
+---
+title: "#[target_feature]"
+description: "Compila una función con instrucciones extra del procesador (AVX2, NEON…). Llamarla en una CPU que no las tiene es comportamiento indefinido, por eso se combina con detección en tiempo de ejecución."
+sidebar:
+  order: 25
+insignias: ["Desde 1.27", "Generación de código"]
+---
+import { Ejecutar } from '~/components';
+
+`#[target_feature(enable = "…")]` permite que una función use instrucciones que no todas las CPU de esa familia tienen.
+
+## Sinopsis
+
+```text
+#[target_feature(enable = "avx2")]
+#[target_feature(enable = "avx2,fma")]
+fn f() { … }
+```
+
+## Qué hace
+
+El compilador genera la función como si la CPU tuviera esas extensiones: puede vectorizar con AVX2, usar `popcnt`, etc. El resto del programa sigue siendo compatible con CPU antiguas.
+
+Ejecutar esa función en una CPU **sin** la extensión es **comportamiento indefinido** (normalmente, «instrucción ilegal»). Por eso:
+
+- Desde 1.86, una función segura puede llevar `#[target_feature]`, pero **llamarla** desde código que no tiene esa extensión activada requiere `unsafe`.
+- Antes de llamarla, se comprueba la CPU: `is_x86_feature_detected!("avx2")` (o `std::arch::is_aarch64_feature_detected!`).
+
+La alternativa sin `unsafe` es compilar **todo** el programa para una CPU concreta: `-C target-cpu=native` (solo para tu máquina) o `-C target-feature=+avx2`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-target-feature" />
+
+Solo para `x86_64`, así que aquí no se ejecuta.
+
+## Desde
+
+Rust 1.27. En funciones seguras: 1.86.
+
+## Ver también
+
+[`#[cfg(target_feature)]`](/ref/lenguaje/atributos/cfg/) · [`std::arch`](/ref/std/)

@@ -1,0 +1,101 @@
+---
+title: "Cuando el compilador es demasiado estricto"
+description: "El comprobador de préstamos rechaza algunos programas correctos. Conoce los dos casos más típicos (métodos que prestan todo self y «obtener o insertar») y cómo rodearlos."
+sidebar:
+  order: 11
+duracion: 12
+desde: "1.0"
+requiere: ["07-prestamos/10-partir-prestamos"]
+tarjetas:
+  - p: "¿El comprobador de préstamos acepta todos los programas correctos?"
+    r: "No. Es conservador: todo lo que acepta es seguro, pero rechaza algunos programas que también lo serían (falsos positivos)."
+  - p: "¿Por qué `inv.marcar()` dentro de `for item in &inv.items` da E0502?"
+    r: "Porque `marcar(&mut self)` presta todo `inv` en exclusiva, aunque solo toque otro campo. La firma no dice qué campos usa."
+  - p: "¿Qué es Polonius?"
+    r: "El nuevo comprobador de préstamos de Rust, todavía en desarrollo. Acepta casos que el actual rechaza, como «obtener o insertar» en un mapa devolviendo la referencia."
+  - p: "¿Qué API de HashMap resuelve «obtener o insertar»?"
+    r: "La entry API: `mapa.entry(k).or_insert(v)` o `.or_insert_with(|| …)`, que devuelve `&mut V`."
+---
+
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa, Historia } from '~/components';
+
+Tienes que saber una cosa con honestidad: el comprobador de préstamos **no es perfecto**. Todo programa que acepta es seguro, pero algunos programas seguros los **rechaza**. Saber reconocer esos casos te ahorra horas de pelea.
+
+## Predice
+
+<NoCompila ej="m07/metodo-presta-todo" explicacion={"`marcar` solo toca `revisados`, y el bucle solo lee `items`. Son campos distintos. ¿Por qué no compila? Mira qué pide la firma de `marcar`."} />
+
+## La idea
+
+El comprobador es **conservador**: ante la duda, dice que no. Prefiere rechazar un programa correcto antes que aceptar uno peligroso. Hay dos casos que te encontrarás seguro:
+
+**1. Los métodos prestan todo `self`.** La firma `fn marcar(&mut self)` dice «necesito acceso exclusivo a **todo** el inventario». El compilador no mira dentro de la función para ver qué campos usa (y no debe: si mañana cambias el cuerpo, el código que llama no debería romperse). Por eso choca con el préstamo de `inv.items`.
+
+Arreglos posibles:
+
+- Acceder al campo directamente (`inv.revisados += 1`), como en el arreglo de arriba.
+- Escribir la función sobre el campo, no sobre `self`: `fn marcar(revisados: &mut usize)`.
+- Separar la lectura y la escritura en dos pasos.
+
+**2. «Obtener o insertar».** Buscar una clave en un mapa y, si no está, insertarla y devolver una referencia:
+
+<NoCompila ej="m07/p-get-o-insertar" explicacion="El programa es seguro: si `get` no encontró nada, no hay ningún préstamo que proteger en la rama `None`. Pero como el resultado de `get` se **devuelve** en la otra rama, el comprobador actual considera vivo el préstamo en todo el `match`. Es un caso conocido que el futuro comprobador (Polonius) aceptará." />
+
+Para ese caso hay una API pensada a propósito: la **entry API** de `HashMap`, que verás en el mundo 11. Busca y, si hace falta, inserta, todo en un solo préstamo exclusivo.
+
+## Pruébalo
+
+<Ejecutar ej="m07/p-entry" />
+
+`entry(c)` reserva el hueco de la clave; `or_insert(0)` lo rellena si estaba vacío y devuelve `&mut u32` para sumarle 1. Un solo préstamo, ningún conflicto.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Por qué no puede ser perfecto.** Decidir con exactitud si un programa cualquiera usará una referencia peligrosamente es, en general, un problema **indecidible** (no existe un algoritmo que lo resuelva siempre). Cualquier comprobador tiene que elegir entre rechazar algunos programas buenos o aceptar algunos malos. Rust elige lo primero.
+
+**Polonius.** Es la próxima versión del comprobador de préstamos: en vez de calcular «dónde está vivo cada préstamo», calcula «de qué préstamos puede venir cada referencia». Con eso acepta el caso de «obtener o insertar» y otros parecidos. En la versión 1.99 sigue en desarrollo y solo se puede probar en nightly (`-Zpolonius`).
+
+**La salida de emergencia.** Cuando un diseño correcto choca con el comprobador y ningún reordenamiento sirve, hay dos caminos legítimos: cambiar la **forma de los datos** (índices en vez de referencias, separar structs) o usar **mutabilidad interior** (`Cell`, `RefCell`), que traslada la comprobación al momento de ejecutar. Lo verás en el mundo 15. `unsafe` casi nunca es la respuesta.
+
+</BajoElCapo>
+
+<Historia titulo="De léxico a NLL, y de NLL a Polonius">
+
+El primer comprobador de préstamos (2015) era **léxico**: los préstamos duraban hasta la `}`. NLL (2018) hizo que duraran hasta su último uso y eliminó la mayoría de las quejas. Polonius es el tercer paso. Cada versión acepta **más** programas que la anterior y ninguna acepta programas peligrosos.
+
+</Historia>
+
+## Trampa típica
+
+<Trampa titulo="Culparte a ti (o al compilador) sin distinguir">
+
+Cuando un error de préstamos no tiene sentido, hazte dos preguntas:
+
+1. **¿Hay de verdad un peligro?** ¿Se podría mudar, liberar o cambiar algo que otra referencia está mirando? Casi siempre la respuesta es sí y el compilador tiene razón.
+2. **Si no lo hay**, ¿es uno de los casos conocidos (método que presta todo `self`, obtener o insertar, préstamo devuelto en una rama)? Entonces reorganiza el código con las técnicas de esta lección.
+
+❌ Llenar el código de `clone()` hasta que compile.
+
+✅ Entender cuál de los dos casos es. Con práctica lo distinguirás en segundos.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="El comprobador de préstamos…"
+  opciones={["acepta exactamente los programas seguros", "acepta todos los seguros y algunos peligrosos", "acepta solo programas seguros, pero rechaza algunos seguros", "comprueba los préstamos al ejecutar"]}
+  correcta={2}
+  explicacion="Es conservador: si acepta un programa, ese programa no tiene errores de préstamos. A cambio, rechaza algunos programas correctos (falsos positivos)."
+  porque={["Eso es imposible en general: el problema es indecidible.", "Aceptar programas peligrosos rompería la garantía de Rust.", "", "Todo ocurre al compilar."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué llamar a `self.metodo_mut()` mientras tienes un préstamo de `self.campo` suele dar error, aunque el método no toque ese campo?"
+  opciones={["Porque los métodos siempre mueven `self`", "Porque `&mut self` presta todo el valor, y el compilador no mira dentro del método", "Porque los campos no se pueden prestar", "Porque es un error de Polonius"]}
+  correcta={1}
+  explicacion="La firma es el contrato: `&mut self` pide exclusividad sobre todo el valor. Mirar dentro del cuerpo haría que cambiar una función rompiera el código de quien la llama."
+  porque={["`&mut self` presta, no mueve.", "", "Sí se pueden, como viste en la lección anterior.", "Polonius es el comprobador futuro, y no cambia este caso."]}
+/>

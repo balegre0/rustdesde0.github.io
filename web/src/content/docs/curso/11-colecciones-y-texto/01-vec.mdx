@@ -1,0 +1,95 @@
+---
+title: "Vec: listas que crecen"
+description: "Guarda una cantidad variable de elementos del mismo tipo, y aprende las operaciones básicas de Vec."
+sidebar:
+  order: 1
+duracion: 10
+desde: "1.0"
+requiere: ["09-structs-enums-y-patrones/06-option-sin-null"]
+tarjetas:
+  - p: "¿Qué diferencia hay entre `v[i]` y `v.get(i)`?"
+    r: "`v[i]` devuelve el elemento o entra en pánico si `i` no existe. `v.get(i)` devuelve `Option<&T>`: `None` si no existe."
+  - p: "¿Qué devuelve `v.pop()`?"
+    r: "`Option<T>`: `Some(último)` quitándolo del Vec, o `None` si estaba vacío."
+  - p: "¿Puede un `Vec` guardar elementos de tipos distintos?"
+    r: "No: todos sus elementos son del mismo tipo `T` (E0308 si intentas mezclar). Para «uno de varios tipos», usa un `Vec` de un enum."
+  - p: "¿Qué crea `vec![0; 5]`?"
+    r: "Un `Vec` con cinco elementos, todos 0."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a usar `Vec`, la colección más usada de Rust: una lista de elementos del mismo tipo que puede crecer y encoger mientras el programa se ejecuta.
+
+## Predice
+
+<Predice
+  ej="m11/vec-predice"
+  opciones={["`[5, 10, 20, 30] Some(40) 4`", "`[5, 10, 20, 30, 40] Some(40) 5`", "`[10, 20, 30] 40 3`", "`[5, 10, 20, 30] 40 4`"]}
+  correcta={0}
+  explicacion="`push(40)` añade al final, `pop()` lo quita y lo devuelve envuelto en `Some`, e `insert(0, 5)` mete el 5 al principio desplazando el resto. Quedan 4 elementos."
+  porque={["Correcto.", "`pop` quitó el 40 del Vec.", "`insert(0, 5)` añadió el 5 al principio.", "`pop` devuelve un `Option`: `Some(40)`, porque podría estar vacío."]}
+/>
+
+## La idea
+
+Un array (`[i32; 3]`) tiene un tamaño fijo, decidido al compilar. Un **`Vec<T>`** (de *vector*) es una lista que puede **cambiar de tamaño** mientras el programa se ejecuta: añades con `push`, quitas con `pop`, insertas o borras en medio con `insert` y `remove`. La `T` dice el tipo de los elementos, y **todos son del mismo tipo**.
+
+Para leer hay dos caminos, como ya viste con `Option`:
+
+- `v[i]` — rápido y directo; si `i` no existe, **pánico**. Úsalo cuando el índice sea correcto por construcción.
+- `v.get(i)` — devuelve `Option<&T>`; si `i` no existe, `None`. Úsalo cuando el índice venga de fuera.
+
+El `Vec` es **dueño** de sus elementos: cuando el `Vec` se destruye, ellos también. Y cumple las reglas de siempre: para cambiarlo (`push`, `v[0] = …`, `sort`), la variable tiene que ser `mut`.
+
+## Pruébalo
+
+<Ejecutar ej="m11/vec" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Los elementos de un `Vec` viven **juntos, uno tras otro, en el heap**. Por eso `v[i]` es instantáneo: la dirección del elemento `i` es «dirección del primero + `i` × tamaño de cada elemento». Antes de leer, Rust **comprueba** que `i < len`; si no, entra en pánico. Esa comprobación (*bounds check*) es la diferencia entre un pánico controlado y leer memoria ajena (comportamiento indefinido).
+
+`insert(0, x)` y `remove(0)` tienen que **desplazar** todos los demás elementos una posición: con un millón de elementos, mueven un millón. `push` y `pop`, al final, no mueven a nadie. Cuando necesites quitar y poner por los dos extremos, existe `VecDeque` (lección 10). En la lección siguiente verás qué hay exactamente en la variable `v`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m11/vec-tipo-mezclado"
+  explicacion="El `Vec` es de enteros (lo dedujo el compilador por `vec![1, 2, 3]`), y no admite un `&str` (E0308). Si de verdad necesitas guardar «un número o un texto», haz un enum con dos variantes y un `Vec` de ese enum (mundo 9)."
+/>
+
+<Trampa titulo="El índice que no existe">
+
+<Ejecutar ej="m11/vec-indice-fuera" titulo="Pánico por índice fuera de rango" />
+
+Si el índice viene de un cálculo o del usuario, usa `get` y trata el `None`.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m11/compra"
+  enunciado={'Crea un `Vec<&str>` vacío, añade `pan`, `leche` y `huevos`, quita `leche` con `remove(1)` y muéstralo con `{:?}`. Debe imprimir `["pan", "huevos"]`.'}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`let v = vec![1, 2, 3];` ¿Qué devuelve `v.get(3)`?"
+  opciones={["`None`", "Un pánico", "`Some(3)`", "`0`"]}
+  correcta={0}
+  porque={["Correcto: los índices válidos son 0, 1 y 2.", "Eso haría `v[3]`.", "`get` recibe una posición, no un valor; la posición 3 no existe.", "`get` nunca inventa valores."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué operación es más cara en un `Vec` con un millón de elementos?"
+  opciones={["`v.remove(0)`", "`v.pop()`", "`v.push(1)` (sin cambiar de capacidad)", "`v[500_000]`"]}
+  correcta={0}
+  porque={["Correcto: desplaza 999 999 elementos.", "Quitar el último no mueve a nadie.", "Añadir al final no mueve a nadie si hay sitio.", "Leer por índice es una suma y una comparación."]}
+/>

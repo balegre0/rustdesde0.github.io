@@ -1,0 +1,192 @@
+---
+title: "Doctests: ejemplos que se comprueban solos"
+description: "Escribe ejemplos en la documentación de tus funciones y deja que cargo test compruebe que siguen funcionando."
+sidebar:
+  order: 5
+duracion: 12
+desde: "1.0"
+requiere: ["16-pruebas-y-herramientas/04-pruebas-de-integracion"]
+tarjetas:
+  - p: "¿Qué es un doctest?"
+    r: "Un bloque de código dentro de un comentario `///`. `cargo test` lo extrae, lo compila como un programa aparte y lo ejecuta: si entra en pánico o no compila, falla."
+  - p: "¿Para qué sirve empezar una línea de un doctest con `# `?"
+    r: "La línea se compila y se ejecuta, pero no aparece en la documentación generada. Sirve para ocultar preparativos como `use` o datos de ejemplo."
+  - p: "¿Qué comprueba un bloque marcado con `compile_fail`?"
+    r: "Que el código **no compile**. Si compila, el doctest falla. Sirve para documentar lo que tu API impide hacer."
+  - p: "¿Qué diferencia hay entre `no_run` e `ignore` en un doctest?"
+    r: "`no_run` lo compila pero no lo ejecuta (debe ser Rust válido). `ignore` ni lo compila ni lo ejecuta; sale como `ignored`."
+---
+
+import { NoCompila, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+La documentación miente con el tiempo: cambias una función y el ejemplo del comentario se queda viejo. En Rust eso tiene arreglo: los ejemplos de la documentación **son pruebas**.
+
+## Predice
+
+<Pregunta
+  pregunta="En el comentario `///` de una función pública pones un ejemplo entre tres comillas invertidas: `assert_eq!(calculo::suma(2, 3), 5);`. Un mes después cambias `suma` y ahora devuelve `6` para esos números. ¿Qué pasa al ejecutar `cargo test`?"
+  opciones={["Nada: los comentarios no se ejecutan nunca", "Falla un doctest: `cargo test` ejecuta los ejemplos de la documentación", "Falla la compilación de la biblioteca", "`cargo doc` borra el ejemplo antiguo"]}
+  correcta={1}
+  explicacion="Los bloques de código de los comentarios `///` se extraen y se ejecutan como pruebas. El ejemplo desactualizado se descubre solo, en el mismo `cargo test` que tus otras pruebas."
+  porque={["Los comentarios normales `//` no; los de documentación con bloques de código, sí.", "Correcto.", "La biblioteca compila bien; lo que falla es el ejemplo.", "`cargo doc` genera la web, no toca tu código."]}
+/>
+
+## La idea
+
+Un **comentario de documentación** (*doc comment*) empieza con tres barras, `///`, y se escribe en Markdown justo encima de lo que documenta. Si dentro pones un bloque de código, ese bloque es un **doctest**:
+
+````rust title="src/lib.rs"
+/// Calcula la media de una lista de notas.
+///
+/// Devuelve `None` si la lista está vacía.
+///
+/// ```
+/// use notas::media;
+///
+/// assert_eq!(media(&[6.0, 8.0]), Some(7.0));
+/// assert_eq!(media(&[]), None);
+/// ```
+pub fn media(notas: &[f64]) -> Option<f64> {
+    // …
+}
+````
+
+`cargo test` lo trata como un programa pequeño **desde fuera** de tu crate, igual que una prueba de integración: por eso necesita `use notas::media;`. Cumple dos funciones a la vez: quien lee la documentación ve cómo se usa la función, y tú tienes la garantía de que ese uso **funciona hoy**.
+
+Después de los tres acentos graves de apertura puedes poner atributos que cambian lo que se comprueba:
+
+| Bloque | Qué hace `cargo test` |
+|---|---|
+| `` ``` `` | compila y ejecuta; falla si no compila o entra en pánico |
+| `` ```should_panic `` | compila y ejecuta; falla si **no** entra en pánico |
+| `` ```compile_fail `` | intenta compilar; falla si **sí** compila |
+| `` ```no_run `` | solo compila (útil si se colgaría, o usa la red) |
+| `` ```ignore `` | nada; sale como `ignored` |
+| `` ```text `` | no es Rust: nunca se trata como prueba |
+
+## Pruébalo
+
+Una función documentada con un ejemplo de cada tipo:
+
+````rust title="src/lib.rs"
+/// Divide `a` entre `b`.
+///
+/// ```
+/// # use calculo::divide;
+/// assert_eq!(divide(10, 2), 5);
+/// ```
+///
+/// Dividir entre cero es un pánico:
+///
+/// ```should_panic
+/// calculo::divide(1, 0);
+/// ```
+///
+/// El resultado es un `i32`; guardarlo en un `u32` no compila:
+///
+/// ```compile_fail
+/// let x: u32 = calculo::divide(1, 1);
+/// ```
+///
+/// ```no_run
+/// // Compila pero no se ejecuta: imagina que esto tardara una hora.
+/// loop { calculo::divide(1, 1); }
+/// ```
+///
+/// ```ignore
+/// esto ni siquiera es Rust válido
+/// ```
+pub fn divide(a: i32, b: i32) -> i32 {
+    a / b
+}
+````
+
+`cargo test --doc` ejecuta solo los doctests. Salida real (quitando la línea de aviso del entorno wasm donde se ejecutó):
+
+```text title="cargo test --doc (salida real)"
+   Doc-tests calculo
+
+running 3 tests
+test src\lib.rs - divide (line 12) - should panic ... ignored
+test src\lib.rs - divide (line 22) - compile ... ok
+test src\lib.rs - divide (line 5) ... ok
+
+test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test src\lib.rs - divide (line 27) ... ignored
+test src\lib.rs - divide (line 18) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+all doctests ran in 0.60s; merged doctests compilation took 0.46s
+```
+
+Cada doctest se nombra por **archivo, elemento y línea**: `src\lib.rs - divide (line 5)`. El `no_run` aparece como `- compile ... ok`: se compiló, no se ejecutó. El `should_panic` sale `ignored` por la misma razón que viste en la lección 2: este entorno wasm aborta en los pánicos y no puede recogerlos. En tu PC se ejecuta y pasa.
+
+La línea `# use calculo::divide;` se compila, pero **no se ve** en la documentación generada. Es la forma de esconder preparativos que distraerían del ejemplo.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`cargo test --doc` llama a **rustdoc**, no a `rustc` directamente. Para cada bloque:
+
+1. Extrae el código y quita las almohadillas de las líneas ocultas.
+2. Si no hay un `fn main`, **lo envuelve** en uno: tu ejemplo pasa a ser el cuerpo de `main`. Por eso en un doctest puedes escribir sentencias sueltas.
+3. Lo compila como un crate externo que depende del tuyo.
+
+Fíjate en que hubo **dos tandas** en la salida y en la última línea: `merged doctests compilation`. Desde la **edición 2024**, rustdoc junta en **un solo programa** todos los doctests que puede (los de la primera tanda) y lo compila de una vez, que es mucho más rápido que compilar un programa por ejemplo. Los que no se pueden juntar —los `compile_fail`, porque cada uno *debe* fallar por separado, y los que lo piden con el atributo `standalone_crate`— se compilan aparte en la segunda tanda.
+
+Un doctest que devuelve error también puede usar `?`: si terminas el ejemplo con `Ok::<(), String>(())` (con la línea oculta si quieres), rustdoc lo envuelve en un `main` que devuelve `Result`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="compile_fail que «pasa» por el motivo equivocado">
+
+Un `compile_fail` solo comprueba que el código **no compila**, no **por qué**. Este ejemplo quiere enseñar el error de usar una `String` después de moverla. Compilado como programa da justo ese error:
+
+<NoCompila ej="m16/doc-compile-fail" explicacion="E0382: `nombre` se movió a `otro` y después se intenta usar. Es lo que el doctest quería demostrar." />
+
+❌ Pero si dentro del doctest te equivocas al escribir (por ejemplo `Strin::from`), también falla al compilar… y el doctest **pasa igual**, sin demostrar nada.
+
+✅ Puedes fijar el **código de error** esperado: `` ```compile_fail,E0382 ``. Así rustdoc comprueba que el fallo sea el que buscabas (esta comprobación de código solo se aplica en la toolchain nightly; en estable el doctest pasa con cualquier error, así que revisa tus `compile_fail` a mano de vez en cuando).
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["/// Devuelve el mayor de dos números.", "///", "/// ```", "/// # use calculo::mayor;", "/// assert_eq!(mayor(3, 8), 8);", "/// ```", "pub fn mayor(a: i32, b: i32) -> i32 {", "    if a > b { a } else { b }", "}"]}
+  distractores={["// assert_eq!(mayor(3, 8), 8);", "/// ```text"]}
+  explicacion="La descripción primero, una línea `///` vacía, y el bloque de código con su `use` oculto (`# `). Con `//` (dos barras) no sería documentación y con `text` no se ejecutaría como prueba."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué un doctest necesita `use mi_crate::funcion;` aunque esté escrito justo encima de `funcion`?"
+  opciones={["Porque rustdoc lo compila como un crate externo que depende del tuyo", "Porque es una regla de estilo, no hace falta", "Porque los doctests no pueden ver funciones públicas", "Porque el `use` hace que se ejecute más rápido"]}
+  correcta={0}
+  explicacion="El ejemplo se compila como si lo escribiera un usuario de tu biblioteca. Por eso solo ve lo `pub` y necesita importarlo por su ruta completa."
+  porque={["Correcto.", "Sin el `use` (o la ruta completa `calculo::divide`) el ejemplo no compila.", "Ve precisamente las públicas; las privadas, no.", "El `use` no cambia la velocidad."]}
+/>
+
+<Pregunta
+  pregunta="Quieres documentar una función que descarga un archivo de internet. ¿Qué atributo pones al ejemplo?"
+  opciones={["`ignore`", "`no_run`", "`should_panic`", "`compile_fail`"]}
+  correcta={1}
+  explicacion="`no_run` comprueba que el ejemplo **compila** (así no se queda viejo) pero no lo ejecuta, porque las pruebas no deberían depender de la red."
+  porque={["`ignore` ni lo compilaría: el ejemplo podría pudrirse sin que te enteres.", "Correcto.", "No esperas un pánico.", "El ejemplo sí debe compilar."]}
+/>
+
+<Pregunta
+  pregunta="En la salida ves `test src\lib.rs - divide (line 22) - compile ... ok`. ¿Qué significa?"
+  opciones={["Que ese doctest se ejecutó y pasó", "Que es un `no_run`: se compiló bien y no se ejecutó", "Que es un `compile_fail` que falló al compilar, como se esperaba", "Que hubo un error de compilación"]}
+  correcta={1}
+  explicacion="La etiqueta `- compile` indica que solo se compiló. Los `compile_fail` llevan `- compile fail`."
+  porque={["Los que se ejecutan no llevan etiqueta.", "Correcto.", "Ese llevaría `- compile fail`.", "Pone `ok`: compiló bien."]}
+/>

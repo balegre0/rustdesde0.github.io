@@ -1,0 +1,37 @@
+---
+title: "file!, line!, column! y module_path!"
+description: "Macros que se sustituyen al compilar por el archivo, la línea, la columna o el módulo donde están escritas."
+sidebar:
+  order: 13
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::file`, `std::line`, `std::column`, `std::module_path`
+
+## Sinopsis
+
+```rust
+file!()        // &'static str: la ruta del archivo
+line!()        // u32: la línea (desde 1)
+column!()      // u32: la columna (desde 1)
+module_path!() // &'static str: la ruta del módulo, como "mi_crate::red::tcp"
+```
+
+## Qué hace
+
+Se sustituyen **al compilar** por la posición de la propia macro en el código. Son la base de los mensajes de `panic!`, de `dbg!` y de los sistemas de registro (*logging*), que dicen de dónde viene cada mensaje.
+
+Si quieres la posición de **quien llama** a tu función (y no la de la macro dentro de ella), usa `#[track_caller]` con `std::panic::Location::caller()`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/macros-ubicacion" />
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[`#[track_caller]`](/ref/lenguaje/atributos/track_caller/) · [`dbg!`](/ref/std/macros/dbg/)

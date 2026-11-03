@@ -1,0 +1,83 @@
+---
+title: "E0499: dos préstamos exclusivos a la vez"
+description: "Pides dos préstamos exclusivos (&mut) del mismo valor y los dos siguen vivos al mismo tiempo."
+sidebar:
+  order: 39
+insignias: ["Préstamos"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` cannot borrow `puntos` as mutable more than once at a time ``
+
+## Qué significa
+
+Un **préstamo exclusivo** (`&mut T`) da permiso para modificar un valor. La regla es que, mientras exista, **nadie más** puede acceder a ese valor: ni otro `&mut`, ni un `&`, ni el propio dueño. Aquí `a` y `b` apuntan a `puntos` y los dos se usan después, así que sus vidas se solapan.
+
+## Qué error evita
+
+Dos caminos que pueden escribir en el mismo sitio a la vez es **aliasing con mutación**: uno podría, por ejemplo, hacer crecer un `Vec` (y mover sus datos a otra zona de memoria) mientras el otro sigue apuntando a la zona vieja. Con hilos, sería una **carrera de datos**.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0499" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0499]: cannot borrow `puntos` as mutable more than once at a time
+ --> E0499.rs:4:13
+  |
+3 |     let a = &mut puntos;
+  |             ----------- first mutable borrow occurs here
+4 |     let b = &mut puntos;
+  |             ^^^^^^^^^^^ second mutable borrow occurs here
+5 |     *a += 1;
+  |     ------- first borrow later used here
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Guardar dos `&mut` del mismo valor en variables y usarlos alternadamente.
+- Llamar a un método `&mut self` mientras guardas otro `&mut` de un campo.
+- Intentar tomar `&mut v[0]` y `&mut v[1]` a la vez de un mismo `Vec`.
+
+## Cómo arreglarlo
+
+Haz que un préstamo **termine** antes de crear el siguiente: úsalo y no vuelvas a usarlo, o enciérralo en un bloque `{ }`. Para dos elementos distintos de un slice existe `split_at_mut` (o `get_disjoint_mut`), que te da dos `&mut` que el compilador sabe que no se solapan.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let mut puntos = 10;
+    {
+        let a = &mut puntos;
+        *a += 1;
+    } // el préstamo `a` termina aquí
+    let b = &mut puntos;
+    *b += 1;
+    println!("{puntos}");
+}
+```
+
+**Salida:**
+
+```text
+12
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0499` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0502](/errores/e0502/): préstamo exclusivo mientras hay uno compartido
+- [E0503](/errores/e0503/): usar un valor mientras está prestado en exclusiva
+- [E0506](/errores/e0506/): asignar a un valor prestado
+
+## Aprende esto en
+
+- [Mundo 07 · Préstamos](/curso/07-prestamos/)

@@ -1,0 +1,37 @@
+---
+title: "str (texto prestado)"
+description: "El tipo primitivo str y &str: trozos de texto UTF-8 prestados, y sus métodos para buscar, dividir y convertir."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+**Ruta:** `primitivo str (y el módulo std::str)`
+
+## Para qué sirve
+
+`str` es el tipo primitivo del **texto UTF-8**. Casi siempre lo verás detrás de una referencia, `&str`: un puntero al primer byte más una longitud. Los literales (`"hola"`) son `&'static str`: viven dentro del programa. Un `&str` también puede apuntar dentro de un `String`. El módulo `std::str` contiene funciones auxiliares (`from_utf8`) y los tipos de los iteradores (`Split`, `Chars`…).
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`str`](/ref/std/str/str/) | Los métodos del texto prestado. | 1.0 |
+| `from_utf8` | Comprueba bytes y los presta como `&str`. | 1.0 |
+| `FromStr` | El trait que hay detrás de `parse()`. | 1.85 |
+
+**Catálogo completo:** [String y str: todos los métodos](/ref/std/string/catalogo/)
+
+## Conceptos clave
+
+- **`&str` no es dueño**: no puede crecer; para modificar texto necesitas un `String`.
+- **Los métodos que transforman** (`to_uppercase`, `replace`) crean un `String` nuevo; los que buscan o dividen devuelven trozos `&str` del original, sin copiar.
+
+## Ver también
+
+- [String](/ref/std/string/string/)
+- [char](/ref/std/char/)
+
+## Aprende esto en
+
+- [Mundo 03 · Valores y tipos](/curso/03-valores-y-tipos/)
+- [Mundo 11 · Colecciones y texto](/curso/11-colecciones-y-texto/)

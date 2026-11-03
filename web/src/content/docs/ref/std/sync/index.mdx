@@ -1,0 +1,43 @@
+---
+title: "std::sync"
+description: "Compartir datos entre hilos sin carreras: Arc, Mutex, RwLock, atómicos, canales mpsc, OnceLock y LazyLock."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "std (Arc y atomic: alloc y core)"]
+---
+**Ruta:** `std::sync`
+
+## Para qué sirve
+
+Este módulo tiene las herramientas para **compartir datos entre hilos** de forma segura. El compilador impide las **carreras de datos** (dos hilos accediendo a la vez a lo mismo, al menos uno escribiendo) con los traits `Send` y `Sync`; estos tipos son la forma permitida de compartir.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Arc`](/ref/std/sync/arc/) | Como `Rc`, pero con contador atómico: varios dueños en varios hilos. | 1.0 |
+| [`Mutex`](/ref/std/sync/mutex/) | Exclusión mutua: un hilo cada vez. | 1.0 |
+| [`RwLock`](/ref/std/sync/rwlock/) | Varios lectores o un escritor. | 1.0 |
+| [`atomic`](/ref/std/sync/atomic/) | Enteros y booleanos que se modifican sin cerrojo. | 1.0 |
+| [`mpsc`](/ref/std/sync/mpsc/) | Canales: varios productores, un consumidor. | 1.0 |
+| `Condvar` | Esperar a que otro hilo avise de un cambio. | 1.0 |
+| `Barrier` | Esperar a que lleguen N hilos. | 1.0 |
+| `OnceLock` | Un valor que se inicializa una sola vez (versión para hilos de `OnceCell`). | 1.70 |
+| `LazyLock` | Un valor que se calcula la primera vez que se usa: ideal para `static`. | 1.80 |
+
+## Conceptos clave
+
+- **El patrón típico**: `Arc<Mutex<T>>`. `Arc` da varios dueños entre hilos; `Mutex` da acceso exclusivo para modificar.
+- **Envenenamiento** (*poisoning*): si un hilo entra en pánico con un `Mutex` bloqueado, el cerrojo queda «envenenado» y los siguientes `lock()` devuelven `Err`. Por eso se escribe `lock().unwrap()`.
+- **Interbloqueo** (*deadlock*): dos hilos que esperan cada uno el cerrojo del otro se quedan parados para siempre. Rust no lo impide: no es comportamiento indefinido. Bloquea siempre en el mismo orden.
+- **En el navegador no hay hilos**, pero todos estos tipos funcionan en un solo hilo; los ejemplos de hilos se ejecutan en el Playground.
+
+## Ver también
+
+- [std::thread](/ref/std/thread/)
+- [Send y Sync](/ref/std/marker/send-sync/)
+- [std::cell (un solo hilo)](/ref/std/cell/)
+
+## Aprende esto en
+
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)

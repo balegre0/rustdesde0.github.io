@@ -1,0 +1,129 @@
+---
+title: "if es una expresión"
+description: "Usa if para decidir qué hacer y también para producir un valor, y entiende por qué las dos ramas deben dar el mismo tipo."
+sidebar:
+  order: 2
+duracion: 10
+desde: "1.0"
+requiere: ["04-expresiones-y-control/01-bloques-son-expresiones"]
+tarjetas:
+  - p: "¿De qué tipo tiene que ser la condición de un `if`?"
+    r: "`bool`, siempre. Un número no vale como condición: hay que compararlo (`n > 0`)."
+  - p: "¿Qué exige Rust a las ramas de un `if` usado como valor?"
+    r: "Que todas produzcan el mismo tipo (error E0308 si no) y que haya `else` (error E0317 si no)."
+  - p: "¿Cuánto vale un `if` sin `else`?"
+    r: "`()`. Por eso no puedes usarlo para dar un número a una variable."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a usar `if` de las dos maneras que permite Rust: como **decisión** («haz esto o aquello») y como **expresión** («vale esto o aquello»).
+
+## Predice
+
+<NoCompila
+  ej="m04/if-tipos-distintos"
+  explicacion="Antes de mirar el error: ¿qué tipo debería tener `mensaje`? Si `lleno` es verdadero sería un número; si es falso, un texto. Rust necesita saber el tipo de cada variable antes de ejecutar el programa, y aquí no puede."
+/>
+
+## La idea
+
+`if condición { A } else { B }` evalúa la condición. Si es `true`, ejecuta el bloque `A`; si es `false`, el bloque `B`. Como cada bloque es una expresión (lo viste en la lección anterior), **el `if` entero también es una expresión**: vale lo que valga el bloque elegido. Por eso puedes escribir `let ropa = if calor { "camiseta" } else { "jersey" };`.
+
+Para que eso funcione, Rust pone dos condiciones. Primera: **las dos ramas deben producir el mismo tipo**. La variable `ropa` tiene un único tipo, fijado al compilar, así que no puede ser «a veces número, a veces texto». Segunda: si usas el valor, **tiene que haber `else`**. Sin `else`, cuando la condición es falsa no hay ninguna rama que dé un valor, y el `if` vale `()`.
+
+La condición, además, tiene que ser un **`bool`** de verdad. Rust no convierte números en verdadero/falso por su cuenta: si quieres preguntar «¿hay mensajes?», escribe `mensajes > 0`.
+
+## Pruébalo
+
+<Ejecutar ej="m04/if-expresion" />
+
+1. El primer `if` se usa como decisión: cada rama imprime algo y vale `()`.
+2. El segundo produce un `&str` que se guarda en `ropa`.
+3. La cadena `else if` comprueba las condiciones **de arriba abajo** y se queda con la primera verdadera. Con 34 grados, `>= 40` es falso y `>= 30` es verdadero, así que `nivel` vale 2: la última rama ni se mira.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El `if` se convierte en un salto.** El compilador traduce `if` a una comparación seguida de un **salto condicional**: una instrucción de la CPU que dice «si el resultado fue falso, sigue leyendo en otra dirección». Las dos ramas existen en el programa; solo se ejecuta una.
+
+**Un `if` sin `else` vale `()`.** Rust lo trata como si hubieras escrito `else { () }`. Por eso este caso sí compila cuando no usas el valor (el `if` de la línea 1 del ejemplo), y falla cuando sí lo usas.
+
+**El tipo se decide antes de ejecutar.** El compilador calcula el tipo de cada rama. Si coinciden, ese es el tipo del `if`. Si no, el error E0308 te enseña las dos: la rama que fijó el tipo («expected because of this») y la que no encaja.
+
+</BajoElCapo>
+
+## Trampa típica
+
+Usar el valor de un `if` que no tiene `else`:
+
+<NoCompila
+  ej="m04/if-sin-else"
+  explicacion="Si `puntos` fuera 3, ¿cuánto valdría `premio`? No hay respuesta, y Rust no se la inventa. La nota lo dice claro: «`if` expressions without `else` evaluate to `()`» (un `if` sin `else` vale `()`)."
+/>
+
+Y usar un número como condición:
+
+<NoCompila
+  ej="m04/if-no-bool"
+  explicacion="«expected `bool`, found integer»: la condición debe ser verdadero o falso. Escribe la pregunta completa: `mensajes > 0`."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m04/signo"
+  enunciado={"Completa la línea de `signo` con un `if` que valga `\"positivo\"`, `\"negativo\"` o `\"cero\"` según el número. El programa debe imprimir una línea por cada número de la lista."}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace `let x = if true { 1 } else { 2.0 };`?"
+  opciones={[
+    "`x` vale `1`",
+    "No compila: una rama es entera y la otra decimal",
+    "`x` vale `1.0`: Rust convierte el entero",
+    "No compila: falta `mut`"
+  ]}
+  correcta={1}
+  explicacion="`1` es un entero y `2.0` es un `f64`. Rust no mezcla tipos numéricos por su cuenta: las ramas deben coincidir exactamente (error E0308)."
+  porque={[
+    "Aunque la condición sea siempre `true`, el compilador comprueba las dos ramas.",
+    "",
+    "Rust nunca convierte números implícitamente; tendrías que escribir `1.0`.",
+    "`mut` no influye: `x` no cambia después."
+  ]}
+/>
+
+<Pregunta
+  pregunta={"Con `let t = 25;`, ¿cuánto vale `if t > 30 { \"calor\" } else if t > 20 { \"templado\" } else if t > 10 { \"fresco\" } else { \"frío\" }`?"}
+  opciones={["`\"calor\"`", "`\"templado\"`", "`\"fresco\"`", "`\"templado\"` y `\"fresco\"`"]}
+  correcta={1}
+  explicacion="Las condiciones se comprueban en orden y gana la primera verdadera: `25 > 30` es falso, `25 > 20` es verdadero. Las demás ni se evalúan."
+  porque={[
+    "`25 > 30` es falso.",
+    "",
+    "`25 > 10` también es verdad, pero ya ganó la rama anterior.",
+    "Un `if` elige una sola rama; nunca vale dos cosas."
+  ]}
+/>
+
+<Pregunta
+  pregunta={"¿Por qué este código SÍ compila? `if n > 5 { println!(\"grande\"); }`"}
+  opciones={[
+    "Porque `println!` devuelve un `bool`",
+    "Porque no se usa el valor del `if`, y la rama vale `()`, igual que el `else` implícito",
+    "Porque Rust ignora los `if` sin `else`",
+    "Porque `n` es mayor que 5"
+  ]}
+  correcta={1}
+  explicacion="Sin `else`, el `if` vale `()`. La rama `{ println!(...); }` también vale `()`. Los tipos coinciden y nadie pide un valor distinto: todo correcto."
+  porque={[
+    "`println!` no devuelve nada útil: su valor es `()`.",
+    "",
+    "No los ignora: se ejecutan normalmente, simplemente valen `()`.",
+    "El compilador no sabe cuánto vale `n` al compilar; comprueba los tipos, no los valores."
+  ]}
+/>

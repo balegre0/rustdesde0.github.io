@@ -1,0 +1,190 @@
+---
+title: "Pruebas de integración"
+description: "Prueba tu biblioteca desde fuera, solo con lo público, como la usaría otra persona."
+sidebar:
+  order: 4
+duracion: 11
+desde: "1.0"
+requiere: ["16-pruebas-y-herramientas/03-organizar-las-pruebas", "12-modulos-crates-y-cargo"]
+tarjetas:
+  - p: "¿Dónde van las pruebas de integración?"
+    r: "En la carpeta `tests/`, junto a `src/`. Cada archivo `.rs` de `tests/` se compila como un crate aparte que usa tu biblioteca como dependencia."
+  - p: "¿Puede una prueba de integración llamar a una función privada de tu biblioteca?"
+    r: "No: es un crate externo y solo ve lo `pub`. Si lo intenta, el compilador da E0603. Lo privado se prueba con pruebas unitarias dentro de `src/`."
+  - p: "¿Cómo compartes funciones auxiliares entre varios archivos de `tests/`?"
+    r: "En `tests/comun/mod.rs` (una subcarpeta) y `mod comun;` en cada archivo que lo use. Un `tests/comun.rs` suelto se trataría como otro archivo de pruebas."
+  - p: "¿Por qué no se pueden escribir pruebas de integración para un crate que solo tiene `src/main.rs`?"
+    r: "Porque un binario no se puede usar como dependencia. La solución habitual: poner la lógica en `src/lib.rs` y dejar `main.rs` como una capa fina que la llama."
+---
+
+import { NoCompila, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Las pruebas unitarias miran cada pieza por dentro. Ahora vas a probar tu biblioteca **desde fuera**, exactamente como la usará quien la descargue: solo con lo que es público.
+
+## Predice
+
+Aquí un módulo hace el papel de tu biblioteca y `main` el de un archivo de pruebas que la usa desde fuera. ¿Por qué no compila?
+
+<NoCompila ej="m16/privada" explicacion="`suma` no es `pub`, así que desde fuera del módulo `notas` no existe: E0603 «function `suma` is private». Una prueba de integración está en la misma situación, porque es otro crate. Lo privado se prueba desde dentro (el arreglo lo muestra con una función dentro del módulo)." />
+
+## La idea
+
+Un proyecto con biblioteca tiene esta forma:
+
+```text
+notas/
+├── Cargo.toml
+├── src/
+│   └── lib.rs          ← tu biblioteca, con sus pruebas unitarias dentro
+└── tests/
+    └── uso_publico.rs  ← pruebas de integración
+```
+
+Cargo trata cada archivo de `tests/` como **un crate independiente** que depende de tu biblioteca, igual que dependería de un crate descargado. Consecuencias:
+
+1. Tienes que importar con el nombre del crate: `use notas::media;`.
+2. Solo ves lo `pub`. Si un archivo de `tests/` necesita algo privado, a lo mejor tu API pública no basta para usar la biblioteca: es una pista de diseño.
+3. No hace falta `#[cfg(test)]`: Cargo solo compila `tests/` cuando ejecutas pruebas.
+
+Las pruebas unitarias responden a «¿esta pieza funciona?». Las de integración, a «¿las piezas funcionan **juntas**, a través de la puerta de entrada que ofrezco?».
+
+## Pruébalo
+
+Un archivo de integración real para la biblioteca de notas de las lecciones anteriores:
+
+```rust title="tests/uso_publico.rs"
+use notas::{aprobado, media, parsear};
+
+#[test]
+fn flujo_completo() {
+    let textos = ["4", "6.5", "9"];
+    let valores: Vec<f64> = textos.iter().map(|t| parsear(t).unwrap()).collect();
+    let m = media(&valores).unwrap();
+    assert!(aprobado(m));
+}
+
+#[test]
+fn texto_invalido_da_error() {
+    assert!(parsear("siete").is_err());
+    assert!(parsear("11").is_err());
+}
+```
+
+Y la salida completa de `cargo test` en ese proyecto (real; solo hemos acortado la ruta de la primera línea a `(…)` y quitado una línea de aviso propia del entorno wasm donde se ejecutó):
+
+```text title="cargo test (salida real)"
+   Compiling notas v0.1.0 (…)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.75s
+     Running unittests src\lib.rs (target\wasm32-wasip1\debug\deps\notas-084254e7a6508a54.wasm)
+
+running 6 tests
+test tests::cinco_aprueba ... ok
+test tests::media_de_dos ... ok
+test tests::media_vacia_es_none ... ok
+test tests::muchas_notas ... ignored, lento: recorre un millón de notas
+test tests::nota_fuera_de_rango - should panic ... ignored
+test tests::parsear_bien ... ok
+
+test result: ok. 4 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\uso_publico.rs (target\wasm32-wasip1\debug\deps\uso_publico-bdc34728528518b3.wasm)
+
+running 2 tests
+test flujo_completo ... ok
+test texto_invalido_da_error ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests notas
+
+running 1 test
+test src\lib.rs - media (line 7) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.49s; merged doctests compilation took 0.43s
+```
+
+Hay **tres bloques**: las pruebas unitarias (`unittests src\lib.rs`), cada archivo de integración (`tests\uso_publico.rs`) y los ejemplos de la documentación (`Doc-tests`, la lección siguiente). Para ejecutar solo un archivo de integración: `cargo test --test uso_publico`.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Mira las rutas de las líneas `Running`: `deps\notas-084254e7a6508a54` y `deps\uso_publico-bdc34728528518b3`. Son **dos programas distintos**, cada uno con su propio `main` generado por el arnés. El número largo es un hash que Cargo añade para distinguir versiones de cada compilación.
+
+El orden de compilación es:
+
+1. Tu biblioteca, compilada normalmente (como `.rlib`, el formato de biblioteca de Rust).
+2. Tu biblioteca otra vez, **con `--test`**: el programa de pruebas unitarias.
+3. Cada archivo de `tests/`, con `--test`, enlazado contra la biblioteca del paso 1. Como ese paso se compiló **sin** `cfg(test)`, desde `tests/` tampoco existe tu módulo `tests` ni nada marcado con `#[cfg(test)]`.
+
+Por eso las pruebas de integración son más lentas de compilar: cada archivo es un ejecutable más que enlazar. En proyectos grandes se suele tener un único `tests/integracion/main.rs` con submódulos, en vez de veinte archivos sueltos.
+
+Si tu crate es **solo un binario** (`src/main.rs`), no hay biblioteca que enlazar y `tests/` no puede usar nada de él. El patrón de costumbre es poner la lógica en `src/lib.rs` y dejar `main.rs` en unas pocas líneas que llaman a la biblioteca: así todo es probable.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="El archivo de ayudas que se convierte en pruebas">
+
+❌ Pones funciones auxiliares en `tests/comun.rs`. Cargo lo trata como **otro archivo de pruebas** y lo ejecuta (salida real):
+
+```text
+     Running tests\comun.rs (target\wasm32-wasip1\debug\deps\comun-b6c980a1e9423472.wasm)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+✅ Ponlas en una **subcarpeta**: `tests/comun/mod.rs`. Cargo no compila las subcarpetas de `tests/` como pruebas por su cuenta; las usas con `mod comun;`:
+
+```rust title="tests/con_ayuda.rs"
+mod comun;
+
+#[test]
+fn media_de_ejemplo() {
+    let v = comun::notas_de_ejemplo();
+    assert!(notas::media(&v).unwrap() > 6.0);
+}
+```
+
+Con este cambio, el bloque `Running tests\comun.rs` desaparece y aparece `Running tests\con_ayuda.rs` con su prueba `media_de_ejemplo ... ok`.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["use notas::{media, parsear};", "#[test]", "fn media_de_textos() {", "    let v: Vec<f64> = [\"5\", \"7\"].iter().map(|t| parsear(t).unwrap()).collect();", "    assert_eq!(media(&v), Some(6.0));", "}"]}
+  distractores={["use super::*;", "#[cfg(test)]", "use crate::parsear;"]}
+  explicacion="En `tests/` estás **fuera** de la biblioteca: se importa con el nombre del crate (`use notas::…`). `use super::*` y `use crate::…` apuntarían al propio archivo de pruebas, y `#[cfg(test)]` sobra porque `tests/` solo se compila para probar."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="En un archivo de `tests/` escribes `use notas::suma_interna;` y `suma_interna` no es `pub`. ¿Qué pasa?"
+  opciones={["Funciona, porque las pruebas tienen permiso especial", "Error E0603: la función es privada", "Funciona solo si el archivo tiene `#[cfg(test)]`", "Avisa con un warning pero compila"]}
+  correcta={1}
+  explicacion="Para el compilador, `tests/uso.rs` es un crate externo más. No hay excepciones para las pruebas: lo privado no se ve."
+  porque={["Las pruebas unitarias ven lo privado porque son módulos hijos; las de integración no.", "Correcto.", "`cfg(test)` no cambia la visibilidad.", "La privacidad es un error, no un aviso."]}
+/>
+
+<Pregunta
+  pregunta="Tienes `tests/a.rs`, `tests/b.rs` y `tests/util/mod.rs`. ¿Cuántos programas de pruebas de integración compila Cargo?"
+  opciones={["1", "2", "3", "Ninguno: necesitas un `tests/main.rs`"]}
+  correcta={1}
+  explicacion="Cada archivo `.rs` directamente en `tests/` es un programa: `a` y `b`. Las subcarpetas como `util/` no se compilan solas; se usan con `mod util;`."
+  porque={["Cada archivo de primer nivel es un crate aparte.", "Correcto.", "`util/mod.rs` está en una subcarpeta y no cuenta por sí solo.", "No hace falta un archivo principal."]}
+/>
+
+<Pregunta
+  pregunta="Tu programa solo tiene `src/main.rs` y quieres pruebas de integración. ¿Qué haces?"
+  opciones={["Escribir las pruebas en `tests/` y llamar a `main()` desde ellas", "Mover la lógica a `src/lib.rs` y que `main.rs` la use; las pruebas de `tests/` usan la biblioteca", "No se puede probar un binario de ninguna forma", "Añadir `pub` a todas las funciones de `main.rs`"]}
+  correcta={1}
+  explicacion="Un binario no puede ser dependencia de otro crate. Separar biblioteca y binario es la forma habitual de que todo sea probable desde fuera."
+  porque={["`tests/` no puede importar nada de un binario.", "Correcto.", "Las pruebas unitarias dentro de `main.rs` sí funcionan; lo que no hay es acceso desde `tests/`.", "`pub` no cambia que un binario no se pueda enlazar como biblioteca."]}
+/>

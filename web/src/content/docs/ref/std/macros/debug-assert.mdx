@@ -1,0 +1,44 @@
+---
+title: "debug_assert!, debug_assert_eq! y debug_assert_ne!"
+description: "Como assert!, pero solo se comprueban en el perfil debug: en release desaparecen y no cuestan nada."
+sidebar:
+  order: 11
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::debug_assert`, `std::debug_assert_eq`, `std::debug_assert_ne`
+
+## Sinopsis
+
+```rust
+debug_assert!(condición);
+debug_assert!(condición, "mensaje {}", args);
+debug_assert_eq!(izquierda, derecha);
+debug_assert_ne!(izquierda, derecha);
+```
+
+## Qué hace
+
+Igual que [`assert!`](/ref/std/macros/assert/), pero **solo cuando `debug_assertions` está activo** (el perfil `dev` de Cargo, por defecto). En `release` el compilador las elimina por completo: ni siquiera se evalúa la condición.
+
+Úsalas para comprobaciones **caras** o de **depuración** (invariantes internos, «esto no debería pasar nunca»), y `assert!` para lo que tiene que comprobarse siempre, incluido lo que protege la seguridad de un bloque `unsafe`.
+
+## Ejemplo
+
+Este ejemplo tiene dos perfiles. En debug, la tercera llamada entra en pánico; en release, la comprobación no existe y la función devuelve `0`:
+
+<Ejecutar ej="ref-std/macros-debug-assert" />
+
+## Errores típicos
+
+- Poner efectos dentro: `debug_assert!(lista.pop().is_some())`. En release el `pop` **no se ejecuta** y el programa cambia de comportamiento.
+- Usarlas para validar datos del usuario: en release no se comprobaría nada. Para eso, `Result`.
+
+## Desde
+
+Rust 1.0.
+
+## Ver también
+
+[`assert!`](/ref/std/macros/assert/) · [Perfiles y cfg](/curso/12-modulos-crates-y-cargo/08-perfiles-y-cfg/)

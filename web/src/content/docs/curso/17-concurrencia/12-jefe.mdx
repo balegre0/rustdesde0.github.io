@@ -1,0 +1,58 @@
+---
+title: "Jefe: tu propia piscina de hilos"
+description: "Construye un thread pool: obreros que comparten un receptor con Arc<Mutex<…>>, trabajos como Box<dyn FnOnce + Send> y un apagado ordenado en Drop."
+sidebar:
+  order: 12
+duracion: 25
+desde: "1.0"
+requiere: ["17-concurrencia/11-paralelismo-y-rayon"]
+tarjetas:
+  - p: "¿Por qué el receptor de la piscina va en un Arc<Mutex<Receiver<Trabajo>>>?"
+    r: "Porque un Receiver no se puede clonar: para que varios obreros se repartan los trabajos, comparten uno solo, protegido por un Mutex."
+  - p: "¿Qué tipo tiene un trabajo en la piscina?"
+    r: "Box<dyn FnOnce() + Send + 'static>: cualquier closure que se pueda ejecutar una vez en otro hilo."
+  - p: "¿Cómo se apaga la piscina de forma ordenada?"
+    r: "Soltando el Sender (el canal se cierra, recv devuelve Err y los obreros salen de su bucle) y haciendo join de cada obrero, en el Drop."
+---
+
+import { Reto, Pregunta } from '~/components';
+
+Un servidor web no crea un hilo por petición: tiene un grupo fijo de hilos, una **piscina** (*thread pool*), que van cogiendo trabajos de una cola. Vas a construir una, usando casi todo lo que has visto en este mundo.
+
+## El reto
+
+<Reto
+  ej="m17/jefe-pool"
+  enunciado="Completa la piscina. (1) El bucle de cada obrero: recibe un trabajo con el candado tomado **el menor tiempo posible** (que el guard sea un temporal de la línea del `recv`), ejecútalo si llega `Ok(trabajo)` y sal del bucle si llega `Err`. (2) El `Drop`: cierra el canal soltando el emisor (`self.emisor.take()`) y haz `join` de todos los obreros. La salida son los factoriales de 1 a 6, ordenados."
+/>
+
+Piensa en qué pasaría si el obrero ejecutara el trabajo **con el candado todavía tomado**: los demás obreros no podrían recibir nada mientras tanto, y tu piscina de tres hilos trabajaría como uno solo.
+
+## Repaso relámpago
+
+<Pregunta
+  pregunta="¿Por qué `emisor` es un `Option<Sender<Trabajo>>` y no un `Sender<Trabajo>`?"
+  opciones={["Para poder sacarlo con `take()` en `drop(&mut self)` y destruirlo antes de esperar a los obreros", "Porque el canal puede no existir", "Por rendimiento", "Porque `Sender` no se puede guardar en un struct"]}
+  correcta={0}
+  explicacion="En `drop` solo tienes `&mut self`: no puedes mover un campo fuera. Con `Option`, `take()` lo saca dejando `None`, y el `Sender` se destruye en ese momento, lo que cierra el canal."
+  porque={["", "El canal siempre existe mientras vive la piscina.", "No tiene que ver con la velocidad.", "Sí se puede guardar."]}
+/>
+
+<Pregunta
+  pregunta="Si en `Drop` haces los `join` **antes** de soltar el emisor, ¿qué pasa?"
+  opciones={["Interbloqueo: los obreros esperan más trabajos en `recv` para siempre, y `drop` espera a los obreros para siempre", "Nada", "Pánico", "Se pierden trabajos"]}
+  correcta={0}
+  explicacion="Los obreros solo salen del bucle cuando `recv` devuelve `Err`, y eso solo ocurre cuando el canal se cierra. Es un ciclo de espera: el orden importa."
+  porque={["", "El programa no terminaría.", "No hay pánico: simplemente nadie avanza.", "Antes de eso, nunca acaba."]}
+/>
+
+## Lo que te llevas del mundo 17
+
+- Hilos con `spawn` (dueños, `move`, `'static`) y con `scope` (pueden tomar prestado).
+- `Send` y `Sync`: el compilador decide qué puede cruzar entre hilos.
+- Rust hace **imposibles** las carreras de datos: la regla de los préstamos, aplicada entre hilos.
+- `Mutex`, `RwLock`, `Condvar`, `LazyLock`, canales y atómicos, cada uno para su caso.
+- El orden de memoria: `Relaxed`, `Acquire`/`Release` y `SeqCst`.
+- Los interbloqueos siguen siendo cosa tuya: orden global y candados cortos.
+
+En el mundo 18 verás la otra forma de hacer muchas cosas a la vez: `async`, para tareas que pasan casi todo el tiempo esperando.

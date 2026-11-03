@@ -1,0 +1,136 @@
+---
+title: "¿Por qué no copiar sin más?"
+description: "Mira qué pasaría si let s2 = s1 copiara la ficha y dejara a las dos como dueñas, y por qué Rust elige mover en vez de copiar en profundidad."
+sidebar:
+  order: 5
+duracion: 9
+desde: "1.0"
+requiere: ["06-ownership/04-mover"]
+tarjetas:
+  - p: "Si al copiar la ficha de un `String` las dos variables siguieran siendo dueñas, ¿qué pasaría al final del ámbito?"
+    r: "Las dos liberarían el mismo trozo del heap: doble liberación, comportamiento indefinido."
+  - p: "¿Por qué Rust no hace una copia profunda automática en cada `let b = a;`?"
+    r: "Porque sería cara (reservar y copiar todo el heap) y estaría escondida en cada asignación. Rust mueve (barato) y deja la copia profunda explícita con `.clone()`."
+  - p: "¿Qué tres opciones tenía el diseño para `let b = a;` con datos en el heap?"
+    r: "Copiar solo la ficha y tener dos dueñas (doble liberación), copiar todo en profundidad (caro y oculto) o mover (barato y seguro). Rust mueve."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Vas a ver por qué mover no es un capricho: es la **única** de las opciones razonables que es a la vez segura y barata.
+
+## Predice
+
+<Pregunta
+  pregunta="Imagina un Rust inventado en el que `let s2 = s1;` copia la ficha (puntero, capacidad, longitud) y deja a **las dos** variables como dueñas. ¿Qué pasa al final de `main`?"
+  opciones={[
+    "Nada malo: cada una libera su copia",
+    "Se libera dos veces el mismo trozo del heap",
+    "Se libera solo la primera",
+    "El texto se duplica automáticamente"
+  ]}
+  correcta={1}
+  explicacion="Las dos fichas tienen **el mismo puntero**. Cada dueña, al salir de ámbito, devolvería ese trozo: dos liberaciones del mismo bloque. Es una doble liberación."
+  porque={[
+    "Lo que se copió es la ficha, no el texto: solo hay **un** texto en el heap.",
+    "",
+    "En ese Rust inventado las dos serían dueñas, y las dos liberarían.",
+    "Copiar la ficha no copia el texto; para eso habría que reservar memoria nueva."
+  ]}
+/>
+
+## La idea
+
+Cuando asignas un valor que tiene datos en el heap, un lenguaje tiene tres opciones:
+
+| Opción | Qué hace `let s2 = s1;` | Problema |
+|---|---|---|
+| **A. Copia superficial con dos dueñas** | Copia la ficha; las dos variables liberarán | **Doble liberación**: el mismo bloque se devuelve dos veces |
+| **B. Copia profunda automática** | Reserva memoria nueva y copia todo el texto | **Caro y escondido**: cada asignación o llamada a función podría copiar megas sin que lo veas |
+| **C. Mover** | Copia la ficha; **solo la nueva** es dueña | Ninguno en memoria: lo único es que no puedes usar `s1` después |
+
+Rust elige **C** por defecto. Y si de verdad quieres la opción B, la pides **por escrito**: `let s2 = s1.clone();`. Así, cada copia cara se ve en el código.
+
+La opción A es justo lo que los lenguajes sin estas reglas dejan hacer por error, y es la fuente de muchos fallos de seguridad graves: liberar dos veces un bloque permite que el asignador se lo entregue a dos partes del programa a la vez, y que lo que escribe una aparezca en la otra.
+
+## Pruébalo
+
+La opción C en acción: un millón de bytes que cambian de dueña sin moverse de sitio.
+
+<Ejecutar ej="m06/mover-grande" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**El dibujo de la opción A** (la que Rust impide):
+
+```text
+  PILA                       HEAP
+  s1 ┌──────────┐
+     │ ptr ─────┼──────┐
+     │ cap 4    │      ▼
+     │ len 4    │     ┌───┬───┬───┬───┐
+     └──────────┘     │ h │ o │ l │ a │◄── liberado por s2... y luego por s1
+  s2 ┌──────────┐     └───┴───┴───┴───┘
+     │ ptr ─────┼──────┘
+     │ cap 4    │
+     │ len 4    │
+     └──────────┘
+```
+
+Al cerrar `main` se libera primero `s2` (orden inverso) y el bloque vuelve al asignador. Después se liberaría `s1`, con el **mismo** puntero. Entre las dos liberaciones, el asignador podría haber dado ese bloque a otro dato: la segunda liberación le quitaría la memoria a un dato inocente.
+
+**Por qué el compilador puede hacerlo gratis.** Para impedir la opción A, Rust no necesita contar dueños mientras el programa se ejecuta. Lo sabe al compilar: en cada línea, cada variable tiene o no tiene la O. Solo inserta `drop` para quien la tiene al final. Es una comprobación **estática** (antes de ejecutar), y por eso no cuesta nada al ejecutar.
+
+**¿Y los enteros?** Un `i32` no tiene nada en el heap: copiarlo (4 bytes) es tan barato como moverlo, y no hay nada que liberar dos veces. Para esos tipos, Rust copia y deja usables a los dos. Es la lección siguiente: `Copy`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="«Mover es lento porque copia el texto»">
+
+❌ «Evito pasar `String` de un lado a otro porque mover copia el texto.»
+
+✅ Mover copia **la ficha**: 24 bytes en un PC de 64 bits (12 en el navegador), sea cual sea el tamaño del texto. Lo que cuesta es `.clone()`, que sí reserva y copia todo el contenido. Si ves un `.clone()` en un bucle, ahí sí hay que mirar.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué Rust no hace una copia profunda automática en cada asignación?"
+  opciones={[
+    "Porque es imposible copiar datos del heap",
+    "Porque sería caro y quedaría oculto: cualquier `let` o llamada podría copiar megas sin que se vea",
+    "Porque provocaría una doble liberación",
+    "Porque el heap es de solo lectura"
+  ]}
+  correcta={1}
+  explicacion="La copia profunda es segura, pero cara. Rust la hace explícita (`.clone()`) para que el coste se vea en el código."
+  porque={[
+    "Es posible: es exactamente lo que hace `.clone()`.",
+    "",
+    "Una copia profunda crea un bloque **nuevo** con su propio dueño: no hay doble liberación.",
+    "El heap se puede leer y escribir."
+  ]}
+/>
+
+<Pregunta
+  pregunta="De las tres opciones (copia superficial con dos dueñas, copia profunda automática, mover), ¿cuál produce comportamiento indefinido?"
+  opciones={[
+    "La copia superficial con dos dueñas",
+    "La copia profunda automática",
+    "Mover",
+    "Ninguna"
+  ]}
+  correcta={0}
+  explicacion="Dos dueñas del mismo bloque implican dos liberaciones: doble liberación, que es UB."
+  porque={[
+    "",
+    "Es cara, pero segura: cada copia tiene su propio bloque.",
+    "Mover deja una sola dueña: una sola liberación.",
+    "La primera sí lo produce."
+  ]}
+/>

@@ -1,0 +1,149 @@
+---
+title: "El solver de traits"
+description: "Descubre cómo rustc demuestra que un tipo cumple un trait encadenando impls como reglas lógicas, y qué cambia con el solver de nueva generación."
+sidebar:
+  order: 6
+duracion: 13
+desde: "1.0"
+requiere: ["21-el-compilador-por-dentro/03-hir-y-thir", "13-traits-y-genericos"]
+tarjetas:
+  - p: "¿Qué es una *obligación* para el solver de traits?"
+    r: "Una afirmación que hay que demostrar, como `Vec<u8>: Clone` o `<T as Iterator>::Item == u32`. El solver busca impls que la prueben."
+  - p: "¿Cómo se lee `impl<T: Contar> Contar for Option<T>` como regla lógica?"
+    r: "«Para todo T, si T cumple Contar, entonces Option<T> cumple Contar». Para probar `Option<X>: Contar` basta probar `X: Contar`."
+  - p: "¿Por qué la coherencia exige que no haya dos impls que se solapen?"
+    r: "Porque cada obligación debe tener una sola prueba posible; si hubiera dos, el comportamiento dependería de cuál eligiera el compilador."
+  - p: "¿Cuál es el estado del solver de traits de nueva generación en noviembre de 2026?"
+    r: "Activado por defecto en nightly (anuncio de agosto de 2026), aún no en estable; ya se usa para la coherencia. El objetivo es estabilizarlo y retirar el antiguo."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Cada vez que escribes `T: Display`, `x.clone()` o un `for`, el compilador tiene que **demostrar** algo: que cierto tipo implementa cierto trait. La pieza que lo hace es el **solver de traits** (*trait solver*). En esta lección ves que funciona como un pequeño demostrador lógico.
+
+## Predice
+
+<Predice
+  ej="m21/contar-impls"
+  opciones={["0, 1, 3", "0, 0, 0", "1, 2, 4", "No compila: la impl de `Option<T>` es recursiva"]}
+  correcta={0}
+  explicacion="Para `()` se usa la primera impl: 0. Para `Option<()>`, la segunda: 1 + 0. Para `Option<Option<Option<()>>>`, el solver aplica la regla de `Option<T>` tres veces hasta llegar a `()`: 1 + 1 + 1 + 0 = 3."
+  porque={[
+    "",
+    "Cada `Option` usa la segunda impl, que suma 1.",
+    "La impl de `()` devuelve 0, no 1.",
+    "Una impl que pide `T: Contar` para dar `Option<T>: Contar` es perfectamente legal: cada paso trabaja con un tipo más pequeño."
+  ]}
+/>
+
+## La idea
+
+Durante la comprobación de tipos, el compilador acumula **obligaciones** (*obligations*): cosas que tienen que ser ciertas para que el programa tenga sentido. `muestra(&ps)` con `fn muestra<T: Display>` genera la obligación `Punto: Display`. Un `for x in v` genera `[i32; 3]: IntoIterator`. Un `+` entre dos `u8` genera `u8: Add<u8>`.
+
+El solver intenta **demostrar** cada obligación con las impls que conoce. Cada impl es una **regla**:
+
+- `impl Contar for ()` es un hecho: «`()` cumple `Contar`».
+- `impl<T: Contar> Contar for Option<T>` es una regla con condición: «si `T` cumple `Contar`, entonces `Option<T>` también».
+
+Para demostrar `Option<Option<()>>: Contar`, el solver busca una impl cuyo tipo encaje (la de `Option<T>`, con `T = Option<()>`) y eso genera una **sub-obligación** (`Option<()>: Contar`), que a su vez genera `(): Contar`, que es un hecho. Prueba completa. Si alguna rama no encuentra impl, aparece E0277.
+
+Para que esto funcione, cada obligación debe tener **como mucho una prueba**. Eso es la **coherencia**: Rust prohíbe impls que se solapen y, con la **regla huérfana** (*orphan rule*), prohíbe implementar un trait ajeno para un tipo ajeno, porque dos crates distintos podrían hacerlo de formas diferentes.
+
+## Pruébalo
+
+Una obligación que no se puede demostrar: falta la regla `Punto: Display`.
+
+<NoCompila ej="m21/falta-display" explicacion="E0277: la obligación `Punto: Display` no tiene prueba. Lee las tres partes del mensaje: dónde nace la obligación (`required by a bound introduced by this call`), qué falta (`help:`) y qué bound la exige (`note: required by a bound in muestra`). El «Ver arreglo» añade la impl que faltaba." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Dos solvers.** El solver clásico vive en `rustc_trait_selection` (selección de impls más un «contexto de cumplimiento» que va resolviendo obligaciones pendientes). Funciona, pero arrastra problemas difíciles de arreglar en su diseño: la **normalización** de tipos asociados (convertir `<Vec<u8> as IntoIterator>::Item` en `u8`) se hace de forma perezosa e incompleta, y los **ciclos** (una obligación que acaba pidiéndose a sí misma) se tratan con reglas ad hoc.
+
+El **solver de nueva generación** (`-Znext-solver`, crate `rustc_next_trait_solver`) es una reescritura desde cero con una semántica más limpia. Estado verificado a noviembre de 2026:
+
+- Ya se usa en la comprobación de **coherencia**.
+- Está **activado por defecto en nightly** desde el anuncio del 21 de agosto de 2026, tras casi cuatro años de desarrollo.
+- Corrige más de 200 issues conocidos y es requisito para estabilizar funciones como los alias de tipo `impl Trait` y la *return type notation*.
+- El gran obstáculo fue el **rendimiento**; según el anuncio, algunos proyectos (como *datafusion*) compilan más de 8 veces más rápido con él.
+- El objetivo del proyecto para 2026 es estabilizarlo globalmente y retirar el antiguo.
+
+Puedes probarlo en tu propio código: `cargo +nightly check`. Si algo cambia de comportamiento respecto a stable, es un buen informe de error para el proyecto.
+
+**Traits como lógica.** Esta forma de ver las impls como reglas de un programa lógico no es una metáfora: un proyecto anterior, **chalk**, implementó el solver traduciendo los traits a cláusulas lógicas. Quedó archivado, pero sus ideas pasaron al solver nuevo. La lección del mundo 24 sobre traits como lógica vuelve sobre esto.
+
+**Monomorfización después.** Fíjate en que el solver trabaja con tipos **genéricos**: puede demostrar `Option<T>: Contar` suponiendo `T: Contar`, sin saber qué es `T`. Las copias concretas para cada tipo se generan mucho después (lección 8).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Leer solo la primera línea de un E0277">
+
+❌ «`Punto doesn't implement Display`… pero si yo no llamo a `Display` en ningún sitio.»
+
+✅ Busca la línea `note: required by a bound in …`: te dice **qué bound** generó la obligación (aquí, el `T: Display` de `muestra`). En cadenas largas verás varias notas `required for X to implement Y`: son los pasos de la prueba fallida, desde tu llamada hasta la obligación que no tiene impl.
+
+</Trampa>
+
+## Tu turno
+
+<Pregunta
+  pregunta="Tienes `impl<T: Clone> Clone for Caja<T>` y llamas a `caja.clone()` con `caja: Caja<String>`. ¿Qué obligaciones genera el solver?"
+  opciones={[
+    "Solo `Caja<String>: Clone`",
+    "`Caja<String>: Clone`, y al usar la impl genérica, la sub-obligación `String: Clone`",
+    "`String: Copy`",
+    "Ninguna: `clone` siempre está disponible"
+  ]}
+  correcta={1}
+  explicacion="La impl encaja con `T = String` y su condición `T: Clone` se convierte en una sub-obligación. `std` tiene `impl Clone for String`, así que la prueba se cierra."
+  porque={["La impl tiene una condición que también hay que demostrar.", "", "`Clone` no exige `Copy`, y `String` no es `Copy`.", "`clone` es un método del trait `Clone`: solo existe si el trait se cumple."]}
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué es la coherencia en el sistema de traits?"
+  opciones={[
+    "Que el código esté bien indentado",
+    "La garantía de que para cada tipo y trait hay como mucho una impl aplicable",
+    "Que todos los traits tengan métodos",
+    "Que un trait solo se pueda implementar en su propio crate"
+  ]}
+  correcta={1}
+  explicacion="Una sola prueba por obligación: así el comportamiento no depende de qué impl elija el compilador ni de qué crates estén enlazados."
+  porque={["Eso es formato, cosa de `rustfmt`.", "", "Existen traits sin métodos (`Send`, `Copy`…).", "Eso exageraría la regla huérfana: puedes implementar traits ajenos para tus tipos y tus traits para tipos ajenos."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuándo se generan las copias concretas de una función genérica?"
+  opciones={[
+    "Al resolver los traits, en el solver",
+    "Después, en la monomorfización, a partir del MIR",
+    "En el lexer",
+    "En tiempo de ejecución, la primera vez que se llama"
+  ]}
+  correcta={1}
+  explicacion="El solver razona con genéricos; la monomorfización, mucho más tarde, recorre el programa y crea una copia por cada combinación de tipos usada."
+  porque={["El solver solo demuestra; no genera código.", "", "El lexer ni siquiera sabe qué es una función.", "Rust no genera código mientras se ejecuta: todo se decide al compilar."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué afirmación sobre el solver de nueva generación es correcta en noviembre de 2026?"
+  opciones={[
+    "Es el solver por defecto de Rust estable 1.99.1 para todo",
+    "Está activado por defecto en nightly y se usa en coherencia; aún no se ha estabilizado para todo",
+    "Fue descartado en favor de chalk",
+    "Solo existe en rust-analyzer"
+  ]}
+  correcta={1}
+  explicacion="Anunciado en el blog de Rust el 21 de agosto de 2026: activado en nightly y cerca de estabilizarse."
+  porque={["En estable, fuera de la coherencia, sigue el solver clásico.", "", "Al revés: chalk quedó archivado y sus ideas pasaron al solver nuevo.", "Es un componente de rustc (aunque rust-analyzer reutiliza piezas)."]}
+/>
+
+## Para saber más
+
+- Mundo 13 (traits y genéricos) y mundo 24, «traits como lógica».
+- Anuncio oficial: https://blog.rust-lang.org/2026/08/21/enabling-next-solver-on-nightly

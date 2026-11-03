@@ -1,0 +1,137 @@
+---
+title: "Slices: prestar un trozo"
+description: "&[T] y &str prestan una parte contigua de un array, un Vec o un texto. Son punteros anchos: dirección más longitud. Y en texto, se corta por bytes."
+sidebar:
+  order: 9
+duracion: 14
+desde: "1.0"
+requiere: ["07-prestamos/08-prestamos-y-colecciones"]
+tarjetas:
+  - p: "¿Qué es una slice?"
+    r: "Un préstamo de una secuencia contigua de elementos: `&[T]` para elementos de tipo T, `&str` para texto UTF-8."
+  - p: "¿Qué guarda en memoria una `&[i32]`?"
+    r: "Dos cosas: la dirección del primer elemento y la longitud. Es un puntero ancho (*fat pointer*): el doble que una referencia normal."
+  - p: "¿Qué significa `&v[1..4]`?"
+    r: "Los elementos con índice 1, 2 y 3: el inicio se incluye y el final no."
+  - p: "¿Por qué `&\"año\"[0..2]` entra en pánico?"
+    r: "Porque los rangos de un `&str` cuentan bytes, y la «ñ» ocupa los bytes 1 y 2: cortar en el byte 2 parte un carácter por la mitad."
+  - p: "¿Por qué es mejor `fn f(s: &str)` que `fn f(s: &String)`?"
+    r: "Porque `&str` acepta tanto un `&String` (se convierte solo) como un literal o un trozo de texto. Y apunta directamente al texto."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
+
+Muchas veces no quieres prestar un vector entero, sino **una parte**: los tres primeros, la segunda mitad, la primera palabra de una frase. Eso es una **slice** (en español, una «rebanada»). Las vas a usar en casi todas las funciones que escribas.
+
+## Predice
+
+<Predice
+  ej="m07/p-len-ano"
+  opciones={["`4 3`", "`3 3`", "`3 4`", "`6 3`"]}
+  correcta={0}
+  explicacion="`len()` cuenta **bytes**: «a» ocupa 1, «ñ» ocupa 2, «o» ocupa 1, en total 4. `chars().count()` cuenta caracteres: 3. Lo viste en el mundo 01 al estudiar UTF-8."
+  porque={["", "Eso sería si «ñ» ocupara un byte; en UTF-8 ocupa dos.", "Al revés: hay más bytes que caracteres.", "Solo la «ñ» ocupa más de un byte."]}
+/>
+
+## La idea
+
+Una **slice** presta un trozo **contiguo** (seguido, sin huecos) de una secuencia:
+
+| Tipo | Es un préstamo de… | Ejemplo |
+|---|---|---|
+| `&[T]` | varios `T` seguidos | `&v[1..3]`, `&array`, `&v` |
+| `&mut [T]` | lo mismo, para modificar | `&mut v[..2]` |
+| `&str` | texto UTF-8 | `"hola"`, `&s[0..4]`, `&s` |
+
+Los **rangos** se escriben `a..b`: incluyen `a` y **excluyen** `b`. Se puede omitir un extremo: `..3` (desde el principio), `2..` (hasta el final), `..` (todo).
+
+Dos ideas clave:
+
+1. **Una slice es un préstamo**, con todas sus reglas. Si tienes una slice de un vector, no puedes vaciar el vector mientras la uses.
+2. **Una slice se adapta.** Una función que pide `&[i32]` acepta un vector entero (`&v`), un trozo (`&v[1..3]`) o un array (`&a`). Una función que pide `&str` acepta un `&String`, un literal o un trozo. Por eso, para leer, `&[T]` y `&str` son las firmas buenas.
+
+## Pruébalo
+
+<Ejecutar ej="m07/p-slice-suma" />
+
+Una misma función, `suma`, recibe un vector, un trozo y un array. Ahora, por dentro:
+
+<Ejecutar ej="m07/slices-por-dentro" />
+
+La slice empieza **exactamente** en `v[1]`: no copia nada, apunta al interior del vector. Y mide el doble que una referencia normal, porque además de la dirección guarda la **longitud**.
+
+Con texto, el clásico: la primera palabra.
+
+<Ejecutar ej="m07/primera-palabra" />
+
+Como la slice es un préstamo, el comprobador te protege si intentas vaciar el texto mientras la usas:
+
+<NoCompila ej="m07/slice-invalida" explicacion="`p` apunta al interior de `frase`. `clear()` necesita un préstamo exclusivo, y `p` se usa después. Si se permitiera, `p` seguiría diciendo «4 bytes a partir de aquí» sobre un texto que ya no existe." />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Puntero ancho.** Una referencia a algo de tamaño conocido (`&i32`, `&String`) es una dirección. Una slice no sabe su tamaño por el tipo (`[i32]` puede tener 3 elementos o 3 millones), así que lleva la longitud consigo:
+
+```text
+  v (Vec<i32>)  ┌──────┐        HEAP
+                │ ptr ─┼──────► ┌────┬────┬────┬────┬────┐
+                │ cap 5│        │ 10 │ 20 │ 30 │ 40 │ 50 │
+                │ len 5│        └────┴────┴────┴────┴────┘
+                └──────┘               ▲
+  trozo (&[i32]) ┌──────────┐          │
+                 │ ptr ─────┼──────────┘   (dirección de v[1])
+                 │ len 3    │
+                 └──────────┘
+```
+
+A los tipos como `[i32]` y `str`, cuyo tamaño no se conoce al compilar, se les llama **tipos sin tamaño** (*dynamically sized types*, DST). Solo se pueden usar detrás de un puntero ancho.
+
+**Cortar texto cuenta bytes.** `&s[a..b]` en un `&str` usa posiciones en **bytes**, y comprueba al ejecutar que `a` y `b` caen en el **límite** de un carácter. Si no, pánico:
+
+<Ejecutar ej="m07/p-slice-utf8-panico" />
+
+`&s[0..1]` es «a» (1 byte). `&s[0..2]` partiría la «ñ» (bytes 1 y 2) por la mitad, y un `&str` **siempre** tiene que ser UTF-8 válido. Para cortar por caracteres usa `char_indices()`, como `primera_palabra`.
+
+**Los índices también se comprueban.** `&v[1..10]` en un vector de 5 elementos entra en pánico en vez de leer fuera. Esa comprobación sí cuesta algo al ejecutar, aunque el optimizador la quita cuando puede demostrar que el rango es válido.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Escribir &String o &Vec<T> en los parámetros">
+
+❌ `fn contar(s: &String)`: no acepta `contar("hola")` ni `contar(&texto[2..])`.
+
+✅ `fn contar(s: &str)`. Funciona con todo: un `&String` se convierte solo en `&str` (es una *coerción por deref*, que verás en el mundo 13).
+
+Lo mismo con vectores: `fn suma(xs: &[i32])` en vez de `fn suma(xs: &Vec<i32>)`. Clippy, la herramienta de avisos de Rust, te lo señala con el aviso `ptr_arg`.
+
+</Trampa>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`let v = [1, 2, 3, 4, 5];` ¿Qué contiene `&v[1..3]`?"
+  opciones={["`[1, 2, 3]`", "`[2, 3]`", "`[2, 3, 4]`", "`[1, 2]`"]}
+  correcta={1}
+  explicacion="El rango `1..3` incluye el índice 1 y excluye el 3: los índices 1 y 2, que valen 2 y 3."
+  porque={["Los índices empiezan en 0 y el final se excluye.", "", "El 3 no se incluye: sería `1..=3`.", "Eso es `0..2`."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuántos bytes mide una `&str` en un PC de 64 bits?"
+  opciones={["8", "16", "24", "Depende del texto"]}
+  correcta={1}
+  explicacion="Es un puntero ancho: dirección (8) + longitud (8). Mide lo mismo tenga el texto 1 byte o un millón."
+  porque={["8 es una referencia normal; a una `&str` le falta la longitud.", "", "24 es la ficha de un `String` (que además guarda la capacidad).", "El texto no está dentro de la referencia."]}
+/>
+
+<Pregunta
+  pregunta={"¿Qué pasa con `let s = \"ñu\"; let t = &s[0..1];`?"}
+  opciones={["`t` vale «ñ»", "`t` vale «n»", "Pánico al ejecutar: el byte 1 está en mitad de la «ñ»", "No compila"]}
+  correcta={2}
+  explicacion="La «ñ» ocupa los bytes 0 y 1. Cortar en el byte 1 la partiría. El compilador no lo sabe (el rango podría venir de una variable), así que se comprueba al ejecutar."
+  porque={["Para «ñ» completa hace falta `0..2`.", "Rust nunca convierte la «ñ» en «n».", "", "Los rangos se comprueban al ejecutar: compila."]}
+/>

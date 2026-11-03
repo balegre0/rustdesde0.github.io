@@ -1,0 +1,72 @@
+---
+title: "E0029: rango en un patrón con un tipo no permitido"
+description: "Usas un rango (a..=b) en un patrón con un tipo que no es número ni char."
+sidebar:
+  order: 5
+insignias: ["Patrones"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` only `char` and numeric types are allowed in range patterns ``
+
+## Qué significa
+
+Los patrones de rango (`'a'..='m'`, `1..=9`) solo funcionan con **números** y con `char`, porque son tipos con un orden fijo que el compilador conoce. Un `&str` no vale.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0029" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0029]: only `char` and numeric types are allowed in range patterns
+ --> E0029.rs:4:9
+  |
+4 |         "a"..="m" => println!("primera mitad"),
+  |         ---^^^---
+  |         |     |
+  |         |     this is of type `&'static str` but it should be `char` or numeric
+  |         this is of type `&'static str` but it should be `char` or numeric
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Comparar textos con rangos en un `match`.
+
+## Cómo arreglarlo
+
+Haz el `match` sobre un `char` (por ejemplo, la primera letra: `nombre.chars().next()`), o compara textos con `if` y `<`/`>=`.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+fn main() {
+    let nombre = "ana";
+    match nombre.chars().next() {
+        Some('a'..='m') => println!("primera mitad"),
+        _ => println!("segunda mitad"),
+    }
+}
+```
+
+**Salida:**
+
+```text
+primera mitad
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0029` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0308](/errores/e0308/): tipos que no coinciden
+- [E0004](/errores/e0004/): patrones no exhaustivos
+
+## Aprende esto en
+
+- [Mundo 09 · Structs, enums y patrones](/curso/09-structs-enums-y-patrones/)

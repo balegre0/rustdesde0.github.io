@@ -1,0 +1,91 @@
+---
+title: "E0053: firma incompatible con la del trait"
+description: "Un método del impl tiene parámetros o tipo de retorno distintos de los que declara el trait."
+sidebar:
+  order: 9
+insignias: ["Traits y closures"]
+---
+import { NoCompila } from '~/components';
+
+> **Mensaje de rustc:** `` method `escalar` has an incompatible type for trait ``
+
+## Qué significa
+
+La firma de cada método en el `impl` debe coincidir con la del trait: mismos tipos de parámetros, mismo tipo de `self` (`&self`, `&mut self`, `self`) y mismo retorno. Aquí el trait dice `factor: f64` y el `impl` escribe `factor: i32`.
+
+## Ejemplo que lo provoca
+
+<NoCompila ej="errores/E0053" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0053]: method `escalar` has an incompatible type for trait
+ --> E0053.rs:8:31
+  |
+8 |     fn escalar(&self, factor: i32) -> f64 {
+  |                               ^^^ expected `f64`, found `i32`
+  |
+note: type in trait
+ --> E0053.rs:2:31
+  |
+2 |     fn escalar(&self, factor: f64) -> f64;
+  |                               ^^^
+  = note: expected signature `fn(&Medida, f64) -> _`
+             found signature `fn(&Medida, i32) -> _`
+help: change the parameter type to match the trait
+  |
+8 -     fn escalar(&self, factor: i32) -> f64 {
+8 +     fn escalar(&self, factor: f64) -> f64 {
+  |
+```
+
+Cómo leerlo: la primera línea dice **qué** pasa; `-->` dice **dónde** (archivo, línea y columna); las marcas `^` y `-` señalan las piezas implicadas, y `help:` propone un arreglo. Léelo siempre de arriba abajo.
+
+## Causas típicas
+
+- Cambiar el tipo de un parámetro.
+- Usar `&mut self` donde el trait dice `&self` (o al revés).
+
+## Cómo arreglarlo
+
+Copia la firma exacta del trait (rustc la muestra en `expected signature`) y adapta el cuerpo.
+
+Así queda el ejemplo arreglado (botón «Ver arreglo» arriba):
+
+```rust
+trait Escalar {
+    fn escalar(&self, factor: f64) -> f64;
+}
+
+struct Medida(f64);
+
+impl Escalar for Medida {
+    fn escalar(&self, factor: f64) -> f64 {
+        self.0 * factor
+    }
+}
+
+fn main() {
+    println!("{}", Medida(1.5).escalar(2.0));
+}
+```
+
+**Salida:**
+
+```text
+3
+```
+
+## Más información
+
+En tu terminal, `rustc --explain E0053` muestra la explicación oficial (en inglés) con más ejemplos, sin conexión.
+
+## Errores parecidos
+
+- [E0046](/errores/e0046/): faltan elementos del trait
+- [E0308](/errores/e0308/): tipos que no coinciden
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

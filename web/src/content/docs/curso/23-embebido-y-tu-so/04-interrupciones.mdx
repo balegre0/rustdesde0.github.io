@@ -1,0 +1,57 @@
+---
+title: "Interrupciones"
+description: "El hardware puede interrumpir tu programa en cualquier instrucción. Cómo compartir datos con una rutina de interrupción de forma segura: atómicos, secciones críticas y el framework RTIC."
+sidebar:
+  order: 4
+duracion: 12
+requiere: ["23-embebido-y-tu-so/03-pac-hal-embedded-hal"]
+tarjetas:
+  - p: "¿Qué es una interrupción?"
+    r: "Una señal del hardware (un botón, un temporizador, un dato que llega) que detiene el programa en cualquier instrucción, ejecuta una rutina y luego continúa donde estaba."
+  - p: "¿Qué es una sección crítica?"
+    r: "Un trozo de código durante el que las interrupciones están desactivadas, para acceder a datos compartidos sin que una interrupción los cambie a medias."
+  - p: "¿Qué hace RTIC?"
+    r: "Un framework que declara tareas y los recursos que usa cada una, y calcula al compilar las prioridades y protecciones necesarias para que no haya carreras de datos."
+---
+
+import { Ejecutar, Pregunta, BajoElCapo } from '~/components';
+
+Un microcontrolador no espera sentado a que pulses un botón: sigue a lo suyo y el hardware le **interrumpe** cuando pasa algo. Es concurrencia, aunque haya un solo núcleo, y tiene los mismos peligros que los hilos del mundo 17.
+
+## La idea
+
+Cuando llega una **interrupción**, la CPU guarda lo que estaba haciendo, ejecuta una **rutina de servicio** (*interrupt service routine*, ISR) y vuelve. Puede llegar **en mitad de cualquier instrucción** del programa principal.
+
+Si el programa principal y la rutina comparten un dato, hay una carrera de datos posible. Rust lo impide igual que con hilos: un `static mut` compartido exige `unsafe`, y las formas seguras son:
+
+- **Atómicos** (`AtomicBool`, `AtomicU32`): para banderas y contadores.
+- **Secciones críticas**: desactivar las interrupciones mientras se usa el dato. El crate `critical-section` da una interfaz común, y con `Mutex<RefCell<T>>` de ese crate se puede guardar cualquier dato.
+- **Frameworks** que lo organizan por ti, como **RTIC**.
+
+## Pruébalo
+
+Una simulación: el «hardware» llama a la rutina cada tres ticks, y el bucle principal atiende el aviso:
+
+<Ejecutar ej="m23/interrupcion" />
+
+`swap(false, …)` lee y borra la bandera en **una sola** operación atómica: si se leyera y luego se borrara en dos pasos, una pulsación que llegara entre los dos se perdería.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**RTIC** (*Real-Time Interrupt-driven Concurrency*) declara las tareas, su prioridad y los **recursos** que usa cada una. Con esa información, calcula **al compilar** qué tarea puede interrumpir a cuál y protege cada recurso compartido elevando la prioridad solo lo necesario (el protocolo de techo de prioridad). Usa el controlador de interrupciones del chip (el NVIC en ARM Cortex-M) como planificador: no hay ningún planificador en software, y el coste es mínimo.
+
+**Por qué `Send` y `Sync` también importan aquí.** Una rutina de interrupción es, a efectos de seguridad, otro hilo. Los frameworks embebidos usan los mismos traits del mundo 17 para decidir qué se puede compartir con ella.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Por qué un `static mut CONTADOR: u32` compartido con una interrupción necesita `unsafe`?"
+  opciones={["Porque los `static` no se pueden modificar", "Porque la interrupción podría modificarlo a mitad de una lectura o escritura del programa principal: una carrera de datos", "Porque los `u32` no son `Copy`", "No lo necesita"]}
+  correcta={1}
+  explicacion="Es el mismo problema que con dos hilos. Con un atómico o una sección crítica, la operación ya no puede quedar a medias."
+  porque={["Un `static mut` se puede modificar, pero solo con `unsafe`.", "", "`u32` es `Copy`.", "En la edición 2024, hasta crear una referencia a un `static mut` es un error por defecto."]}
+/>

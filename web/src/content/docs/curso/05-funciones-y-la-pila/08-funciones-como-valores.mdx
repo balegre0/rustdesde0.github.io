@@ -1,0 +1,72 @@
+---
+title: "Funciones como valores"
+description: "Una función se puede guardar en una variable, pasar como argumento o devolver: el tipo fn(i32) -> i32. Y la diferencia entre un elemento función (0 bytes) y un puntero a función."
+sidebar:
+  order: 8
+duracion: 11
+desde: "1.0"
+requiere: ["05-funciones-y-la-pila/07-donde-vive-cada-valor"]
+tarjetas:
+  - p: "¿Qué tipo tiene un parámetro que recibe una función de i32 en i32?"
+    r: "fn(i32) -> i32: un puntero a función."
+  - p: "¿Cuánto ocupa `let f = doble;` (sin anotar el tipo)?"
+    r: "0 bytes: es un «elemento función», un tipo propio que ya sabe qué función es. Convertido a fn(i32) -> i32, ocupa lo que una dirección."
+  - p: "¿Para qué sirve guardar funciones en un array?"
+    r: "Para elegir qué hacer con datos en vez de con if o match: una tabla de operaciones, de comandos, de manejadores…"
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Una función no es solo algo que se llama: también es un **valor**. Se puede guardar en una variable, meter en un array, pasar a otra función o devolver. Es la base de las closures del mundo 14.
+
+## Predice
+
+<Predice
+  ej="m05/fn-como-valor"
+  pregunta="¿Qué imprimen las dos primeras líneas?"
+  opciones={["`12` y `81`", "`6` y `9`", "`12` y `9`", "No compila: no se puede pasar una función como argumento"]}
+  correcta={0}
+  explicacion="`aplicar_dos_veces` llama dos veces a la función que recibe: doble(doble(3)) = 12 y cuadrado(cuadrado(3)) = 81."
+  porque={["", "Eso sería aplicarla una sola vez.", "`cuadrado` también se aplica dos veces: 3² = 9 y 9² = 81.", "Sí se puede: el tipo del parámetro es `fn(i32) -> i32`."]}
+/>
+
+## La idea
+
+El tipo de una función se escribe con `fn`, sus parámetros y su resultado:
+
+```rust
+fn aplicar_dos_veces(f: fn(i32) -> i32, x: i32) -> i32 { f(f(x)) }
+```
+
+`fn(i32) -> i32` es un **puntero a función**: «la dirección de alguna función que recibe un `i32` y devuelve un `i32`». Para pasar una función se escribe su nombre **sin paréntesis**: `aplicar_dos_veces(doble, 3)`. Con paréntesis la llamarías.
+
+También se pueden **devolver**: una función puede elegir qué operación hacer y devolverla.
+
+## Pruébalo
+
+<Reto
+  ej="m05/elegir-operacion"
+  enunciado="Completa `elegir`: tiene que **devolver la función** que corresponde a cada símbolo (`'+'` → `sumar`, `'-'` → `restar`, cualquier otro → `multiplicar`). Pista: un `match` cuyos brazos son nombres de funciones, sin paréntesis."
+/>
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Elemento función y puntero a función no son lo mismo.** Cada función tiene su **propio tipo**, de tamaño cero (`let f = doble;`), que ya sabe exactamente qué función es: llamarlo es una llamada directa que el compilador puede expandir en línea. Al convertirlo a `fn(i32) -> i32` se pierde esa información: queda una **dirección**, y la llamada es indirecta.
+
+<Ejecutar ej="m05/fn-item-tamano" />
+
+**Por qué importa.** Cuando el compilador sabe exactamente qué función se llama (un elemento función), puede expandirla en línea: `doble(doble(x))` acaba siendo `x * 4`. Con un puntero cuyo valor no conoce, el procesador tiene que saltar a una dirección leída de memoria (aunque el optimizador, si ve de dónde viene el puntero, a veces también lo resuelve). En el mundo 14 verás que las closures funcionan como los elementos función: cada una tiene su tipo, y por eso son tan rápidas.
+
+</BajoElCapo>
+
+## Comprueba
+
+<Pregunta
+  pregunta="`fn doble(x: i32) -> i32`. ¿Qué pasa en `aplicar(doble(3))` si `aplicar` espera un `fn(i32) -> i32`?"
+  opciones={["No compila: `doble(3)` es un `i32` (el resultado de llamarla), no una función", "Funciona igual que `aplicar(doble)`", "Llama a `doble` dos veces", "Pánico al ejecutar"]}
+  correcta={0}
+  explicacion="Con paréntesis, la llamas; sin paréntesis, la pasas. El compilador da E0308: se esperaba un puntero a función y llegó un `i32`."
+  porque={["", "Con paréntesis se pasa el resultado, no la función.", "Solo se evalúa `doble(3)`, y el tipo no encaja.", "El error se detecta al compilar."]}
+/>

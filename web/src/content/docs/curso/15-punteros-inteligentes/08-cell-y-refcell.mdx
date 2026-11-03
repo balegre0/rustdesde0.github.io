@@ -1,0 +1,133 @@
+---
+title: "Cell y RefCell: mutabilidad interior"
+description: "Modificas datos a través de un préstamo compartido con Cell y RefCell, y provocas (y entiendes) el pánico «RefCell already borrowed»."
+sidebar:
+  order: 8
+duracion: 14
+desde: "1.0"
+requiere: ["15-punteros-inteligentes/05-rc"]
+tarjetas:
+  - p: "¿Qué es la mutabilidad interior?"
+    r: "Poder modificar un valor a través de un préstamo compartido `&T`. Solo es posible con tipos construidos sobre `UnsafeCell`, como `Cell` y `RefCell`."
+  - p: "¿Por qué `Cell<T>` es segura sin comprobaciones?"
+    r: "Porque nunca presta lo de dentro: solo copia (`get`), sustituye (`set`, `replace`) o saca (`take`). Sin referencias al interior, no hay aliasing con mutación."
+  - p: "¿Qué pasa si pides `borrow_mut()` a un `RefCell` que ya tiene un `borrow()` activo?"
+    r: "Pánico en ejecución: «RefCell already borrowed». Las reglas de préstamo son las mismas, pero se comprueban al ejecutar."
+  - p: "¿Cómo pides un préstamo de un `RefCell` sin arriesgarte a un pánico?"
+    r: "Con `try_borrow()` o `try_borrow_mut()`, que devuelven un `Result`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a modificar datos a través de un préstamo **compartido**, algo que el compilador normalmente prohíbe, y a ver qué ocurre cuando rompes las reglas en ejecución.
+
+## Predice
+
+<Predice
+  ej="m15/refcell-panico"
+  pregunta="Tenemos un préstamo de lectura activo (`lectura`) y pedimos uno de escritura. ¿Qué pasa?"
+  opciones={["No compila: error E0502", "Imprime la primera nota y luego entra en pánico", "Imprime las dos líneas sin problema", "Imprime basura porque el Vec se movió"]}
+  correcta={1}
+  explicacion="`RefCell` traslada las reglas de préstamo a la ejecución. El compilador no protesta, pero cuando `borrow_mut()` ve que hay una lectura viva, entra en pánico con «RefCell already borrowed»."
+  porque={["El compilador no ve el conflicto: `borrow()` y `borrow_mut()` reciben `&self`.", "Correcto.", "La regla sigue existiendo: solo cambia cuándo se comprueba.", "Rust no deja que eso pase: el pánico llega antes."]}
+/>
+
+## La idea
+
+La regla de los préstamos es «muchos lectores **o** un escritor». Normalmente la comprueba el compilador mirando el código. Pero hay situaciones en las que el compilador no puede saberlo (varios `Rc` que comparten un valor, un contador de visitas dentro de un objeto que solo prestas como `&`) y, sin embargo, tú sabes que tu programa es correcto. Para eso existe la **mutabilidad interior** (*interior mutability*): tipos que permiten modificar su contenido a través de `&T`.
+
+`Cell<T>` es la versión más sencilla. Nunca te presta lo de dentro: con `get()` te da una **copia** (por eso exige `T: Copy`), con `set(v)` lo sustituye, con `replace(v)` lo sustituye y te devuelve el viejo, con `take()` lo saca. Como nadie puede tener una referencia al interior, cambiarlo no puede pillar a nadie a medias: es seguro y **no cuesta nada** comprobarlo.
+
+`RefCell<T>` sí presta lo de dentro, con `borrow()` (lectura) y `borrow_mut()` (escritura). Para mantener la regla, lleva un **contador de préstamos** y lo comprueba **en ejecución**. Si la rompes, no hay error de compilación: hay un **pánico**. No desactiva el borrow checker: lo mueve a la ejecución, con un pequeño coste y el riesgo de que tu programa se caiga.
+
+## Pruébalo
+
+Primero `Cell`: un botón que cuenta sus pulsaciones aunque `pulsar` solo reciba `&Boton`.
+
+<Ejecutar ej="m15/cell" />
+
+Ahora el pánico de la predicción. Esta es la salida real:
+
+<Ejecutar ej="m15/refcell-panico" />
+
+```text
+primera nota: 7
+
+thread 'main' (1) panicked at refcell-panico.rs:9:11:
+RefCell already borrowed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+```
+
+Y la forma correcta: préstamos cortos, y `try_borrow_mut` cuando no estás seguro.
+
+<Ejecutar ej="m15/refcell-ok" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Todo tipo con mutabilidad interior está construido sobre `UnsafeCell<T>`, el **único** tipo que el compilador trata de forma especial: le indica que el valor puede cambiar aunque haya préstamos `&` a él. Mutar a través de un `&T` sin pasar por `UnsafeCell` es comportamiento indefinido, aunque uses `unsafe` (mundo 20).
+
+`RefCell<T>` guarda, junto al valor, un contador `borrow` (con signo):
+
+| Estado del contador | Significado | `borrow()` | `borrow_mut()` |
+|---|---|---|---|
+| 0 | nadie lo usa | ✅ sube a 1 | ✅ pasa a −1 |
+| n > 0 | n lectores | ✅ sube a n+1 | ❌ pánico |
+| −1 | un escritor | ❌ pánico | ❌ pánico |
+
+`borrow()` no devuelve un `&T` sino un `Ref<T>`, un guardián cuyo `Drop` vuelve a bajar el contador. Por eso el préstamo dura lo que vive ese guardián: en `refcell-panico`, `lectura` vive hasta el final de `main`, y el `borrow_mut()` de la línea 9 lo encuentra activo.
+
+Tamaños comprobados con `size_of` en x86-64: `Cell<i32>` = **4** (lo mismo que `i32`: no lleva nada extra) y `RefCell<i32>` = **16** (el contador de 8 bytes + el valor, con alineación). En el navegador, `RefCell<i32>` mide 8.
+
+Ni `Cell` ni `RefCell` son `Sync`: sus comprobaciones no son atómicas, así que el compilador no deja compartirlas entre hilos. Para eso existen `Mutex` y `RwLock` (mundo 17).
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Un préstamo de RefCell que vive demasiado">
+
+❌ Guardar el resultado de `borrow()` en una variable y luego pedir `borrow_mut()` en la misma función:
+
+```rust
+let lectura = notas.borrow();
+notas.borrow_mut().push(10); // pánico: RefCell already borrowed
+```
+
+✅ Haz los préstamos lo más cortos posible: úsalos en la misma expresión (`notas.borrow().len()`), ciérralos en un bloque `{ }` o suéltalos con `drop(lectura)` antes de escribir.
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m15/r-refcell"
+  enunciado="Este programa compila pero entra en pánico con «RefCell already borrowed». Arréglalo (sin quitar el `RefCell`) para que imprima `[10, 20, 30]`. Pista: el préstamo de lectura tiene que terminar antes del `borrow_mut()`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué hace `RefCell` con las reglas de préstamo?"
+  opciones={["Las desactiva", "Las comprueba en ejecución en vez de al compilar", "Las comprueba dos veces, al compilar y al ejecutar", "Solo las aplica en modo debug"]}
+  correcta={1}
+  explicacion="Las reglas son las mismas (muchos lectores o un escritor); solo cambia el momento de comprobarlas."
+  porque={["Es el malentendido más común: siguen ahí, y romperlas da pánico.", "Correcto.", "El compilador no ve los préstamos de `RefCell`.", "Se comprueban también en release."]}
+/>
+
+<Pregunta
+  pregunta="Quieres un contador `u32` que se pueda incrementar a través de `&self`. ¿Qué es lo más sencillo y barato?"
+  opciones={["`RefCell<u32>`", "`Cell<u32>`", "`Rc<u32>`", "`Box<u32>`"]}
+  correcta={1}
+  explicacion="Para un valor `Copy` pequeño, `Cell` basta: `c.set(c.get() + 1)`, sin contador de préstamos y sin riesgo de pánico."
+  porque={["Funciona, pero añade un contador y la posibilidad de pánico sin necesidad.", "Correcto.", "`Rc` no permite modificar.", "`Box` necesita `&mut` para modificar."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `Cell::get` exige que `T` sea `Copy`?"
+  opciones={["Por rendimiento", "Porque devuelve una copia del valor: no puede prestarlo", "Porque `Cell` solo funciona con números", "No lo exige"]}
+  correcta={1}
+  explicacion="`Cell` nunca da referencias al interior. Para darte el valor sin sacarlo, tiene que copiarlo. Para tipos no `Copy` usa `take` o `replace`."
+  porque={["Es una cuestión de seguridad, no de velocidad.", "Correcto.", "Funciona con cualquier `T`; solo `get` pide `Copy`.", "Sí lo exige, en `impl<T: Copy> Cell<T>`."]}
+/>

@@ -1,0 +1,112 @@
+---
+title: "Tu primer ejecutor: block_on"
+description: "Escribir un ejecutor mínimo que solo sondea cuando le despiertan, y ejecutarlo en el navegador."
+sidebar:
+  order: 4
+duracion: 12
+desde: "1.68"
+requiere: ["18-async/03-waker"]
+tarjetas:
+  - p: "¿Qué hace block_on?"
+    r: "Sondea un future, durmiendo entre sondeos hasta que su waker avisa, y devuelve el resultado cuando está Ready."
+  - p: "¿Para qué sirve std::pin::pin!?"
+    r: "Fija un valor en la pila para obtener un Pin<&mut T> y poder llamar a poll (estable desde 1.68)."
+  - p: "¿La biblioteca estándar trae un ejecutor?"
+    r: "No. Trae Future, Poll, Context, Waker y Wake; el ejecutor lo elige cada programa (Tokio, smol, Embassy… o el tuyo)."
+---
+
+import { Ejecutar, Pregunta, Ordena, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir un **ejecutor** de verdad, de unas treinta líneas, que corre aquí mismo sin un solo hilo extra.
+
+## Predice
+
+<Pregunta
+  pregunta="`sumar` cede el turno una vez (devuelve `Pending` una vez) antes de terminar. El bloque async llama a `sumar` dos veces, una detrás de otra. ¿Cuántas veces sondeará el ejecutor el bloque entero?"
+  opciones={["1", "2", "3", "4"]}
+  correcta={2}
+  explicacion="Primer sondeo: el primer `sumar` cede → Pending. Segundo: el primer `sumar` termina, empieza el segundo y cede → Pending. Tercero: el segundo termina y el bloque devuelve Ready."
+  porque={["Solo sería 1 si nada cediera.", "Te falta el sondeo final, el que obtiene el Ready.", "Correcto: 2 Pending + 1 Ready.", "El segundo `sumar` arranca en el mismo sondeo en que termina el primero."]}
+/>
+
+## La idea
+
+Un ejecutor tiene tres piezas:
+
+1. **Un waker** que, al llamarse, deja una marca: «esta tarea puede avanzar». Aquí, una bandera atómica.
+2. **El future fijado** con `pin!` para poder llamar a `poll`.
+3. **Un bucle**: si la bandera está levantada, bájala y sondea. Si sale `Ready`, devuelve el valor. Si no hay bandera, **espera** hasta que la haya.
+
+En un programa real, «esperar» significa pedir al sistema operativo que duerma el hilo hasta que pase algo (llegue un paquete, venza un temporizador). En el navegador no tenemos nada de eso, así que si nadie ha levantado la bandera, nuestro ejecutor entra en pánico avisando de que la tarea se ha quedado colgada. Es una ventaja pedagógica: un future que olvida avisar se descubre al instante.
+
+## Pruébalo
+
+<Ejecutar ej="m18/block-on" />
+
+Tres sondeos, tal como predijiste. Y fíjate en algo importante: dentro del bloque async escribimos `.await` sin pensar en `poll`, ni en `Pending`, ni en wakers. El compilador lo traduce todo a llamadas a `poll`; el ejecutor es quien las hace.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`pin!` fija en la pila.** `let mut fut = pin!(fut);` mueve el future a una variable oculta del marco de `block_on` y te da un `Pin<&mut F>`. Desde ese momento el future no se puede mover (la variable oculta no tiene nombre, así que no puedes sacarlo), y como `block_on` no vuelve hasta que el future termina, el préstamo es válido todo el tiempo. Cada sondeo usa `fut.as_mut()`, que «re-presta» el `Pin` sin consumirlo.
+
+**`swap(false)` es atómico.** `bandera.0.swap(false, ...)` lee el valor viejo y escribe `false` en un solo paso indivisible. Si otro hilo llamara a `wake` justo entre la lectura y la escritura (con E/S real, ese hilo existe), con dos pasos separados perderíamos el aviso. Así no.
+
+**Lo que haría un ejecutor real en el `else`.** En vez de `panic!`, usaría `std::thread::park()` para dormir el hilo, y el `wake` haría `thread.unpark()`. Es el diseño de crates mínimos como `pollster`. En el navegador `park` no sirve (no hay otro hilo que pueda despertarnos), por eso nuestro ejecutor solo funciona con futures que se despiertan a sí mismos.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Llamar a block_on dentro de una tarea async">
+
+❌ Dentro de una función async, llamar a un `block_on` para «esperar a lo bruto»:
+
+```rust
+async fn mala() {
+    let x = block_on(otra()); // bloquea el hilo del ejecutor
+}
+```
+
+Si `otra()` necesita que el **mismo** ejecutor avance otras tareas (por ejemplo, la que le enviará un mensaje), nadie las sondeará mientras `block_on` tiene el hilo ocupado: bloqueo mutuo. Los runtimes como Tokio detectan este caso y entran en pánico.
+
+✅ Dentro de async, usa `.await`. `block_on` es solo para la frontera: el `main` síncrono que arranca todo.
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={[
+    "let mut fut = pin!(fut);",
+    "let mut cx = Context::from_waker(Waker::noop());",
+    "loop {",
+    "    if let Poll::Ready(v) = fut.as_mut().poll(&mut cx) {",
+    "        return v;",
+    "    }",
+    "}"
+  ]}
+  distractores={["let v = fut.poll(&mut cx);", "fut.await;"]}
+  explicacion="Primero se fija el future, después se crea el contexto y por último se sondea en bucle. `fut.poll` sin `Pin` no compila y `.await` no se puede usar fuera de async."
+/>
+
+<Reto ej="m18/reto-block-on" enunciado="Escribe `block_on_contando`, un ejecutor que, además del resultado, devuelva cuántos sondeos hicieron falta. Usa `Waker::noop()`: los futures de este reto se despiertan solos." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué incluye la biblioteca estándar de Rust para async?"
+  opciones={["Un ejecutor multihilo completo", "Los traits y tipos (`Future`, `Poll`, `Context`, `Waker`, `Wake`) pero ningún ejecutor de propósito general", "Nada: async es un crate", "Solo la palabra `async`"]}
+  correcta={1}
+  explicacion="El lenguaje y `std` definen la interfaz; el ejecutor lo pone un crate o tu código. Así Rust async funciona igual en un servidor que en un microcontrolador."
+  porque={["Eso lo ponen crates como Tokio.", "Correcto.", "`async`/`.await` son del lenguaje y `Future` está en `core`.", "También están los traits y tipos."]}
+/>
+
+<Pregunta
+  pregunta="En nuestro `block_on`, ¿qué pasaría si quitáramos `cx.waker().wake_by_ref()` de `Ceder`?"
+  opciones={["Iría más rápido", "Nada", "El ejecutor entraría en pánico con «bloqueo»: la tarea dijo Pending y nadie levantó la bandera", "El compilador lo rechazaría"]}
+  correcta={2}
+  explicacion="Tras el primer Pending la bandera queda bajada para siempre. Un ejecutor real se dormiría eternamente; el nuestro lo convierte en un pánico visible."
+  porque={["No avanzaría en absoluto.", "Sí cambia: se rompe el contrato de `poll`.", "Correcto.", "Es un error de lógica, el compilador no lo ve."]}
+/>

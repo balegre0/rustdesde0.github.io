@@ -1,0 +1,105 @@
+---
+title: "Repeticiones: $(...),*"
+description: "Acepta listas de cualquier longitud con *, + y ?, y construye tu propio vec! y un literal de mapa."
+sidebar:
+  order: 4
+duracion: 12
+desde: "1.0"
+requiere: ["19-macros/03-fragmentos"]
+tarjetas:
+  - p: "¿Qué significan *, + y ? en una repetición de macro?"
+    r: "* = cero o más veces; + = una o más; ? = cero o una."
+  - p: "¿Cómo se acepta una coma final opcional en una lista?"
+    r: "Añadiendo $(,)? después de la repetición."
+  - p: "¿Qué pasa si en la plantilla repites juntas dos metavariables capturadas un número distinto de veces?"
+    r: "Error de compilación: «meta-variable `a` repeats 2 times, but `b` repeats 3 times»."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a escribir macros que aceptan listas de cualquier longitud, como `vec![1, 2, 3]`, y a entender cómo «se desenrolla» una repetición en la plantilla.
+
+## Predice
+
+<Predice
+  ej="m19/suma-rep"
+  opciones={["0 / 5 / 6 / 60", "No compila: suma!() no tiene argumentos", "0 / 5 / 6 / No compila por la coma final", "/ 5 / 6 / 60"]}
+  correcta={0}
+  explicacion="`$($x:expr),*` acepta cero o más expresiones. Con cero, la plantilla `0 $(+ $x)*` se queda en `0`. `$(,)?` permite una coma final."
+  porque={["Correcto.", "`*` significa «cero o más», así que la lista vacía es válida.", "`$(,)?` acepta justamente esa coma final.", "La plantilla siempre empieza por `0`, así que nunca queda vacía."]}
+/>
+
+## La idea
+
+Una **repetición** (*repetition*) se escribe `$( … ) sep op`:
+
+- Lo que va entre `$(` y `)` es el trozo que se repite.
+- `sep` (opcional) es el **separador** entre repeticiones: casi siempre `,` o `;`.
+- `op` dice cuántas veces: `*` (cero o más), `+` (una o más) o `?` (cero o una; no admite separador).
+
+En la plantilla escribes otra repetición con las mismas metavariables, y el compilador la **desenrolla** una vez por cada elemento capturado. Por eso `$(+ $x)*` con `1, 2, 3` produce `+ 1 + 2 + 3`.
+
+## Pruébalo
+
+<Ejecutar ej="m19/mi-lista" titulo="Tu propio vec!" />
+
+1. Dos reglas: la lista vacía y la que tiene al menos un elemento (`+`).
+2. La plantilla usa **llaves dobles** `{{ … }}`: las de fuera delimitan la plantilla y las de dentro son un bloque de verdad. Así la macro puede declarar `let mut v` y devolver `v` como valor del bloque.
+3. `$( v.push($x); )+` genera un `push` por elemento.
+
+Cada repetición puede capturar varias metavariables a la vez:
+
+<Ejecutar ej="m19/mapa" titulo="Un literal de mapa" />
+
+`$($k:expr => $v:expr),*` captura parejas. El `=>` dentro del patrón es un token literal más (puede ir detrás de `expr`, lo permite el follow-set).
+
+## Bajo el capó
+
+<BajoElCapo>
+La expansión real de `suma-rep.rs` (Rust 1.99.1):
+
+```rust
+{ ::std::io::_print(format_args!("{0}\n", 0)); };
+{ ::std::io::_print(format_args!("{0}\n", 0 + 5)); };
+{ ::std::io::_print(format_args!("{0}\n", 0 + 1 + 2 + 3)); };
+{ ::std::io::_print(format_args!("{0}\n", 0 + 10 + 20 + 30)); };
+```
+
+No hay bucle: la «suma de una lista» se ha convertido en una expresión fija para cada llamada. El bucle lo ejecutó el compilador mientras expandía.
+
+**Profundidad de repetición.** Cada metavariable tiene una profundidad: cuántas repeticiones la rodean en el patrón. En la plantilla debe aparecer dentro del mismo número de repeticiones. Si dos metavariables se desenrollan en la misma repetición de la plantilla, deben haberse capturado **el mismo número de veces**; si no, el compilador no sabe cuántas vueltas dar.
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m19/rep-mezcla" explicacion="La plantilla desenrolla `$a` y `$b` juntos, pero se capturaron 2 y 3 veces. El error lo dice con todas las letras. Arreglo: pasa listas del mismo tamaño (o diseña la macro con parejas `$($a:expr => $b:expr),*`, que hace imposible el desajuste)." />
+
+## Tu turno
+
+<Reto ej="m19/reto-cuadrados" enunciado="Haz que `cuadrados![1, 2, 3]` devuelva el Vec [1, 4, 9]. Debe aceptar una coma final." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Qué operador de repetición exige al menos un elemento?"
+  opciones={["`*`", "`+`", "`?`", "Ninguno: siempre hace falta escribir dos reglas"]}
+  correcta={1}
+  explicacion="`+` es «una o más». `*` admite cero y `?` admite cero o una."
+  porque={["`*` acepta la lista vacía.", "Correcto.", "`?` es «como mucho una».", "Basta con elegir el operador."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué la plantilla de `lista!` usa `{{ ... }}`?"
+  opciones={["Es un error de estilo, con una llave basta", "Las llaves externas delimitan la plantilla y las internas forman un bloque que puede declarar variables y devolver un valor", "Para que la macro se ejecute dos veces", "Para escapar las llaves en el texto"]}
+  correcta={1}
+  explicacion="La plantilla `{ let mut v = ...; v }` sin bloque interno expandiría varias sentencias sueltas, que no sirven como valor de `let nums = lista![...]`."
+  porque={["Con una sola, el resultado serían sentencias sueltas y no una expresión.", "Correcto.", "La expansión ocurre una vez por invocación.", "No es formato de texto; son tokens."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué produce la plantilla `[$( ($a, $b) ),*]` con `$a` = 1, 2 y `$b` = 'x', 'y'?"
+  opciones={["`[(1, 'x'), (2, 'y')]`", "`[(1, 2), ('x', 'y')]`", "`[(1, 'x'), (1, 'y'), (2, 'x'), (2, 'y')]`", "Error de compilación"]}
+  correcta={0}
+  explicacion="Las dos metavariables avanzan juntas: primera con primera, segunda con segunda. No es un producto cartesiano."
+  porque={["Correcto.", "Eso agruparía por metavariable, no por posición.", "Las repeticiones no combinan todo con todo.", "Las dos se capturaron 2 veces: no hay desajuste."]}
+/>

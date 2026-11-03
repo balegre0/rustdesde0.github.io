@@ -1,0 +1,35 @@
+---
+title: "std::cmp"
+description: "Comparar y ordenar: PartialEq, Eq, PartialOrd, Ord, Ordering, min, max y Reverse."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "core"]
+---
+**Ruta:** `std::cmp`
+
+## Para qué sirve
+
+Los operadores `==`, `!=`, `<`, `<=`, `>` y `>=` y todo lo que ordena (`sort`, `max`, `BTreeMap`, `BinaryHeap`) se basan en los traits de este módulo.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`PartialEq, Eq, PartialOrd, Ord`](/ref/std/cmp/ord/) | Los cuatro traits de comparación. | 1.0 |
+| [`Ordering`](/ref/std/cmp/ord/) | `Less`, `Equal` o `Greater`. | 1.0 |
+| `min, max, minmax` | El menor o el mayor de dos valores. | None |
+| `Reverse` | Envoltorio que invierte el orden. | 1.19 |
+
+## Conceptos clave
+
+- **Parcial frente a total**: `f64` solo es `PartialOrd` porque `NaN` no es comparable con nada (ni consigo mismo). Por eso no puedes hacer `sort()` de un `Vec<f64>`; usa `sort_by(|a, b| a.total_cmp(b))`.
+- **`derive` compara en orden**: primero el primer campo; si empatan, el segundo… En un enum, las variantes declaradas antes son menores.
+
+## Ver también
+
+- [slice::sort](/ref/std/slice/)
+- [BTreeMap](/ref/std/collections/btreemap/)
+
+## Aprende esto en
+
+- [Mundo 13 · Traits y genéricos](/curso/13-traits-y-genericos/)

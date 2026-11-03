@@ -1,0 +1,40 @@
+---
+title: "std::io"
+description: "Entrada y salida: los traits Read, Write y BufRead, la consola (stdin, stdout, stderr) y io::Error."
+sidebar:
+  order: 0
+insignias: ["Desde 1.0", "std"]
+---
+**Ruta:** `std::io`
+
+## Para qué sirve
+
+Todo lo que lee bytes implementa `Read` y todo lo que los escribe implementa `Write`: la consola, los archivos, las conexiones de red, un `Vec<u8>` en memoria… Así, una función que recibe `impl Read` funciona con cualquiera de ellos. Los errores de entrada y salida son del tipo `io::Error`, y `io::Result<T>` es un atajo de `Result<T, io::Error>`.
+
+## Contenido de un vistazo
+
+| Nombre | Resumen | Desde |
+|---|---|---|
+| [`Read`](/ref/std/io/read/) | Leer bytes. | 1.0 |
+| [`Write`](/ref/std/io/write/) | Escribir bytes. | 1.0 |
+| [`BufRead`](/ref/std/io/bufread/) | Leer con búfer: líneas, hasta un byte. | 1.0 |
+| [`stdin`](/ref/std/io/stdin/) | La entrada estándar (teclado). | 1.0 |
+| [`stdout, stderr`](/ref/std/io/stdout/) | Las salidas estándar y de errores. | 1.0 |
+| `BufReader, BufWriter` | Añaden un búfer a un lector o escritor. | 1.0 |
+| `Error, ErrorKind, Result` | Los errores de E/S y su clasificación. | 1.0 |
+
+## Conceptos clave
+
+- **Búfer**: leer o escribir de byte en byte es lento (cada operación puede llamar al sistema operativo). `BufReader` y `BufWriter` agrupan las operaciones. `stdout` ya tiene búfer **por líneas**.
+- **`flush`**: lo que está en un búfer todavía no se ha escrito de verdad. `print!` (sin salto de línea) no aparece hasta que haces `flush` o escribes un `\n`.
+- **Importa los traits**: los métodos `read_line`, `write_all`, `lines`… son de traits; si no compilan, falta `use std::io::{Read, Write, BufRead};` ([E0599](/errores/e0599/)).
+
+## Ver también
+
+- [std::fs](/ref/std/fs/)
+- [write! y writeln!](/ref/std/macros/write/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)

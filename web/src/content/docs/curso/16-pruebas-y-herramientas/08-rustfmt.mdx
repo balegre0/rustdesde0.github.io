@@ -1,0 +1,143 @@
+---
+title: "rustfmt: el formato no se discute"
+description: "Formatea todo tu código con un comando y comprueba en cada cambio que nadie se lo ha saltado."
+sidebar:
+  order: 8
+duracion: 9
+desde: "1.0"
+requiere: ["16-pruebas-y-herramientas/07-clippy"]
+tarjetas:
+  - p: "¿Qué hace `cargo fmt`?"
+    r: "Reescribe todos los archivos `.rs` del proyecto con el estilo oficial de Rust: sangría de 4 espacios, espacios alrededor de operadores, saltos de línea, etc. No cambia lo que hace el programa."
+  - p: "¿Para qué sirve `cargo fmt --check`?"
+    r: "Para comprobar sin tocar nada: muestra las diferencias y termina con código de salida 1 si algún archivo no está formateado. Se usa en la integración continua."
+  - p: "¿Necesita rustfmt que el código compile?"
+    r: "Necesita que se pueda **leer** (sintaxis correcta), pero no que los tipos cuadren: formatea `let x: u8 = \"hola\";` sin quejarse. Con un error de sintaxis, falla."
+  - p: "¿Cómo evitas que rustfmt toque un trozo concreto de código?"
+    r: "Con el atributo `#[rustfmt::skip]` encima de ese elemento, por ejemplo una tabla de números alineada a mano."
+---
+
+import { Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+
+Dónde va cada llave, cuántos espacios, cuándo partir una línea… Son decisiones sin importancia que pueden ocupar horas. En Rust las toma una herramienta y todo el mundo usa la misma.
+
+## Predice
+
+<Predice
+  ej="m16/fmt-feo"
+  opciones={["No compila: falta sangría", "Compila y muestra `¡buen trimestre! 21`", "No compila: faltan espacios alrededor de `=`", "Compila, pero con avisos de formato"]}
+  correcta={1}
+  explicacion="Al compilador le dan igual los espacios y los saltos de línea: solo separan unas palabras de otras. El programa es correcto, aunque cueste leerlo. El formato es para las personas."
+  porque={["La sangría no tiene significado en Rust.", "Correcto.", "Los espacios alrededor de operadores son opcionales.", "El compilador no comprueba el formato; eso es trabajo de rustfmt."]}
+/>
+
+## La idea
+
+**rustfmt** es el formateador oficial: lee tu código y lo vuelve a escribir siguiendo la **guía de estilo de Rust** (*Rust Style Guide*). Viene con rustup (componente `rustfmt`) y se usa con dos comandos:
+
+- **`cargo fmt`**: formatea todos los archivos del proyecto, en el sitio.
+- **`cargo fmt --check`**: no toca nada; dice qué cambiaría y termina con error si hay algo sin formatear.
+
+La ventaja no es que su estilo sea «el mejor», sino que es **el de todos**. Cualquier proyecto en Rust que abras tendrá el mismo aspecto, y en una revisión de código nadie gasta tiempo en espacios. Muchos editores (con rust-analyzer) lo ejecutan al guardar.
+
+## Pruébalo
+
+Este es `cargo fmt --check` sobre el programa de arriba (salida real; la ruta del principio, acortada). Las líneas con `-` son las actuales; las de `+`, cómo quedarían:
+
+```text title="cargo fmt --check (salida real)"
+Diff in …\fmt1\src\main.rs:1:
+-fn main(){
+-let notas=vec![7,5,9];
+-    let total:i32=notas.iter().sum();
+-  if total>20{println!("¡buen trimestre! {}",total);}
++fn main() {
++    let notas = vec![7, 5, 9];
++    let total: i32 = notas.iter().sum();
++    if total > 20 {
++        println!("¡buen trimestre! {}", total);
++    }
+ }
+```
+
+Termina con **código de salida 1**: así un servidor de integración continua sabe que alguien subió código sin formatear y marca el cambio en rojo. Tras `cargo fmt`, el archivo queda exactamente como las líneas `+`, y `cargo fmt --check` ya no dice nada y termina con 0.
+
+Puedes ajustar algunas opciones con un archivo `rustfmt.toml` en la raíz del proyecto. Por ejemplo, con `max_width = 40` (el ancho máximo de línea; por defecto 100), rustfmt parte el `println!` (real):
+
+```rust
+fn main() {
+    let notas = vec![7, 5, 9];
+    let total: i32 = notas.iter().sum();
+    if total > 20 {
+        println!(
+            "¡buen trimestre! {}",
+            total
+        );
+    }
+}
+```
+
+La mayoría de proyectos no tiene `rustfmt.toml`: usar el estilo por defecto es justo lo que hace que todo el código en Rust se parezca.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+rustfmt **no compila** tu programa. Lee el texto y construye el **árbol de sintaxis** (*AST*), la misma estructura que crea el compilador en su primer paso, y después lo vuelve a imprimir con sus reglas. No resuelve nombres ni comprueba tipos. Dos consecuencias que puedes ver de verdad:
+
+- Un programa con un **error de tipos** se formatea sin problema. `fn main(){let x:u8="hola";println!("{x}");}` sale bien formateado y rustfmt termina con 0, aunque el programa no compile.
+- Un programa con un **error de sintaxis** no se puede formatear, porque no hay árbol que reimprimir. Con `fn main(){let x = ;}` rustfmt termina con 1 y el error `expected expression, found ;`.
+
+Como trabaja sobre el árbol, rustfmt sabe que dentro de `println!(…)` hay argumentos separados por comas, pero el interior de una macro hecha con `macro_rules!` con sintaxis propia a menudo lo deja tal cual: no siempre sabe qué forma tiene. Los comentarios los conserva.
+
+El estilo depende de la **edición de estilo** (*style edition*): con la edición 2024 llegó el estilo 2024, con algunos cambios pequeños respecto al anterior. Por defecto se toma de la edición de tu `Cargo.toml`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="La tabla alineada a mano que rustfmt aplasta">
+
+❌ Escribes una matriz bien alineada y rustfmt la junta en una sola línea, porque cabe en el ancho máximo (real):
+
+```rust
+const OTRA: [[i32; 3]; 3] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+```
+
+✅ `#[rustfmt::skip]` le dice que no toque ese elemento. Úsalo poco, solo donde la forma visual tenga significado:
+
+```rust
+#[rustfmt::skip]
+const MATRIZ: [[i32; 3]; 3] = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+];
+```
+
+</Trampa>
+
+## Tu turno
+
+<Ordena
+  lineas={["cargo fmt", "cargo clippy", "cargo test", "git commit"]}
+  distractores={["cargo fmt --check --fix", "cargo build --format"]}
+  explicacion="Una rutina habitual antes de guardar un cambio: formatear, revisar con Clippy, ejecutar las pruebas y, si todo está bien, hacer el commit. Las opciones de los distractores no existen."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Tu programa tiene un error de tipos (guardas una cadena en una variable `u8`). ¿Qué hace `cargo fmt`?"
+  opciones={["Falla, porque el programa no compila", "Lo formatea igual: rustfmt solo necesita que la sintaxis sea correcta", "Corrige el error de tipos", "Borra la línea con el error"]}
+  correcta={1}
+  explicacion="rustfmt lee el árbol de sintaxis sin comprobar tipos. Formatea código que no compila siempre que se pueda leer."
+  porque={["Solo falla con errores de sintaxis.", "Correcto.", "No cambia el significado del código, solo su aspecto.", "Nunca borra código."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué se usa `cargo fmt --check` en la integración continua en vez de `cargo fmt`?"
+  opciones={["Porque es más rápido", "Porque no modifica los archivos y termina con error si hay algo sin formatear, así el servidor puede rechazar el cambio", "Porque `cargo fmt` necesita el enlazador", "Porque `--check` también ejecuta las pruebas"]}
+  correcta={1}
+  explicacion="El servidor no debe cambiar tu código por su cuenta: solo comprobar. El código de salida 1 es la señal de «esto no cumple»."
+  porque={["La velocidad es parecida.", "Correcto.", "Ninguno de los dos enlaza.", "Solo comprueba el formato."]}
+/>

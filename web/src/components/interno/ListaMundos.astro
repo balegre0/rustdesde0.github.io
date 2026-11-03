@@ -1,0 +1,36 @@
+---
+// Índice del curso: todos los mundos con su número de lecciones y progreso.
+import { mundos } from '../../lib/lecciones';
+const ms = await mundos();
+---
+<ol class="rdc-mundos not-content" data-lista-mundos>
+  {ms.map((m) => {
+    const ids = m.lecciones.map((l) => l.id);
+    const mins = m.lecciones.reduce((s, l) => s + (l.duracion ?? 0), 0);
+    const href = m.href ?? m.lecciones[0]?.href;
+    return (
+      <li data-mundo={m.slug} data-ids={JSON.stringify(ids)}>
+        {href ? <a href={href} class="rdc-mundo-enlace">
+          <span class="rdc-mundo-num" aria-hidden="true">{m.numero ?? '·'}</span>
+          <span class="rdc-mundo-texto">
+            <span class="rdc-mundo-titulo">{m.titulo}</span>
+            {m.descripcion && <span class="rdc-mundo-desc">{m.descripcion}</span>}
+            <span class="rdc-mundo-meta">{m.lecciones.length} {m.lecciones.length === 1 ? 'lección' : 'lecciones'}{mins > 0 && ` · ${mins} min`} · <span data-hechas>0</span> de {m.lecciones.length} completadas</span>
+          </span>
+          <span class="rdc-mundo-barra" aria-hidden="true"><span data-barra style="width:0%"></span></span>
+        </a> : <span class="rdc-mundo-enlace">{m.titulo}</span>}
+      </li>
+    );
+  })}
+  {ms.length === 0 && <li>Todavía no hay mundos publicados.</li>}
+</ol>
+<script>
+  import { leer } from '../../runtime/progreso';
+  const p = leer();
+  for (const li of document.querySelectorAll<HTMLElement>('[data-lista-mundos] [data-mundo]')) {
+    const ids: string[] = JSON.parse(li.dataset.ids || '[]');
+    const n = ids.filter((id) => p.lecciones[id]).length;
+    const c = li.querySelector('[data-hechas]'); if (c) c.textContent = String(n);
+    const b = li.querySelector<HTMLElement>('[data-barra]'); if (b && ids.length) b.style.width = `${Math.round((100 * n) / ids.length)}%`;
+  }
+</script>

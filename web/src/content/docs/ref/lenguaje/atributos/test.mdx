@@ -1,0 +1,57 @@
+---
+title: "#[test], #[ignore] y #[should_panic]"
+description: "Los atributos de las pruebas: test marca una función como prueba, ignore la salta salvo que se pida y should_panic exige que entre en pánico."
+sidebar:
+  order: 14
+insignias: ["Desde 1.0", "Pruebas"]
+---
+
+Estos atributos solo tienen efecto cuando se compila en modo prueba (`cargo test`, o `rustc --test`).
+
+## Sinopsis
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn suma_basica() {
+        assert_eq!(sumar(2, 2), 4);
+    }
+
+    #[test]
+    #[should_panic(expected = "división entre cero")]
+    fn dividir_entre_cero() {
+        dividir(1, 0);
+    }
+
+    #[test]
+    #[ignore = "tarda un minuto"]
+    fn prueba_lenta() { /* … */ }
+
+    #[test]
+    fn con_result() -> Result<(), String> {
+        Ok(())
+    }
+}
+```
+
+## Qué hace
+
+- **`#[test]`**: la función (sin parámetros, que devuelve `()` o un `Result`) es una prueba. Pasa si termina sin pánico (o con `Ok`). Fuera de `cargo test`, no se compila.
+- **`#[should_panic]`**: la prueba pasa solo si **entra en pánico**. Con `expected = "…"`, además el mensaje del pánico tiene que **contener** ese texto.
+- **`#[ignore]`** (con motivo opcional): la prueba no se ejecuta salvo con `cargo test -- --ignored` (o `--include-ignored`).
+- `#[cfg(test)]` en el módulo hace que las pruebas y sus `use` ni se compilen en el programa normal.
+
+## Bajo el capó
+
+Con `--test`, el compilador genera un `main` propio (el *test harness* de `libtest`) que reúne todas las funciones `#[test]`, las ejecuta en varios hilos y resume los resultados. Las pruebas de este curso en el navegador no usan ese harness, porque en `wasm32-wasip1` no hay hilos.
+
+## Desde
+
+Rust 1.0. Pruebas que devuelven `Result`: 1.28. Motivo en `ignore`: 1.61.
+
+## Ver también
+
+[Tu primer test](/curso/16-pruebas-y-herramientas/01-tu-primer-test/)

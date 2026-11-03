@@ -1,0 +1,28 @@
+---
+title: "#[instruction_set] y #![no_builtins]"
+description: "Dos atributos de generación de código poco frecuentes: elegir ARM o Thumb para una función, y evitar que el compilador sustituya bucles por llamadas a memcpy o memset."
+sidebar:
+  order: 27
+insignias: ["Desde 1.56", "Generación de código"]
+---
+
+## `#[instruction_set]`
+
+```rust
+#[instruction_set(arm::t32)]
+fn rapida_y_pequena() { … }
+```
+
+En los procesadores ARM de 32 bits hay dos juegos de instrucciones: **A32** (ARM, instrucciones de 4 bytes) y **T32** (Thumb, de 2 o 4 bytes, código más compacto). Este atributo elige uno para una función concreta: `arm::a32` o `arm::t32`. Solo existe en los targets `arm*` y `thumb*` que admiten los dos. Desde Rust 1.56.
+
+## `#![no_builtins]`
+
+```rust
+#![no_builtins]
+```
+
+El optimizador reconoce bucles que copian o rellenan memoria y los sustituye por llamadas a `memcpy`, `memset` o `memcmp`. En un crate que **implementa** esas mismas funciones (como `compiler_builtins`, o un núcleo propio), eso crearía una función que se llama a sí misma sin fin. `#![no_builtins]` desactiva esa sustitución en todo el crate (y, en la práctica, algunas optimizaciones entre crates).
+
+## Ver también
+
+[`#[target_feature]`](/ref/lenguaje/atributos/target_feature/) · [Mundo 23](/curso/23-embebido-y-tu-so/)

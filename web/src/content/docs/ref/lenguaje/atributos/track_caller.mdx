@@ -1,0 +1,41 @@
+---
+title: "#[track_caller]"
+description: "Hace que Location::caller() y los mensajes de pánico apunten a la línea de quien llama a la función, no a la propia función."
+sidebar:
+  order: 4
+insignias: ["Desde 1.46", "Generación de código"]
+---
+import { Ejecutar } from '~/components';
+
+`#[track_caller]` hace que una función informe de **dónde la llamaron** en vez de dónde está escrita.
+
+## Sinopsis
+
+```text
+#[track_caller]
+fn f(…) { … }
+```
+
+## Qué hace
+
+Dentro de una función con `#[track_caller]`, `std::panic::Location::caller()` devuelve el archivo, la línea y la columna de **la llamada**. Y si la función entra en pánico, el mensaje señala esa línea.
+
+Por eso, cuando `opcion.unwrap()` falla, el mensaje apunta a **tu** línea y no al interior de la biblioteca estándar: `unwrap`, `expect`, el índice `v[i]` y muchas otras funciones tienen `#[track_caller]`.
+
+Es ideal para tus propias funciones de validación: `fn comprobar(x: u32) { if x > 10 { panic!(…) } }` con `#[track_caller]` hace que el pánico señale quién pasó el valor malo.
+
+## Ejemplo
+
+<Ejecutar ej="ref-lenguaje/at-track-caller" />
+
+## Bajo el capó
+
+El compilador añade a la función un **parámetro oculto**: un `&'static Location`, que cada llamada rellena con su posición. Si una función con `#[track_caller]` llama a otra que también lo tiene, la posición se propaga. Por eso tiene un coste pequeñísimo (un argumento más) y no se puede usar en `extern "C" fn` ni en la función `main`.
+
+## Desde
+
+Rust 1.46. En closures: inestable.
+
+## Ver también
+
+[`std::panic`](/ref/std/) · [`#[inline]`](/ref/lenguaje/atributos/inline/)

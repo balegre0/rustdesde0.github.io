@@ -1,0 +1,104 @@
+---
+title: "Versiones"
+description: "Los hitos de Rust desde 1.0 hasta 1.99, y la tabla detallada de 1.85 a 1.99."
+sidebar:
+  order: 5
+desde: "1.0"
+---
+
+Rust publica una versión estable **cada seis semanas**. Esta página resume qué trajo cada una al lenguaje, desde 1.0 hasta **1.99.1**, la versión que usa este curso.
+
+## En una frase
+
+Hay tres canales: **stable** (la versión que usas), **beta** (la siguiente, en pruebas) y **nightly** (cada noche, con características inestables tras `#![feature(…)]`). Lo que entra en estable no se rompe: el código que compila con una versión compila con las siguientes (salvo correcciones de errores de solidez).
+
+## Fechas y numeración
+
+- 1.0 salió el **15 de mayo de 2015**. Desde entonces: 1.1, 1.2… cada seis semanas. Las versiones de parche (como 1.99.1) corrigen errores graves.
+- Cada versión indica en la tabla qué trajo al **lenguaje**; las novedades de la biblioteca estándar se documentan en cada ficha de `std`.
+- Fuente: las notas de versión oficiales (`RELEASES.md`) incluidas con el propio compilador 1.99.1.
+
+## Hitos de 1.0 a 1.84
+
+| Versión | Fecha | Lo más importante para el lenguaje |
+|---|---|---|
+| 1.0 | 2015-05-15 | primera versión estable; edición 2015 |
+| 1.13 | 2016-11-10 | operador `?` |
+| 1.15 | 2017-02-02 | macros derive procedurales |
+| 1.18 | 2017-06-08 | `pub(crate)`, `pub(in ruta)` |
+| 1.19 | 2017-07-20 | `union`; `break valor` en `loop` |
+| 1.20 | 2017-08-31 | constantes asociadas |
+| 1.22 | 2017-11-22 | `?` con `Option` |
+| 1.26 | 2018-05-10 | `impl Trait`, `i128`/`u128`, ergonomía de `match`, `..=`, `main` devolviendo `Result` |
+| 1.27 | 2018-06-21 | sintaxis `dyn Trait` |
+| 1.28 | 2018-08-02 | `#[repr(transparent)]` |
+| 1.30 | 2018-10-25 | macros procedurales tipo función y atributo, identificadores crudos `r#`, `crate::` en rutas |
+| 1.31 | 2018-12-06 | **edición 2018**; `const fn` |
+| 1.33 | 2019-02-28 | `Rc`, `Arc` y `Pin` como receptores de métodos |
+| 1.34 | 2019-04-11 | `TryFrom`/`TryInto` |
+| 1.36 | 2019-07-04 | `Future`; crate `alloc`; *non-lexical lifetimes* también en 2015 |
+| 1.39 | 2019-11-07 | `async`/`.await` |
+| 1.40 | 2019-12-19 | `#[non_exhaustive]` |
+| 1.42 | 2020-03-12 | `matches!` |
+| 1.45 | 2020-07-16 | `as` de flotante a entero satura (antes era comportamiento indefinido) |
+| 1.46 | 2020-08-27 | `if`, `match` y bucles en `const fn`; `#[track_caller]` |
+| 1.51 | 2021-03-25 | genéricos constantes |
+| 1.53 | 2021-06-17 | alternativas `\|` anidadas en patrones; identificadores Unicode |
+| 1.55 | 2021-09-09 | patrones de rango abiertos `a..` |
+| 1.56 | 2021-10-21 | **edición 2021** |
+| 1.57 | 2021-12-02 | `panic!` en contextos constantes |
+| 1.58 | 2022-01-13 | variables capturadas en cadenas de formato: `println!("{x}")` |
+| 1.59 | 2022-02-24 | `asm!`; asignación con desestructuración |
+| 1.62 | 2022-06-30 | `#[derive(Default)]` en enums con `#[default]` |
+| 1.63 | 2022-08-11 | hilos con ámbito `thread::scope` |
+| 1.64 | 2022-09-22 | `IntoFuture` |
+| 1.65 | 2022-11-03 | tipos asociados genéricos (GAT), `let … else`, `break` desde bloques etiquetados |
+| 1.66 | 2022-12-15 | discriminantes explícitos en enums con datos |
+| 1.68 | 2023-03-09 | `pin!` |
+| 1.70 | 2023-06-01 | `OnceCell`, `OnceLock` |
+| 1.71 | 2023-07-13 | ABI `"C-unwind"`; `#[debugger_visualizer]` |
+| 1.74 | 2023-11-16 | tabla `[lints]` en `Cargo.toml` |
+| 1.75 | 2023-12-28 | `async fn` e `impl Trait` en traits |
+| 1.77 | 2024-03-21 | literales `c"…"`; `offset_of!` |
+| 1.78 | 2024-05-02 | `#[diagnostic::on_unimplemented]` |
+| 1.79 | 2024-06-13 | bloques `const { … }`; límites en tipos asociados |
+| 1.80 | 2024-07-25 | rangos exclusivos en patrones; `LazyCell`, `LazyLock`; `size_of` en el prelude |
+| 1.81 | 2024-09-05 | `#[expect]`; `core::error::Error` |
+| 1.82 | 2024-10-17 | `&raw const`/`&raw mut`, `unsafe extern`, atributos `#[unsafe(…)]`, `use<…>`, flotantes en `const fn`, patrones que omiten tipos vacíos |
+| 1.83 | 2024-11-28 | `&mut` en `const fn` |
+| 1.84 | 2025-01-09 | APIs de procedencia estricta de punteros; resolver de Cargo consciente de `rust-version` |
+
+## De 1.85 a 1.99
+
+| Versión | Fecha | Lenguaje | Biblioteca destacada |
+|---|---|---|---|
+| 1.85 | 2025-02-20 | **edición 2024**; closures async; `#[diagnostic::do_not_recommend]` | `ptr::fn_addr_eq`, `Waker::noop`, `midpoint` |
+| 1.86 | 2025-04-03 | conversión de `dyn` a supertrait (*upcasting*); `#[target_feature]` en funciones seguras | `get_disjoint_mut`, `Vec::pop_if`, `OnceLock::wait` |
+| 1.87 | 2025-05-15 | `asm_goto`; `use<…>` en traits | `Vec::extract_if`, `io::pipe`, `is_multiple_of` |
+| 1.88 | 2025-06-26 | cadenas `let` (edición 2024); funciones *naked*; `cfg(true)`/`cfg(false)` | `Cell::update`, `HashMap::extract_if`, `as_chunks` |
+| 1.89 | 2025-08-07 | `_` como argumento constante deducido; `repr(u128/i128)`; lint `mismatched_lifetime_syntaxes` | — |
+| 1.90 | 2025-09-18 | un `const` puede referirse a memoria mutable (no usable como patrón) | `f64::floor`/`ceil`/`round` en const |
+| 1.91 | 2025-10-30 | lints `dangling_pointers_from_locals`, `integer_to_ptr_transmutes` | aritmética `strict_*`, `Duration::from_mins` |
+| 1.92 | 2025-12-11 | `&raw` sobre campos de `union` en código seguro; `#[track_caller]` con `#[no_mangle]` | `Box::new_zeroed`, `RwLockWriteGuard::downgrade` |
+| 1.93 | 2026-01-22 | `#[cfg]` dentro de `asm!` | `fmt::from_fn`, `Vec::into_raw_parts` |
+| 1.94 | 2026-03-05 | Unicode 17; lint `unused_visibilities` | `array_windows`, `LazyLock::get` |
+| 1.95 | 2026-04-16 | guardas `if let` en `match`; renombrar `self` en importaciones | `cfg_select!`, `hint::cold_path`, `Vec::push_mut` |
+| 1.96 | 2026-05-28 | metavariables `expr` en `cfg`; `!` siempre se convierte en tuplas; constantes `ManuallyDrop` como patrones | `assert_matches!`, `core::range::Range` |
+| 1.97 | 2026-07-09 | lint `dead_code_pub_in_binary`; `cfg(target_has_atomic_primitive_alignment)` | `bit_width`, `highest_one`, `lowest_one` |
+| 1.98 | 2026-08-20 | un `&mut` puede acortar su tiempo de vida en coerciones *unsize* invariantes | `str::substr_range`, `bool::ok_or`, `map_or_default` |
+| 1.99 | 2026-10-01 | **definición** de funciones variádicas con ABI C; macros atributo sobre `mod nombre;` | `core::ffi::VaList`, `Vec::into_parts`, `Box::into_non_null` |
+| 1.99.1 | 2026-10-15 | parche: valores `bool` devueltos por FFI en x86-64, `wcslen` en UEFI | — |
+
+## Lo que viene
+
+- **Rust 1.100** (beta en noviembre de 2026): en el compilador nightly, el tipo `!` ya aparece como estable para la versión 1.100.
+- Siguen **inestables** (solo nightly), entre otros: bloques `gen` y `try`, especialización, `generic_const_exprs`, `type_alias_impl_trait`, *return type notation*, `deref_patterns`, `async_drop`, `default_field_values`, `explicit_tail_calls` (`become`), macros 2.0 (`macro`), `f16`/`f128`.
+- El nuevo borrow checker **Polonius** (versión alfa) está activado en nightly, con el objetivo de estabilizarse.
+
+## Ver también
+
+- [Ediciones](/ref/ediciones/) · [Referencia del lenguaje](/ref/lenguaje/)
+
+## Aprende esto en
+
+- [Mundo 00 · El taller](/curso/00-el-taller/)

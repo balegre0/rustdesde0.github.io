@@ -1,0 +1,132 @@
+---
+title: "El trait Future y poll"
+description: "Escribir tu primer future a mano y sondearlo hasta que esté listo."
+sidebar:
+  order: 2
+duracion: 12
+desde: "1.36"
+requiere: ["18-async/01-por-que-async", "14-closures-e-iteradores/05-el-trait-iterator"]
+tarjetas:
+  - p: "¿Qué devuelve Future::poll?"
+    r: "Un Poll<T>: Poll::Ready(valor) si ya terminó, o Poll::Pending si todavía no."
+  - p: "¿Qué pasa al llamar a una async fn sin .await ni poll?"
+    r: "Nada: solo se crea el future. Los futures de Rust son perezosos."
+  - p: "¿Qué tipo tiene self en Future::poll?"
+    r: "Pin<&mut Self>, no &mut self."
+  - p: "¿Quién llama a poll en un programa real?"
+    r: "Un ejecutor (runtime), no tu código."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir un **future** con tus propias manos y a hacer el trabajo del ejecutor: llamarle una y otra vez hasta que termine.
+
+## Predice
+
+<Predice
+  ej="m18/perezoso"
+  opciones={[
+    "«(dentro de saludar)» sale justo después de «1. llamo a saludar()»",
+    "«(dentro de saludar)» sale después de «3. lo sondeo»",
+    "«(dentro de saludar)» no sale nunca",
+    "No compila: falta .await"
+  ]}
+  correcta={1}
+  explicacion="Llamar a `saludar()` solo construye un future. El cuerpo empieza a ejecutarse en el primer `poll`."
+  porque={[
+    "Eso pasaría si llamar a la función ejecutara el cuerpo; en async no es así.",
+    "Correcto: los futures son perezosos (*lazy*).",
+    "Sí sale: el `poll` del paso 3 lo ejecuta.",
+    "Compila: no hace falta `.await` si lo sondeas tú a mano."
+  ]}
+/>
+
+## La idea
+
+Un **future** (*futuro*) es un valor que representa un resultado que **todavía no está**. En Rust es cualquier tipo que implementa este trait de la biblioteca estándar:
+
+```rust
+pub trait Future {
+    type Output;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
+}
+
+pub enum Poll<T> {
+    Ready(T),
+    Pending,
+}
+```
+
+**Sondear** (*poll*) es preguntar «¿has terminado?». El future avanza todo lo que puede y responde `Poll::Ready(valor)` si acabó, o `Poll::Pending` si se ha quedado esperando algo. Nadie lo sondea solo: si no lo sondeas, no hace nada. Por eso se dice que los futures de Rust son **perezosos** (*lazy*).
+
+De momento ignora dos detalles: `Pin<&mut Self>` (es un `&mut self` con una promesa extra; lección 7) y `Context` (lleva dentro el `Waker`; lección 3). Para sondear sin ejecutor usaremos `Waker::noop()`, un waker que no hace nada (estable desde Rust 1.85).
+
+## Pruébalo
+
+<Ejecutar ej="m18/future-a-mano" />
+
+Paso a paso: `Cuenta { veces: 3 }` responde `Pending` tres veces (restando uno cada vez) y a la cuarta, `Ready`. El bucle de `main` es un **ejecutor** de juguete: sondea sin parar hasta obtener `Ready`.
+
+`Pin::new(&mut fut)` funciona aquí porque `Cuenta` es un struct simple que se puede mover sin peligro (es `Unpin`; lo verás en la lección 7). Con el future de una `async fn` hace falta `pin!`, como en el ejemplo del principio.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**Un future es solo un valor.** `Cuenta` mide 4 bytes (un `u32`). No hay hilo, ni pila propia, ni nada escondido: el «estado» de la tarea son sus campos. Cuando `poll` devuelve `Pending`, la función **termina de verdad** y su marco de pila desaparece; lo que haya que recordar para la próxima vez tiene que estar guardado en `self`. Por eso `poll` recibe `self` por referencia exclusiva: tiene que poder modificar su propio estado (aquí, `self.veces -= 1`).
+
+**El contrato de `poll`** (documentación de `std::future::Future`):
+- Si devuelve `Pending`, el future se compromete a que **alguien** llamará al `Waker` de `cx` cuando valga la pena volver a sondear. Nuestro future lo cumple con `cx.waker().wake_by_ref()` («sondéame otra vez enseguida»).
+- Después de `Ready`, no se debe volver a sondear. Si lo haces, el future puede entrar en pánico, quedarse colgado o devolver cualquier cosa (pero nunca causar comportamiento indefinido: `poll` es una función segura).
+
+**`Poll` frente a `Option`.** `Poll<T>` tiene la misma forma que `Option<T>` (dos variantes, una con dato), pero un nombre que dice lo que significa. Tiene métodos como `is_ready()`, `is_pending()` y `map`.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="Devolver Pending sin avisar a nadie">
+
+❌ Un `poll` que devuelve `Poll::Pending` y **no** guarda ni usa el waker:
+
+```rust
+fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+    Poll::Pending // nadie sabrá cuándo volver a sondear
+}
+```
+
+Con un ejecutor real (que solo sondea cuando le avisan), esa tarea se queda **dormida para siempre**. No hay error ni pánico: simplemente no avanza.
+
+✅ Antes de devolver `Pending`, o despiertas tú (`wake_by_ref()`) o entregas `cx.waker().clone()` a quien vaya a producir el dato (el sistema operativo, un temporizador, otra tarea).
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m18/reto-cuenta-atras" enunciado="Implementa `poll` para `CuentaAtras`: suma 1 a `sondeos` en cada llamada; si `n` es 0 devuelve `Ready(sondeos)`; si no, resta 1 a `n`, avisa al waker y devuelve `Pending`." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Escribes `let f = descargar(url);` (una `async fn`) y no haces nada más con `f`. ¿Qué ocurre?"
+  opciones={["Empieza a descargar en segundo plano", "No pasa nada: se crea el future y se suelta sin ejecutarse", "El programa espera a que termine", "Error de compilación"]}
+  correcta={1}
+  explicacion="Los futures son perezosos. Si ni siquiera lo guardas (`descargar(url);` a secas), rustc 1.99.1 avisa: «unused implementer of `Future` that must be used» con la nota «futures do nothing unless you `.await` or poll them»."
+  porque={["Eso solo ocurre si un ejecutor lo lanza (por ejemplo `tokio::spawn`).", "Correcto.", "Esperar requiere `.await` o un ejecutor.", "Compila; como mucho, con un aviso (aquí, de variable sin usar)."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué debe hacer un future antes de devolver `Poll::Pending`?"
+  opciones={["Nada", "Entrar en pánico", "Asegurarse de que alguien llamará a su `Waker` cuando pueda avanzar", "Devolver también un valor parcial"]}
+  correcta={2}
+  explicacion="Es el contrato de `poll`: si dices Pending, alguien tiene que despertarte. Si no, el ejecutor no vuelve a sondearte."
+  porque={["Así la tarea se queda dormida para siempre.", "Pending no es un error.", "Correcto.", "Pending no lleva dato."]}
+/>
+
+<Pregunta
+  pregunta="¿Por qué `poll` recibe el future por referencia (exclusiva y fijada) y no por valor?"
+  opciones={["Por rendimiento solamente", "Porque se llama muchas veces y entre llamada y llamada el future tiene que conservar su estado", "Porque los futures no se pueden copiar", "Es un error histórico"]}
+  correcta={1}
+  explicacion="Si `poll` tomara `self` por valor, el future se consumiría en la primera llamada. Por referencia exclusiva puede actualizar su estado y seguir existiendo."
+  porque={["El motivo es de diseño, no de velocidad.", "Correcto.", "Que no sean `Copy` no obliga a usar referencias.", "Es intencionado."]}
+/>

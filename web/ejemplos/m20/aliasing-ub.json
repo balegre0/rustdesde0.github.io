@@ -1,0 +1,1 @@
+{ "plataforma": "playground", "nota": "rustc no ve el problema. Ejecútalo con Tools → Miri: lo rechaza en el paso 4 por violar las reglas de aliasing." }

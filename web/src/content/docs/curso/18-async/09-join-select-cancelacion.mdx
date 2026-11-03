@@ -1,0 +1,123 @@
+---
+title: "join, select y cancelación"
+description: "Esperar a varios futures a la vez, quedarte con el primero y entender qué significa cancelar en Rust."
+sidebar:
+  order: 9
+duracion: 15
+desde: "1.64"
+requiere: ["18-async/06-await", "15-punteros-inteligentes/04-drop"]
+tarjetas:
+  - p: "¿Qué hace join?"
+    r: "Sondea varios futures intercalados en la misma tarea y termina cuando terminan todos, devolviendo todos los resultados."
+  - p: "¿Qué hace select?"
+    r: "Sondea varios futures y termina con el primero que acabe; los demás se sueltan (se cancelan)."
+  - p: "¿Cómo se cancela un future en Rust?"
+    r: "Soltándolo (drop). No vuelve a sondearse, así que se detiene en su último .await y se ejecutan los Drop de lo que guardaba."
+  - p: "¿Qué es un future «cancel-safe»?"
+    r: "Uno que, si se suelta en cualquier .await, no pierde datos ni deja nada a medias."
+---
+
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a escribir tu propio `join` y tu propio `select`, y con ellos vas a descubrir la consecuencia más sutil del async de Rust: **cancelar es soltar**.
+
+## Predice
+
+<Predice
+  ej="m18/select-propio"
+  opciones={[
+    "ganó: lento",
+    "ganó: rápido, y antes «lento cancelado (le faltaban 3 sondeos)»",
+    "ganó: rápido, y el lento sigue ejecutándose después",
+    "El programa no termina"
+  ]}
+  correcta={1}
+  explicacion="`select` sondea los dos en cada vuelta. «rápido» termina en el segundo sondeo; en ese momento `select` devuelve y suelta a «lento», que solo había recibido 2 de sus 5 sondeos. Su `Drop` lo anuncia **antes** de «select terminó»."
+  porque={[
+    "El lento necesita 5 sondeos; el rápido, 1.",
+    "Correcto.",
+    "Nadie vuelve a sondearlo: está soltado.",
+    "Termina en cuanto gana el rápido."
+  ]}
+/>
+
+## La idea
+
+`.await` uno tras otro es secuencial (lección 6). Para que varios futures avancen **dentro de la misma tarea**, hace falta un future que los contenga y los sondee **por turnos**:
+
+- **`join(a, b)`**: en cada sondeo, sondea a `a` y a `b` (a los que no hayan terminado). Termina cuando terminan los dos y devuelve `(ra, rb)`.
+- **`select(a, b)`**: en cada sondeo, sondea a `a` y a `b`; en cuanto uno termina, devuelve su resultado y **suelta al otro**.
+
+Ese «soltar al otro» es la **cancelación** en Rust: no hay ninguna función `cancel()`. Un future solo avanza cuando lo sondean; si lo sueltas (*drop*), nadie lo volverá a sondear y se queda parado para siempre en su último `.await`. Rust ejecuta entonces los `Drop` de todo lo que guardaba dentro: archivos que se cierran, cerrojos que se liberan, memoria que se devuelve.
+
+## Pruébalo
+
+Primero, `join` a mano. Mira cómo se intercalan los sondeos de A y B:
+
+<Ejecutar ej="m18/join-propio" />
+
+Y ahora la cancelación, sin `select`: sondeamos dos veces una tarea que nunca terminará y la soltamos.
+
+<Ejecutar ej="m18/cancelar-drop" />
+
+La línea «después del .await» no se imprime nunca, pero el guardián **sí** se destruye: cancelar no fuga recursos.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`std::future::poll_fn`** (Rust 1.64) crea un future a partir de una closure que recibe `&mut Context` y devuelve `Poll<T>`. Es la forma más corta de escribir combinadores como `join` y `select` sin declarar un struct.
+
+**`join` y `select` en el ecosistema.** El crate `futures` y Tokio traen `join!`, `try_join!` (para cuando todos devuelven `Result`: se detiene en el primer error) y `select!`. La biblioteca estándar tiene `std::future::join!`, todavía inestable.
+
+**`join` no es paralelismo.** Todo pasa dentro de **una** tarea y, por tanto, en un hilo a la vez. Las esperas se solapan, pero si dos futures hacen cálculo, se turnan. Para paralelismo real, lanza tareas separadas (`tokio::spawn`) en un runtime multihilo.
+
+**Seguridad ante la cancelación** (*cancellation safety*). Como un future puede soltarse en cualquier `.await`, la pregunta es: si me sueltan **aquí**, ¿se pierde algo? Fíjate en este ejemplo:
+
+<Ejecutar ej="m18/cancel-safety" />
+
+`procesar_mal` saca el mensaje de la cola y **después** espera. Si la cancelan en ese `.await`, el mensaje ya no está en la cola y tampoco se procesó: **perdido**. `procesar_bien` espera primero y saca el mensaje cuando ya no quedan `.await`: cancelarla deja la cola intacta.
+
+La documentación de Tokio marca cada método como seguro o no ante la cancelación. Por ejemplo, recibir de un canal (`mpsc::Receiver::recv`) lo es; leer un número exacto de bytes (`read_exact`) no lo es, porque puede haber leído la mitad.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<Trampa titulo="select! en un bucle con un future que no es cancel-safe">
+
+❌ Un bucle que, en cada vuelta, crea un `read_exact(...)` nuevo y lo compite contra un temporizador con `select!`. Cada vez que gana el temporizador, el `read_exact` a medias se suelta y **los bytes que ya había leído se pierden**: el flujo de datos queda desalineado.
+
+✅ Dos soluciones: usar operaciones cancel-safe dentro de `select!`, o crear el future **una vez fuera del bucle**, fijarlo con `pin!` y competir por referencia (`&mut fut`), de modo que perder una vuelta no lo suelta y sigue donde estaba.
+
+</Trampa>
+
+## Tu turno
+
+<Reto ej="m18/reto-join-todos" enunciado="Escribe `join_todos`: recibe un `Vec<Tarda>`, los sondea todos por turnos y devuelve sus resultados en el **mismo orden** de entrada cuando han terminado todos. Debe imprimir [1, 2, 3]." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="Haces `join(descargar(a), descargar(b)).await` en un runtime de un solo hilo. ¿Las dos descargas se solapan?"
+  opciones={["No: join las hace una detrás de otra", "Sí: mientras una espera a la red, join sondea la otra", "Solo si son de servidores distintos", "Solo en un runtime multihilo"]}
+  correcta={1}
+  explicacion="Las esperas se solapan dentro de la misma tarea. Lo que no hay es paralelismo de CPU, que aquí no hace falta: casi todo es esperar."
+  porque={["Eso es lo que hacen dos `.await` seguidos.", "Correcto.", "Da igual el servidor.", "No hace falta: con un hilo ya se solapan las esperas."]}
+/>
+
+<Pregunta
+  pregunta="Un future se suelta mientras está parado en un `.await`. ¿Qué pasa con un `String` que tenía como variable local viva?"
+  opciones={["Se fuga: nadie lo libera", "Se libera: al soltar el future se ejecutan los Drop de lo que guardaba", "Sigue viviendo hasta el final del programa", "Es comportamiento indefinido"]}
+  correcta={1}
+  explicacion="El `String` vive dentro de la máquina de estados (lección 5); soltar el future suelta sus campos, como con cualquier `enum`."
+  porque={["Rust no fuga en la cancelación normal.", "Correcto.", "Se libera en ese momento.", "Cancelar es una operación segura y bien definida."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué hace que `procesar_mal` no sea cancel-safe?"
+  opciones={["Que usa `RefCell`", "Que modifica la cola y **después** tiene un `.await` donde se le puede soltar antes de terminar el trabajo", "Que no devuelve nada", "Que usa `VecDeque`"]}
+  correcta={1}
+  explicacion="La regla práctica: entre «tomar algo» y «terminar con ello» no debería haber un punto de suspensión, o lo tomado tiene que volver a su sitio si te cancelan."
+  porque={["`RefCell` no tiene que ver con la cancelación.", "Correcto.", "El tipo de retorno no influye.", "La estructura de datos da igual."]}
+/>

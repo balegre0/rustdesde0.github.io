@@ -1,0 +1,94 @@
+---
+title: "stdin"
+description: "Leer lo que el usuario escribe: read_line, lines y lock."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::io::stdin`
+
+## Sinopsis
+
+```rust
+pub fn stdin() -> Stdin
+```
+
+## Qué hace
+
+`io::stdin()` devuelve un manejador de la **entrada estándar** (lo que se teclea, o lo que llega por una tubería). `read_line` añade la siguiente línea, **con su `\n`**, al final de un `String`: casi siempre querrás `.trim()` antes de convertirla. Antes de preguntar con `print!`, haz `io::stdout().flush()` para que la pregunta se vea.
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`read_line`](#read_line) | Lee una línea y la **añade** al `String` (no lo vacía antes). | 1.0 |
+| [`lines`](#lines) | Iterador de líneas hasta el final de la entrada (sin el salto de línea). | 1.62 |
+| [`lock`](#lock) | Bloquea la entrada para tu hilo y da un `StdinLock`, que implementa `BufRead`. | 1.0 |
+
+### `read_line`
+
+```rust
+pub fn read_line(&self, buf: &mut String) -> Result<usize>
+```
+
+Lee una línea y la **añade** al `String` (no lo vacía antes). Devuelve cuántos bytes leyó; `0` significa fin de la entrada.
+
+### `lines`
+
+```rust
+pub fn lines(self) -> Lines<StdinLock<'static>>
+```
+
+Iterador de líneas hasta el final de la entrada (sin el salto de línea).
+
+### `lock`
+
+```rust
+pub fn lock(&self) -> StdinLock<'static>
+```
+
+Bloquea la entrada para tu hilo y da un `StdinLock`, que implementa `BufRead`.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/io-stdin" />
+
+**Salida:**
+
+```text
+¿Cómo te llamas? ¿Y cuántos años tienes? 
+Hola, Ana. El año que viene tendrás 22.
+(se leyeron 4 bytes en la segunda línea)
+```
+
+<Ejecutar ej="ref-std/io-lineas" />
+
+**Salida:**
+
+```text
+1: uno
+2: dos
+3: tres
+10 letras
+```
+
+## Errores
+
+`read_line` devuelve `Err` si la entrada no es UTF-8 válido o si falla el sistema.
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `lines` (1.62).
+
+## Ver también
+
+- [stdout](/ref/std/io/stdout/)
+- [BufRead](/ref/std/io/bufread/)
+- [str::parse](/ref/std/str/str/)
+
+## Aprende esto en
+
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/)
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)

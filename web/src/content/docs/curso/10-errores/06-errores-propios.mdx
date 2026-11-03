@@ -1,0 +1,98 @@
+---
+title: "Tus propios errores"
+description: "Diseña un enum de error con un caso por cada forma de fallar, y dale Debug, Display y el trait Error."
+sidebar:
+  order: 6
+duracion: 13
+desde: "1.0"
+requiere: ["10-errores/05-combinadores", "09-structs-enums-y-patrones/05-enums-con-datos"]
+tarjetas:
+  - p: "¿Qué necesita un tipo para implementar `std::error::Error`?"
+    r: "Implementar `Debug` y `Display`. El trait `Error` los exige (E0277 si falta `Display`); sus métodos tienen implementación por defecto, así que `impl Error for MiError {}` basta."
+  - p: "¿Para quién es `Display` y para quién `Debug`?"
+    r: "`Display` (`{}`) es el mensaje para personas. `Debug` (`{:?}`) es la vista para programadores, normalmente derivada con `#[derive(Debug)]`."
+  - p: "¿Por qué un enum de error y no un `String`?"
+    r: "Porque quien llama puede distinguir los casos con `match` y reaccionar distinto a cada uno, y los datos del error (longitud, valor…) llegan con su tipo, no aplastados en texto."
+  - p: "¿Qué escribe `write!(f, …)` dentro de `fmt`?"
+    r: "El texto formateado en el `Formatter` que recibe la función. Devuelve `fmt::Result`, que se propaga tal cual."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+
+Vas a escribir tu propio tipo de error, como hacen las bibliotecas serias: un enum que dice exactamente qué salió mal.
+
+## Predice
+
+<Predice
+  ej="m10/error-propio-predice"
+  opciones={["`nadie tiene 200 años` y luego `Imposible(200)`", "`Imposible(200)` dos veces", "`nadie tiene 200 años` dos veces", "No compila: falta implementar `Error`"]}
+  correcta={0}
+  explicacion="`{}` usa nuestro `Display`, que escribe el mensaje para personas. `{:?}` usa el `Debug` derivado, que muestra la variante y sus datos."
+  porque={["Correcto.", "`{}` no usa `Debug`; usa el `Display` que escribimos.", "`{:?}` usa el `Debug` derivado, no nuestro texto.", "Para imprimir solo hacen falta `Display` y `Debug`; el trait `Error` es opcional aquí."]}
+/>
+
+## La idea
+
+Un error con forma de `String` sirve para mostrarlo, pero no para **decidir** nada: quien llama solo puede leer texto. Un **enum de error** tiene un caso por cada forma de fallar, con los datos que hacen falta para entenderlo:
+
+```rust
+enum ErrorClave {
+    Corta { largo: usize, minimo: usize },
+    SinNumero,
+    Prohibida(String),
+}
+```
+
+Para que se comporte como un error «de verdad», le das tres cosas:
+
+1. **`Debug`** (con `#[derive(Debug)]`): la vista para programadores.
+2. **`Display`** (escrito a mano): el mensaje para personas. Se implementa con un método `fmt` que escribe con `write!(f, "…")`.
+3. **`std::error::Error`**: el trait que dice «esto es un error». Exige `Debug` + `Display` y no necesita nada más: `impl std::error::Error for ErrorClave {}`.
+
+Los traits (un `impl Algo for Tipo` que da a un tipo ciertas capacidades) se estudian a fondo en el mundo 13. Aquí basta con copiar la forma.
+
+## Pruébalo
+
+<Ejecutar ej="m10/error-propio" />
+
+El `match` del paso 5 trata `SinNumero` de forma especial y deja el resto al mensaje genérico. Eso es imposible si el error es un simple texto.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+`Display` y `Debug` son traits de formato. `println!("{}", e)` termina llamando a `Display::fmt(&e, f)`, donde `f` es un `Formatter`: un objeto que sabe dónde escribir (la consola, un `String`…) y con qué opciones (ancho, alineación). `write!(f, …)` escribe en él y devuelve `fmt::Result` (que es `Result<(), fmt::Error>`), así un fallo de escritura se propaga hacia arriba.
+
+El trait `Error` vive en `core` (desde Rust 1.81), así que también existe en programas sin sistema operativo. Sus métodos tienen implementación por defecto; el más útil es `source()`, que dice qué otro error causó este (lección 8). En memoria, tu enum de error es un enum normal: si es pequeño, devolver `Result<T, ErrorClave>` es barato.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m10/error-sin-display"
+  explicacion="El trait `Error` está declarado como `pub trait Error: Debug + Display`: no puedes implementarlo sin `Display` (E0277). Tiene sentido: un error que no se puede mostrar a una persona no sirve como error."
+/>
+
+## Tu turno
+
+<Reto
+  ej="m10/error-hora"
+  enunciado="Completa el `Display` de `ErrorHora`: `FueraDeRango(h)` → `la hora h no existe`; `Formato` → `usa el formato HH:MM`. Debe imprimir `la hora 25 no existe` y `usa el formato HH:MM`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Una función de una biblioteca puede fallar porque el archivo no existe, porque está vacío o porque una línea está mal. ¿Qué tipo de error es mejor?"
+  opciones={["Un enum con tres variantes (la de línea mala, con el número de línea)", "`String` con el mensaje", "`bool`: `false` si falló", "`u8` con un código de error"]}
+  correcta={0}
+  porque={["Correcto: quien llama puede distinguir los casos y usar los datos.", "Solo sirve para mostrarlo; distinguir casos obligaría a comparar textos.", "No dice qué falló.", "Un número mágico no se puede mostrar ni lleva datos, y nada impide un código inválido."]}
+/>
+
+<Pregunta
+  pregunta={'¿Qué escribe `println!("{:?}", ErrorClave::SinNumero)` si `ErrorClave` tiene `#[derive(Debug)]`?'}
+  opciones={["`SinNumero`", "`la clave necesita al menos un número`", "`ErrorClave::SinNumero`", "No compila sin `Display`"]}
+  correcta={0}
+  porque={["Correcto: el `Debug` derivado escribe el nombre de la variante.", "Eso sería con `{}` (Display).", "El `Debug` derivado no incluye el nombre del enum.", "`{:?}` solo necesita `Debug`."]}
+/>

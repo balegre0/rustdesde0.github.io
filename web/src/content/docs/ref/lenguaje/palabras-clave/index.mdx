@@ -1,0 +1,100 @@
+---
+title: "Palabras clave"
+description: "Todas las palabras clave de Rust 1.99 (edición 2024): estrictas, reservadas y débiles."
+sidebar:
+  order: 0
+desde: "1.0"
+---
+
+Una **palabra clave** (*keyword*) es una palabra que el lenguaje usa para sí mismo. Rust las divide en tres grupos según lo que te dejan hacer con ellas.
+
+## Las tres categorías
+
+- **Estrictas**: tienen un significado fijo y **no** pueden usarse como nombre de nada (variables, funciones, tipos, campos, módulos, etiquetas, tiempos de vida, macros, crates…).
+- **Reservadas**: hoy no significan nada en Rust estable, pero están apartadas para el futuro. Tienen las mismas restricciones que las estrictas.
+- **Débiles**: solo son especiales en un contexto concreto. Fuera de él son identificadores normales: `let union = 1;` es válido.
+
+## Identificadores crudos `r#`
+
+Si necesitas usar una palabra clave como nombre (por ejemplo, porque otro sistema tiene un campo llamado `type`), escribe un **identificador crudo** (*raw identifier*): `r#type`. Para el compilador es el nombre `type`, sin más. Funciona con todas las palabras clave **excepto** `crate`, `self`, `super` y `Self`. Existe desde Rust 1.30.
+
+Las palabras clave dependen de la **edición**: `async`, `await` y `dyn` son estrictas desde 2018; `try` está reservada desde 2018 y `gen` desde 2024. Un crate de la edición 2015 puede seguir llamando `async` a una función, y otro crate de la 2024 puede usarla escribiendo `r#async`. Ver [Ediciones](/ref/ediciones/).
+
+## Estrictas
+
+| Palabra | Para qué | Desde |
+|---|---|---|
+| [`_`](/ref/lenguaje/palabras-clave/guion-bajo/) | comodín en patrones, expresiones y tipos | 1.0 |
+| [`as`](/ref/lenguaje/palabras-clave/as/) | conversión primitiva; renombrar al importar | 1.0 |
+| [`async`](/ref/lenguaje/palabras-clave/async/) | funciones, bloques y closures que devuelven un futuro | 1.39 (ed. 2018) |
+| [`await`](/ref/lenguaje/palabras-clave/await/) | esperar un futuro | 1.39 (ed. 2018) |
+| [`break`](/ref/lenguaje/palabras-clave/break/) | salir de un bucle o bloque etiquetado | 1.0 |
+| [`const`](/ref/lenguaje/palabras-clave/const/) | constantes, `const fn`, genéricos constantes, `*const` | 1.0 |
+| [`continue`](/ref/lenguaje/palabras-clave/continue/) | siguiente vuelta de un bucle | 1.0 |
+| [`crate`](/ref/lenguaje/palabras-clave/crate/) | raíz del crate en rutas; `pub(crate)` | 1.0 |
+| [`dyn`](/ref/lenguaje/palabras-clave/dyn/) | objetos trait con despacho dinámico | 1.27 (estricta desde ed. 2018) |
+| [`else`](/ref/lenguaje/palabras-clave/else/) | rama alternativa; `let … else` | 1.0 |
+| [`enum`](/ref/lenguaje/palabras-clave/enum/) | tipo con variantes | 1.0 |
+| [`extern`](/ref/lenguaje/palabras-clave/extern/) | ABI, bloques externos, `extern crate` | 1.0 |
+| [`false`](/ref/lenguaje/palabras-clave/false/) | valor falso de `bool` | 1.0 |
+| [`fn`](/ref/lenguaje/palabras-clave/fn/) | funciones y punteros a función | 1.0 |
+| [`for`](/ref/lenguaje/palabras-clave/for/) | bucle sobre un iterador; `for<'a>` | 1.0 |
+| [`if`](/ref/lenguaje/palabras-clave/if/) | condicional; `if let`; guardas | 1.0 |
+| [`impl`](/ref/lenguaje/palabras-clave/impl/) | implementaciones; `impl Trait` | 1.0 |
+| [`in`](/ref/lenguaje/palabras-clave/in/) | parte del `for`; `pub(in ruta)` | 1.0 |
+| [`let`](/ref/lenguaje/palabras-clave/let/) | declarar variables | 1.0 |
+| [`loop`](/ref/lenguaje/palabras-clave/loop/) | bucle infinito | 1.0 |
+| [`match`](/ref/lenguaje/palabras-clave/match/) | comparar con patrones | 1.0 |
+| [`mod`](/ref/lenguaje/palabras-clave/mod/) | declarar módulos | 1.0 |
+| [`move`](/ref/lenguaje/palabras-clave/move/) | closures que se quedan con lo capturado | 1.0 |
+| [`mut`](/ref/lenguaje/palabras-clave/mut/) | mutabilidad; `&mut`; `*mut` | 1.0 |
+| [`pub`](/ref/lenguaje/palabras-clave/pub/) | visibilidad | 1.0 |
+| [`ref`](/ref/lenguaje/palabras-clave/ref/) | enlazar por referencia en un patrón | 1.0 |
+| [`return`](/ref/lenguaje/palabras-clave/return/) | salir de la función | 1.0 |
+| [`self`](/ref/lenguaje/palabras-clave/self/) | receptor de método; módulo actual | 1.0 |
+| [`Self`](/ref/lenguaje/palabras-clave/self-tipo/) | el tipo actual | 1.0 |
+| [`static`](/ref/lenguaje/palabras-clave/static/) | variables globales | 1.0 |
+| [`struct`](/ref/lenguaje/palabras-clave/struct/) | tipo con campos | 1.0 |
+| [`super`](/ref/lenguaje/palabras-clave/super/) | módulo padre | 1.0 |
+| [`trait`](/ref/lenguaje/palabras-clave/trait/) | comportamiento compartido | 1.0 |
+| [`true`](/ref/lenguaje/palabras-clave/true/) | valor verdadero de `bool` | 1.0 |
+| [`type`](/ref/lenguaje/palabras-clave/type/) | alias de tipo; tipos asociados | 1.0 |
+| [`unsafe`](/ref/lenguaje/palabras-clave/unsafe/) | código cuyas garantías das tú | 1.0 |
+| [`use`](/ref/lenguaje/palabras-clave/use/) | importar nombres; `use<…>` | 1.0 |
+| [`where`](/ref/lenguaje/palabras-clave/where/) | cláusula de límites | 1.0 |
+| [`while`](/ref/lenguaje/palabras-clave/while/) | bucle condicional | 1.0 |
+
+## Reservadas
+
+| Palabra | Idea prevista | Desde |
+|---|---|---|
+| [`abstract`](/ref/lenguaje/palabras-clave/abstract/) | — | 1.0 |
+| [`become`](/ref/lenguaje/palabras-clave/become/) | llamadas de cola explícitas (inestable) | 1.0 |
+| [`box`](/ref/lenguaje/palabras-clave/box/) | sintaxis antigua de `Box` | 1.0 |
+| [`do`](/ref/lenguaje/palabras-clave/do/) | — | 1.0 |
+| [`final`](/ref/lenguaje/palabras-clave/final/) | — | 1.0 |
+| [`gen`](/ref/lenguaje/palabras-clave/gen/) | bloques generadores (inestable) | ed. 2024 |
+| [`macro`](/ref/lenguaje/palabras-clave/macro/) | macros declarativas 2.0 (inestable) | 1.0 |
+| [`override`](/ref/lenguaje/palabras-clave/override/) | — | 1.0 |
+| [`priv`](/ref/lenguaje/palabras-clave/priv/) | — | 1.0 |
+| [`try`](/ref/lenguaje/palabras-clave/try/) | bloques `try` (inestable) | ed. 2018 |
+| [`typeof`](/ref/lenguaje/palabras-clave/typeof/) | — | 1.0 |
+| [`unsized`](/ref/lenguaje/palabras-clave/unsized/) | — | 1.0 |
+| [`virtual`](/ref/lenguaje/palabras-clave/virtual/) | — | 1.0 |
+| [`yield`](/ref/lenguaje/palabras-clave/yield/) | corrutinas y generadores (inestable) | 1.0 |
+
+## Débiles
+
+| Palabra | Especial solo en… | Desde |
+|---|---|---|
+| [`'static`](/ref/lenguaje/palabras-clave/static-lifetime/) | tiempos de vida | 1.0 |
+| [`macro_rules`](/ref/lenguaje/palabras-clave/macro-rules/) | `macro_rules!` | 1.0 |
+| [`raw`](/ref/lenguaje/palabras-clave/raw/) | `&raw const` / `&raw mut` | 1.82 |
+| [`safe`](/ref/lenguaje/palabras-clave/safe/) | elementos de un bloque `unsafe extern` | 1.82 |
+| [`union`](/ref/lenguaje/palabras-clave/union/) | la declaración de una unión | 1.19 |
+
+En la edición 2015, `dyn` también era débil: solo era palabra clave en posición de tipo.
+
+## Ver también
+
+- [Ediciones](/ref/ediciones/) · [Referencia del lenguaje](/ref/lenguaje/)

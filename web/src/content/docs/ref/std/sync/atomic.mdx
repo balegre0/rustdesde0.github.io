@@ -1,0 +1,138 @@
+---
+title: "std::sync::atomic"
+description: "Tipos atómicos (AtomicUsize, AtomicBool…): leer y modificar entre hilos sin cerrojo, con un Ordering."
+sidebar:
+  order: 4
+insignias: ["Desde 1.0", "core"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::sync::atomic`
+
+## Sinopsis
+
+```rust
+pub struct Atomic<T>
+where
+    T: AtomicPrimitive,
+{ /* private fields */ }
+
+pub type AtomicUsize = Atomic<usize>;
+
+#[non_exhaustive]
+pub enum Ordering {
+    Relaxed,
+    Release,
+    Acquire,
+    AcqRel,
+    SeqCst,
+}
+```
+
+## Qué hace
+
+Los tipos atómicos (`AtomicBool`, `AtomicI32`, `AtomicUsize`, `AtomicPtr`…) son enteros, booleanos y punteros que varios hilos pueden leer y modificar **a la vez** sin carreras de datos, porque el procesador hace cada operación de una pieza. Se modifican a través de `&self` (mutabilidad interior), así que pueden ir en un `static` o dentro de un `Arc` sin `Mutex`.
+
+En Rust 1.99 todos son alias de un tipo genérico, `Atomic<T>` (por ejemplo, `AtomicUsize` es `Atomic<usize>`), pero se siguen usando con sus nombres de siempre.
+
+Cada operación recibe un **`Ordering`**, que dice qué garantías de orden da respecto a otras operaciones de memoria:
+
+| `Ordering` | Para qué |
+|---|---|
+| `Relaxed` | Solo la atomicidad. Contadores y estadísticas. |
+| `Release` (al escribir) + `Acquire` (al leer) | Publicar datos: lo escrito antes del `Release` lo ve quien lee con `Acquire`. |
+| `AcqRel` | Las dos cosas en una operación de lectura y escritura. |
+| `SeqCst` | El más fuerte: todos los hilos ven las operaciones en un mismo orden. Si dudas, empieza por este. |
+
+## Métodos principales (de AtomicUsize; los demás son iguales)
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`new`](#new) | Crea el atómico (es `const`: sirve para `static`). | 1.0 |
+| [`load`](#load) | Lee el valor. | 1.0 |
+| [`store`](#store) | Escribe un valor. | 1.0 |
+| [`fetch_add`](#fetch_add) | Suma y devuelve el valor **anterior**, en una sola operación. | 1.0 |
+| [`swap`](#swap) | Pone un valor y devuelve el anterior. | 1.0 |
+| [`compare_exchange`](#compare_exchange) | Si el valor actual es `current`, lo cambia por `new` y devuelve `Ok(anterior)`; si no, `Err(actual)`. | 1.10 |
+
+### `new`
+
+```rust
+pub const fn new(v: usize) -> Atomic<usize>
+```
+
+Crea el atómico (es `const`: sirve para `static`).
+
+### `load`
+
+```rust
+pub fn load(&self, order: Ordering) -> usize
+```
+
+Lee el valor.
+
+### `store`
+
+```rust
+pub fn store(&self, val: usize, order: Ordering)
+```
+
+Escribe un valor.
+
+### `fetch_add`
+
+```rust
+pub fn fetch_add(&self, val: usize, order: Ordering) -> usize
+```
+
+Suma y devuelve el valor **anterior**, en una sola operación.
+
+### `swap`
+
+```rust
+pub fn swap(&self, val: usize, order: Ordering) -> usize
+```
+
+Pone un valor y devuelve el anterior.
+
+### `compare_exchange`
+
+```rust
+pub fn compare_exchange(
+    &self,
+    current: usize,
+    new: usize,
+    success: Ordering,
+    failure: Ordering,
+) -> Result<usize, usize>
+```
+
+Si el valor actual es `current`, lo cambia por `new` y devuelve `Ok(anterior)`; si no, `Err(actual)`. Es la base de los algoritmos sin cerrojo.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/sync-atomic" />
+
+**Salida:**
+
+```text
+3
+3 -> 100
+Ok(100)
+Err(7)
+true
+```
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `compare_exchange` (1.10).
+
+## Ver también
+
+- [Mutex](/ref/std/sync/mutex/)
+- [Cell (un solo hilo)](/ref/std/cell/cell/)
+
+## Aprende esto en
+
+- [Mundo 17 · Concurrencia](/curso/17-concurrencia/)
+- [Mundo 20 · Unsafe y comportamiento indefinido](/curso/20-unsafe-y-ub/)

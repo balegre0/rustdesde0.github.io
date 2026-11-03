@@ -1,0 +1,124 @@
+---
+title: "String y &str: la diferencia que más confunde"
+description: "Entiende de una vez qué es un String, qué es un &str, dónde vive cada uno y cuál usar en cada sitio."
+sidebar:
+  order: 4
+duracion: 14
+desde: "1.0"
+requiere: ["11-colecciones-y-texto/03-slices", "08-lifetimes"]
+tarjetas:
+  - p: "¿Qué es un `String`?"
+    r: "Texto UTF-8 propio y ampliable que vive en el heap. Por dentro es como un `Vec<u8>`: puntero, capacidad y longitud."
+  - p: "¿Qué es un `&str`?"
+    r: "Un préstamo de texto UTF-8 que vive en otro sitio (el binario, un `String`…): puntero + longitud, como un `&[u8]` con garantía de UTF-8."
+  - p: "Regla rápida: ¿`&str` o `String`?"
+    r: "Parámetros: `&str` (acepta literales y `&String`). Campos de structs y valores devueltos que creas: `String` (necesitas ser dueño)."
+  - p: "¿Por qué no compila `match s { \"salir\" => … }` si `s` es `String`?"
+    r: "Porque los patrones son `&str` y `s` es `String` (E0308). Se arregla con `match s.as_str()`."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a resolver la duda número uno sobre Rust en Stack Overflow: la diferencia entre `String` y `&str`.
+
+## Predice
+
+<Predice
+  ej="m11/string-predice"
+  opciones={["`hola | hola, mundo | hola`", "`hola, mundo | hola, mundo | hola`", "No compila: no se puede crear un `String` desde un `&str`", "`hola | hola, mundo | hola, mundo`"]}
+  correcta={0}
+  explicacion="`String::from(literal)` **copia** el texto a un `String` nuevo; cambiar `propio` no toca `literal`. `&propio[..4]` presta los 4 primeros bytes: «hola»."
+  porque={["Correcto.", "`literal` y `propio` son textos distintos: `String::from` hizo una copia.", "`String::from` es justo la forma de hacerlo.", "`[..4]` toma solo los 4 primeros bytes."]}
+/>
+
+## La idea
+
+Rust tiene dos tipos principales de texto, y la diferencia es **la de siempre: dueño o prestado**.
+
+- **`String`** es **dueño** de su texto. Vive en el heap y puede crecer (`push_str`). Por dentro es un `Vec<u8>` con una promesa: sus bytes son siempre UTF-8 válido.
+- **`&str`** es un **préstamo** de texto que vive en otro sitio. Se lee «referencia a `str`», donde `str` es el texto en sí (un tipo sin tamaño conocido, como `[T]`). Es a `String` lo que `&[T]` es a `Vec<T>`.
+
+Los literales como `"hola"` son `&'static str`: el texto está grabado **dentro del programa** y vive mientras el programa vive.
+
+Regla práctica:
+
+| Situación | Usa |
+|---|---|
+| parámetro que solo lee texto | `&str` |
+| campo de un struct | `String` |
+| función que crea texto nuevo y lo devuelve | `String` |
+| función que devuelve un trozo de su parámetro | `&str` (con su lifetime) |
+
+## Pruébalo
+
+<Ejecutar ej="m11/string-y-str" />
+
+Fíjate en el paso 5: `&propio[..6]` da «Íñig», no «Íñigo». Los rangos de texto cuentan **bytes**, y «Í» y «ñ» ocupan 2 bytes cada una. Es el tema de la lección siguiente.
+
+## Bajo el capó
+
+<BajoElCapo>
+
+Los tres sitios donde puede vivir texto, con lo que hay en la pila (tamaños de wasm32):
+
+```text
+BINARIO (solo lectura)          HEAP
+┌──────────────┐                ┌───┬───┬───┬───┬───┬───┬───┬───┐
+│ "Begoña"     │ ◀─┐            │ Í │   │ ñ │   │ i │ g │ o │ … │  (UTF-8: Í y ñ = 2 bytes)
+└──────────────┘   │            └───┴───┴───┴───┴───┴───┴───┴───┘
+                   │              ▲               ▲
+PILA               │              │               │
+literal: &str   = (ptr ─┘, len 7) │               │
+propio:  String = (ptr ───────────┘, cap 14, len 14)
+trozo:   &str   = (ptr ───────────┘, len 6)  ── presta parte de propio
+```
+
+- `String` = puntero + capacidad + longitud: **12 bytes** (24 en un PC de 64 bits).
+- `&str` = puntero + longitud: **8 bytes** (16 en 64 bits). Un puntero gordo, como `&[u8]`.
+
+Pasar un `&String` donde se pide `&str` funciona por **coerción por `Deref`** (como `&Vec<T>` → `&[T]`): sale gratis. Pasar de `&str` a `String` (`to_string`, `String::from`, `into`) **copia** el texto al heap: cuesta una reserva de memoria.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila
+  ej="m11/devolver-str-local"
+  explicacion="La función quiere devolver un `&str` que apunte a `completo`, pero `completo` es un `String` local que se destruye al terminar la función: sería una referencia colgante. rustc no llega ni a ese punto: E0106 pide decir de qué parámetro sale el préstamo. La solución es devolver el `String` (ser dueño), no un préstamo."
+/>
+
+<Trampa titulo="Comparar un String con literales en un match">
+
+<NoCompila ej="m11/match-string" explicacion="Los patrones como «salir» son `&str` y `orden` es `String`: no encajan (E0308). `orden.as_str()` presta el texto como `&str`. Es una de las preguntas más vistas de Stack Overflow sobre Rust." />
+
+</Trampa>
+
+## Tu turno
+
+<Reto
+  ej="m11/iniciales"
+  enunciado="Escribe `etiqueta(nombre: &str, edad: u32) -> String` que devuelva `nombre (edad)`. Debe imprimir `Bruno (8)` y `Lucía (31)`: fíjate en que una llamada pasa un literal y la otra un `&String`."
+/>
+
+## Comprueba
+
+<Pregunta
+  pregunta="Un struct `Libro` guarda su título. ¿De qué tipo debería ser el campo?"
+  opciones={["`String`", "`&str`", "`&String`", "`str`"]}
+  correcta={0}
+  porque={["Correcto: el libro es dueño de su título.", "Funciona solo con un parámetro de lifetime, y entonces el libro no puede vivir más que el texto prestado: complica mucho.", "Peor que `&str` y con el mismo problema.", "`str` no tiene tamaño conocido: no puede ir suelto en un campo."]}
+/>
+
+<Pregunta
+  pregunta="¿Cuál de estas llamadas NO compila si `fn f(s: &str)`?"
+  opciones={["`f(String::from(\"a\"))`", "`f(\"a\")`", "`f(&String::from(\"a\"))`", "`f(&\"abc\"[1..])`"]}
+  correcta={0}
+  porque={["Correcto: pasa un `String` por valor, no un `&str` (E0308).", "Un literal es `&'static str`.", "`&String` se convierte en `&str` por coerción.", "Un trozo de un literal también es `&str`."]}
+/>
+
+<Pregunta
+  pregunta={'En wasm32, ¿cuántos bytes ocupa la variable `s` si `let s: &str = "una frase muy larga…";`?'}
+  opciones={["8", "4", "12", "Lo que ocupe la frase"]}
+  correcta={0}
+  porque={["Correcto: puntero + longitud.", "Un `&str` es un puntero gordo: también guarda la longitud.", "12 es un `String` (con capacidad).", "El texto está en el binario; la variable solo lo señala."]}
+/>

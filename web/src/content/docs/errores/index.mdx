@@ -1,0 +1,181 @@
+---
+title: "Errores del compilador"
+description: "Los errores de rustc que más vas a ver, explicados uno a uno con el mensaje real y su arreglo."
+sidebar:
+  order: 0
+---
+import { NoCompila } from '~/components';
+
+Cuando `rustc` rechaza tu programa no te está regañando: te está enseñando una regla que tu código incumple, casi siempre con la línea exacta y una propuesta de arreglo. Al compilador se le gana entendiéndolo, no peleando. En esta sección tienes los errores que más aparecen al aprender Rust, cada uno con **el mensaje real** (copiado de compilar el ejemplo con rustc 1.99.1, edición 2024), qué significa, por qué existe la regla y cómo arreglarlo.
+
+## Cómo se lee un error de rustc
+
+Este es el error más frecuente de todos, [E0382](/errores/e0382/):
+
+<NoCompila ej="errores/E0382" />
+
+**Error real** (rustc 1.99.1, edición 2024):
+
+```text
+error[E0382]: borrow of moved value: `saludo`
+ --> E0382.rs:4:16
+  |
+2 |     let saludo = String::from("hola");
+  |         ------ move occurs because `saludo` has type `String`, which does not implement the `Copy` trait
+3 |     let otro = saludo; // la propiedad se mueve a `otro`
+  |                ------ value moved here
+4 |     println!("{saludo}");
+  |                ^^^^^^ value borrowed here after move
+  |
+help: consider cloning the value if the performance cost is acceptable
+  |
+3 |     let otro = saludo.clone(); // la propiedad se mueve a `otro`
+  |                      ++++++++
+```
+
+1. **`error[E0382]`**: el **código** del error. Cada código tiene su ficha aquí y su explicación oficial con `rustc --explain E0382`.
+2. **El mensaje** (`borrow of moved value`): qué regla se ha roto, en una frase.
+3. **`-->`**: archivo, línea y columna donde está el problema.
+4. **Las líneas numeradas** con marcas: `-` y `^` subrayan las piezas de la historia (dónde se creó el valor, dónde se movió, dónde se usó después). Lee las etiquetas en orden.
+5. **`note:`** añade contexto y **`help:`** propone un cambio concreto, a veces con las líneas ya corregidas (`+` añade, `-` quita).
+
+Un consejo: arregla siempre **el primer error** y vuelve a compilar. Muchas veces los siguientes son consecuencia del primero.
+
+Algunos errores del comprobador de préstamos **no tienen código**, como [«lifetime may not live long enough»](/errores/vida-insuficiente/). Se leen igual.
+
+## Los diez que más vas a ver
+
+| Código | En una frase |
+|---|---|
+| [E0382](/errores/e0382/) | Usas una variable después de que su valor se movió a otra variable o a una función. |
+| [E0502](/errores/e0502/) | Intentas modificar (o pedir &mut de) un valor mientras sigue vivo un préstamo compartido (&) de él. |
+| [E0499](/errores/e0499/) | Pides dos préstamos exclusivos (&mut) del mismo valor y los dos siguen vivos al mismo tiempo. |
+| [E0308](/errores/e0308/) | El tipo de un valor no es el que se esperaba en ese sitio (argumento, retorno, rama de if…). |
+| [E0277](/errores/e0277/) | Usas un valor en un sitio que exige un trait (Display, Debug, Copy, Add, Iterator…) que su tipo no implementa. |
+| [E0599](/errores/e0599/) | Llamas a un método que el tipo no tiene (o que existe pero en un trait que no está importado o no se cumple). |
+| [E0106](/errores/e0106/) | Una función o struct usa una referencia sin decir de quién viene o cuánto vive. |
+| [E0597](/errores/e0597/) | Una referencia se sigue usando después de que el valor al que apunta haya salido de su ámbito. |
+| [E0507](/errores/e0507/) | Intentas sacar (mover) un valor que solo tienes prestado, por ejemplo un campo a través de &. |
+| [E0425](/errores/e0425/) | Usas una variable, función o tipo que no existe en ese ámbito (a menudo, una errata). |
+
+## Todos los errores, por tema
+
+### Propiedad y movimientos
+
+| Código | Título | Qué pasa |
+|---|---|---|
+| [E0381](/errores/e0381/) | usar una variable que quizá no está inicializada | Usas una variable que, en algún camino del programa, no ha recibido valor. |
+| [E0382](/errores/e0382/) | uso de un valor ya movido | Usas una variable después de que su valor se movió a otra variable o a una función. |
+| [E0384](/errores/e0384/) | asignar dos veces a una variable inmutable | Asignas un valor nuevo a una variable que no declaraste con mut. |
+| [E0507](/errores/e0507/) | mover desde detrás de una referencia | Intentas sacar (mover) un valor que solo tienes prestado, por ejemplo un campo a través de &. |
+| [E0508](/errores/e0508/) | mover fuera de un array | Intentas mover un elemento no Copy fuera de un array indexándolo. |
+| [E0509](/errores/e0509/) | mover fuera de un tipo con Drop | Intentas sacar un campo de un struct que implementa Drop, desmontándolo con un patrón. |
+
+### Préstamos
+
+| Código | Título | Qué pasa |
+|---|---|---|
+| [E0499](/errores/e0499/) | dos préstamos exclusivos a la vez | Pides dos préstamos exclusivos (&mut) del mismo valor y los dos siguen vivos al mismo tiempo. |
+| [E0502](/errores/e0502/) | préstamo exclusivo mientras hay uno compartido | Intentas modificar (o pedir &mut de) un valor mientras sigue vivo un préstamo compartido (&) de él. |
+| [E0503](/errores/e0503/) | usar un valor mientras está prestado en exclusiva | Lees o usas un valor mientras un préstamo exclusivo (&mut) suyo sigue vivo. |
+| [E0505](/errores/e0505/) | mover un valor que está prestado | Mueves un valor (a otra variable o a una función) mientras sigue vivo un préstamo de él. |
+| [E0506](/errores/e0506/) | asignar a un valor prestado | Cambias un valor con = mientras existe un préstamo compartido suyo que todavía se usa. |
+| [E0594](/errores/e0594/) | asignar a través de un préstamo compartido | Intentas modificar un valor al que solo llegas con & (o una variable o campo no mutable). |
+| [E0596](/errores/e0596/) | préstamo exclusivo de algo no mutable | Llamas a algo que necesita &mut sobre una variable que no es mut (o a través de un &). |
+
+### Tiempos de vida
+
+| Código | Título | Qué pasa |
+|---|---|---|
+| [E0310](/errores/e0310/) | el tipo genérico podría no vivir lo suficiente | Guardas un `T` genérico donde se exige `'static` (como `Box<dyn Trait>`) sin pedir `T: 'static`. |
+| [E0106](/errores/e0106/) | falta un especificador de tiempo de vida | Una función o struct usa una referencia sin decir de quién viene o cuánto vive. |
+| [E0261](/errores/e0261/) | tiempo de vida no declarado | Usas un nombre de tiempo de vida como 'a sin declararlo antes. |
+| [E0373](/errores/e0373/) | la closure puede vivir más que lo que toma prestado | Una closure que se devuelve (o se manda a otro hilo) toma prestada una variable local que morirá antes. |
+| [E0515](/errores/e0515/) | devolver una referencia a una variable local | Una función devuelve una referencia a algo que se crea dentro de ella y que muere al terminar. |
+| [E0521](/errores/e0521/) | un dato prestado escapa de la función | Una referencia recibida como parámetro acaba dentro de algo que debe vivir para siempre ('static). |
+| [E0597](/errores/e0597/) | un valor no vive lo suficiente | Una referencia se sigue usando después de que el valor al que apunta haya salido de su ámbito. |
+| [E0621](/errores/e0621/) | se necesita un tiempo de vida explícito | Una función guarda un parámetro referencia en un sitio que exige un tiempo de vida que el parámetro no declara. |
+| [E0716](/errores/e0716/) | un temporal se destruye mientras está prestado | Tomas prestado un valor temporal (sin variable) y sigues usando el préstamo cuando el temporal ya no existe. |
+| [sin código](/errores/vida-insuficiente/) | «lifetime may not live long enough» | Error sin código: una referencia tendría que vivir más de lo que su tiempo de vida garantiza. |
+
+### Tipos
+
+| Código | Título | Qué pasa |
+|---|---|---|
+| [E0061](/errores/e0061/) | número de argumentos incorrecto | Llamas a una función con más o menos argumentos de los que declara. |
+| [E0063](/errores/e0063/) | falta un campo al crear un struct | Creas un struct sin dar valor a todos sus campos. |
+| [E0070](/errores/e0070/) | lado izquierdo de asignación inválido | A la izquierda de = pones algo que no es un lugar donde se pueda guardar un valor. |
+| [E0072](/errores/e0072/) | tipo recursivo de tamaño infinito | Un struct o enum se contiene a sí mismo directamente, así que su tamaño sería infinito. |
+| [E0282](/errores/e0282/) | hacen falta anotaciones de tipo | El compilador no puede deducir un tipo genérico con la información que hay. |
+| [E0283](/errores/e0283/) | hacen falta anotaciones (tipo ambiguo) | Hay varias implementaciones posibles de un trait y el compilador no sabe cuál elegir. |
+| [E0308](/errores/e0308/) | tipos que no coinciden | El tipo de un valor no es el que se esperaba en ese sitio (argumento, retorno, rama de if…). |
+| [E0317](/errores/e0317/) | `if` sin `else` donde se espera un valor | Usas un `if` como expresión con valor pero no tiene rama `else`. |
+| [E0392](/errores/e0392/) | parámetro genérico sin usar | Declaras un parámetro de tipo o de tiempo de vida en un struct o enum y ningún campo lo usa. |
+| [E0560](/errores/e0560/) | el struct no tiene ese campo | Al crear un struct das valor a un campo que no existe en su definición. |
+| [E0599](/errores/e0599/) | no existe ese método para el tipo | Llamas a un método que el tipo no tiene (o que existe pero en un trait que no está importado o no se cumple). |
+| [E0571](/errores/e0571/) | `break` con valor en un `while` o `for` | Solo `loop` puede devolver un valor con `break`. |
+| [E0605](/errores/e0605/) | conversión con as no primitiva | Usas as para convertir entre tipos que no son primitivos (structs, Vec, String…). |
+| [E0606](/errores/e0606/) | conversión con as inválida | Usas as entre dos tipos primitivos que no se pueden convertir así (por ejemplo, &u8 a u32 o &str a i32). |
+| [E0608](/errores/e0608/) | no se puede indexar ese tipo | Usas [i] sobre un valor que no admite indexación (un número, un struct…). |
+| [E0609](/errores/e0609/) | el tipo no tiene ese campo | Accedes a un campo que no existe en el tipo (o el valor es de otro tipo del que crees). |
+| [E0614](/errores/e0614/) | no se puede desreferenciar ese tipo | Usas * sobre un valor que no es una referencia ni un puntero. |
+| [E0618](/errores/e0618/) | se esperaba una función | Usas ( ) para llamar a algo que no es una función ni una closure. |
+
+### Traits y closures
+
+| Código | Título | Qué pasa |
+|---|---|---|
+| [E0038](/errores/e0038/) | el trait no es compatible con dyn | Usas dyn Trait con un trait que tiene métodos que no se pueden llamar a través de un objeto de trait. |
+| [E0040](/errores/e0040/) | llamada explícita a drop() | Llamas al método drop de un valor directamente; Rust no lo permite. |
+| [E0046](/errores/e0046/) | faltan elementos del trait | Un impl de un trait no define todos los métodos (o tipos asociados) obligatorios. |
+| [E0053](/errores/e0053/) | firma incompatible con la del trait | Un método del impl tiene parámetros o tipo de retorno distintos de los que declara el trait. |
+| [E0117](/errores/e0117/) | regla huérfana: trait y tipo ajenos | Implementas un trait de fuera de tu crate para un tipo de fuera de tu crate. |
+| [E0119](/errores/e0119/) | implementaciones en conflicto | Dos impl del mismo trait se solapan para algún tipo. |
+| [E0184](/errores/e0184/) | Copy y Drop a la vez | Un tipo implementa Copy y también Drop; Rust lo prohíbe. |
+| [E0204](/errores/e0204/) | Copy no se puede implementar para este tipo | Pides Copy para un tipo que contiene campos que no son Copy (String, Vec, Box…). |
+| [E0277](/errores/e0277/) | un tipo no implementa el trait que se necesita | Usas un valor en un sitio que exige un trait (Display, Debug, Copy, Add, Iterator…) que su tipo no implementa. |
+| [E0369](/errores/e0369/) | operador binario no aplicable | Usas `+`, `-`, `*`, `==`, `<` u otro operador con un tipo que no lo implementa. |
+| [E0407](/errores/e0407/) | el método no pertenece al trait | Dentro de un impl Trait for Tipo defines un método que el trait no declara. |
+| [E0525](/errores/e0525/) | se esperaba una closure Fn y es FnOnce | Pasas una closure que consume lo que captura a algo que necesita poder llamarla varias veces. |
+| [E0600](/errores/e0600/) | operador unario no aplicable | Aplicas ! o - a un tipo que no lo admite. |
+| [E0746](/errores/e0746/) | devolver dyn Trait sin indirección | Una función declara que devuelve dyn Trait directamente, cuyo tamaño no se conoce al compilar. |
+
+### Patrones
+
+| Código | Título | Qué pasa |
+|---|---|---|
+| [E0004](/errores/e0004/) | patrones no exhaustivos | Un match no cubre todos los valores posibles. |
+| [E0005](/errores/e0005/) | patrón refutable en un let | Usas en un let un patrón que podría no encajar (como Some(n)). |
+| [E0023](/errores/e0023/) | número de campos incorrecto en un patrón | Un patrón de tupla o de variante tiene más o menos campos de los que tiene el tipo. |
+| [E0029](/errores/e0029/) | rango en un patrón con un tipo no permitido | Usas un rango (a..=b) en un patrón con un tipo que no es número ni char. |
+| [E0408](/errores/e0408/) | variable no ligada en todas las alternativas | En un patrón con | (o), una variable aparece en una alternativa pero no en las otras. |
+
+### Nombres, módulos y visibilidad
+
+| Código | Título | Qué pasa |
+|---|---|---|
+| [E0423](/errores/e0423/) | se esperaba un valor y hay un tipo | Usas el nombre de un struct como si fuera un valor, sin darle sus campos. |
+| [E0425](/errores/e0425/) | nombre no encontrado | Usas una variable, función o tipo que no existe en ese ámbito (a menudo, una errata). |
+| [E0428](/errores/e0428/) | nombre definido dos veces | Defines dos elementos con el mismo nombre en el mismo módulo. |
+| [E0432](/errores/e0432/) | importación sin resolver | Un use apunta a un módulo o elemento que no existe. |
+| [E0433](/errores/e0433/) | no se puede resolver la ruta | Usas una ruta (algo::otra) o un tipo cuyo primer tramo no se encuentra; típico: olvidar un use. |
+| [E0603](/errores/e0603/) | elemento privado | Usas desde fuera de un módulo una función, tipo o constante que no es pub. |
+| [E0616](/errores/e0616/) | campo privado | Lees o escribes un campo de un struct que no es pub desde fuera de su módulo. |
+| [E0624](/errores/e0624/) | método privado | Llamas desde fuera de su módulo a un método que no es pub. |
+
+### Constantes, unsafe, async y otros
+
+| Código | Título | Qué pasa |
+|---|---|---|
+| [E0015](/errores/e0015/) | llamada a función no const en una constante | Inicializas una const o static llamando a una función que no es const fn. |
+| [E0080](/errores/e0080/) | error al evaluar una constante | Al calcular una constante en tiempo de compilación ocurre un error (desbordamiento, división por cero, pánico…). |
+| [E0133](/errores/e0133/) | operación insegura fuera de unsafe | Haces algo que requiere unsafe (desreferenciar un puntero crudo, llamar a una unsafe fn…) fuera de un bloque unsafe. |
+| [E0601](/errores/e0601/) | no hay función main | Compilas un programa (binario) que no tiene función main. |
+| [E0658](/errores/e0658/) | característica inestable | Usas una característica del lenguaje o de la biblioteca que todavía no es estable. |
+| [E0728](/errores/e0728/) | await fuera de async | Usas .await en una función o bloque que no es async (por ejemplo, en main). |
+
+## Ver también
+
+- [Biblioteca estándar](/ref/std/)
+- [Mundo 02 · Tu primer programa](/curso/02-tu-primer-programa/): la primera lección sobre leer errores.
+- [Mundo 07 · Préstamos](/curso/07-prestamos/): las reglas que hay detrás de E0499, E0502 y E0506.

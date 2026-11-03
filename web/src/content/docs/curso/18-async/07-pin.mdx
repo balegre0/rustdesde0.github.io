@@ -1,0 +1,124 @@
+---
+title: "Pin a fondo"
+description: "Entender por qué un future no se puede mover una vez sondeado, qué promete Pin y cuándo Unpin lo hace innecesario."
+sidebar:
+  order: 7
+duracion: 15
+desde: "1.33"
+requiere: ["18-async/05-maquina-de-estados", "15-punteros-inteligentes/01-box"]
+tarjetas:
+  - p: "¿Qué promete un Pin<P>?"
+    r: "Que el valor al que apunta P no se moverá de su sitio en memoria (salvo que sea Unpin) hasta que se destruya."
+  - p: "¿Por qué los futures de async fn necesitan Pin?"
+    r: "Porque pueden guardar referencias a sus propios campos (préstamos vivos a través de un .await); moverlos dejaría esas referencias colgando."
+  - p: "¿Qué es Unpin?"
+    r: "Un auto trait: los tipos Unpin se pueden mover aunque estén dentro de un Pin. Casi todos los tipos lo son; los futures de async fn no."
+  - p: "Dos formas seguras de fijar un future"
+    r: "std::pin::pin!(fut) en la pila, o Box::pin(fut) en el heap."
+---
+
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+
+Vas a entender la pieza que más asusta del async de Rust, `Pin`, y vas a ver que resuelve un problema muy concreto.
+
+## Predice
+
+<Predice
+  ej="m18/autorreferencia"
+  opciones={[
+    "true / true",
+    "true / false",
+    "false / false",
+    "No compila"
+  ]}
+  correcta={1}
+  explicacion="Al mover el struct, sus bytes se copian a otro sitio (aquí, al heap dentro de un `Box`), pero el número guardado sigue siendo la dirección **vieja**. El struct ya no apunta a sí mismo."
+  porque={[
+    "Mover no actualiza los punteros que un valor guarda sobre sí mismo.",
+    "Correcto.",
+    "Antes de mover sí apunta a sí mismo.",
+    "Compila: guardamos la dirección como un número `usize`, que no tiene préstamo."
+  ]}
+/>
+
+## La idea
+
+En Rust, **mover** un valor es copiar sus bytes a otro sitio y olvidar el original (mundo 6). Casi siempre da igual dónde esté un valor. Pero hay una excepción: un valor que guarda la dirección de **una parte de sí mismo** (un tipo *autorreferencial*). Al moverlo, esa dirección apunta al sitio viejo: un puntero colgante, que es justo un **uso tras liberar** esperando a ocurrir.
+
+¿Y quién escribe tipos así? El compilador, cuando haces esto:
+
+```rust
+async fn f() {
+    let v = vec![1, 2, 3];
+    let r = &v;          // préstamo de una variable local...
+    paso().await;        // ...vivo a través del .await
+    println!("{r:?}");
+}
+```
+
+`v` y `r` viajan **dentro** del future (lección 5), y `r` apunta a `v`, que está en el mismo future. Si alguien moviera el future después del primer sondeo, `r` colgaría. Por eso `poll` exige `self: Pin<&mut Self>`: **`Pin` es la promesa de que el valor ya no se moverá**. Antes del primer sondeo el future se puede mover sin problema (aún no ha creado ningún préstamo interno); a partir de ahí, ya no.
+
+## Pruébalo
+
+Primero, el error que te encuentras si intentas sondear sin fijar:
+
+<NoCompila ej="m18/poll-sin-pin" explicacion="`poll` no existe sobre el future a secas, solo sobre `Pin<&mut ...>`. El propio rustc sugiere el arreglo: fijarlo con `std::pin::pin!` y sondear con `.as_mut().poll(...)`." />
+
+Y ahora, `Unpin`: la mayoría de tipos no tienen ningún problema en moverse, así que para ellos `Pin` no estorba.
+
+<Ejecutar ej="m18/unpin" />
+
+## Bajo el capó
+
+<BajoElCapo>
+
+**`Pin<P>` envuelve un puntero, no un valor.** Se escribe `Pin<&mut T>`, `Pin<Box<T>>`… El `Pin` no cambia nada en memoria (mide lo mismo que el puntero de dentro); lo que cambia es la **API**: para un `T` que no sea `Unpin`, ya no puedes conseguir un `&mut T` de forma segura, y sin `&mut T` no puedes hacer `mem::swap`, `mem::replace` ni mover el valor fuera. Las únicas puertas son `unsafe` (`get_unchecked_mut`), y quien las abre promete no mover.
+
+**`Unpin` es un auto trait** (como `Send` y `Sync`): un tipo es `Unpin` si todos sus campos lo son. Casi todo lo es (`u32`, `String`, `Vec<T>`, tus structs normales). Para `T: Unpin`, `Pin::new` y `get_mut` son seguros, porque moverlo no rompe nada. Los futures de `async fn` **no** son `Unpin`, porque podrían ser autorreferenciales. Para quitarle `Unpin` a un tipo propio se añade un campo `PhantomPinned` (que mide 0 bytes: por eso `Anclado` medía 4).
+
+**Las formas seguras de fijar:**
+
+| Cómo | Dónde vive | Cuándo usarlo |
+|---|---|---|
+| `std::pin::pin!(fut)` (1.68) | en la pila del marco actual | cuando el future no tiene que salir de esta función |
+| `Box::pin(fut)` | en el heap | para guardarlo, devolverlo o meter futures distintos en una colección (`Pin<Box<dyn Future>>`) |
+
+**La garantía de *drop*.** Además de no moverse, la memoria de un valor fijado no se reutiliza sin ejecutar antes su `Drop`. Eso permite a los runtimes enlazar wakers en listas intrusivas que apuntan dentro de los futures.
+
+**Proyección.** Pasar de `Pin<&mut MiStruct>` a `Pin<&mut campo>` a mano requiere `unsafe`. Los crates `pin-project` y `pin-project-lite` lo generan de forma segura.
+
+</BajoElCapo>
+
+## Trampa típica
+
+<NoCompila ej="m18/pin-new-falla" explicacion="`Pin::new` solo acepta punteros a tipos `Unpin`, porque no puede comprobar que no vayas a mover el valor después. El future de una `async fn` no es `Unpin`. El arreglo usa `Box::pin`, que fija el future en el heap, donde su dirección ya no cambiará." />
+
+## Tu turno
+
+<Reto ej="m18/reto-caja" enunciado="`sumar_todas` recibe futures de **tipos distintos** guardados como `Pin<Box<dyn Future<Output = u32>>>`. Sondea cada uno hasta que termine y devuelve la suma de los resultados (debe dar 60)." />
+
+## Comprueba
+
+<Pregunta
+  pregunta="¿Cuándo deja de ser seguro mover el future de una `async fn`?"
+  opciones={["Nunca es seguro moverlo", "Después del primer `poll`, porque puede haber creado préstamos internos", "Solo después de terminar", "Siempre es seguro"]}
+  correcta={1}
+  explicacion="En el estado Unresumed solo guarda argumentos: moverlo es inofensivo (por eso puedes pasar futures de un sitio a otro antes de esperarlos). Al sondearlo puede crear referencias a sí mismo."
+  porque={["Antes de sondearlo se mueve sin problema todo el rato.", "Correcto.", "Desde el primer sondeo ya puede ser autorreferencial.", "No, por eso existe `Pin`."]}
+/>
+
+<Pregunta
+  pregunta="Tienes `let mut x = 5; let p = Pin::new(&mut x);`. ¿Puedes cambiar `x` a través de `p` sin `unsafe`?"
+  opciones={["No, nunca se puede mutar algo fijado", "Sí: `i32` es `Unpin`, así que `get_mut` es seguro", "Solo con `Box::pin`", "Solo dentro de un bloque async"]}
+  correcta={1}
+  explicacion="Para tipos `Unpin`, `Pin` no añade restricciones. Fijar no impide **mutar**: impide **mover**. Incluso un future fijado se muta en cada `poll`."
+  porque={["`Pin` prohíbe mover, no mutar.", "Correcto.", "`Pin::new` basta para un `Unpin`.", "No tiene nada que ver con async."]}
+/>
+
+<Pregunta
+  pregunta="¿Qué ocupa en memoria un `Pin<&mut T>`?"
+  opciones={["Lo mismo que un `&mut T`", "El doble", "Lo mismo que `T`", "Cero bytes"]}
+  correcta={0}
+  explicacion="`Pin` es un envoltorio sin coste: solo cambia qué operaciones permite el compilador."
+  porque={["Correcto.", "No guarda nada extra.", "Contiene un puntero, no el valor.", "Contiene el puntero."]}
+/>

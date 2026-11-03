@@ -1,0 +1,101 @@
+---
+title: "File"
+description: "Un archivo abierto: open, create, OpenOptions, leer con BufReader y escribir con write!."
+sidebar:
+  order: 1
+insignias: ["Desde 1.0", "std"]
+---
+import { Ejecutar } from '~/components';
+
+**Ruta:** `std::fs::File`
+
+## Sinopsis
+
+```rust
+pub struct File { /* private fields */ }
+```
+
+## Qué hace
+
+`File` representa un archivo abierto. Implementa `Read` y `Write`, así que se usa con todo lo de `std::io`. `File::open` abre para leer; `File::create` crea (o vacía) para escribir; `OpenOptions` permite combinaciones (por ejemplo, añadir al final).
+
+## Métodos principales
+
+| Método | Qué hace | Desde |
+|---|---|---|
+| [`open`](#open) | Abre un archivo existente para leer. | 1.0 |
+| [`create`](#create) | Crea un archivo para escribir, o lo vacía si existe. | 1.0 |
+| [`options`](#options) | Atajo de `OpenOptions::new()`. | 1.58 |
+| [`metadata`](#metadata) | Datos del archivo abierto (tamaño, tipo…). | 1.0 |
+| [`sync_all`](#sync_all) | Espera a que todo lo escrito llegue al disco. | 1.0 |
+
+### `open`
+
+```rust
+pub fn open<P: AsRef<Path>>(path: P) -> Result<File>
+```
+
+Abre un archivo existente para leer.
+
+### `create`
+
+```rust
+pub fn create<P: AsRef<Path>>(path: P) -> Result<File>
+```
+
+Crea un archivo para escribir, o lo vacía si existe.
+
+### `options`
+
+```rust
+pub fn options() -> OpenOptions
+```
+
+Atajo de `OpenOptions::new()`.
+
+### `metadata`
+
+```rust
+pub fn metadata(&self) -> Result<Metadata>
+```
+
+Datos del archivo abierto (tamaño, tipo…).
+
+### `sync_all`
+
+```rust
+pub fn sync_all(&self) -> Result<()>
+```
+
+Espera a que todo lo escrito llegue al disco.
+
+## Ejemplo
+
+<Ejecutar ej="ref-std/fs-file" />
+
+**Salida:**
+
+```text
+1: inicio
+2: segunda entrada
+No such file or directory (os error 44)
+```
+
+## Errores
+
+`open` falla si el archivo no existe o no tienes permiso (el ejemplo muestra el mensaje del navegador; en Windows o Linux el texto y el número de error son otros). Mira `e.kind()` para distinguir casos: `NotFound`, `PermissionDenied`, `AlreadyExists`…
+
+## Desde
+
+Rust 1.0 (estable). Métodos de esta página añadidos después: `options` (1.58).
+
+## Ver también
+
+- [Read](/ref/std/io/read/)
+- [Write](/ref/std/io/write/)
+- [BufRead](/ref/std/io/bufread/)
+
+## Aprende esto en
+
+- [Mundo 22 · Sistemas y FFI](/curso/22-sistemas-y-ffi/)
+- [Mundo 10 · Errores](/curso/10-errores/)
