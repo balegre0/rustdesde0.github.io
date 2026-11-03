@@ -15,6 +15,8 @@ tarjetas:
     r: "No: avanza 3 elementos de tipo T (3 × size_of::<T>() bytes), y el resultado debe quedar dentro de la misma asignación o justo al final."
   - p: "¿Por qué `&s.campo` da E0793 en un struct `repr(packed)`?"
     r: "Porque el campo puede estar desalineado y crear una referencia desalineada ya es UB. Se usa `&raw const` y `read_unaligned`."
+frase: "Los punteros crudos (`*const T`, `*mut T`) son direcciones sin garantías: crearlos es seguro, pero seguirlos (desreferenciar) exige `unsafe` y que tú garantices que son válidos."
+imagina: "Como un papel con una dirección escrita a mano: no garantiza que la casa exista ni que sea la correcta. Ir hasta allí es cosa tuya."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

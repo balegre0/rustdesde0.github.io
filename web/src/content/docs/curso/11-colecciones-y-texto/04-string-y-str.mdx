@@ -15,6 +15,8 @@ tarjetas:
     r: "Parámetros: `&str` (acepta literales y `&String`). Campos de structs y valores devueltos que creas: `String` (necesitas ser dueño)."
   - p: "¿Por qué no compila `match s { \"salir\" => … }` si `s` es `String`?"
     r: "Porque los patrones son `&str` y `s` es `String` (E0308). Se arregla con `match s.as_str()`."
+frase: "`String` es texto tuyo que vive en el heap y puede crecer; `&str` es una vista prestada de un texto. Para recibir texto en una función, pide `&str`."
+imagina: "`String` es tu libreta: escribes, borras y añades. `&str` es mirar una página de la libreta de alguien: la lees, pero no es tuya."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

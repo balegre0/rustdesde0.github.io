@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque `read` copia los bits: tras sacarlo, esa casilla ya no debe contar como viva, o el Drop del vector la destruiría por segunda vez (doble liberación)."
   - p: "¿Por qué MiVec rechaza los tipos de tamaño cero?"
     r: "Porque Layout::array de un ZST mide 0 bytes y pedir 0 bytes al asignador es UB; el Vec real los trata aparte."
+frase: "Tu propio `Vec` es `unsafe` por dentro (memoria y punteros crudos) y seguro por fuera, porque cada método mantiene sus invariantes documentadas."
+imagina: "Como un ascensor: dentro hay motores y cables peligrosos, pero por fuera solo hay botones que no puedes usar mal."
 ---
 
 import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

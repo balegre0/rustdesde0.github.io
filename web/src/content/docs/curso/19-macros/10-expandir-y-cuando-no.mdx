@@ -13,6 +13,8 @@ tarjetas:
     r: "Evalúa el argumento dos veces: llama a siguiente dos veces."
   - p: "¿Cuál es la regla general para elegir entre macro y función?"
     r: "Primero una función (o un genérico, un trait o una closure); una macro solo si necesitas algo que una función no puede: sintaxis propia, número variable de argumentos, generar items o trabajar en compilación."
+frase: "`cargo expand` te enseña el código que escribió la macro; y si una función normal puede hacer el trabajo, usa una función, que es más fácil de leer y depurar."
+imagina: "No contrates a un traductor para algo que ya entiendes: la macro es una herramienta potente, pero una función es más sencilla para casi todo."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa, Ordena } from '~/components';

@@ -13,6 +13,8 @@ tarjetas:
     r: "Para que el optimizador no pueda ver a través de un valor: lo trata como si viniera de fuera y como si se usara después. Así no puede precalcular ni eliminar el trabajo que quieres medir."
   - p: "¿Qué aporta un crate como criterion o divan frente a cronometrar con `Instant`?"
     r: "Repiten la medición muchas veces, calientan antes de medir, calculan estadísticas (media, dispersión, valores atípicos) y comparan con la ejecución anterior para decirte si algo se ha vuelto más lento."
+frase: "Para medir velocidad hay que compilar en `--release`, repetir muchas veces y evitar que el optimizador se salte el código que mides."
+imagina: "Como cronometrar a un corredor: una sola carrera con viento a favor no dice nada; hay que repetirla en las mismas condiciones y hacer la media."
 ---
 
 import { Ejecutar, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

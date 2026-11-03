@@ -9,6 +9,8 @@ requiere: ["12-modulos-crates-y-cargo/12-publicar"]
 tarjetas:
   - p: "Orden para decidir la visibilidad de algo:"
     r: "Privado por defecto; `pub(crate)` si lo necesita otro módulo del crate; `pub` solo si lo necesitan otros crates (o `main`, desde fuera del módulo)."
+frase: "Decide la visibilidad de dentro a fuera: privado por defecto, `pub(crate)` si lo necesita otro módulo y `pub` solo si debe verlo quien use tu biblioteca."
+imagina: "Como dar llaves en una empresa: por defecto, ninguna; la del almacén a quien trabaja dentro; y la puerta principal, solo la que necesitan los clientes."
 ---
 
 import { Reto, Pregunta } from '~/components';

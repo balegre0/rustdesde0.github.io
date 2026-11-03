@@ -13,6 +13,8 @@ tarjetas:
     r: "(dir + alin - 1) & !(alin - 1), o dir.next_multiple_of(alin)."
   - p: "¿Por qué Box::new(()) no reserva memoria?"
     r: "Porque () ocupa 0 bytes: Box de un tipo de tamaño cero usa un puntero ficticio y no llama al asignador."
+frase: "Con `#[global_allocator]` cambias quién reparte la memoria del heap a todo el programa: por ejemplo, uno que cuenta las reservas o uno *bump* que solo avanza."
+imagina: "Como cambiar al encargado del guardarropa: uno apunta cuántos abrigos recoge; otro los cuelga en fila sin buscar huecos, rapidísimo, y los devuelve todos al final."
 ---
 
 import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

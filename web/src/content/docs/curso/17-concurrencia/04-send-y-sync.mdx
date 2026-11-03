@@ -17,6 +17,8 @@ tarjetas:
     r: "Porque el compilador no puede comprobar la promesa: si te equivocas, permites carreras de datos (comportamiento indefinido)."
   - p: "¿Es Cell<i32> Send? ¿Y Sync?"
     r: "Send sí (puede moverse a otro hilo); Sync no (dos hilos con &Cell podrían mutarla a la vez)."
+frase: "`Send` dice que un valor puede viajar a otro hilo; `Sync` dice que varios hilos pueden mirarlo a la vez. El compilador los calcula solo."
+imagina: "`Send` es «se puede mandar por mensajero»; `Sync` es «se puede colgar en un tablón que miran todos». Algunas cosas solo admiten lo primero."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

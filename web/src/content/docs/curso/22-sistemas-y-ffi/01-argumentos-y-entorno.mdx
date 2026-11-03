@@ -13,6 +13,8 @@ tarjetas:
     r: "`Err(VarError::NotPresent)`. También puede dar `Err(NotUnicode)` si el valor no es UTF-8 válido."
   - p: "¿Cómo pasas argumentos a tu programa con cargo?"
     r: "Después de `--`: `cargo run -- Ana 42`. Lo que va antes de `--` es para cargo."
+frase: "`std::env::args()` te da lo que se escribió al lanzar el programa, y `env::var` lee las variables de entorno; si algo falta, respóndelo con un error claro, no con un pánico."
+imagina: "Como un camarero que recibe el pedido: si el cliente no dice la bebida, la pregunta con educación; no se queda bloqueado."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';

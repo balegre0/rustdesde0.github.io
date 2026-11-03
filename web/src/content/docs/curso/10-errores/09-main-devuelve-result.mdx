@@ -13,6 +13,8 @@ tarjetas:
     r: "`fn main() -> Result<(), Box<dyn Error>>`: así `?` acepta cualquier error."
   - p: "¿Cómo eliges el código de salida y el formato del mensaje?"
     r: "Devolviendo `std::process::ExitCode` desde `main` y tratando el error tú mismo: `eprintln!(\"error: {e}\")` y `ExitCode::from(2)`."
+frase: "`main` puede devolver un `Result` para usar `?` directamente; si termina con `Err`, Rust imprime el error y el programa acaba con un código de fallo."
+imagina: "Como un repartidor que, si no puede entregar, deja una nota explicando el motivo en lugar de desaparecer sin decir nada."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

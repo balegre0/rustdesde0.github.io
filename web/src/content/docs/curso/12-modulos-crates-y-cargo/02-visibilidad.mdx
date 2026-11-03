@@ -17,6 +17,8 @@ tarjetas:
     r: "Que intentas usar un elemento privado desde fuera de su módulo (*… is private*)."
   - p: "¿Para qué sirven los campos privados?"
     r: "Para proteger invariantes: solo los métodos del módulo pueden cambiarlos, así que nadie puede dejar el valor en un estado inválido."
+frase: "Todo es privado salvo que lo marques con `pub`; incluso en un `struct` público, cada campo es privado si no lleva su propio `pub`."
+imagina: "Como las puertas de un restaurante: el comedor es público, la cocina no. Y aunque el restaurante esté abierto, la caja fuerte sigue cerrada con su propia llave."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

@@ -12,6 +12,8 @@ tarjetas:
     r: "Un trozo de código durante el que las interrupciones están desactivadas, para acceder a datos compartidos sin que una interrupción los cambie a medias."
   - p: "¿Qué hace RTIC?"
     r: "Un framework que declara tareas y los recursos que usa cada una, y calcula al compilar las prioridades y protecciones necesarias para que no haya carreras de datos."
+frase: "El hardware puede interrumpir tu programa en cualquier instrucción, así que los datos compartidos con una interrupción se protegen con atómicos o secciones críticas."
+imagina: "Como que te suene el teléfono a mitad de escribir una frase: tienes que poder dejarla y retomarla sin que se mezcle lo que escribías con lo que te dicen."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "No directamente (E0277). Hay que convertir: `resultado.ok()?` descarta el error y lo trata como `None`."
   - p: "¿Qué hace `?` sobre un `Option`?"
     r: "Si es `Some(v)`, vale `v`; si es `None`, la función devuelve `None` en ese punto."
+frase: "`?` pone el valor si todo fue bien y, si hubo error, termina la función y se lo devuelve a quien la llamó."
+imagina: "Como un empleado con instrucciones claras: si el paso sale bien, sigue; si sale mal, para y le pasa el problema a su jefe."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';

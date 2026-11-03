@@ -15,6 +15,8 @@ tarjetas:
     r: "Que el valor al que apunta `P` no se moverá de su sitio en memoria hasta que se destruya (salvo que su tipo sea `Unpin`)."
   - p: "¿Qué significa que un tipo sea `Unpin`?"
     r: "Que moverlo es inofensivo aunque esté fijado. Casi todos los tipos lo son (números, `String`, `Vec`…); `Pin` solo restringe a los que no lo son."
+frase: "`Cow` devuelve un préstamo si no hace falta cambiar nada y una copia propia solo si hay que modificar; `Pin` es la promesa de que un valor no se moverá de sitio."
+imagina: "`Cow` es fotocopiar un documento solo si vas a escribir en él; si solo lo lees, te vale el original. `Pin` es atornillar un mueble a la pared."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

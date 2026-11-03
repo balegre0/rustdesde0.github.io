@@ -17,6 +17,8 @@ tarjetas:
     r: "En memoria, siempre 4 bytes (un valor Unicode). En UTF-8, de 1 a 4 bytes (`c.len_utf8()`)."
   - p: "¿Qué da `char_indices()`?"
     r: "Cada carácter junto con el índice del BYTE donde empieza: «añil» → 0:a 1:ñ 3:i 4:l."
+frase: "`len()` cuenta bytes, no letras (`\"año\".len()` es 4); para recorrer letras usa `.chars()`. Por eso no existe `s[0]`."
+imagina: "Como contar los vagones de un tren en vez de los pasajeros: algunos pasajeros ocupan dos asientos, así que contar asientos no te dice cuánta gente va."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque quien llama puede distinguir los casos con `match` y reaccionar distinto a cada uno, y los datos del error (longitud, valor…) llegan con su tipo, no aplastados en texto."
   - p: "¿Qué escribe `write!(f, …)` dentro de `fmt`?"
     r: "El texto formateado en el `Formatter` que recibe la función. Devuelve `fmt::Result`, que se propaga tal cual."
+frase: "Tu propio tipo de error es un `enum` con un caso por cada forma de fallar, y con `Display` y el trait `Error` se entiende y se integra con todo."
+imagina: "Como los códigos de avería de un coche: en vez de «algo va mal», «falta aceite» o «rueda pinchada», cada uno con su explicación."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';

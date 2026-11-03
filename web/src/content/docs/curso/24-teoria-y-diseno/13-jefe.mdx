@@ -8,6 +8,8 @@ requiere: ["24-teoria-y-diseno/12-disenar-con-tipos"]
 tarjetas:
   - p: "¿Por qué `Vec::first` devuelve `Option<&T>`?"
     r: "Porque el conjunto de valores de `Vec<T>` incluye el vector vacío. Un tipo que excluya ese valor (`NoVacio<T>`) puede devolver `&T` directamente."
+frase: "Si el propio tipo garantiza que nunca está vacío, el primer elemento y el máximo siempre existen: ya no necesitas `Option` para preguntarlo."
+imagina: "Como una cola que por norma siempre tiene a alguien atendiendo: nunca tienes que preguntar si hay alguien, ya sabes que sí."
 ---
 
 import { Reto, Pregunta } from '~/components';

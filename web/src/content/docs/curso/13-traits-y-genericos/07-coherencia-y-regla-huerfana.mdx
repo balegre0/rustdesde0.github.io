@@ -15,6 +15,8 @@ tarjetas:
     r: "Envolver un tipo ajeno en un struct propio de un campo, `struct Bytes(Vec<u8>)`. Como `Bytes` es tuyo, puedes implementarle cualquier trait."
   - p: "¿Qué error da implementar dos veces un trait para el mismo tipo, por ejemplo con una impl general que lo cubre?"
     r: "E0119, «conflicting implementations of trait … for type …»."
+frase: "Solo puedes implementar un trait para un tipo si **uno de los dos es tuyo**; si no, envuelves el tipo en un *newtype* propio."
+imagina: "No puedes ponerle tu cerradura a la puerta del vecino. Pero sí puedes ponerla en una puerta tuya que da a la misma habitación (el newtype)."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

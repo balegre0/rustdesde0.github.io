@@ -13,6 +13,8 @@ tarjetas:
     r: "Porque las carpetas están dentro de `Rc` (solo lectura) y hay que poder cambiar su madre después de crearlas."
   - p: "¿En qué orden se liberan raíz → hija → nieta cuando se suelta la raíz?"
     r: "Raíz, luego hija, luego nieta: el `Drop` de cada carpeta imprime y después se destruyen sus campos, entre ellos el Vec de hijas."
+frase: "En un árbol, los padres son dueños de sus hijos (`Rc`), los hijos solo miran a su padre (`Weak`) y lo que cambia va en un `RefCell`. Así se libera entero, sin fugas."
+imagina: "Como una familia en la que los padres son responsables de los hijos y los hijos solo saben dónde están sus padres. Si los hijos fueran responsables de los padres, nadie se iría nunca."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa, Ordena } from '~/components';

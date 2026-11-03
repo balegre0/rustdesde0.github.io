@@ -15,6 +15,8 @@ tarjetas:
     r: "La carrera de datos es acceso a memoria sin sincronizar (UB, imposible en Rust seguro). La condición de carrera es un fallo lógico por el orden de los sucesos; Rust seguro sí la permite."
   - p: "¿Qué tres piezas de Rust impiden las carreras de datos?"
     r: "La exclusividad de &mut (un único préstamo exclusivo), Send/Sync (qué cruza entre hilos) y la mutabilidad interior sincronizada (Mutex, atómicos)."
+frase: "Una carrera de datos es que dos hilos toquen el mismo dato a la vez y al menos uno lo cambie; en Rust seguro es imposible gracias a la regla de préstamos y a `Send`/`Sync`."
+imagina: "Como dos personas actualizando a la vez el mismo saldo en papel: cada una lee 100, suma 10 y escribe 110. Una de las sumas se pierde."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

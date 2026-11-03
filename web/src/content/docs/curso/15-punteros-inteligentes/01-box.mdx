@@ -12,6 +12,8 @@ tarjetas:
     r: "La propia Box, al salir de ámbito: es la única dueña y su `Drop` libera el heap. No hay que hacer nada a mano."
   - p: "Si mueves una `Box<[u8; 100000]>` a una función, ¿cuántos bytes se copian?"
     r: "Solo el puntero. Los 100 000 bytes se quedan donde estaban, en el heap; cambia el dueño, no los datos."
+frase: "`Box` guarda un valor en el heap y deja en la pila solo su dirección; cuando la caja se libera, también se libera lo que hay dentro."
+imagina: "Como guardar un mueble grande en un trastero y llevar en el bolsillo solo el papel con el número del trastero. Si tiras el papel, el trastero se vacía."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

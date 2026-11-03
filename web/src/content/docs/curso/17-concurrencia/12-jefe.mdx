@@ -13,6 +13,8 @@ tarjetas:
     r: "Box<dyn FnOnce() + Send + 'static>: cualquier closure que se pueda ejecutar una vez en otro hilo."
   - p: "¿Cómo se apaga la piscina de forma ordenada?"
     r: "Soltando el Sender (el canal se cierra, recv devuelve Err y los obreros salen de su bucle) y haciendo join de cada obrero, en el Drop."
+frase: "Una piscina de hilos tiene unos cuantos obreros fijos que sacan trabajos de una cola compartida, y al apagarse espera a que todos terminen."
+imagina: "Como la cocina de un restaurante: no contratas un cocinero por plato; unos pocos cocineros van cogiendo comandas de la misma barra."
 ---
 
 import { Reto, Pregunta } from '~/components';

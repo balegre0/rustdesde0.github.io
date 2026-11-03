@@ -15,6 +15,8 @@ tarjetas:
     r: "Usa un árbol con estados por nodo (Reserved, Active, Frozen, Disabled); un &mut empieza Reserved y solo es exclusivo al escribir. Rechaza un 54 % menos de casos de test reales (PLDI 2025)."
   - p: "¿Hay ya un modelo de aliasing oficial en Rust?"
     r: "No. La Reference dice que las reglas exactas no están fijadas; Stacked y Tree Borrows son propuestas implementadas en Miri."
+frase: "Un `&mut` es exclusivo también dentro de `unsafe`: el compilador optimiza dando eso por hecho, y modelos como Tree Borrows describen exactamente qué está permitido."
+imagina: "Si un cocinero tiene la exclusiva de una olla, nadie más echa sal en ella. Si alguien lo hace a escondidas, el cocinero salará dos veces."
 ---
 
 import { Ejecutar, NoCompila, Ordena, Pregunta, BajoElCapo, Trampa } from '~/components';

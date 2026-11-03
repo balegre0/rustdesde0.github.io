@@ -13,6 +13,8 @@ tarjetas:
     r: "Velocidad: cada copia está especializada para su tipo, las llamadas son directas y el compilador puede insertarlas (inlining). El genérico no cuesta nada al ejecutar."
   - p: "¿Qué pagas con la monomorfización?"
     r: "Tamaño y tiempo de compilación: cada tipo usado añade otra copia de la función al ejecutable, y el compilador tiene que generarla y optimizarla."
+frase: "El compilador crea una copia de la función genérica para cada tipo con el que la usas: va igual de rápido que si la escribieras a mano, a cambio de un programa más grande."
+imagina: "Como imprimir un formulario ya relleno para cada cliente en vez de uno en blanco: cada uno tiene el suyo listo al instante, pero gastas más papel."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

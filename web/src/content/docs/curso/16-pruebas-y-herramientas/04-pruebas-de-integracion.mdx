@@ -15,6 +15,8 @@ tarjetas:
     r: "En `tests/comun/mod.rs` (una subcarpeta) y `mod comun;` en cada archivo que lo use. Un `tests/comun.rs` suelto se trataría como otro archivo de pruebas."
   - p: "¿Por qué no se pueden escribir pruebas de integración para un crate que solo tiene `src/main.rs`?"
     r: "Porque un binario no se puede usar como dependencia. La solución habitual: poner la lógica en `src/lib.rs` y dejar `main.rs` como una capa fina que la llama."
+frase: "Las pruebas de integración, en la carpeta `tests/`, usan tu biblioteca desde fuera, solo con lo público, como lo haría otra persona."
+imagina: "Las unitarias revisan cada pieza del coche en el taller; las de integración salen a dar una vuelta con el coche montado."
 ---
 
 import { NoCompila, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

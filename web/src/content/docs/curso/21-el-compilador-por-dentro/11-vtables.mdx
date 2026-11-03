@@ -15,6 +15,8 @@ tarjetas:
     r: "A un salto indirecto a través de la vtable: `jmp qword ptr [rdx + 24]`, porque la vtable llega en `rdx` y el primer método está tras 3 palabras de 8 bytes."
   - p: "¿Por qué la vtable guarda el tamaño y el alineamiento?"
     r: "Para que `Box<dyn Trait>` pueda liberar la memoria (el asignador necesita el tamaño y el alineamiento) y para `size_of_val`/`align_of_val`."
+frase: "Un `dyn Trait` es un puntero a los datos más un puntero a una tabla con las direcciones de sus métodos; puedes construir una tabla así tú mismo a mano."
+imagina: "Como una tarjeta de visita con dos datos: dónde vive la persona y un folleto con los teléfonos de todo lo que sabe hacer."
 ---
 
 import { Ejecutar, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

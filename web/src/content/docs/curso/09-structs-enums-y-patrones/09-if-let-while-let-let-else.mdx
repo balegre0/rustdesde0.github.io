@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque `let` necesita un patrón irrefutable (que encaje siempre), y `Some(n)` no encaja con `None` (E0005). Usa `let else`, `if let` o `match`."
   - p: "¿Qué hace `while let Some(x) = pila.pop()`?"
     r: "Repite el bucle mientras `pop()` devuelva `Some`; cuando devuelve `None`, el bucle termina."
+frase: "`if let` se queda con un solo caso, `while let` repite mientras ese caso encaje, y `let else` saca el valor o sale de la función si no está."
+imagina: "`match` es revisar todo el correo; `if let` es «si hay un paquete para mí, ábrelo»; `let else` es «dame mi paquete, y si no ha llegado, me voy»."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';

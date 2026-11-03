@@ -15,6 +15,8 @@ tarjetas:
     r: "No. Async solo aprovecha los tiempos de espera; para repartir cálculo entre núcleos se usan hilos (o Rayon)."
   - p: "¿Desde qué versión de Rust existen async/.await en estable?"
     r: "Desde Rust 1.39 (noviembre de 2019)."
+frase: "`async` sirve cuando tienes muchas tareas que pasan casi todo el tiempo **esperando** (a la red, a un disco, a un reloj): un solo hilo puede atenderlas todas."
+imagina: "Como un camarero con diez mesas: no se queda mirando a una mesa mientras decide; toma nota, pasa a la siguiente y vuelve cuando lo llaman."
 ---
 
 import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa, Historia } from '~/components';

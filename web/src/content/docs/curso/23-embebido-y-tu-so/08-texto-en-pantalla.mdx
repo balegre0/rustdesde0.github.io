@@ -12,6 +12,8 @@ tarjetas:
     r: "Porque el programa nunca vuelve a leer lo que escribe: el optimizador podría pensar que esas escrituras sobran y quitarlas."
   - p: "¿Por qué la «ñ» no se ve bien en el modo texto VGA?"
     r: "Porque el búfer espera un byte por carácter (de la página de códigos 437), y en UTF-8 la «ñ» ocupa dos bytes."
+frase: "En modo texto VGA, la pantalla es una matriz de celdas de dos bytes (letra y color) a partir de la dirección `0xb8000`: escribir ahí hace aparecer texto."
+imagina: "Como un panel de letras de una estación antigua: cada casilla tiene su letra y su color, y cambiar la casilla cambia lo que ve todo el mundo."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

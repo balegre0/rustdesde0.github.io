@@ -12,6 +12,8 @@ tarjetas:
     r: "Sondea (`poll`) las tareas que están listas. Cuando ninguna lo está, espera. Embassy, en vez de girar, pone la CPU a dormir hasta la siguiente interrupción."
   - p: "¿Qué es Embassy?"
     r: "Un framework async para embebido: ejecutor, temporizadores, HAL async para muchos chips, red, USB y Bluetooth. Funciona en Rust estable."
+frase: "Embassy lleva `async/await` a un microcontrolador: el ejecutor duerme la CPU hasta que una interrupción la despierta, y así gasta muy poca batería."
+imagina: "Como un vigilante nocturno que duerme junto a la alarma: no hace rondas sin parar; se despierta solo cuando suena algo."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

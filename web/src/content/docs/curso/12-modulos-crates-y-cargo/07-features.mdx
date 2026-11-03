@@ -15,6 +15,8 @@ tarjetas:
     r: "`cfg!` es una expresión que vale `true` o `false` (el código existe siempre). `#[cfg]` hace que el código marcado ni siquiera se compile si la condición es falsa."
   - p: "¿Por qué las features deben ser aditivas?"
     r: "Porque Cargo unifica las features: si dos crates piden el mismo crate con features distintas, se compila una sola vez con la unión de todas."
+frase: "Las *features* son interruptores para activar partes opcionales de una biblioteca desde `Cargo.toml`, y así compilar solo lo que necesitas."
+imagina: "Como los extras al comprar un coche: el modelo básico es el mismo, y tú marcas si quieres navegador o techo solar. Solo pagas (compilas) lo que pides."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';

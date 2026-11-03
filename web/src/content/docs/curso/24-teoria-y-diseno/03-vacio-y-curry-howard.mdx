@@ -14,6 +14,8 @@ tarjetas:
     r: "Que los tipos se pueden leer como proposiciones lógicas y los programas como demostraciones: un valor de tipo T prueba T; una función A → B prueba «si A, entonces B»."
   - p: "¿Cuánto ocupa `Result<u32, Infallible>`?"
     r: "Lo mismo que un `u32`: la variante `Err` es imposible, así que no hace falta guardar cuál de las dos es."
+frase: "Un tipo sin valores (`Infallible`, `!`) representa lo imposible; y si un tipo es una afirmación, un programa que lo produce es su demostración."
+imagina: "Como un examen sin respuestas posibles: nadie puede entregarlo. Y si un tipo es una pregunta, escribir un valor de ese tipo es responderla."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

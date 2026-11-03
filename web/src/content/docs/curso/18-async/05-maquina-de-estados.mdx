@@ -15,6 +15,8 @@ tarjetas:
     r: "120 bytes frente a 24 (medido con rustc 1.99.1)."
   - p: "¿Cómo se adelgaza un future?"
     r: "Haciendo que lo grande muera antes del .await (encerrarlo en un bloque) o metiéndolo en un Box."
+frase: "El compilador convierte cada `async fn` en una máquina de estados: un valor que recuerda en qué `.await` se quedó y qué variables necesitará al seguir."
+imagina: "Como un marcapáginas con notas: cuando dejas el libro, apuntas la página y lo que necesitas recordar, y al volver sigues exactamente desde ahí."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

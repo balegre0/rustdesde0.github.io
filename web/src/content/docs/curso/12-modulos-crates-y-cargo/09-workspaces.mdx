@@ -13,6 +13,8 @@ tarjetas:
     r: "Por ruta: `nucleo = { path = \"../nucleo\" }` (o con `workspace = true` si se declaró en `[workspace.dependencies]`)."
   - p: "¿Por qué usar un workspace en vez de un único paquete enorme?"
     r: "Porque cada crate se recompila por separado: cambiar uno no obliga a recompilar los que no dependen de él. Además separa responsabilidades."
+frase: "Un *workspace* agrupa varios paquetes que se compilan juntos, comparten `Cargo.lock` y la carpeta `target`, y pueden depender unos de otros."
+imagina: "Como varios negocios en el mismo local: cada uno con su mostrador, pero comparten almacén y el mismo proveedor, así no compran dos veces lo mismo."
 ---
 
 import { Pregunta, Trampa } from '~/components';

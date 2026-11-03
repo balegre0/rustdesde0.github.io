@@ -15,6 +15,8 @@ tarjetas:
     r: "El pánico termina el proceso al instante, sin desenrollar ni ejecutar `Drop`. El binario es más pequeño. El objetivo `wasm32-wasip1` (este navegador) funciona así."
   - p: "¿Para qué sirven `todo!()` y `unreachable!()`?"
     r: "Son pánicos con significado: `todo!` marca código sin escribir todavía; `unreachable!` marca un camino que, según tu razonamiento, no puede ocurrir."
+frase: "Un pánico (`panic!`) detiene el programa cuando ocurre algo que no debería pasar nunca, un fallo del propio programa, y antes recoge la memoria por el camino."
+imagina: "Como el botón de parada de emergencia de una máquina: no es para el uso normal, es para cuando algo ha ido tan mal que seguir sería peor."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

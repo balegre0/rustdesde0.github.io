@@ -15,6 +15,8 @@ tarjetas:
     r: "Pánico en ejecución: «RefCell already borrowed». Las reglas de préstamo son las mismas, pero se comprueban al ejecutar."
   - p: "¿Cómo pides un préstamo de un `RefCell` sin arriesgarte a un pánico?"
     r: "Con `try_borrow()` o `try_borrow_mut()`, que devuelven un `Result`."
+frase: "`Cell` y `RefCell` permiten modificar datos a través de un préstamo compartido; `RefCell` vigila la regla de préstamos **al ejecutar** y entra en pánico si la rompes."
+imagina: "Como una sala de reuniones con una tablilla en la puerta: «ocupada» o «libre». El control no lo hace el arquitecto del edificio, se hace en el momento, en la puerta."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

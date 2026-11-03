@@ -13,6 +13,8 @@ tarjetas:
     r: "Porque algunas acciones no tienen nada que decir (meter una moneda, devolver con saldo 0). `None` lo expresa sin inventar un texto vacío."
   - p: "¿Qué hace `self.productos.get(n)` si `n` no existe?"
     r: "Devuelve `None` en vez de dar un pánico como `self.productos[n]`. Con `let Some(p) = … else { return … }` se trata el caso y se sigue."
+frase: "Un programa grande es la suma de piezas pequeñas: `struct` para los datos, `enum` para los casos, métodos para las acciones y `match` para decidir."
+imagina: "Como una máquina expendedora: tiene su estado (monedas, productos), recibe acciones (meter moneda, elegir) y decide qué hacer en cada caso."
 ---
 
 import { Pregunta, Reto, BajoElCapo, Ordena } from '~/components';

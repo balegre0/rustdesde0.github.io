@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque si mañana añades una variante, el `_` se la traga en silencio y el compilador ya no te avisa de que tienes que decidir qué hacer con ella."
   - p: "¿En qué orden se prueban los brazos de un `match`?"
     r: "De arriba abajo; se ejecuta el primero que encaja. Un brazo detrás de `_` nunca se alcanza (aviso «unreachable pattern»)."
+frase: "`match` te obliga a tratar **todos** los casos posibles; si te dejas alguno, no compila (E0004) y el error te dice cuál falta."
+imagina: "Como un plan de emergencias de un edificio: tiene que haber instrucciones para el incendio, la inundación y el apagón. Si falta una, el inspector no lo aprueba."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

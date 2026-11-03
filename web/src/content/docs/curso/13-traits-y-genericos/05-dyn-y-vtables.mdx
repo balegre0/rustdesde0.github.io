@@ -17,6 +17,8 @@ tarjetas:
     r: "Genéricos: un tipo por uso, máxima velocidad, más copias. `dyn`: tipos mezclados o elegidos al ejecutar, una sola copia, llamada indirecta."
   - p: "¿Cuántas instrucciones cuesta llamar a un método por `&dyn` en x86-64?"
     r: "En el caso más simple, una: `jmp qword ptr [rdx + 24]`, un salto a la dirección guardada en la vtable."
+frase: "`dyn Trait` permite guardar tipos distintos en la misma lista; al ejecutar, cada valor lleva una tabla (*vtable*) que dice dónde está su versión de cada método."
+imagina: "Como una orquesta en la que el director dice «toca»: cada músico sabe tocar su propio instrumento, y el director no necesita saber cuál es cada uno."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

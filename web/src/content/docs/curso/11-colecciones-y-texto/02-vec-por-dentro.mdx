@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque `push` necesita un préstamo exclusivo mientras `p` (compartido) sigue vivo (E0502). Si `push` mudara los datos, `p` apuntaría a memoria liberada: uso tras liberar."
   - p: "¿Para qué sirve `Vec::with_capacity(n)`?"
     r: "Para reservar de una vez sitio para `n` elementos y evitar mudanzas sucesivas cuando sabes cuántos vas a meter."
+frase: "Un `Vec` guarda en la pila un puntero, su capacidad y su longitud; cuando se llena, pide un sitio más grande en el heap y se muda allí."
+imagina: "Como una estantería: cuando se llena, compras otra el doble de grande y pasas los libros. Por eso no puedes tener el dedo en un libro mientras alguien muda la estantería."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Prestamos } from '~/components';

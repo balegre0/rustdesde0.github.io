@@ -12,6 +12,8 @@ tarjetas:
     r: "`extern crate alloc;`, una zona de memoria mapeada para el heap y un `#[global_allocator]` que implemente `GlobalAlloc`."
   - p: "¿Qué es la alineación de una reserva y por qué importa?"
     r: "La dirección tiene que ser múltiplo de un número (1, 2, 4, 8…) que pide el tipo. Una referencia desalineada es comportamiento indefinido."
+frase: "Para tener `Box`, `Vec` y `String` en tu núcleo necesitas un heap y un asignador, que registras con `#[global_allocator]`."
+imagina: "Como montar el almacén de una tienda nueva: hasta que no tienes almacén y alguien que lo organice, no puedes guardar nada de tamaño variable."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

@@ -13,6 +13,8 @@ tarjetas:
     r: "Una referencia `&'static mut T` al valor del heap, que ya nunca se liberará. Útil para datos que viven todo el programa."
   - p: "¿Por qué ningún código seguro puede depender de que se ejecute un `Drop`?"
     r: "Porque desde código seguro se puede impedir que se ejecute: `mem::forget`, `Box::leak` o un ciclo de `Rc`."
+frase: "Perder memoria a propósito (`mem::forget`, `Box::leak`) no es inseguro en Rust: malgasta, pero nunca corrompe ni deja leer basura."
+imagina: "Como dejarte un paraguas olvidado en el metro: es una pena y ocupa sitio, pero nadie sale herido. Lo peligroso sería usar un paraguas que ya no es tuyo."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa, Historia } from '~/components';

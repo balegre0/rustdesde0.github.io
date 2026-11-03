@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque código seguro del mismo módulo puede romper una invariante (por ejemplo, cambiar un campo privado) de la que depende el bloque unsafe."
   - p: "¿Cómo hace split_at_mut lo que el borrow checker no permite?"
     r: "Comprueba mid <= len y crea dos slices con from_raw_parts_mut sobre rangos disjuntos; la comprobación es lo que la hace sound."
+frase: "Se puede envolver código `unsafe` en una función segura si tú garantizas sus reglas internas (invariantes) y la privacidad impide que alguien las rompa desde fuera."
+imagina: "Como un enchufe: dentro hay cables peligrosos, pero la carcasa está hecha para que, por fuera, nadie pueda tocarlos."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

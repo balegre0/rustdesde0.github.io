@@ -17,6 +17,8 @@ tarjetas:
     r: "Uno solo, el 0. Por eso un enum con `Box` y otra variante sin datos ocupa 8 bytes, pero con dos variantes sin datos pasa a 16 (en x86-64)."
   - p: "¿Cuánto ocupa `struct { a: u8, b: u32, c: u16 }` con y sin `#[repr(C)]` en x86-64?"
     r: "8 bytes sin `repr(C)` (rustc reordena: b, c, a + 1 de relleno) y 12 bytes con `repr(C)` (orden de declaración con relleno)."
+frase: "El compilador decide cómo colocar los campos en memoria: los reordena para ahorrar huecos y esconde el `None` en valores imposibles (nichos)."
+imagina: "Como hacer la maleta: pones primero lo grande y rellenas los huecos con calcetines. Y el bolsillo que nunca usas sirve para indicar «maleta vacía»."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "Un intérprete de la representación intermedia de Rust (MIR) que ejecuta tu programa comprobando cada operación de memoria y detiene la ejecución si detecta comportamiento indefinido. Se usa con `cargo +nightly miri test` o desde el Playground."
   - p: "¿Por qué una prueba que pasa no demuestra que no haya comportamiento indefinido?"
     r: "Porque el UB puede «parecer funcionar»: leer memoria fuera de una asignación puede devolver un valor cualquiera sin fallar. Las pruebas comprueban resultados; Miri comprueba las reglas."
+frase: "`cargo audit` te avisa de fallos conocidos en las bibliotecas que usas, y Miri ejecuta tu código vigilando errores de memoria que las pruebas normales no ven."
+imagina: "Como revisar los avisos de retirada de productos del supermercado y, además, pasar un detector de fugas de gas por la cocina."
 ---
 
 import { Ejecutar, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

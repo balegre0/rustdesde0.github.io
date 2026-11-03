@@ -13,6 +13,8 @@ tarjetas:
     r: "Su contador no es atómico: dos hilos clonando o soltando a la vez podrían perder una actualización (carrera de datos) y liberar el valor antes de tiempo."
   - p: "¿Con qué se combina `Arc` para que varios hilos puedan modificar un dato?"
     r: "Con `Mutex` o `RwLock`: `Arc<Mutex<T>>`. Es el equivalente para hilos de `Rc<RefCell<T>>`."
+frase: "`Rc` no puede pasar entre hilos porque su contador no está protegido; `Arc` es igual pero con un contador seguro para varios hilos (*atómico*)."
+imagina: "Como la lista de invitados de una fiesta: si la apuntan dos personas a la vez sin turno, se descuadra. `Arc` es una lista en la que se apunta de uno en uno."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

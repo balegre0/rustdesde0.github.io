@@ -11,6 +11,8 @@ tarjetas:
     r: "0 si encontró algo, 1 si no encontró nada y 2 si hubo un error de uso. En Rust: main devuelve ExitCode."
   - p: "¿Dónde van los mensajes de error de una herramienta de terminal?"
     r: "A la salida de errores (stderr, con eprintln!), para no mezclarse con los resultados de stdout."
+frase: "Una herramienta de terminal bien hecha lee la entrada estándar, escribe con búfer, manda los avisos a `stderr` y termina con un código de salida que otros programas entienden."
+imagina: "Como un buen empleado de oficina: hace su trabajo, separa los informes de las quejas y, al terminar, dice claramente si salió bien o mal."
 ---
 
 import { Ejecutar, Pregunta } from '~/components';

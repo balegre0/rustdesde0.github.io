@@ -15,6 +15,8 @@ tarjetas:
     r: "No: todos sus elementos son del mismo tipo `T` (E0308 si intentas mezclar). Para «uno de varios tipos», usa un `Vec` de un enum."
   - p: "¿Qué crea `vec![0; 5]`?"
     r: "Un `Vec` con cinco elementos, todos 0."
+frase: "Un `Vec` es una lista de elementos del mismo tipo que puede crecer y encoger: `push` añade, `pop` quita y `get` consulta sin riesgo de pánico."
+imagina: "Como una lista de la compra en una libreta: puedes añadir líneas, tachar la última y consultar cualquiera. Pedir la línea 50 de una lista de 10 no tiene sentido."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

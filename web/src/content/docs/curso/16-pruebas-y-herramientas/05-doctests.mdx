@@ -15,6 +15,8 @@ tarjetas:
     r: "Que el código **no compile**. Si compila, el doctest falla. Sirve para documentar lo que tu API impide hacer."
   - p: "¿Qué diferencia hay entre `no_run` e `ignore` en un doctest?"
     r: "`no_run` lo compila pero no lo ejecuta (debe ser Rust válido). `ignore` ni lo compila ni lo ejecuta; sale como `ignored`."
+frase: "Los ejemplos que escribes en la documentación se compilan y ejecutan con `cargo test`, así que nunca quedan desactualizados."
+imagina: "Como una receta de cocina que alguien vuelve a cocinar cada vez que se reimprime el libro: si ya no sale bien, te enteras antes de publicarla."
 ---
 
 import { NoCompila, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

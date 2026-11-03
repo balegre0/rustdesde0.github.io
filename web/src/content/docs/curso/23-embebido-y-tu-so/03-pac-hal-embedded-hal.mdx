@@ -14,6 +14,8 @@ tarjetas:
     r: "Define traits comunes (`OutputPin`, `I2c`, `SpiBus`, `DelayNs`…) que implementan los HAL. Un controlador escrito contra esos traits funciona en cualquier chip."
   - p: "¿Qué gana un HAL con el patrón typestate en los pines?"
     r: "Que un pin configurado como entrada no tenga método `set_high`: el error se detecta al compilar."
+frase: "Nadie escribe direcciones a mano: el PAC da tipos para cada registro, el HAL da pines y periféricos, y `embedded-hal` define traits comunes para que un controlador sirva en cualquier chip."
+imagina: "Como los mandos de un coche: no tocas los cables, usas el volante y los pedales. Y como todos los coches tienen los mismos mandos, sabes conducir cualquiera."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

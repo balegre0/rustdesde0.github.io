@@ -13,6 +13,8 @@ tarjetas:
     r: "libc: declaraciones crudas de la biblioteca del sistema. nix: envoltorios seguros sobre libc. rustix: envoltorios seguros que en Linux pueden hacer las llamadas al sistema directamente, sin libc."
   - p: "¿Cómo se escribe código distinto para Windows y para Unix?"
     r: "Con #[cfg(windows)] y #[cfg(unix)] (o target_os), normalmente en módulos separados con la misma interfaz."
+frase: "Para hablar directamente con el sistema operativo hay crates para Windows (`windows-sys`) y para Unix (`libc`, `rustix`), y con `cfg` el mismo código compila en los dos."
+imagina: "Como un adaptador de enchufe de viaje: el aparato es el mismo, y solo cambia la pieza que conecta con la pared de cada país."
 ---
 
 import { Pregunta, BajoElCapo } from '~/components';

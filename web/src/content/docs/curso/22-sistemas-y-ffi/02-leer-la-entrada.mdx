@@ -15,6 +15,8 @@ tarjetas:
     r: "`io::Result<String>`: cada línea puede fallar al leerse (por ejemplo, si no es UTF-8 válido)."
   - p: "¿Para qué sirve `std::io::Cursor`?"
     r: "Para envolver datos en memoria (`&str`, `Vec<u8>`) y que implementen `Read`/`BufRead`/`Seek`; ideal para probar funciones que leen."
+frase: "Lee la entrada línea a línea con `BufRead`, tratando los errores de lectura, y escribe el código para que funcione igual con el teclado, un archivo o un texto en memoria."
+imagina: "Como un lector que no distingue si el texto le llega en un libro, en una carta o dictado: solo necesita algo de lo que leer línea a línea."
 ---
 
 import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

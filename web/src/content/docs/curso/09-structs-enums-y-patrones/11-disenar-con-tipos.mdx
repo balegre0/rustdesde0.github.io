@@ -15,6 +15,8 @@ tarjetas:
     r: "Para que el valor en el estado viejo quede movido y no se pueda volver a usar: el compilador impide seguir usando un `Borrador` ya publicado."
   - p: "«Parsea, no valides»: ¿qué significa?"
     r: "Convertir la entrada una sola vez en un tipo que solo puede existir si es válido (`Nota::new(v) -> Option<Nota>`), en vez de comprobar lo mismo en cada sitio."
+frase: "Diseña tus tipos para que los estados absurdos ni siquiera se puedan escribir: el compilador vigila por ti."
+imagina: "Como un enchufe con forma especial: no hace falta un cartel que diga «no lo enchufes al revés» si la clavija físicamente no entra al revés."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';

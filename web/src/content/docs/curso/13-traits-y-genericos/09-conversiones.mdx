@@ -15,6 +15,8 @@ tarjetas:
     r: "Para aceptar cualquier cosa que se pueda ver como `&str` (un `&str`, un `String`, un `&String`…) sin copiar nada: `x.as_ref()` da el `&str`."
   - p: "¿Por qué `let x = 5u8.into();` no compila?"
     r: "Porque `into` puede convertir a muchos tipos (`u16`, `u32`, `f64`…) y nada dice a cuál (E0283). Hay que anotar el destino: `let x: u32 = 5u8.into();`."
+frase: "`From` e `Into` convierten de un tipo a otro cuando no puede fallar, `TryFrom` cuando sí puede, y `AsRef` presta un valor como si fuera de otro tipo."
+imagina: "Como un cambio de moneda: euros a céntimos siempre funciona (`From`); cambiar un billete raro puede que no te lo acepten (`TryFrom`)."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

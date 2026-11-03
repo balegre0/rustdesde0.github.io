@@ -15,6 +15,8 @@ tarjetas:
     r: "Un valor que cada `impl` fija: `const SIMBOLO: &'static str;` en el trait y `const SIMBOLO: &'static str = \"€\";` en el `impl`. Se usa como `Euro::SIMBOLO`."
   - p: "¿Qué error sale si un tipo implementa `ConvertirA<f64>` y `ConvertirA<String>` y llamas `let x = t.convertir();`?"
     r: "E0283, «type annotations needed»: hay dos impl posibles y nada dice cuál. Se arregla anotando `let x: f64`."
+frase: "Un tipo asociado (`type Item`) es un tipo que cada implementación fija **una vez**; un parámetro genérico (`Trait<T>`) permite implementar el trait varias veces con distintos `T`."
+imagina: "Una máquina expendedora de café siempre da café (tipo asociado). Un enchufe universal acepta varios tipos de clavija (parámetro genérico)."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

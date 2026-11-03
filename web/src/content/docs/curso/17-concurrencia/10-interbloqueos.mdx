@@ -13,6 +13,8 @@ tarjetas:
     r: "Que todos los hilos tomen los candados en el mismo orden global."
   - p: "¿Qué pasa si un hilo llama dos veces a lock() del mismo Mutex sin soltarlo?"
     r: "Se bloquea para siempre o entra en pánico, según la plataforma: el Mutex de Rust no es reentrante."
+frase: "Rust impide las carreras de datos, pero no los interbloqueos: dos hilos que esperan cada uno el candado que tiene el otro se quedan parados para siempre."
+imagina: "Dos coches en un puente estrecho, cada uno esperando a que el otro dé marcha atrás. Nadie hace nada «ilegal», pero nadie avanza nunca."
 ---
 
 import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

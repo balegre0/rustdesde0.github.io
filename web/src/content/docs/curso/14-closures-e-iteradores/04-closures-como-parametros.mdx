@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque cada closure tiene un tipo propio. Para mezclarlos hay que usar `Box<dyn Fn(…)>`: un puntero a datos más un puntero a vtable."
   - p: "¿Qué dice el error E0373 al devolver `|x| x + n` sin `move`?"
     r: "Que el closure puede vivir más que la función pero toma prestada `n`, que es local. Con `move` se lleva su propia copia."
+frase: "Una función puede recibir un closure (`impl Fn(i32) -> i32`), devolver uno, o guardar varios distintos en una lista con `Box<dyn Fn>`."
+imagina: "Como darle a un repartidor una tarjeta con instrucciones de entrega: el repartidor es siempre el mismo, pero lo que hace en cada puerta depende de la tarjeta."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

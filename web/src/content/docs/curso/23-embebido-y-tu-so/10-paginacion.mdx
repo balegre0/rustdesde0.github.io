@@ -12,6 +12,8 @@ tarjetas:
     r: "Cuatro índices de 9 bits (uno por nivel de tabla: P4, P3, P2 y P1) y un desplazamiento de 12 bits dentro de la página de 4 KiB."
   - p: "¿Para qué sirve la paginación?"
     r: "Aísla los programas (cada uno tiene su espacio de direcciones), protege la memoria (solo lectura, no ejecutable) y permite usar trozos sueltos de RAM como si fueran seguidos."
+frase: "Cada dirección que usa un programa es virtual: la CPU la traduce a una física con tablas de páginas de cuatro niveles, y cada programa ve su propia memoria."
+imagina: "Como el número de habitación de un hotel: tú usas el 312, pero recepción sabe en qué edificio y en qué planta está de verdad. Otro huésped tiene su propio 312 en otro hotel."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

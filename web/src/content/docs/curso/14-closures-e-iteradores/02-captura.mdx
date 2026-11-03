@@ -15,6 +15,8 @@ tarjetas:
     r: "El closure tiene un préstamo exclusivo de `c` mientras siga vivo; leer `c` en medio es aliasing con mutación (E0502)."
   - p: "¿Qué es la captura disjunta de la edición 2021?"
     r: "Un closure que usa `j.nombre` captura solo ese campo, no el struct `j` entero; puedes seguir modificando otros campos."
+frase: "Un closure toma cada variable de alrededor de la forma más ligera posible: prestada, prestada para cambiarla o, con `move`, llevándosela consigo."
+imagina: "Como un amigo que viene a cocinar a tu casa: usa tus cosas mientras está allí. Con `move`, en cambio, se lleva los ingredientes a su casa."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

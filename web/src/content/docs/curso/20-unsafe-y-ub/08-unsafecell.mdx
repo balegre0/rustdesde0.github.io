@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque UnsafeCell no es Sync: dos hilos podrían mutar a la vez sin sincronizar (carrera de datos). Para hilos hacen falta Mutex o atómicos."
   - p: "¿Qué devuelve `UnsafeCell::get`?"
     r: "Un `*mut T` hacia el interior, a partir de `&self`. Crearlo es seguro; usarlo exige que nadie más acceda a la vez."
+frase: "Toda modificación a través de un préstamo compartido (`&T`) pasa por `UnsafeCell`, la única puerta permitida; `Cell`, `RefCell` y `Mutex` están construidos encima."
+imagina: "Como la única puerta de servicio de un museo: todo lo que cambia en las salas entra por ahí, y todos los demás sistemas se apoyan en esa puerta."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

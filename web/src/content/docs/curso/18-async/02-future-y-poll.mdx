@@ -15,6 +15,8 @@ tarjetas:
     r: "Pin<&mut Self>, no &mut self."
   - p: "¿Quién llama a poll en un programa real?"
     r: "Un ejecutor (runtime), no tu código."
+frase: "Un *future* es un trabajo que todavía no ha terminado; alguien le pregunta con `poll` «¿ya estás?», y responde `Ready` (listo) o `Pending` (aún no)."
+imagina: "Como un pedido en una hamburguesería: preguntas en el mostrador; o te lo dan, o te dicen «todavía no»."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

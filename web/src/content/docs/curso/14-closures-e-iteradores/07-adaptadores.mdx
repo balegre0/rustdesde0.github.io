@@ -15,6 +15,8 @@ tarjetas:
     r: "En el más corto: en cuanto uno de los dos devuelve `None`."
   - p: "¿Qué tipo tiene `v.iter().filter(f).map(g)`?"
     r: "`Map<Filter<slice::Iter<'_, T>, F>, G>`: structs anidados, uno por adaptador, con los closures dentro."
+frase: "Los adaptadores (`map`, `filter`, `take`…) transforman un iterador en otro y se encadenan como las piezas de una tubería."
+imagina: "Como una cadena de lavado de coches: primero agua, luego jabón, luego secado. Cada estación hace una cosa, y el coche pasa por todas en orden."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

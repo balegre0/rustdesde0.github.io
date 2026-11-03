@@ -15,6 +15,8 @@ tarjetas:
     r: "En la carpeta que indica la variable de entorno `OUT_DIR`, nunca en `src`."
   - p: "¿Qué riesgo tiene `build.rs` en una dependencia?"
     r: "Que ejecuta código arbitrario en tu máquina al compilar. Revisa qué hace en crates poco conocidos."
+frase: "`build.rs` es un pequeño programa que Cargo ejecuta **antes** de compilar tu crate, para generar código o preparar lo que haga falta."
+imagina: "Como precalentar el horno y preparar los ingredientes antes de cocinar: no es el plato, pero sin ese paso previo el plato no sale."
 ---
 
 import { Pregunta, BajoElCapo } from '~/components';

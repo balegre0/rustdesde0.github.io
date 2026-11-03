@@ -15,6 +15,8 @@ tarjetas:
     r: "Err(...) con el mensaje del pánico. El pánico de un hilo no tumba a main por sí solo."
   - p: "¿Por qué el orden de los println! de varios hilos cambia entre ejecuciones?"
     r: "Porque el sistema operativo decide cuándo corre cada hilo (planificación); sin sincronización no hay orden garantizado."
+frase: "`thread::spawn` lanza trabajo en otro hilo que corre a la vez que el tuyo, y `join` espera a que termine y te da su resultado."
+imagina: "Como encargar a un ayudante que pele las patatas mientras tú haces la salsa; `join` es esperar a que te traiga el bol antes de mezclarlo todo."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "`abort`: lo dice `rustc --print cfg --target wasm32-wasip1` (`panic=\"abort\"`). Por eso en el navegador `catch_unwind` no captura nada."
   - p: "¿Qué pasa si un pánico intenta salir de una función `extern \"C\"`?"
     r: "El proceso aborta. Para permitir que un pánico cruce esa frontera existe la ABI `extern \"C-unwind\"`."
+frase: "Un pánico recorre la pila hacia atrás liberando cada valor (*unwinding*), salvo con `panic = \"abort\"`, que corta el programa en seco y lo hace más pequeño."
+imagina: "Como evacuar un edificio planta por planta apagando cada luz al salir, frente a cortar la electricidad general de golpe."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';

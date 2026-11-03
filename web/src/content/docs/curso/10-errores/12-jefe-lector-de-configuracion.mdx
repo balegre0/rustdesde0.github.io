@@ -13,6 +13,8 @@ tarjetas:
     r: "Convierte el `Option<u32>` en `Result<u32, ErrorConfig>` y, si era `None`, sale de la función con `Err(Falta(\"ancho\"))`."
   - p: "¿Por qué los números de línea se calculan con `i + 1`?"
     r: "Porque `enumerate()` cuenta desde 0 y las personas cuentan las líneas desde 1."
+frase: "Un buen error dice qué falló, dónde (número de línea) y por qué (su causa original), y `?` lo hace llegar hasta quien puede resolverlo."
+imagina: "Como un informe de incidencia bien hecho: «en la línea 7, el puerto no es un número porque pone “ochenta”». Quien lo lee sabe exactamente qué arreglar."
 ---
 
 import { Pregunta, Reto, BajoElCapo, Ordena } from '~/components';

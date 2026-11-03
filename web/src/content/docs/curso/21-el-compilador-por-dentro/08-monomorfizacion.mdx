@@ -15,6 +15,8 @@ tarjetas:
     r: "La versión `dyn` tiene una sola copia y llama a los métodos a través de la vtable; la genérica tiene una copia por tipo con llamadas directas."
   - p: "¿Qué truco usa `std` para que una función genérica no genere mucho código?"
     r: "Una función externa genérica que solo convierte el argumento (`p.as_ref()`) y llama a una función interna NO genérica que hace todo el trabajo."
+frase: "Cada uso de una función genérica con un tipo distinto genera una copia especializada: velocidad de código escrito a mano, a cambio de un programa más grande."
+imagina: "Como hacer un traje a medida para cada cliente en vez de uno de talla única: a cada uno le queda perfecto, pero gastas más tela."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';

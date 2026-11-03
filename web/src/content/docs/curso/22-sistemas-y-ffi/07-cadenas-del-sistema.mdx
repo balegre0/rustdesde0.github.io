@@ -15,6 +15,8 @@ tarjetas:
     r: "Para texto tal como lo maneja el sistema operativo (nombres de archivo, variables de entorno), que puede no ser UTF-8 válido."
   - p: "¿Por qué `CString::new(\"ho\\0la\")` devuelve un error?"
     r: "Porque el 0 interior marcaría el final de la cadena para quien la lea: se perdería `la` en silencio."
+frase: "El sistema operativo no siempre usa UTF-8: `OsString` guarda sus textos tal cual, y `CString`/`CStr` son textos terminados en un byte cero, como los esperan muchas bibliotecas del sistema."
+imagina: "Como enviar un paquete a otro país: hay que usar su formato de dirección, aunque en casa escribas las direcciones de otra manera."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';

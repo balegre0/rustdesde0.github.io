@@ -17,6 +17,8 @@ tarjetas:
     r: "Desde Rust 1.81 el proceso aborta. Para propagarlo existe `extern \"C-unwind\"`; si no, usa catch_unwind y devuelve un código de error."
   - p: "¿Qué tiene de malo `CString::new(s).unwrap().as_ptr()`?"
     r: "El CString temporal se destruye al final de la sentencia y el puntero queda colgando (lint dangling_pointers_from_temporaries)."
+frase: "Para llamar a funciones del sistema escritas fuera de Rust se usa `unsafe extern`, se fija la forma de los datos con `repr(C)` y se cuidan los errores típicos de la frontera."
+imagina: "Como pasar mercancía por una aduana: hay que declarar exactamente qué llevas y en qué formato, porque al otro lado no se aplican tus reglas."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

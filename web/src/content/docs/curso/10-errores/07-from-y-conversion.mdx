@@ -13,6 +13,8 @@ tarjetas:
     r: "`impl From<ParseIntError> for MiError { fn from(e: ParseIntError) -> Self { MiError::Numero(e) } }`."
   - p: "Si no quieres escribir `impl From`, ¿cómo conviertes a mano?"
     r: "Con `map_err` antes del `?`: `texto.parse::<u32>().map_err(MiError::Numero)?`. Una variante con datos se puede usar como función."
+frase: "Si implementas `From` para tu error, `?` convierte automáticamente los errores de otros tipos en el tuyo."
+imagina: "Como un traductor en la frontera: llegue el aviso en el idioma que llegue, te lo entrega en el tuyo sin que tengas que pedírselo."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';

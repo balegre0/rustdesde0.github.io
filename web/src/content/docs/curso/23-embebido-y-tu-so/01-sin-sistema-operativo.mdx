@@ -12,6 +12,8 @@ tarjetas:
     r: "Lo que depende del sistema operativo: `println!`, archivos, hilos, red, `HashMap` (necesita aleatoriedad del sistema). Conserva tipos, Option, Result, iteradores, slices, fmt, atómicos…"
   - p: "¿Qué necesita un binario `no_std` que una biblioteca no necesita?"
     r: "Un `#[panic_handler]` y un punto de entrada propio (`#![no_main]`). Si usa `alloc`, también un `#[global_allocator]`."
+frase: "Con `#![no_std]` tu programa solo usa `core`: sin archivos, hilos ni `println!`, pero con todo el lenguaje, y lo que falta lo añades tú."
+imagina: "Como acampar sin luz ni agua corriente: sigues sabiendo cocinar, solo que tienes que traer tú el fuego y el agua."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

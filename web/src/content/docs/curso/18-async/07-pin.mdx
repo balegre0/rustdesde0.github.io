@@ -15,6 +15,8 @@ tarjetas:
     r: "Un auto trait: los tipos Unpin se pueden mover aunque estén dentro de un Pin. Casi todos los tipos lo son; los futures de async fn no."
   - p: "Dos formas seguras de fijar un future"
     r: "std::pin::pin!(fut) en la pila, o Box::pin(fut) en el heap."
+frase: "Un future puede guardar referencias a sí mismo, así que una vez sondeado no se puede mover; `Pin` es la promesa de que no se moverá, y `Unpin` dice que da igual moverlo."
+imagina: "Como un cuadro colgado con un clavo en la pared: si mueves la pared, el clavo ya no apunta al sitio correcto. `Pin` es fijarlo para que no se mueva."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

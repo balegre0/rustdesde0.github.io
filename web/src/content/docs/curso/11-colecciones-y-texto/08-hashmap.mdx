@@ -15,6 +15,8 @@ tarjetas:
     r: "En ninguno definido: puede cambiar entre ejecuciones (std usa una semilla aleatoria). Si necesitas orden, ordena las claves o usa `BTreeMap`."
   - p: "¿Qué devuelve `insert` si la clave ya existía?"
     r: "`Some(valor_viejo)`: el nuevo valor reemplaza al viejo. Si no existía, `None`."
+frase: "Un `HashMap` guarda valores por clave, como «palabra → significado»; `entry` te deja contar y agrupar en una línea, y su orden no está garantizado."
+imagina: "Como una agenda de teléfonos: buscas por el nombre y obtienes el número. Pero las páginas no siguen ningún orden, así que no esperes que salgan alfabéticas."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

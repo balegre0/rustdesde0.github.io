@@ -15,6 +15,8 @@ tarjetas:
     r: "undocumented_unsafe_blocks, missing_safety_doc y multiple_unsafe_ops_per_block (también ptr_as_ptr, transmute_ptr_to_ref…)."
   - p: "¿Para qué sirven cargo audit, cargo-geiger y cargo vet?"
     r: "audit: compara Cargo.lock con los avisos de RustSec; geiger: cuenta el unsafe del árbol de dependencias; vet: registra qué dependencias ha revisado una persona de confianza."
+frase: "Cada bloque `unsafe` lleva un comentario `// SAFETY:` que explica por qué es correcto, se reduce al mínimo y se revisa con herramientas, también en las dependencias."
+imagina: "Como un registro de mantenimiento de un avión: cada intervención se anota con quién la hizo y por qué es segura, para que otro pueda comprobarlo."
 ---
 
 import { Ejecutar, NoCompila, Ordena, Pregunta, BajoElCapo, Trampa } from '~/components';

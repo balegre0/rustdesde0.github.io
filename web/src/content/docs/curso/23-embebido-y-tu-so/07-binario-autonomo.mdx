@@ -12,6 +12,8 @@ tarjetas:
     r: "*Writing an OS in Rust*, la serie de Philipp Oppermann que construye paso a paso un núcleo para x86_64 en Rust."
   - p: "¿Qué hace un cargador de arranque (bootloader)?"
     r: "Lo que ejecuta la máquina al encenderse: prepara la CPU (modo de 64 bits, paginación básica), carga tu núcleo en memoria y salta a su punto de entrada."
+frase: "El primer paso de un sistema operativo es un programa sin `std` ni `main`, con su propio punto de entrada, que arranca directamente sobre el hardware."
+imagina: "Como poner los cimientos de una casa: no hay paredes ni muebles todavía, pero es lo primero sobre lo que se apoya todo."
 ---
 
 import { Pregunta, BajoElCapo } from '~/components';

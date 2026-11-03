@@ -15,6 +15,8 @@ tarjetas:
     r: "Recibiendo su nombre como argumento, por ejemplo con $v:ident."
   - p: "¿Para qué sirve $crate?"
     r: "Es una ruta a la crate donde se definió la macro, para que sus rutas funcionen aunque se invoque desde otra crate o módulo."
+frase: "Las variables que crea una macro no chocan con las tuyas aunque se llamen igual (higiene), y `$crate` hace que la macro encuentre lo suyo desde cualquier sitio."
+imagina: "Como un electricista que trae sus propias herramientas: aunque las suyas se llamen igual que las tuyas, nunca se mezclan."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

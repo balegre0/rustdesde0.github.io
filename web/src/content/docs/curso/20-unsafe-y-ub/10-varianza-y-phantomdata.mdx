@@ -17,6 +17,8 @@ tarjetas:
     r: "Los quita: el tipo deja de ser Send y Sync (los punteros crudos no lo son)."
   - p: "¿Cuánto mide PhantomData<T>?"
     r: "0 bytes, sea cual sea T."
+frase: "La varianza decide cuándo un tipo con vida larga sirve donde se pide uno con vida corta, y `PhantomData` deja declararlo en tipos que guardan punteros crudos."
+imagina: "Como poner en la etiqueta de una caja «contiene objetos prestados» aunque por fuera no se vea: así quien la maneja sabe con qué cuidado tratarla."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

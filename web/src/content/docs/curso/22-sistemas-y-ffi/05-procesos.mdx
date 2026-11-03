@@ -13,6 +13,8 @@ tarjetas:
     r: "Porque cada `.arg()` se pasa como un argumento separado, sin interpretar espacios ni caracteres especiales: no hay inyección de órdenes."
   - p: "¿Qué diferencia hay entre `process::exit(n)` y devolver `ExitCode` desde `main`?"
     r: "`exit` termina en el acto sin ejecutar los `Drop` pendientes; devolver `ExitCode` deja que `main` termine normalmente y luego sale con ese código."
+frase: "`Command` lanza otros programas, recoge lo que escriben y su código de salida, y `process::exit` termina el tuyo con el código que elijas."
+imagina: "Como encargar un trabajo a otra empresa: le das las instrucciones, esperas el resultado y miras si te dice «hecho» o «hubo un problema»."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';

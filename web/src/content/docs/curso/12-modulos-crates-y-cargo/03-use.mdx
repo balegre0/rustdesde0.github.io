@@ -17,6 +17,8 @@ tarjetas:
     r: "Que un `use` apunta a algo que no existe en esa ruta (*unresolved import*)."
   - p: "¿Por qué a veces hay que importar un trait para llamar a un método?"
     r: "Porque los métodos de un trait solo se pueden llamar si el trait está en el ámbito. `use std::io::Write;` es necesario para usar `writeln!` sobre `stdout()`."
+frase: "`use` trae un nombre a tu código para no escribir la ruta entera cada vez; `as` lo renombra y `pub use` lo deja a la vista de quien use tu código."
+imagina: "Como guardar un contacto en el móvil: en vez de marcar el número completo cada vez, lo llamas por su nombre (o por un apodo, con `as`)."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

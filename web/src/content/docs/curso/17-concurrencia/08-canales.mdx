@@ -15,6 +15,8 @@ tarjetas:
     r: "Se mueve: pasa a ser del receptor. El emisor ya no puede usarlo."
   - p: "¿Qué diferencia hay entre channel() y sync_channel(n)?"
     r: "channel no tiene límite; sync_channel(n) admite como mucho n mensajes pendientes y bloquea al emisor (o falla con try_send) si está lleno."
+frase: "En vez de compartir un dato, los hilos se envían mensajes por un canal: muchos pueden enviar (`Sender`) y uno solo recibe (`Receiver`)."
+imagina: "Como un buzón de sugerencias: muchas personas pueden echar notas, pero solo hay una persona que abre el buzón y las lee."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

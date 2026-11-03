@@ -15,6 +15,8 @@ tarjetas:
     r: "Para que `cargo test` no ejecute esa prueba por defecto (por ejemplo, porque es lenta). Se ejecuta con `cargo test -- --ignored`. Admite un motivo: `#[ignore = \"lenta\"]`."
   - p: "¿Qué diferencia hay entre `assert!` y `debug_assert!`?"
     r: "`debug_assert!` solo se comprueba con las comprobaciones de depuración activas (perfil debug); en release desaparece. `assert!` se comprueba siempre."
+frase: "Una prueba que falla es una pista: lee qué esperaba y qué obtuvo, y escribe mensajes que expliquen el porqué. También se prueban los pánicos y los errores."
+imagina: "Como el testigo de una avería en el coche: no es el problema, es la señal que te dice dónde mirar."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

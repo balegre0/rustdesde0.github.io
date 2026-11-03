@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque el tipo de sus parámetros se infiere en el primer uso y queda fijo. Un closure no es genérico (E0308)."
   - p: "¿Cuánto ocupa en memoria un closure que no captura nada?"
     r: "0 bytes: es un tipo de tamaño cero. Un closure es un struct con sus capturas como campos."
+frase: "Un *closure* es una función pequeña y sin nombre, escrita con `|x| ...`, que puede usar las variables que tiene alrededor."
+imagina: "Como una nota que dejas escrita en la nevera: «pon la lavadora con lo que hay en el cesto». La nota sabe dónde está el cesto porque la escribiste en casa."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

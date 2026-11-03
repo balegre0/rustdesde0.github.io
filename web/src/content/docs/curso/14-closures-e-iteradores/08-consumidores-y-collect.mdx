@@ -17,6 +17,8 @@ tarjetas:
     r: "Porque se para en el primer elemento que cumple la condición (cortocircuito). Igual `all` con el primero que no cumple, y `find`."
   - p: "¿Por qué `vec_de_f64.iter().max()` no compila?"
     r: "`max` exige `Ord` (orden total), y `f64` solo tiene `PartialOrd` porque `NaN` no es comparable (E0277)."
+frase: "Los consumidores (`sum`, `count`, `find`, `collect`…) cierran la tubería y producen el resultado final; `collect` construye la colección que le pidas."
+imagina: "Al final de la cadena de lavado alguien tiene que recoger el coche. Sin consumidor, la cadena ni se pone en marcha."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

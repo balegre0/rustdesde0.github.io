@@ -15,6 +15,8 @@ tarjetas:
     r: "Obliga a evaluar su contenido al compilar, aunque esté en mitad de código normal."
   - p: "¿Qué relación hay entre la evaluación de constantes y Miri?"
     r: "Comparten el mismo motor de interpretación de MIR; Miri le añade la detección de comportamiento indefinido."
+frase: "Una `const fn` se puede ejecutar mientras se compila: el compilador tiene un pequeño intérprete que calcula el resultado y lo deja escrito en el programa."
+imagina: "Como precocinar un plato en casa y llevarlo ya hecho: en la fiesta (al ejecutar) solo hay que servirlo."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

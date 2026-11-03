@@ -13,6 +13,8 @@ tarjetas:
     r: "Añadiéndole `where Self: Sized`: el método sigue existiendo para los tipos concretos, pero no se puede llamar a través de dyn."
   - p: "¿Qué es el upcasting de trait objects?"
     r: "Convertir un &dyn Sub en &dyn Super cuando Super es supertrait de Sub. Estable desde Rust 1.86."
+frase: "No todo trait se puede usar con `dyn`: un método genérico o que devuelve `Self` no cabe en una vtable (E0038); `where Self: Sized` lo deja fuera de la tabla."
+imagina: "Una vtable es una centralita con un número fijo de extensiones. Un método genérico serían infinitas extensiones, y eso no cabe en ninguna centralita."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo } from '~/components';

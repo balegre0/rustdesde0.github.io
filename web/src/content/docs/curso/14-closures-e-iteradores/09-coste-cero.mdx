@@ -15,6 +15,8 @@ tarjetas:
     r: "No: el optimizador demostró que `i < v.len()` y la quitó. Un `v[i]` sin esa garantía conserva una comparación y un salto a `panic_bounds_check`."
   - p: "¿Garantiza «coste cero» que el bucle siempre se vectorice?"
     r: "No. Garantiza que no pierdes frente al bucle equivalente; algunos adaptadores (`chain`, `flat_map`, `step_by`) pueden dar peor código. Hay que medir."
+frase: "Una cadena de iteradores y closures se compila al mismo código máquina que un bucle escrito a mano: escribes más claro y no pagas nada en velocidad."
+imagina: "Como dar indicaciones con «gira a la izquierda en la panadería» en vez de en coordenadas: es más fácil de leer y llegas al mismo sitio igual de rápido."
 ---
 
 import { Ejecutar, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

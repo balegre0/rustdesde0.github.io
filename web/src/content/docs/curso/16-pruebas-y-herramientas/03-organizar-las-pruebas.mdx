@@ -15,6 +15,8 @@ tarjetas:
     r: "`cargo test media`. El filtro es una subcadena del nombre completo (`tests::media_de_dos`)."
   - p: "¿Por qué no ves los `println!` de una prueba que pasa?"
     r: "El arnés captura la salida de cada prueba y solo la enseña si falla. Para verla siempre: `cargo test -- --nocapture` (o `--show-output`)."
+frase: "Las pruebas unitarias viven junto al código, en un módulo `tests` con `#[cfg(test)]`, pueden probar lo privado y puedes elegir cuáles ejecutar."
+imagina: "Como guardar las instrucciones de cada electrodoméstico junto a él, no todas juntas en un cajón: sabes enseguida cuáles van con cada cosa."
 ---
 
 import { NoCompila, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

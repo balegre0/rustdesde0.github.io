@@ -15,6 +15,8 @@ tarjetas:
     r: "mapa.range(9..=15)."
   - p: "¿En qué orden ordena un BTreeMap<&str, _> las claves con tildes?"
     r: "Por bytes (UTF-8): las letras con tilde, como «Á», van después de todas las letras sin tilde."
+frase: "`BTreeMap` mantiene las claves siempre ordenadas; `HashSet` y `BTreeSet` guardan cada valor una sola vez y saben hacer unión, intersección y diferencia."
+imagina: "Un `BTreeMap` es un diccionario: siempre en orden alfabético. Un conjunto es una lista de invitados: cada persona aparece una sola vez, aunque la apuntes dos."
 ---
 
 import { Ejecutar, Predice, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

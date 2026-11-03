@@ -15,6 +15,8 @@ tarjetas:
     r: "`split(' ')` corta en cada espacio y deja trozos vacíos si hay varios seguidos; `split_whitespace()` trata cualquier racha de espacios, tabuladores y saltos de línea como un solo separador."
   - p: "¿Los trozos que devuelve `split` copian el texto?"
     r: "No: son `&str` que apuntan dentro del texto original. Por eso no pueden vivir más que él."
+frase: "`split`, `trim`, `lines`, `find` y `contains` cortan y buscan en un texto sin copiarlo; si cortas por bytes a mano, el corte debe caer entre letras."
+imagina: "Como cortar una barra de pan por las marcas: puedes cortar entre rebanadas, pero no por la mitad de una, o se te deshace."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

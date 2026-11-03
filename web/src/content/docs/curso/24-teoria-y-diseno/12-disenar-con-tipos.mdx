@@ -14,6 +14,8 @@ tarjetas:
     r: "En vez de comprobar un dato y seguir usando el tipo original, conviértelo una vez en un tipo que garantice la propiedad (por ejemplo `NoVacio<T>` en vez de `Vec<T>` + comprobación)."
   - p: "¿Cuánto cuesta en memoria el estado en el patrón typestate con `PhantomData`?"
     r: "Nada: `PhantomData<Estado>` y los structs de estado sin campos tienen tamaño cero."
+frase: "Diseña para que los estados inválidos no se puedan escribir: *newtypes*, `enum` en vez de banderas sueltas, el patrón *typestate* y «convertir al validar» (*parse, don't validate*)."
+imagina: "Como un formulario que solo te deja elegir fechas reales en un calendario, en vez de una casilla de texto donde alguien podría escribir «30 de febrero»."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo } from '~/components';

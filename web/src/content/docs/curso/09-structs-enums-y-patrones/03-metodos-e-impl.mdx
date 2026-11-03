@@ -15,6 +15,8 @@ tarjetas:
     r: "El método se queda con el valor (lo mueve). Si el tipo no es `Copy`, usar la variable después da E0382."
   - p: "¿A qué equivale `r.area()`?"
     r: "A `Rectangulo::area(&r)`. El punto añade el `&` o `&mut` que pide el método (auto-referencia)."
+frase: "En un bloque `impl` pegas funciones a tu tipo (métodos), y cada una dice si solo lo mira (`&self`), lo cambia (`&mut self`) o se lo queda (`self`)."
+imagina: "Como los botones de un electrodoméstico: unos solo muestran información (la hora), otros cambian algo (subir la temperatura) y otro lo consume (tirarlo al reciclaje)."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

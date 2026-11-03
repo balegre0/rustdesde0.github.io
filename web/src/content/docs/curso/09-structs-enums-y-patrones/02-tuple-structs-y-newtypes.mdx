@@ -13,6 +13,8 @@ tarjetas:
     r: "Un tuple struct de un solo campo (`struct Metros(f64);`) que crea un tipo distinto. Ocupa exactamente lo mismo que el campo: 0 bytes de coste."
   - p: "¿Cuánto ocupa un unit struct como `struct Marca;`?"
     r: "0 bytes. Es un tipo de tamaño cero (ZST): existe para el compilador, pero no ocupa memoria."
+frase: "Envolver un número en un tipo propio (`struct Metros(f64)`) hace que el compilador no te deje mezclarlo con otro que significa algo distinto."
+imagina: "Como poner etiqueta a dos botes con polvo blanco: «sal» y «azúcar». Por dentro parecen iguales, pero la etiqueta evita que eches azúcar al guiso."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';

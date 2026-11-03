@@ -12,6 +12,8 @@ tarjetas:
     r: "La excepción que lanza la CPU cuando falla al atender otra excepción. Si tampoco se atiende, se produce un triple fallo y la máquina se reinicia."
   - p: "¿Qué ABI usan las rutinas de excepción en Rust?"
     r: "`extern \"x86-interrupt\"`, que guarda todos los registros y vuelve con `iretq`. Hoy es inestable (nightly)."
+frase: "Cuando algo va mal (dividir entre cero) o el hardware avisa (el teclado, el reloj), la CPU salta a la función que le indica la tabla IDT."
+imagina: "Como el plan de emergencias de un edificio: para cada tipo de alarma hay una persona responsable, y la tabla dice a quién llamar."
 ---
 
 import { Pregunta, BajoElCapo } from '~/components';

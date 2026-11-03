@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque puede haber despertares espurios y otro hilo pudo cambiar la condición entre el aviso y el despertar."
   - p: "¿Qué diferencia hay entre LazyLock y OnceLock?"
     r: "LazyLock lleva la función que lo inicializa y se construye solo en el primer uso. OnceLock empieza vacío y se rellena una vez con set o get_or_init."
+frase: "`RwLock` permite muchos lectores o un escritor, `Condvar` deja a un hilo dormido hasta que otro le avise, y `LazyLock` inicializa algo una sola vez."
+imagina: "`RwLock` es una biblioteca: muchos pueden leer, pero para reorganizar las estanterías hay que cerrar. `Condvar` es esperar sentado a que te llamen por tu número."
 ---
 
 import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

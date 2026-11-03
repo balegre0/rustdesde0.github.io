@@ -15,6 +15,8 @@ tarjetas:
     r: "syn analiza un TokenStream y lo convierte en un árbol de sintaxis; quote! construye un TokenStream a partir de código con huecos #variable."
   - p: "¿Por qué una dependencia con macros procedurales es un riesgo de seguridad?"
     r: "Porque su código se ejecuta en tu máquina al compilar, con tus permisos, igual que build.rs."
+frase: "Una macro procedural es una función de Rust que recibe código (`TokenStream`) y devuelve código nuevo; así funcionan `#[derive(...)]` y muchos atributos."
+imagina: "Como un robot de cocina programable: le das los ingredientes (código) y te devuelve el plato preparado (más código), siguiendo el programa que le escribiste."
 ---
 
 import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

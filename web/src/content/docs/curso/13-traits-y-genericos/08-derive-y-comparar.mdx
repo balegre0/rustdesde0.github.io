@@ -17,6 +17,8 @@ tarjetas:
     r: "Por `NaN`: `NaN == NaN` es falso, así que la igualdad no es reflexiva, y `NaN` no es mayor ni menor que nada. Por eso solo tiene `PartialEq` y `PartialOrd`."
   - p: "¿Qué necesitas para meter un tipo en un `HashSet` o como clave de un `HashMap`?"
     r: "`Hash` y `Eq` (que pide `PartialEq`). Con `derive(PartialEq, Eq, Hash)` basta."
+frase: "`#[derive(...)]` pide al compilador que escriba por ti código habitual: mostrar (`Debug`), copiar (`Clone`), comparar (`PartialEq`, `Ord`), valores por defecto (`Default`)…"
+imagina: "Como marcar casillas en un formulario de alta: «quiero factura, quiero garantía». No redactas los contratos, solo eliges qué servicios quieres."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "`Rc` solo implementa `Deref`, no `DerefMut`: da préstamos compartidos. Mutar algo con varios dueños sería aliasing con mutación. Error E0596."
   - p: "¿Rc se puede enviar a otro hilo?"
     r: "No. Su contador no es atómico, así que `Rc` no es `Send`. Para hilos existe `Arc`."
+frase: "`Rc` deja que un mismo valor tenga **varios dueños**: cuenta cuántos hay y lo libera cuando se va el último. A cambio, el valor no se puede modificar."
+imagina: "Como la tele del salón: varias personas la están viendo y la última que se va la apaga. Mientras tanto, nadie puede cambiar de canal sin acuerdo."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

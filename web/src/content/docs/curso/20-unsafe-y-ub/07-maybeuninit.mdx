@@ -15,6 +15,8 @@ tarjetas:
     r: "Para los que no admiten el patrón «todo ceros»: referencias, Box, NonZero*, punteros a función, enums sin variante 0… rustc avisa con el lint invalid_value."
   - p: "¿Cuánto ocupa `MaybeUninit<T>`?"
     r: "Lo mismo que T: no añade ningún indicador; quien sabe si está inicializada eres tú."
+frase: "`MaybeUninit` reserva memoria sin rellenarla; la vas rellenando paso a paso y, solo cuando está completa, afirmas que ya es un valor válido."
+imagina: "Como un formulario en blanco: no lo entregas como válido hasta haber rellenado todas las casillas."
 ---
 
 import { Ejecutar, Ordena, Pregunta, BajoElCapo, Trampa } from '~/components';

@@ -13,6 +13,8 @@ tarjetas:
     r: "Pares (&K, &V). Con &mut mapa, (&K, &mut V): los valores se pueden cambiar, las claves no."
   - p: "¿Por qué no se pueden modificar las claves al recorrer un mapa?"
     r: "Porque su posición depende de la clave (su hash o su orden): cambiarla rompería la estructura."
+frase: "`iter()` presta para leer, `iter_mut()` presta para cambiar e `into_iter()` consume la colección; `for x in &v`, `&mut v` y `v` hacen lo mismo."
+imagina: "Como revisar una caja de fruta: mirar cada pieza (`&v`), pulir cada pieza (`&mut v`) o repartirlas todas, quedándote sin caja (`v`)."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';

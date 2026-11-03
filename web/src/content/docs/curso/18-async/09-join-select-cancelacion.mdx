@@ -15,6 +15,8 @@ tarjetas:
     r: "Soltándolo (drop). No vuelve a sondearse, así que se detiene en su último .await y se ejecutan los Drop de lo que guardaba."
   - p: "¿Qué es un future «cancel-safe»?"
     r: "Uno que, si se suelta en cualquier .await, no pierde datos ni deja nada a medias."
+frase: "`join` espera a varios futures a la vez, `select` se queda con el primero que termine, y cancelar una tarea es simplemente dejar de sondearla."
+imagina: "`join` es esperar a que lleguen todos los invitados; `select` es coger el primer autobús que pase; cancelar es irte de la parada."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

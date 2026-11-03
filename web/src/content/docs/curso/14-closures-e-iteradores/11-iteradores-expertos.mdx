@@ -15,6 +15,8 @@ tarjetas:
     r: "`windows` da ventanas solapadas (`[a,b]`, `[b,c]`…); `chunks` trozos sin solapar (`[a,b]`, `[c,d]`…, el último puede ser más corto). Son métodos de slices."
   - p: "En edición 2024, ¿qué captura un `-> impl Iterator` de una función que recibe `&[i32]`?"
     r: "Todos los parámetros genéricos en ámbito, también el tiempo de vida de la referencia: el iterador puede tomar prestado el slice sin escribir nada más. Se limita con `use<…>`."
+frase: "Puedes devolver iteradores desde funciones, recoger errores con `collect` y mirar ventanas (`windows`), bloques (`chunks`) o el siguiente sin consumirlo (`peekable`)."
+imagina: "Como leer una fila de casas con distintas lentes: de una en una, de dos en dos solapadas (ventanas), por manzanas (bloques) o echando un vistazo a la siguiente."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

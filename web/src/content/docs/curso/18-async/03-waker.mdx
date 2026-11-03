@@ -15,6 +15,8 @@ tarjetas:
     r: "W: Wake + Send + Sync + 'static, porque un Waker puede clonarse y usarse desde cualquier hilo."
   - p: "¿Qué cuatro funciones tiene la vtable de un RawWaker?"
     r: "clone, wake, wake_by_ref y drop."
+frase: "El `Waker` es la forma que tiene un future de decir «vuelve a preguntarme cuando esté listo», en vez de que le pregunten sin parar."
+imagina: "Como el aparato que vibra en algunos restaurantes: no te quedas preguntando en la barra cada minuto; te sientas y te avisa cuando tu pedido está listo."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

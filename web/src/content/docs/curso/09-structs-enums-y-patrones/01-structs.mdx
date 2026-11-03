@@ -15,6 +15,8 @@ tarjetas:
     r: "No. Con la representación por defecto (`repr(Rust)`) el compilador puede reordenarlos para ahorrar relleno. Con `#[repr(C)]` sí se respeta el orden."
   - p: "¿Qué es el relleno (padding)?"
     r: "Bytes vacíos que el compilador mete entre campos o al final para que cada campo empiece en una dirección múltiplo de su alineamiento."
+frase: "Un `struct` crea tu propio tipo juntando varios datos con nombre que van juntos, como `nombre` y `edad` de una persona."
+imagina: "Como una ficha de inscripción con casillas fijas: «Nombre», «Edad», «Ciudad». Cada persona rellena su ficha, pero todas las fichas tienen las mismas casillas."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

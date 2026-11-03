@@ -15,6 +15,8 @@ tarjetas:
     r: "Una expresión async { … } que produce un future anónimo, como una async fn sin nombre."
   - p: "¿Desde qué versión son estables las closures async y los traits AsyncFn?"
     r: "Desde Rust 1.85 (febrero de 2025)."
+frase: "`.await` pausa la tarea hasta que el future esté listo, sin bloquear el hilo; los bloques y closures `async` crean futures que no hacen nada hasta que se esperan."
+imagina: "Como poner la lavadora y, mientras tanto, fregar los platos: no te quedas delante de la lavadora, vuelves cuando pita."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

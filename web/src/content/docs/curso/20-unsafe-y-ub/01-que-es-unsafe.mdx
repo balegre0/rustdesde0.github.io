@@ -15,6 +15,8 @@ tarjetas:
     r: "`unsafe fn` declara un contrato que debe cumplir quien llama; `unsafe { }` es el sitio donde tú afirmas que lo cumples."
   - p: "En la edición 2024, ¿el cuerpo de una unsafe fn es un bloque unsafe?"
     r: "No: cada operación insegura necesita su propio `unsafe { }` (lint unsafe_op_in_unsafe_fn, aviso por defecto)."
+frase: "`unsafe` desbloquea cinco operaciones que el compilador no puede comprobar (como seguir un puntero crudo); no apaga el resto de comprobaciones, y la responsabilidad pasa a ti."
+imagina: "Como la llave de la sala de máquinas: puedes entrar donde está prohibido para el público, pero si algo se rompe ahí dentro, la responsabilidad es tuya."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

@@ -13,6 +13,8 @@ tarjetas:
     r: "Una indirección (un puntero de tamaño fijo): `Box`, `Rc`, `&` o un contenedor como `Vec` que guarda sus elementos en el heap."
   - p: "¿Por qué `struct Arbol { hijos: Vec<Arbol> }` compila sin Box?"
     r: "Porque un `Vec` ya guarda sus elementos en el heap; en la pila solo mide puntero, capacidad y longitud."
+frase: "Un tipo que se contiene a sí mismo tendría tamaño infinito (E0072); metiendo la parte recursiva en un `Box` tiene tamaño fijo: una dirección."
+imagina: "Una caja que contiene una caja igual, que contiene otra… no cabe en ningún sitio. Pero una caja con una nota que dice «la siguiente está en el trastero 5» sí."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

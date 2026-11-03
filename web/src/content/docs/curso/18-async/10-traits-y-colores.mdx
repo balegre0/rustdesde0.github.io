@@ -15,6 +15,8 @@ tarjetas:
     r: "La notación de tipo de retorno (RTN, para exigir Send al future de un método) y async drop."
   - p: "¿Qué es el «coloreado de funciones»?"
     r: "La idea de que las funciones async y las normales forman dos mundos: una función normal no puede hacer .await, así que lo async se contagia hacia arriba."
+frase: "Ya puedes escribir `async fn` dentro de un trait, aunque aún faltan piezas (`dyn`, *async drop*); y una función `async` solo se puede esperar desde otra `async`."
+imagina: "Como un club con dos tipos de carné: los socios `async` pueden entrar en todas las salas; los demás necesitan que alguien les abra la puerta."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

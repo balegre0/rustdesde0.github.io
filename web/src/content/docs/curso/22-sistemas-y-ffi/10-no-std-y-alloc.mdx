@@ -13,6 +13,8 @@ tarjetas:
     r: "Para que funcione también en microcontroladores, núcleos y WebAssembly sin WASI. Quien la use desde std no pierde nada."
   - p: "¿Qué hace `extern crate alloc;` en un crate no_std?"
     r: "Da acceso a alloc (Vec, String, Box…). Alguien tendrá que poner un #[global_allocator]."
+frase: "La biblioteca estándar tiene tres capas: `core` (funciona en cualquier sitio), `alloc` (añade memoria dinámica) y `std` (añade el sistema operativo)."
+imagina: "Como una tienda de campaña modular: la base sirve en cualquier terreno; si hay sitio, añades el avance; y con enchufe cerca, la luz."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

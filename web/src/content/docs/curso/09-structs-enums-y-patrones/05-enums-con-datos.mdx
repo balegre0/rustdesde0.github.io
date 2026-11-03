@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque no todas las variantes tienen `radio` (E0609). Primero hay que preguntar qué variante es, con `match` o `if let`."
   - p: "¿De qué tipo es `Forma::Circulo { radio: 1.0 }`?"
     r: "De tipo `Forma`. Las variantes no son tipos propios: todas son valores del mismo tipo enum, y por eso caben juntas en un `Vec<Forma>`."
+frase: "Un `enum` dice «es **una** de estas opciones», y cada opción puede llevar sus propios datos."
+imagina: "Como un pedido en una cafetería: es un café (con tamaño), un té (con sabor) o un zumo (con fruta). Nunca dos a la vez, y cada uno trae lo suyo."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';

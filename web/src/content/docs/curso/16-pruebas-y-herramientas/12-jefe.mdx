@@ -13,6 +13,8 @@ tarjetas:
     r: "Porque `len()` cuenta **bytes** en UTF-8. `\"ÑÑÑÑ1\"` tiene 9 bytes pero 5 caracteres. Para caracteres: `clave.chars().count()`."
   - p: "¿Qué cuatro comandos forman la rutina de calidad de un proyecto en Rust?"
     r: "`cargo fmt --check` (formato), `cargo clippy` (revisión), `cargo test` (unitarias, integración y doctests) y, si hay `unsafe`, `cargo +nightly miri test`."
+frase: "Una función importante se protege con tres capas de pruebas: ejemplos normales, casos límite y propiedades que deben cumplirse siempre."
+imagina: "Como revisar un puente: con coches normales, con el camión más pesado permitido y comprobando que nunca se doble más de lo previsto."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

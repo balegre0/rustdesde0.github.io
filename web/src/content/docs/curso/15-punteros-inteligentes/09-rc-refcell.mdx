@@ -13,6 +13,8 @@ tarjetas:
     r: "Contadores en ejecución (más memoria y trabajo), posibles pánicos por préstamos que chocan y posibles fugas por ciclos."
   - p: "¿Qué es una arena con índices?"
     r: "Un `Vec` que es dueño de todos los nodos; los nodos se refieren unos a otros por su posición (`usize`) en lugar de con punteros."
+frase: "`Rc<RefCell<T>>` da varios dueños que pueden modificar el valor, pero a menudo es mejor guardar todo en un `Vec` y referirse a los elementos por su número."
+imagina: "En vez de que cada vecino tenga una copia de la llave de cada piso, un conserje guarda todas las llaves numeradas y te da la del piso que pidas."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

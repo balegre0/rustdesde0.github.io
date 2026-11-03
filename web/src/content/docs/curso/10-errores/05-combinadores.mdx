@@ -15,6 +15,8 @@ tarjetas:
     r: "Con `ok_or(error)` (o `ok_or_else(|| error)`): `Some(v)` → `Ok(v)`, `None` → `Err(error)`."
   - p: "¿Qué hace `iter.collect::<Result<Vec<T>, E>>()` sobre resultados?"
     r: "Si todos son `Ok`, da `Ok(vec)`. En cuanto encuentra un `Err`, se para y devuelve ese primer error."
+frase: "`map`, `and_then`, `map_err` y `ok_or` transforman y encadenan resultados sin escribir un `match` en cada paso."
+imagina: "Como una cadena de montaje con desvío automático: cada estación trabaja la pieza buena, y si una pieza sale defectuosa, se va directa a la bandeja de rechazos."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';

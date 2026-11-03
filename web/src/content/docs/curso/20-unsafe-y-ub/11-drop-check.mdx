@@ -15,6 +15,8 @@ tarjetas:
     r: "Un atributo inestable que usa la biblioteca estándar (por ejemplo en Vec) para prometer que su Drop no usará los T prestados, solo los destruirá; necesita unsafe impl y PhantomData<T>."
   - p: "¿`let _ = valor;` mantiene vivo el valor?"
     r: "No: `_` no enlaza, así que un temporal se destruye en ese mismo momento. `let _x = valor;` sí lo mantiene hasta el final del bloque."
+frase: "Si un tipo implementa `Drop`, el compilador asume que puede usar lo que tiene dentro al destruirse, y por eso exige que eso siga vivo hasta el final."
+imagina: "Si alguien va a hacer inventario antes de cerrar la tienda, la mercancía tiene que seguir ahí hasta el momento de cerrar."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

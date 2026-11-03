@@ -13,6 +13,8 @@ tarjetas:
     r: "Fija un valor en la pila para obtener un Pin<&mut T> y poder llamar a poll (estable desde 1.68)."
   - p: "¿La biblioteca estándar trae un ejecutor?"
     r: "No. Trae Future, Poll, Context, Waker y Wake; el ejecutor lo elige cada programa (Tokio, smol, Embassy… o el tuyo)."
+frase: "Un ejecutor es el bucle que sondea los futures, pero solo cuando su `Waker` le avisa de que hay novedades; `block_on` es el más sencillo."
+imagina: "Como un recepcionista que espera junto al timbre: no recorre las habitaciones preguntando, atiende solo a quien llama."
 ---
 
 import { Ejecutar, Pregunta, Ordena, Reto, BajoElCapo, Trampa } from '~/components';

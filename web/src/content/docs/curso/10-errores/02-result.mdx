@@ -15,6 +15,8 @@ tarjetas:
     r: "Compila, pero con el aviso «unused Result that must be used»: `Result` está marcado `#[must_use]`."
   - p: "¿Qué devuelve `\"300\".parse::<u8>()`?"
     r: "`Err(ParseIntError { kind: PosOverflow })`, que se muestra como «number too large to fit in target type»."
+frase: "Los fallos que se pueden esperar (un archivo que no existe, un texto que no es un número) se devuelven como un valor `Result`: `Ok(dato)` o `Err(error)`."
+imagina: "Como pedir algo por correo: te llega el paquete o una carta explicando por qué no ha llegado. En los dos casos te llega algo, y tú decides qué hacer."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

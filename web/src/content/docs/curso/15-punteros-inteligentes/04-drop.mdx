@@ -13,6 +13,8 @@ tarjetas:
     r: "Porque luego Rust volvería a destruir `x` al final del ámbito: sería una doble liberación. Error E0040. Se usa `drop(x)`, que se queda con `x`."
   - p: "¿Qué hace en realidad `std::mem::drop`?"
     r: "Nada: es una función vacía que recibe el valor por valor. Al acabar la función, su parámetro sale de ámbito y se destruye."
+frase: "Implementando `Drop` escribes código que se ejecuta justo cuando un valor deja de existir, y Rust destruye las cosas en un orden exacto y predecible."
+imagina: "Como el último que sale de la oficina: apaga las luces y cierra con llave automáticamente al salir, sin que nadie tenga que recordárselo."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

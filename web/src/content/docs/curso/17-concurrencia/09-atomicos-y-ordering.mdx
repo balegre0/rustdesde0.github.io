@@ -17,6 +17,8 @@ tarjetas:
     r: "Que si el lector ve el valor escrito con Release, también ve todo lo que el escritor hizo antes de ese store."
   - p: "¿Qué es una prueba de tornasol (litmus test)?"
     r: "Un programa diminuto con varios hilos que se usa para preguntar qué resultados permite un modelo de memoria."
+frase: "Los atómicos hacen operaciones indivisibles sin candados (sumar, comparar y cambiar), y el `Ordering` dice qué garantías de orden tienen respecto a otras operaciones."
+imagina: "Como un contador de entrada en un museo que pulsa todo el mundo: cada pulsación cuenta exactamente una, aunque dos personas pulsen a la vez."
 ---
 
 import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

@@ -13,6 +13,8 @@ tarjetas:
     r: "`for x in v.iter()`: entrega `&T` y `v` sigue siendo tuyo después."
   - p: "¿Por qué `for x in v { }` deja `v` inutilizable?"
     r: "Porque llama a `v.into_iter()`, que toma `v` por valor (lo mueve). Usar `v` después da E0382."
+frase: "`iter()` recorre prestando, `iter_mut()` recorre prestando para cambiar e `into_iter()` recorre llevándose los valores y consumiendo la colección."
+imagina: "Como una visita a un museo: mirar los cuadros, restaurarlos o llevártelos a otra exposición (y dejar el museo vacío)."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

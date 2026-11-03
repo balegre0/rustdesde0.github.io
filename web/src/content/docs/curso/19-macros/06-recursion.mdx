@@ -15,6 +15,8 @@ tarjetas:
     r: "128 niveles; con #![recursion_limit = \"256\"] en la raíz de la crate."
   - p: "¿Por qué el punto de entrada de un tt-muncher suele ir al final?"
     r: "Porque suele aceptar cualquier cosa ($($t:tt)*) y, al probarse en orden, taparía las reglas internas."
+frase: "Una macro puede llamarse a sí misma con lo que queda de la entrada, y así contar elementos, invertir listas o entender un pequeño lenguaje propio."
+imagina: "Como comerse una tableta de chocolate pastilla a pastilla: cada vez coges una y te quedas con el resto, hasta que no queda ninguna."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

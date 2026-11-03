@@ -15,6 +15,8 @@ tarjetas:
     r: "Devolver condicionalmente un préstamo (por ejemplo, el resultado de `mapa.get`) y, en el otro camino, mutar el mismo valor. NLL lo rechaza con E0502 aunque es seguro; Polonius lo acepta."
   - p: "¿Qué es Polonius?"
     r: "La siguiente versión del borrow checker: razona sobre de qué préstamos puede venir cada referencia en cada punto (sensible al flujo). Su versión «alpha» está activada en nightly desde agosto de 2026; en estable 1.99.1 sigue NLL."
+frase: "El comprobador de préstamos trabaja sobre MIR, siguiendo cada camino posible; algunos casos que hoy rechaza los acepta Polonius, el comprobador de la siguiente generación."
+imagina: "Como un revisor que recorre el plano de metro línea por línea comprobando que ningún billete se use después de caducar."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa, Historia } from '~/components';

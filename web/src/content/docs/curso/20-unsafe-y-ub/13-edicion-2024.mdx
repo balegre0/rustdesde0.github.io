@@ -13,6 +13,8 @@ tarjetas:
     r: "Porque modificar el entorno mientras otro hilo lo lee (por ejemplo, la biblioteca de C del sistema al consultar la zona horaria) es una carrera de datos."
   - p: "¿Qué alternativa propone rustc a `&STATIC_MUT`?"
     r: "`&raw const STATIC_MUT` (un puntero, no una referencia). Mejor aún: un atómico, Mutex, OnceLock o LazyLock."
+frase: "La edición 2024 pide marcar el `unsafe` en más sitios (`unsafe extern`, atributos como `#[unsafe(no_mangle)]` y, con un aviso, cada operación dentro de una `unsafe fn`) para que cada riesgo quede a la vista."
+imagina: "Como una nueva norma que obliga a señalizar cada cable pelado, no solo la entrada de la sala: el peligro es el mismo, pero ahora se ve dónde está."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

@@ -13,6 +13,8 @@ tarjetas:
     r: "Cuando pasas `&A` donde se espera `&B` y `A: Deref<Target = B>`, el compilador inserta las llamadas a `deref` necesarias, en tantos pasos como haga falta."
   - p: "¿Qué trait necesitas para modificar a través de `*x`?"
     r: "`DerefMut`, además de `Deref`. Sin él solo puedes leer."
+frase: "El trait `Deref` hace que tu tipo se use como un puntero, y gracias a él Rust convierte solo `&Box<String>` o `&String` en `&str` cuando hace falta."
+imagina: "Como un llavero con muchas anillas: para abrir la puerta no sueltas cada anilla a mano, el llavero te deja llegar directamente a la llave."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

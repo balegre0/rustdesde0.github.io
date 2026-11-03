@@ -17,6 +17,8 @@ tarjetas:
     r: "Que los nombres creados dentro de una macro no chocan con los de quien la usa: cada identificador lleva su contexto de sintaxis."
   - p: "¿Por qué la expansión de macros y la resolución de nombres se hacen intercaladas?"
     r: "Porque una macro puede crear nombres nuevos y un nombre puede ser una macro: hay que repetir expandir y resolver hasta que no quede nada por expandir."
+frase: "Primero el texto se trocea en *tokens* (palabras), luego se ordena en un árbol (AST); después se expanden las macros y se resuelve a qué se refiere cada nombre."
+imagina: "Como analizar una frase en clase de lengua: primero separas las palabras y luego dibujas el árbol con sujeto, verbo y complementos."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

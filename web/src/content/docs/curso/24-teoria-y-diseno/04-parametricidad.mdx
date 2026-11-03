@@ -14,6 +14,8 @@ tarjetas:
     r: "Una: la identidad. Sin cotas, no hay otra forma de conseguir un T que devolver el que recibes."
   - p: "¿Qué rompe la parametricidad en Rust?"
     r: "Las cotas (`T: Debug` deja mirar), `TypeId`/`Any` (preguntar el tipo al ejecutar), `size_of::<T>()` y la especialización (inestable)."
+frase: "Una función genérica sin condiciones apenas puede hacer nada con un `T` desconocido, así que su firma ya te dice casi todo lo que hace."
+imagina: "Si te dan una caja cerrada que no sabes abrir, solo puedes guardarla, moverla o devolverla. Por eso «recibe T, devuelve T» casi seguro devuelve la misma caja."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

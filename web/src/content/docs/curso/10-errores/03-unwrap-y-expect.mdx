@@ -15,6 +15,8 @@ tarjetas:
     r: "`unwrap_or(valor)`, `unwrap_or_default()` y `unwrap_or_else(|e| …)`. (Y, por supuesto, `match`, `if let` y `?`.)"
   - p: "¿Cuándo es razonable `unwrap`/`expect`?"
     r: "En pruebas, prototipos y ejemplos, y cuando el fallo es imposible por cómo está escrito el programa (y entonces `expect` explica por qué)."
+frase: "`unwrap` y `expect` sacan el valor a la fuerza y provocan un pánico si no está; úsalos solo cuando de verdad no pueda fallar."
+imagina: "Como abrir una caja dando por hecho que hay algo dentro: si está vacía, te llevas el susto. `expect` al menos deja apuntado qué esperabas encontrar."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

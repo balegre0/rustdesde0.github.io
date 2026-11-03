@@ -17,6 +17,8 @@ tarjetas:
     r: "Un bloque que solo se ejecuta durante el unwinding de un pánico: hace los `drop` pendientes y termina en `resume` para seguir desenrollando."
   - p: "¿Cómo se genera el MIR con la toolchain estable?"
     r: "`rustc --edition 2024 --emit=mir archivo.rs` (o `--crate-type lib` para una biblioteca)."
+frase: "MIR es una versión de tu función en bloques sencillos unidos por saltos; leerla te enseña exactamente qué hace el programa y cuándo se libera cada valor."
+imagina: "Como el plano de metro de una función: estaciones (bloques) unidas por líneas (saltos), sin calles ni edificios que distraigan."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

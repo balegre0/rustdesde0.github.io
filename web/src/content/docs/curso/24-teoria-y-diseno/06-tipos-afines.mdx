@@ -14,6 +14,8 @@ tarjetas:
     r: "Porque Rust es afín, no lineal: no garantiza que los destructores se ejecuten. Olvidar un valor puede perder memoria, pero no crear un uso tras liberar."
   - p: "¿De dónde viene la lógica lineal?"
     r: "De Jean-Yves Girard (1987): una lógica en la que las hipótesis son recursos que se consumen al usarse."
+frase: "El ownership es un sistema de tipos **afín**: cada valor se usa como mucho una vez. Se puede no usar (por eso `mem::forget` es seguro), pero nunca dos veces."
+imagina: "Como un billete de metro de un solo viaje: puedes no usarlo, pero no puedes pasar dos veces con el mismo billete."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Historia } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "Cada hilo tiene su cola de tareas; cuando un hilo se queda sin trabajo, roba tareas de la cola de otro. Así se reparte la carga sola."
   - p: "¿Cuántos núcleos tiene la máquina, desde Rust?"
     r: "std::thread::available_parallelism() devuelve el número de hilos que se pueden ejecutar en paralelo."
+frase: "Para usar todos los núcleos, reparte un trabajo grande en trozos; con Rayon basta con cambiar `iter()` por `par_iter()`."
+imagina: "Como corregir 400 exámenes: si cada profesor se lleva un montón, se acaba mucho antes que si uno solo los corrige todos."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';

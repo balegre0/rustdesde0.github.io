@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque rustc ya le prometió a LLVM que no hay aliasing (`noalias`); el optimizador genera código que da resultados incorrectos si la promesa se rompe."
   - p: "¿Qué es Cranelift en rustc?"
     r: "Un backend alternativo a LLVM, pensado para compilar más rápido en desarrollo (debug), a cambio de optimizar menos. Se instala en nightly con el componente `rustc-codegen-cranelift`."
+frase: "Al final, `rustc` entrega el programa a un *backend* (normalmente LLVM) que genera el código máquina; cada `&mut` llega con la promesa `noalias`, que permite optimizar más."
+imagina: "Como mandar los planos a una fábrica: el diseño es tuyo, pero la fábrica decide cómo construirlo. Y si le prometes que una pieza solo la toca un operario, trabaja más rápido."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa, Historia } from '~/components';

@@ -13,6 +13,8 @@ tarjetas:
     r: "Porque Item no depende de la lifetime del préstamo de self en next(&mut self): todos los elementos tienen el mismo tipo, fijo para el iterador."
   - p: "¿Por qué hace falta `where Self: 'a` en `type Item<'a>`?"
     r: "Porque Item<'a> va a contener préstamos de Self de lifetime 'a, y eso solo tiene sentido si Self vive al menos 'a. El compilador lo exige."
+frase: "Un GAT es un tipo asociado con sus propios parámetros, como `Item<'a>`, y sirve para iteradores que prestan trozos de sí mismos."
+imagina: "Como un bibliotecario que te presta un libro de su propia estantería: lo que te da depende de cuánto tiempo te deja tenerlo, y lo tienes que devolver antes de pedir otro."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo } from '~/components';

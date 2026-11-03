@@ -11,6 +11,8 @@ tarjetas:
     r: "texto.chars().filter(|c| c.is_alphabetic()).count(): por caracteres, no con len(), que cuenta bytes."
   - p: "¿Cómo ordenas pares (palabra, veces) de más a menos veces y, en empate, alfabéticamente?"
     r: "v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)))."
+frase: "Para analizar un texto en español: cuenta letras con `.chars()` y no con `len()`, normaliza mayúsculas y usa un mapa para contar repeticiones."
+imagina: "Como hacer el recuento de votos: separas papeleta a papeleta, unificas cómo están escritos los nombres y apuntas una marca junto a cada uno."
 ---
 
 import { Reto, Pregunta } from '~/components';

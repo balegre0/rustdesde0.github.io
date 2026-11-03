@@ -15,6 +15,8 @@ tarjetas:
     r: "No: `impl Trait` es UN tipo fijo, elegido al compilar (E0308). Para elegir el tipo al ejecutar hace falta `Box<dyn Display>`."
   - p: "¿Qué captura `-> impl Trait` en la edición 2024 y cómo se limita?"
     r: "Todos los parámetros genéricos en ámbito, incluidos los tiempos de vida de los argumentos. Se limita con `+ use<…>`; `use<>` vacío = no captura nada."
+frase: "`impl Trait` significa «algún tipo que sabe hacer esto»: te deja recibir o devolver un valor sin escribir el nombre exacto de su tipo."
+imagina: "Como pedir «un taxi» en vez de «el Toyota gris matrícula 1234»: te da igual cuál sea, mientras te lleve."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

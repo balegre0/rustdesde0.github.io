@@ -14,6 +14,8 @@ tarjetas:
     r: "Uno solo, `()`. Por eso ocupa 0 bytes: no hay nada que distinguir."
   - p: "¿Qué relación hay entre la cardinalidad y el tamaño?"
     r: "Para distinguir n valores hacen falta al menos log₂(n) bits. El compilador redondea a bytes y añade alineación."
+frase: "Un tipo es el conjunto de valores que puede tomar; contarlos (su cardinalidad) te dice cuánta memoria hace falta y qué valores son imposibles."
+imagina: "Como las opciones de un desplegable: un `bool` es un desplegable de dos opciones; un `u8`, de 256. Lo que no está en la lista no se puede elegir."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

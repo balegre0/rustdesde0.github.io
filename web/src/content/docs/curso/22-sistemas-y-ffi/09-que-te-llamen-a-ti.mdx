@@ -15,6 +15,8 @@ tarjetas:
     r: "El proceso aborta. Para que no ocurra, captura el pánico dentro con `std::panic::catch_unwind` y conviértelo en un código de error."
   - p: "¿Por qué `#[unsafe(no_mangle)]` lleva `unsafe`?"
     r: "Porque un símbolo sin mangling puede chocar con otro del mismo nombre en el programa final (por ejemplo, de la biblioteca del sistema), y eso es comportamiento indefinido que el compilador no puede detectar."
+frase: "También puedes exportar funciones de Rust para que otros programas las llamen, compiladas como `staticlib` o `cdylib`, y sin dejar que un pánico cruce la frontera."
+imagina: "Como abrir una ventanilla para clientes de fuera: les atiendes con su protocolo, y si algo va mal dentro, nunca les cae encima el problema."
 ---
 
 import { Pregunta, BajoElCapo, Trampa } from '~/components';

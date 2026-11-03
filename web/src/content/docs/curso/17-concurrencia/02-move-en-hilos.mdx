@@ -15,6 +15,8 @@ tarjetas:
     r: "Haciendo que el closure lo devuelva: join() te entrega ese valor y la propiedad vuelve al hilo que espera."
   - p: "¿Qué error da usar una variable después de moverla a un hilo?"
     r: "E0382, «borrow of moved value»: la propiedad ya es del hilo."
+frase: "Un hilo puede durar más que la función que lo lanzó, así que no puede llevarse préstamos de ella: con `move` se lleva sus datos en propiedad."
+imagina: "Si mandas a alguien de viaje sin fecha de vuelta, no le prestas tu llave de casa: le das sus propias cosas para que se las lleve."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

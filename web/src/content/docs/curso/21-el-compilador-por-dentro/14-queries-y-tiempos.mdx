@@ -15,6 +15,8 @@ tarjetas:
     r: "`cargo build --timings`: genera un informe HTML con cuánto tardó cada crate y qué se compiló en paralelo."
   - p: "¿Por qué `cargo check` es mucho más rápido que `cargo build`?"
     r: "Porque se para tras el análisis y solo produce metadatos (`.rmeta`): no hay monomorfización, ni LLVM, ni enlazado."
+frase: "El compilador funciona como un sistema de preguntas con memoria: si algo no ha cambiado, reutiliza la respuesta anterior; así compila de nuevo solo lo necesario."
+imagina: "Como un alumno que guarda los ejercicios ya resueltos: si el profesor repite uno, no lo vuelve a hacer, copia su respuesta."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';

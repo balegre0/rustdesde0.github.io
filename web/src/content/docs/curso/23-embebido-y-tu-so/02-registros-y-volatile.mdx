@@ -12,6 +12,8 @@ tarjetas:
     r: "Porque el optimizador puede eliminar, juntar o reordenar accesos normales a memoria. Con volatile, cada lectura y escritura se hace exactamente como está escrita."
   - p: "¿`volatile` sirve para compartir datos entre hilos?"
     r: "No. No da atomicidad ni orden entre núcleos. Para eso están los atómicos."
+frase: "Los periféricos se controlan escribiendo en direcciones de memoria fijas, y `read_volatile`/`write_volatile` garantizan que cada acceso ocurra de verdad, sin que el compilador lo quite."
+imagina: "Como los interruptores de un cuadro eléctrico: cada uno controla algo físico. Si pulsas dos veces, tienen que ser dos pulsaciones de verdad, no una «optimizada»."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';

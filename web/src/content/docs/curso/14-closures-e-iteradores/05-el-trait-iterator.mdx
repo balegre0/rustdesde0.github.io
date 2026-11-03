@@ -15,6 +15,8 @@ tarjetas:
     r: "Que preparar `v.iter().map(f)` no ejecuta nada: `f` solo se llama cuando alguien pide elementos con `next()` (un `for`, `sum`, `collect`…)."
   - p: "¿En qué se convierte `for x in algo { … }`?"
     r: "En `let mut it = IntoIterator::into_iter(algo);` seguido de un bucle que llama a `it.next()` hasta recibir `None`."
+frase: "Un iterador es algo con un método `next()` que da el siguiente elemento o `None` al acabar; es **perezoso**: no hace nada hasta que alguien lo consume."
+imagina: "Como un dispensador de tiques de la carnicería: da el siguiente número solo cuando alguien tira. Si nadie tira, no se imprime ninguno."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "Rust imprime `Error: ` seguido de `e` con formato `Debug` en stderr y el proceso termina con código 1."
   - p: "¿Por qué `writeln!(salida, ...)` puede dar E0599?"
     r: "Porque `writeln!` llama al método `write_fmt` del trait `io::Write` (o `fmt::Write`) y el trait no está importado con `use`."
+frase: "Escribe los resultados en `stdout` y los avisos en `stderr` con el trait `Write`; `BufWriter` agrupa las escrituras y lo hace mucho más rápido."
+imagina: "Como mandar cartas: en vez de ir a correos con cada una, las juntas en un saco y vas una vez. El buzón de quejas (stderr) es otro distinto."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

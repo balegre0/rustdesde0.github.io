@@ -14,6 +14,8 @@ tarjetas:
     r: "Porque garantiza que no hay aliasing con mutación: el verificador sabe que un `&mut` es el único camino al valor, y puede razonar sobre él como si fuera un valor normal."
   - p: "¿Qué es una especificación (contrato) de una función?"
     r: "Precondiciones (lo que exige a quien llama) y postcondiciones (lo que garantiza al terminar), escritas de forma que una herramienta pueda comprobarlas."
+frase: "Las herramientas de verificación (Kani, Prusti, Creusot, Verus…) demuestran que una propiedad se cumple para **todas** las entradas, no solo para las que probaste."
+imagina: "Las pruebas son probar un candado con cien llaves distintas; la verificación es demostrar que ninguna llave posible salvo la buena puede abrirlo."
 ---
 
 import { Pregunta, BajoElCapo } from '~/components';

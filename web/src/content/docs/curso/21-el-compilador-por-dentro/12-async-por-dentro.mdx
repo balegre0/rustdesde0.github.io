@@ -15,6 +15,8 @@ tarjetas:
     r: "`Unresumed` (creado, sin sondear), `Suspend0` (parado en el primer `.await`), `Returned` (terminó) y `Panicked` (entró en pánico durante un `poll`)."
   - p: "¿Por qué `Future::poll` recibe `Pin<&mut Self>`?"
     r: "Porque el futuro puede contener referencias a sus propios campos (una variable local prestada a través de un `.await`); si se moviera de sitio, esas referencias quedarían colgando."
+frase: "Una `async fn` se compila a un `enum` con un estado por cada `.await`, que guarda las variables vivas; como puede apuntarse a sí misma, necesita `Pin`."
+imagina: "Como un juego de mesa en pausa: la caja guarda en qué casilla estabas y las cartas de cada jugador, para continuar exactamente donde lo dejaste."
 ---
 
 import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

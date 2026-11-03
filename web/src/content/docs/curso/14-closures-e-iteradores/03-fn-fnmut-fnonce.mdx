@@ -15,6 +15,8 @@ tarjetas:
     r: "`FnOnce` acepta cualquiera. `Fn` solo acepta los que no modifican ni consumen lo capturado. Pedir menos acepta más."
   - p: "¿Qué error sale si pasas un closure que modifica una variable a una función que pide `Fn`?"
     r: "E0594: «cannot assign to … as it is a captured variable in a `Fn` closure». El compilador sugiere cambiar el bound a `FnMut`."
+frase: "`Fn` se puede llamar muchas veces sin cambiar nada; `FnMut` cambia algo en cada llamada; `FnOnce` solo puede llamarse una vez porque consume lo que capturó."
+imagina: "Mirar una foto (`Fn`), tachar un día del calendario (`FnMut`) o soplar las velas de una tarta (`FnOnce`): eso último solo se puede hacer una vez."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

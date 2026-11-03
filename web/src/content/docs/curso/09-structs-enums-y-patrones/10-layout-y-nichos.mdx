@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque su tamaño sería infinito (E0072): una `Lista` contendría otra `Lista` entera. Se rompe el ciclo con un puntero, por ejemplo `Box<Lista>`."
   - p: "¿Qué hacer si una variante de un enum es mucho más grande que las demás?"
     r: "Meter sus datos en un `Box`: el enum guarda solo un puntero y todas las variantes dejan de pagar el tamaño de la grande."
+frase: "Un enum ocupa lo que su variante más grande más una marca de cuál es; pero si el tipo tiene valores imposibles (nichos), Rust guarda la marca ahí gratis."
+imagina: "Como un aparcamiento en el que la plaza 0 no existe: si ves un 0 escrito, sabes que significa «vacío», sin necesitar un cartel aparte."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

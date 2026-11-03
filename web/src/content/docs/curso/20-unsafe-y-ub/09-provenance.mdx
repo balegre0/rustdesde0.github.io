@@ -15,6 +15,8 @@ tarjetas:
     r: "Para crear un puntero con dirección `a` y sin permiso: vale como centinela o para comparar, nunca para leer o escribir."
   - p: "¿Desde qué versión son estables las APIs de strict provenance?"
     r: "Rust 1.84 (enero de 2025)."
+frase: "Un puntero no es solo una dirección: también lleva el permiso de acceder a una zona concreta de memoria (su *provenance*), y no puedes inventarte ese permiso."
+imagina: "Como una llave de hotel: abre tu habitación, no cualquier puerta con ese número. Saber el número de otra habitación no te da permiso para entrar."
 ---
 
 import { Ejecutar, Ordena, Pregunta, BajoElCapo, Trampa } from '~/components';

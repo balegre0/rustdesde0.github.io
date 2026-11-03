@@ -17,6 +17,8 @@ tarjetas:
     r: "Se descontinuó (última versión 1.13.1, febrero de 2025); sus mantenedores recomiendan smol."
   - p: "¿Qué hacer con un cálculo largo o una llamada bloqueante dentro de Tokio?"
     r: "Sacarlo del hilo del ejecutor con tokio::task::spawn_blocking (o un hilo propio)."
+frase: "Los ejecutores reales tienen una cola de tareas listas, y Tokio (y otros como smol o Embassy) añaden temporizadores, red y varios hilos."
+imagina: "Como una oficina de correos con turnos: las tareas sacan número, esperan sentadas y se las llama cuando hay alguien libre para atenderlas."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa, Historia } from '~/components';

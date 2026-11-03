@@ -13,6 +13,8 @@ tarjetas:
     r: "Reexportándola con pub(crate) use nombre_macro; justo después de definirla."
   - p: "¿Dónde coloca #[macro_export] la macro?"
     r: "En la raíz de la crate (crate::nombre!), sea cual sea el módulo donde se escribió, y la hace pública para otras crates."
+frase: "Una macro se ve desde donde se define hacia abajo en el texto; con `use` se importa y con `#[macro_export]` se publica para otros crates."
+imagina: "Como una norma colgada en el pasillo: rige desde que la cuelgas, no antes. Si quieres que valga en todo el edificio, la cuelgas en la entrada."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

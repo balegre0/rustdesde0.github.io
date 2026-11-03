@@ -15,6 +15,8 @@ tarjetas:
     r: "Una prueba formal de que el sistema de tipos de Rust y bibliotecas con unsafe (Arc, Rc, Cell, RefCell, Mutex…) son sound; encontró un bug real en MutexGuard."
   - p: "¿Por qué thread::scope es sound y el antiguo thread::scoped no?"
     r: "scoped confiaba en el Drop de un guard (que se podía filtrar); scope recibe un closure y espera a todos los hilos antes de volver, sin depender de ningún destructor."
+frase: "Un diseño puede ser correcto (*sound*) y aun así tener fallos en el compilador o en la biblioteca; la historia de Rust tiene casos famosos de ambos tipos."
+imagina: "Como un edificio con buenos planos pero un muro mal construido: el problema no está en el diseño, sino en una obra concreta que hay que arreglar."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa, Historia } from '~/components';

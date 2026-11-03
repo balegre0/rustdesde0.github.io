@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque `_` no enlaza: el guard se destruye en esa misma línea. rustc lo rechaza con el lint let_underscore_lock."
   - p: "¿Para qué sirve el Arc en Arc<Mutex<T>>?"
     r: "Para que varios hilos (con thread::spawn) sean dueños del MISMO Mutex; el Mutex aporta la exclusión mutua."
+frase: "Un `Mutex` envuelve un dato con un candado: para tocarlo hay que cerrarlo, solo un hilo a la vez, y se abre solo cuando sueltas el *guard*."
+imagina: "Como el baño de un tren: entras, echas el pestillo y nadie más puede entrar hasta que sales. Y al salir, el pestillo se abre solo."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

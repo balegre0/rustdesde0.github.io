@@ -15,6 +15,8 @@ tarjetas:
     r: "La plataforma para la que se genera el programa: procesador, sistema operativo y ABI. Por ejemplo `x86_64-pc-windows-msvc` o `wasm32-wasip1`."
   - p: "¿Cómo compilas código solo para Windows?"
     r: "Con `#[cfg(target_os = \"windows\")]` o `cfg!(target_os = \"windows\")`."
+frase: "Los perfiles (`dev`, `release`…) deciden **cómo** se compila; `cfg` decide **qué** código se compila según la plataforma de destino."
+imagina: "El perfil es elegir entre un borrador rápido y la versión pasada a limpio. `cfg` es escribir instrucciones distintas para quien use enchufe europeo o americano."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo } from '~/components';

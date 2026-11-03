@@ -15,6 +15,8 @@ tarjetas:
     r: "No: las reglas de préstamos valen igual entre hilos. El compilador da E0502 (o E0499 con dos exclusivos)."
   - p: "¿Por qué la API de scope usa un closure en vez de un guard que se destruye al salir?"
     r: "Porque destruir un guard no está garantizado (mem::forget es seguro). El closure obliga a esperar a los hilos antes de devolver, pase lo que pase."
+frase: "Con `thread::scope` los hilos terminan antes de que acabe el bloque, así que sí pueden tomar prestados datos locales, con las reglas de préstamos de siempre."
+imagina: "Como dejar que los niños jueguen con tus herramientas en el patio, porque sabes que no saldrán del patio antes de que tú cierres la puerta."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, Reto, BajoElCapo, Trampa, Historia } from '~/components';

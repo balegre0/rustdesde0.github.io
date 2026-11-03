@@ -15,6 +15,8 @@ tarjetas:
     r: "Declara que llamar a esa función es seguro con cualquier argumento, así que se puede llamar sin bloque `unsafe`. Solo es correcto si de verdad no existe ningún argumento que provoque UB."
   - p: "¿Qué es un envoltorio seguro (*safe wrapper*)?"
     r: "Una función de Rust normal que recibe tipos seguros (`&[i32]`, `&str`…), comprueba o garantiza los requisitos y hace la llamada `unsafe` por dentro."
+frase: "Llamar a funciones compiladas fuera de Rust requiere `unsafe extern \"C\"` y datos con forma fija (`repr(C)`); luego se envuelven en una API segura para el resto del programa."
+imagina: "Como contratar a un proveedor extranjero: hay un intérprete en la frontera que traduce, y dentro de tu empresa nadie más tiene que hablar su idioma."
 ---
 
 import { NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "Los elementos de índice 1 y 2: el inicio se incluye, el final no."
   - p: "¿Cuánto ocupa `&[i32]` en wasm32?"
     r: "8 bytes: puntero (4) + longitud (4). En un PC de 64 bits, 16."
+frase: "`&v[a..b]` presta un trozo de una lista, y una función que pide `&[T]` acepta un `Vec`, un array o un trozo, todo por igual."
+imagina: "Como prestar «las páginas de la 3 a la 7» de un libro: no da igual de qué libro sea, quien lo recibe solo necesita saber dónde empieza y cuántas páginas son."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

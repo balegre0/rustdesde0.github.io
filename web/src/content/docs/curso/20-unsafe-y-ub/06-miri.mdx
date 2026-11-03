@@ -15,6 +15,8 @@ tarjetas:
     r: "No necesariamente: Miri solo ve los caminos que ejecuta, y casi no admite FFI. Es una red, no una demostración."
   - p: "¿Qué hace la biblioteca estándar en debug con algunas precondiciones unsafe?"
     r: "Las comprueba antes de que ocurra el UB y aborta con «unsafe precondition(s) violated». Es una ayuda opcional, no una garantía."
+frase: "Miri ejecuta tu programa en una máquina que vigila cada acceso a memoria y te avisa del comportamiento indefinido que una ejecución normal no enseña."
+imagina: "Como un inspector que sigue a un obrero por toda la obra apuntando cada paso: es lento, pero detecta lo que nadie vería a simple vista."
 ---
 
 import { Ejecutar, Predice, Ordena, Pregunta, BajoElCapo, Trampa } from '~/components';
