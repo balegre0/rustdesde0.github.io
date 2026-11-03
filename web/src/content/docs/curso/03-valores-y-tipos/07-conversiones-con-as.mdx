@@ -17,6 +17,8 @@ tarjetas:
     r: "`Err(TryFromIntError(PosOverflow))`: la conversión no cabe y te lo dice."
   - p: "¿Qué enteros se pueden convertir a `char` con `as`?"
     r: "Solo `u8`. Para otros, `char::from_u32`, que devuelve un `Option`."
+frase: "`as` convierte entre números sin preguntar y puede recortar (300 como `u8` da 44); `try_from` te avisa si el valor no cabe."
+imagina: "`as` es meter un abrigo en una maleta pequeña a la fuerza: entra, pero recortado. `try_from` es probarlo antes y decirte «no cabe»."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';

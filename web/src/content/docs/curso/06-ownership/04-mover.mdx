@@ -15,6 +15,8 @@ tarjetas:
     r: "Que usas un valor que ya se movió («borrow of moved value» / «use of moved value»)."
   - p: "¿Cuántas liberaciones inserta el compilador para `let s1 = String::from(\"x\"); let s2 = s1;`?"
     r: "Una sola: la de `s2`. La variable movida (`s1`) no se libera."
+frase: "`let s2 = s1;` con un `String` no copia el texto: le **pasa la propiedad** a `s2`, y `s1` ya no se puede usar (E0382)."
+imagina: "Como dar las llaves de tu coche: el coche no se duplica, sigue aparcado en el mismo sitio. Solo cambia quién tiene las llaves, y tú ya no puedes abrirlo."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

@@ -13,6 +13,8 @@ tarjetas:
     r: "Al préstamo de `self` (regla 3 de la elisión): mientras uses el resultado, el cursor sigue prestado en exclusiva."
   - p: "¿Cómo devuelves un trozo del texto prestado sin atarlo a `self`?"
     r: "Escribiendo la lifetime del struct en la salida: `fn siguiente(&mut self) -> Option<&'a str>`."
+frase: "En los métodos, un `&str` devuelto queda atado a `self` por defecto; si en realidad sale del texto que el struct tiene prestado, escribe `'a`."
+imagina: "Es la diferencia entre «esto vale mientras tengas el lector» y «esto vale mientras exista el libro»: si viene del libro, puedes soltar el lector y seguir usándolo."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

@@ -17,6 +17,8 @@ tarjetas:
     r: "Los valores a los que apuntan, no las direcciones. Para comparar direcciones se usa `std::ptr::eq`."
   - p: "¿Qué garantiza una referencia que una dirección cualquiera no garantiza?"
     r: "Que nunca es nula, que está alineada y que apunta a un valor vivo y válido de su tipo durante todo el tiempo que se usa."
+frase: "Una referencia es una dirección de memoria que el compilador garantiza que es válida; `*r` sigue esa dirección hasta el valor."
+imagina: "Como una tarjeta con la dirección de una casa: la tarjeta no es la casa, pero te lleva a ella. `*` es ir hasta la puerta."
 ---
 
 import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa, Ordena } from '~/components';

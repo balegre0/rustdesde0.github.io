@@ -13,6 +13,8 @@ tarjetas:
     r: "Porque sería cara (reservar y copiar todo el heap) y estaría escondida en cada asignación. Rust mueve (barato) y deja la copia profunda explícita con `.clone()`."
   - p: "¿Qué tres opciones tenía el diseño para `let b = a;` con datos en el heap?"
     r: "Copiar solo la ficha y tener dos dueñas (doble liberación), copiar todo en profundidad (caro y oculto) o mover (barato y seguro). Rust mueve."
+frase: "Si al asignar quedaran dos dueñas del mismo texto, las dos lo liberarían (doble liberación); copiarlo todo cada vez sería caro y escondido. Por eso Rust **mueve**."
+imagina: "Si hicieras una copia de la llave del coche para el comprador y te quedaras otra, los dos podríais venderlo. Rust prefiere que la llave cambie de mano."
 ---
 
 import { Ejecutar, Pregunta, BajoElCapo, Trampa } from '~/components';

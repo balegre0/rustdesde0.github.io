@@ -17,6 +17,8 @@ tarjetas:
     r: "Con métodos que dejan el vector coherente: `remove(i)`, `pop()`, `swap_remove(i)` o `std::mem::take(&mut v[i])`."
   - p: "¿En qué orden se liberan un `Vec` y sus elementos?"
     r: "Al liberar el `Vec`, primero se liberan sus elementos (en orden) y luego su propio bloque del heap."
+frase: "Un `Vec` es dueño de sus elementos: `push` se queda con el valor, `for x in v` consume el vector, y no puedes sacar un elemento por índice sin más (E0507)."
+imagina: "Como meter cartas en un buzón: una vez dentro, son del buzón. Para sacar una tienes que vaciar el buzón o cambiarla por otra, no cogerla y dejar el hueco."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

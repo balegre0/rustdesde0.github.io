@@ -17,6 +17,8 @@ tarjetas:
     r: "Cuando su dueño se acaba, normalmente al llegar a la `}` del bloque donde se creó. El compilador inserta esa liberación por ti."
   - p: "Si escribes `let b = a;` con `a` un `String`, ¿quién es el dueño?"
     r: "`b`. El valor se mueve: `a` deja de poder usarse, y así solo hay un dueño que libere la memoria una vez (error E0382 si usas `a`)."
+frase: "Con el heap se cometen tres errores clásicos (no devolver, devolver dos veces, usar lo devuelto), y Rust los evita con una regla: cada dato tiene **un dueño**."
+imagina: "Como las llaves de un trastero alquilado: si nadie es responsable, o nadie lo devuelve, o lo devuelven dos personas, o alguien entra cuando ya es de otro."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Historia } from '~/components';

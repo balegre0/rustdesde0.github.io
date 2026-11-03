@@ -27,6 +27,9 @@ export const collections = {
         desde: texto.optional(),
         requiere: z.array(z.string()).optional(),
         tarjetas: z.array(z.object({ p: z.string(), r: z.string() })).optional(),
+        // La idea de la lección en una sola frase, y una comparación con algo cotidiano (se ven arriba).
+        frase: z.string().optional(),
+        imagina: z.string().optional(),
         insignias: z.array(z.string()).optional(),
       }),
     }),

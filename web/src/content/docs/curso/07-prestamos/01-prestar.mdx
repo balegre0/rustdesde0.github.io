@@ -15,6 +15,8 @@ tarjetas:
     r: "Prestar (*borrow*). La referencia creada es un préstamo."
   - p: "¿Por qué `fn longitud(s: String)` es mala idea si solo vas a leer?"
     r: "Porque mueve el `String` dentro de la función: después de llamarla, el que llama ya no puede usarlo (E0382). Para leer basta con `&String` (o mejor `&str`)."
+frase: "Con `&x` le **prestas** un valor a una función: ella lo usa, pero la dueña sigue siendo la misma y nada se copia ni se libera."
+imagina: "Como prestar un libro a un amigo: lo lee, pero sigue siendo tuyo. Cuando termina, el libro sigue existiendo y vuelve a ti."
 ---
 
 import { Ejecutar, NoCompila, Predice, Prestamos, Pregunta, BajoElCapo, Trampa } from '~/components';

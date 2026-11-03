@@ -13,6 +13,8 @@ tarjetas:
     r: "Depende del sistema: unos 8 MB en Linux y 1 MB en Windows. Los hilos que crea Rust tienen 2 MB por defecto."
   - p: "¿Cómo se evita desbordar la pila con una recursión?"
     r: "Convirtiéndola en un bucle (guardando el estado en variables), o en una pila propia en el heap (un Vec) si la recursión es en árbol."
+frase: "La pila tiene un tamaño fijo (unos pocos MB), así que una recursión demasiado profunda la desborda (*stack overflow*) y Rust detiene el programa."
+imagina: "Como apilar cajas en una habitación de techo bajo: puedes apilar muchas, pero no infinitas. Si te pasas, chocas con el techo."
 ---
 
 import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "Cuando sus referencias pueden venir de sitios con vidas distintas y quieres poder devolver una de ellas sin atarla a la otra."
   - p: "¿Cuándo es mejor que un struct sea dueño (`String`) en vez de prestar (`&str`)?"
     r: "Casi siempre que el struct tenga que vivir mucho, guardarse en colecciones o devolverse lejos. Prestar va bien para vistas de vida corta sobre datos que ya existen."
+frase: "Un struct que guarda una referencia necesita una lifetime en su definición (`Extracto<'a>`), y nunca puede vivir más que lo que tiene prestado."
+imagina: "Como un marcapáginas: solo tiene sentido mientras exista el libro. Si tiras el libro, el marcapáginas ya no marca nada."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

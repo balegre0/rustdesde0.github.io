@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque `r` se usa después del `println!`, así que está vivo cuando se lee `x`: un compartido mientras hay un exclusivo vivo (E0502)."
   - p: "¿Cuál es la forma más común de arreglar un E0502?"
     r: "Reordenar: hacer el último uso del préstamo antes de la línea que necesita el permiso contrario."
+frase: "Un préstamo dura desde que se crea hasta **su último uso**, no hasta la llave `}` que cierra el bloque."
+imagina: "Como pedir prestado un bolígrafo para firmar: en cuanto has firmado, ya lo has devuelto, aunque sigas sentado en la misma mesa."
 ---
 
 import { Ejecutar, NoCompila, Predice, Prestamos, Pregunta, BajoElCapo, Trampa, Ordena } from '~/components';

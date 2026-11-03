@@ -15,6 +15,8 @@ tarjetas:
     r: "Un booleano oculto que el compilador añade cuando no sabe al compilar si un valor se movió: al ejecutar, decide si hay que liberarlo al final del ámbito."
   - p: "¿Qué es un movimiento parcial?"
     r: "Mover solo un campo de una tupla o struct (`let a = par.0;`). Los demás campos se pueden seguir usando, pero el conjunto ya no."
+frase: "El compilador revisa todos los caminos posibles: lo que se mueve en la primera vuelta de un bucle no existe en la segunda, y lo movido en un `if` no se puede usar después."
+imagina: "Como regalar tu única entrada de cine: si se la das a alguien en la primera parada, en la segunda ya no la tienes, aunque quieras volver a regalarla."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

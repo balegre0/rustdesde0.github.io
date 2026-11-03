@@ -15,6 +15,8 @@ tarjetas:
     r: "E0423: no existe una función `println`; el compilador sugiere añadir `!` porque hay una macro con ese nombre."
   - p: "¿En qué se convierte por dentro una llamada a `println!`?"
     r: "En una llamada a una función de std (`std::io::_print`) con los argumentos ya preparados por `format_args!`."
+frase: "El `!` de `println!` indica una **macro**: algo que escribe más código por ti al compilar, y por eso puede revisar los huecos `{}` antes de que el programa exista."
+imagina: "Una macro es como un sello de plantilla: tú pones «Hola, {}» y el nombre, y el sello escribe la frase completa. Si falta el nombre, lo ves antes de estampar."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';

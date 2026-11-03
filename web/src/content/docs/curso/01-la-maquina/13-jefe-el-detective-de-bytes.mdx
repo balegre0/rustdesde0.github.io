@@ -13,6 +13,8 @@ tarjetas:
     r: "Intenta leer los bytes como texto. Devuelve `Ok` con el texto si son UTF-8 válido, o un `Err` si no lo son (por ejemplo, si cortas una «ñ» por la mitad)."
   - p: "Los bytes `2c 01 00 00` leídos como `u32` little-endian, ¿qué número son?"
     r: "300: `0x0000012c`."
+frase: "Para leer bytes desconocidos hazte siempre tres preguntas: ¿cuántos bytes forman cada dato?, ¿en qué orden están?, ¿de qué tipo son?"
+imagina: "Como descifrar una nota en clave: primero averiguas dónde empieza y acaba cada palabra, luego en qué sentido se lee y por último en qué idioma está."
 ---
 
 import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

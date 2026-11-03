@@ -17,6 +17,8 @@ tarjetas:
     r: "Porque los rangos de un `&str` cuentan bytes, y la «ñ» ocupa los bytes 1 y 2: cortar en el byte 2 parte un carácter por la mitad."
   - p: "¿Por qué es mejor `fn f(s: &str)` que `fn f(s: &String)`?"
     r: "Porque `&str` acepta tanto un `&String` (se convierte solo) como un literal o un trozo de texto. Y apunta directamente al texto."
+frase: "Una *slice* (`&[T]`, `&str`) presta un **trozo seguido** de un array, un `Vec` o un texto: guarda dónde empieza y cuántos elementos tiene."
+imagina: "Como señalar en un libro «de la página 10 a la 15»: no arrancas las páginas ni las copias, solo dices dónde empieza el trozo y cuánto mide."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

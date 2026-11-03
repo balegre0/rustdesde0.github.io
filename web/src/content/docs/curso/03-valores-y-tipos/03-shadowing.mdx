@@ -15,6 +15,8 @@ tarjetas:
     r: "La sombra desaparece y el nombre vuelve a referirse a la variable de fuera."
   - p: "¿Qué error da `let mut s = \"   \"; s = s.len();`?"
     r: "E0308 (tipos que no coinciden): se esperaba `&str` y se encontró `usize`."
+frase: "El sombreado crea una variable **nueva** con el mismo nombre que tapa a la anterior, y por eso puede cambiar hasta el tipo."
+imagina: "Es como pegar una etiqueta nueva encima de la vieja en otra caja: el nombre es el mismo, pero la caja (y lo que contiene) es otra."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque clonar cuesta (memoria y tiempo) y crea dos valores independientes. Rust quiere que ese coste y ese cambio de significado se vean en el código."
   - p: "¿Todo tipo `Copy` es también `Clone`?"
     r: "Sí: `Copy` exige `Clone`. Para un tipo `Copy`, `.clone()` hace lo mismo que la copia implícita."
+frase: "`.clone()` hace una copia completa con su propia memoria nueva: dos dueñas independientes. Se escribe a mano porque cuesta tiempo y memoria."
+imagina: "Como fotocopiar un libro entero: te quedas con el tuyo y el otro tiene el suyo. Funciona, pero no lo haces sin pensar, porque cuesta."
 ---
 
 import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa, Prestamos } from '~/components';

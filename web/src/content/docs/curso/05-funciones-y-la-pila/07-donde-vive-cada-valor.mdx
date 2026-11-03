@@ -15,6 +15,8 @@ tarjetas:
     r: "Los que no tienen un tamaño conocido al compilar o pueden crecer (como los bytes de un `String`), o los que deben vivir más que la función que los creó."
   - p: "¿Qué pasa cuando un `String` crece y no cabe en su hueco del heap?"
     r: "Se reserva un hueco nuevo más grande, se copian los bytes y se libera el antiguo: su puntero cambia."
+frase: "Tus datos viven en tres sitios: la **pila** (lo de tamaño fijo), el **heap** (lo que crece, como las letras de un `String`) y el propio programa (los literales como `\"hola\"`)."
+imagina: "Como tus cosas: en el bolsillo lo pequeño y a mano (pila), en el trastero lo grande (heap), y lo que viene impreso en el propio libro que llevas (el programa)."
 ---
 
 import { Ejecutar, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

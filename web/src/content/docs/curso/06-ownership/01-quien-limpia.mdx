@@ -15,6 +15,8 @@ tarjetas:
     r: "Leer o escribir memoria que ya se devolvió al asignador. Puede leer basura o datos de otro: comportamiento indefinido."
   - p: "¿Qué significan R, W y O en una tabla de permisos?"
     r: "R: leer. W: escribir (modificar). O: propiedad (mover o liberar)."
+frase: "Rust evita los fallos de memoria con tres reglas: cada valor tiene **un dueño**, solo hay **uno** a la vez, y cuando el dueño desaparece, el valor se libera."
+imagina: "Como el alquiler de un trastero: siempre hay exactamente una persona responsable, y cuando se va, el trastero se vacía y se devuelve. Nunca dos, nunca ninguna."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

@@ -11,6 +11,8 @@ tarjetas:
     r: "En una tupla: `-> (u64, u64)`, y quien llama la desarma con `let (n, m) = f(...);`."
   - p: "¿Cuántos marcos hay en la pila mientras se ejecuta `mcd` dentro de `simplificar` dentro de `sumar` dentro de `mostrar` dentro de `main`?"
     r: "Al menos cinco, uno por cada llamada activa (más los de cada nivel recursivo de `mcd`)."
+frase: "Divide un problema en funciones pequeñas que reciben datos, devuelven resultados (varios a la vez en una tupla) y se llaman entre ellas."
+imagina: "Como una cadena de montaje: cada operario hace una tarea, se la pasa al siguiente y, al final, alguien entrega el producto terminado."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';

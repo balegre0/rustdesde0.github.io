@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque basta con mover el puntero de pila hacia arriba: no hay que buscar ni ordenar nada."
   - p: "¿Cuánto ocupan `u8`, `i32`, `f64`, `bool`, `char` y `(u8, u32)`?"
     r: "1, 4, 8, 1, 4 y 8 bytes (la tupla lleva 3 bytes de relleno para alinear el `u32`)."
+frase: "Cada llamada reserva en la pila su propio **marco** para sus parámetros y variables, y al volver ese marco se libera solo."
+imagina: "Como una pila de bandejas en un comedor: cada llamada pone una bandeja encima con sus cosas; al terminar, quita la suya, y la de abajo vuelve a estar arriba."
 ---
 
 import { Ejecutar, Predice, Pregunta, Respuesta, BajoElCapo, Trampa } from '~/components';

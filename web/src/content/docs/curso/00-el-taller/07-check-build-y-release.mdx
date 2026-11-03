@@ -12,6 +12,8 @@ tarjetas:
     r: "`dev` (por defecto) compila rápido, sin optimizar y con comprobaciones extra (como el desbordamiento de enteros). `release` (`--release`) tarda más en compilar pero genera un programa mucho más rápido."
   - p: "¿Se puede borrar la carpeta `target`?"
     r: "Sí: solo contiene resultados de compilación. `cargo clean` la borra y se regenera al compilar."
+frase: "`cargo check` solo revisa que el código sea correcto, `cargo build` además crea el programa y `--release` lo crea optimizado para que vaya rápido."
+imagina: "Es como un examen: `check` es que te lo corrijan sin nota, `build` es entregarlo, y `--release` es pasarlo a limpio con buena letra (tarda más, pero queda mejor)."
 ---
 
 import { Ejecutar, Pregunta } from '~/components';

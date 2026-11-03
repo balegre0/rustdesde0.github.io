@@ -13,6 +13,8 @@ tarjetas:
     r: "Un apóstrofo y un nombre antes del bucle: `'fuera: for ...`. Luego `break 'fuera;` o `continue 'fuera;`."
   - p: "¿Qué bloques pueden devolver un valor con `break`?"
     r: "`loop` y los bloques etiquetados (`'b: { ... break 'b valor; ... }`, desde Rust 1.65)."
+frase: "Con dos bucles uno dentro de otro, `break` solo sale del de dentro; si le pones nombre al de fuera (`'fuera:`), `break 'fuera` sale de los dos."
+imagina: "Como un edificio con puertas: «sal» te saca de la habitación; «sal del edificio» te saca del todo. La etiqueta es decir de dónde exactamente."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo } from '~/components';

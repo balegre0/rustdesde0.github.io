@@ -15,6 +15,8 @@ tarjetas:
     r: "El nuevo comprobador de préstamos de Rust, todavía en desarrollo. Acepta casos que el actual rechaza, como «obtener o insertar» en un mapa devolviendo la referencia."
   - p: "¿Qué API de HashMap resuelve «obtener o insertar»?"
     r: "La entry API: `mapa.entry(k).or_insert(v)` o `.or_insert_with(|| …)`, que devuelve `&mut V`."
+frase: "El comprobador de préstamos es prudente: todo lo que acepta es seguro, pero rechaza algunos programas correctos, y hay formas conocidas de rodearlo."
+imagina: "Como un portero muy estricto: nunca deja entrar a nadie peligroso, pero a veces también para a alguien inocente. Hay que saber cómo enseñarle la invitación."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa, Historia } from '~/components';

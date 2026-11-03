@@ -13,6 +13,8 @@ tarjetas:
     r: "7 caracteres y 8 bytes (la ñ ocupa 2 en UTF-8)."
   - p: "¿Qué devuelve `u8::try_from(370)`?"
     r: "`Err(TryFromIntError(PosOverflow))`: 370 no cabe en un `u8`."
+frase: "Para convertir datos sin sorpresas: convierte el tipo **antes** de calcular (`as f64`), comprueba lo que puede fallar y cuenta caracteres, no bytes."
+imagina: "Como cambiar dinero en un viaje: primero cambias de moneda y luego haces cuentas; si haces las cuentas a medias en cada moneda, te sale mal."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';

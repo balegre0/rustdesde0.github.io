@@ -15,6 +15,8 @@ tarjetas:
     r: "Lo mismo que `x = x + 5`; necesita que `x` sea `mut`."
   - p: "¿Qué hace el compilador si pones `mut` y nunca cambias la variable?"
     r: "Compila, pero da un aviso (`unused_mut`): «variable does not need to be mutable»."
+frase: "En Rust las variables no cambian salvo que lo pidas con `mut`; si intentas cambiar una sin `mut`, el compilador te para (E0384)."
+imagina: "Por defecto las cajas vienen cerradas con precinto. Si quieres poder cambiar lo de dentro, tienes que pedir una caja con tapa: `let mut`."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';

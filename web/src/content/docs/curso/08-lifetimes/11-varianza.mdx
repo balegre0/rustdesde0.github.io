@@ -15,6 +15,8 @@ tarjetas:
     r: "Escribir una referencia de vida corta en un sitio que otros creen `'static`: al morir el valor corto, ese sitio quedaría colgando."
   - p: "Covariante, contravariante e invariante, en una línea:"
     r: "Covariante: se acepta un subtipo (más largo). Contravariante: se acepta un supertipo (pasa con las entradas de `fn(T)`). Invariante: tiene que ser exactamente el mismo."
+frase: "Una referencia que vale más tiempo sirve donde se pide una que vale menos; detrás de `&mut`, en cambio, el tipo tiene que coincidir exactamente."
+imagina: "Un abono anual sirve para entrar un solo día. Pero si te dejan cambiar lo que hay dentro de la caja (`&mut`), tiene que ser exactamente lo que se pide."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque al pasar una referencia exclusiva a una función que espera `&mut T`, el compilador represta automáticamente: pasa `&mut *r`."
   - p: "¿Por qué compila `v.push(v.len())`?"
     r: "Por los préstamos en dos fases (*two-phase borrows*): el `&mut v` del método se reserva primero y solo se activa después de evaluar los argumentos, cuando `v.len()` ya terminó."
+frase: "Los préstamos para leer (`&T`) se pueden copiar libremente; los de escribir (`&mut T`) no, y para usarlos varias veces Rust los **represta** en cada llamada."
+imagina: "Copiar el permiso de «puedes leer» no hace daño a nadie. Copiar el de «puedes escribir» crearía dos escritores, así que se presta un ratito y se recupera."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

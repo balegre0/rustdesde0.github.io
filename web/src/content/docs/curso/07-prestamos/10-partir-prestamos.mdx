@@ -15,6 +15,8 @@ tarjetas:
     r: "Parte la slice en dos préstamos exclusivos que no se solapan: `[..i]` y `[i..]`. Por dentro usa `unsafe`, pero la función es segura."
   - p: "¿Cómo intercambias dos elementos de un vector?"
     r: "Con `v.swap(i, j)`. `std::mem::swap(&mut v[i], &mut v[j])` da E0499."
+frase: "El compilador sabe que dos **campos** distintos no se solapan, pero no lo sabe de dos **índices**; para eso existen `split_at_mut` y `swap`."
+imagina: "Es fácil ver que «el cajón de arriba» y «el de abajo» son distintos. Con «el cajón número i» y «el número j», el compilador no puede saber si son el mismo."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

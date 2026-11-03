@@ -15,6 +15,8 @@ tarjetas:
     r: "Cada llamada hace dos más: el número de llamadas crece exponencialmente (fib(25) hace 242 785 llamadas)."
   - p: "¿Qué ocurre con `factorial(21)` en un `u64` en modo debug?"
     r: "Pánico: «attempt to multiply with overflow». 21! no cabe en 64 bits."
+frase: "Una función recursiva se llama a sí misma con un problema más pequeño, y necesita un **caso base** que responda sin volver a llamarse."
+imagina: "Como las muñecas rusas: abres una y dentro hay otra más pequeña, y así hasta la última, que ya no se abre. Sin esa última, no acabarías nunca."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "La O (propiedad): no puede moverse ni liberarse. Si era `mut`, pierde también la W."
   - p: "¿Por qué reasignar un `String` prestado sería un uso tras liberar?"
     r: "Porque asignar un valor nuevo libera el texto viejo, y el préstamo seguiría apuntando a él."
+frase: "Mientras un valor está prestado, su dueña no puede moverlo (E0505) ni cambiarlo por otro (E0506): el préstamo apuntaría a algo que ya no es lo que era."
+imagina: "Si has prestado tu bici a un amigo, no puedes venderla ni cambiarla por otra mientras él la está usando: se quedaría montado en el aire."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Pregunta, BajoElCapo, Trampa } from '~/components';

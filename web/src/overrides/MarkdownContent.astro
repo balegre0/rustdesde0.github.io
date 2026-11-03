@@ -1,12 +1,19 @@
 ---
 // En la portada de cada mundo (curso/<mundo>/index.mdx) la plataforma añade la lista de lecciones.
+// En cada lección: arriba, la idea en una frase; abajo, sus tarjetas para repasar de memoria.
 import Default from '@astrojs/starlight/components/MarkdownContent.astro';
 import ListaLecciones from '../components/interno/ListaLecciones.astro';
-import { esMundoId } from '../lib/lecciones';
-const { id } = Astro.locals.starlightRoute;
+import LaClave from '../components/interno/LaClave.astro';
+import RepasaSinMirar from '../components/interno/RepasaSinMirar.astro';
+import { esLeccionId, esMundoId } from '../lib/lecciones';
+const { id, entry } = Astro.locals.starlightRoute;
 const mundo = esMundoId(id) ? id.replace(/^curso\//, '') : null;
+const leccion = esLeccionId(id);
+const d = entry.data as { frase?: string; imagina?: string; tarjetas?: { p: string; r: string }[] };
 ---
 <Default>
+  {leccion && <LaClave frase={d.frase} imagina={d.imagina} />}
   <slot />
+  {leccion && <RepasaSinMirar tarjetas={d.tarjetas ?? []} />}
   {mundo && <ListaLecciones mundo={mundo} />}
 </Default>

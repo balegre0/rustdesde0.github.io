@@ -11,6 +11,8 @@ tarjetas:
     r: "`fn siguiente(&mut self) -> Option<&'a str>`: atado al texto (`'a`), no al préstamo de `self`."
   - p: "Tres preguntas ante un error de lifetimes:"
     r: "¿De dónde sale la referencia? ¿Hasta dónde se usa? ¿Vive su dueña hasta ahí? Casi siempre la respuesta lleva a reordenar o a devolver un valor propio."
+frase: "Ante un error de lifetimes, hazte tres preguntas: ¿de dónde sale la referencia?, ¿hasta dónde la uso?, ¿vive su dueña hasta ahí?"
+imagina: "Como seguir el rastro de un objeto prestado: quién te lo dejó, hasta cuándo lo necesitas y si su dueño seguirá ahí para entonces."
 ---
 
 import { Reto, Pregunta } from '~/components';

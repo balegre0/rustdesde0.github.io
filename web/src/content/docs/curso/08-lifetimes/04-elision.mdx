@@ -17,6 +17,8 @@ tarjetas:
     r: "No. Son reglas fijas sobre la firma. Si se equivocan con lo que hace el cuerpo, el cuerpo no compila."
   - p: "¿Qué significa `'_`?"
     r: "La lifetime anónima: «aquí hay una lifetime, dedúcela con las reglas de siempre». Sirve para que se vea que un tipo lleva una referencia, como `Lector<'_>`."
+frase: "Casi nunca escribes lifetimes porque tres reglas fijas las ponen por ti; si con ellas no queda claro de dónde sale lo que devuelves, te pide escribirla (E0106)."
+imagina: "Como cuando en una conversación nadie dice «yo» todo el rato porque se sobreentiende. Solo hay que decirlo cuando hay dudas de quién habla."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

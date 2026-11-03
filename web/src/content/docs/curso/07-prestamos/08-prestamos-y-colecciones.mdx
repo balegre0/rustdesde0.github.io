@@ -15,6 +15,8 @@ tarjetas:
     r: "Que intentas mover un valor fuera de algo prestado (*cannot move out of …*), por ejemplo `let s = v[0];` con `v: &Vec<String>`."
   - p: "Tres arreglos de E0507:"
     r: "Devolver o guardar un préstamo (`&v[0]`), clonar (`v[0].clone()`) o, si tienes `&mut`, quitarlo dejando otro en su sitio (`std::mem::take`, `swap`, `remove`)."
+frase: "Recorre con `&v` para leer, con `&mut v` para cambiar y con `v` para consumir; y no modifiques un `Vec` mientras lo estás recorriendo."
+imagina: "Como pasar lista en clase: si mientras lees los nombres alguien mueve a los alumnos de sitio, te saltas a unos y lees dos veces a otros."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

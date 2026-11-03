@@ -15,6 +15,8 @@ tarjetas:
     r: "`u` es *unsigned* (sin signo: solo 0 y positivos) y 32 es el número de bits."
   - p: "¿Qué devuelve `255u8.checked_add(1)`?"
     r: "`None`: el resultado (256) no cabe en un `u8`."
+frase: "Un entero sin signo de N bits va de 0 a 2ᴺ − 1: un `u8` va de 0 a 255. Si un resultado no cabe, hay un **desbordamiento**."
+imagina: "Como el cuentakilómetros de un coche viejo con tres ruedas de cifras: llega a 999 y no hay sitio para el 1000."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa, Bits } from '~/components';

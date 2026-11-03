@@ -15,6 +15,8 @@ tarjetas:
     r: "Porque `r` es la referencia, no el número. Para sumar al número hay que seguir la flecha: `*r += 1` (E0368 en el primer caso)."
   - p: "¿Por qué se llama «exclusivo» al préstamo `&mut`?"
     r: "Porque mientras está vivo es el único camino para acceder al valor: ni la dueña ni nadie más puede leerlo ni modificarlo."
+frase: "`&mut x` presta un valor **para modificarlo**: la dueña tiene que ser `mut` y, mientras dura, nadie más puede tocarlo."
+imagina: "Como dejarle tu cuaderno a alguien para que escriba en él: solo puede tenerlo una persona a la vez, y tú no lo usas hasta que te lo devuelve."
 ---
 
 import { Ejecutar, NoCompila, Predice, Prestamos, Pregunta, BajoElCapo, Trampa } from '~/components';

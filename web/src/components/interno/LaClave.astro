@@ -1,0 +1,22 @@
+---
+// Arriba de cada lección: la idea en una frase y una comparación cotidiana (frontmatter «frase» e «imagina»).
+import { mdEnLinea } from '../islas/md';
+interface Props { frase?: string; imagina?: string }
+const { frase, imagina } = Astro.props;
+---
+{(frase || imagina) && (
+  <aside class="rdc-clave not-content" aria-label="La idea de esta lección">
+    {frase && (
+      <div class="rdc-clave-bloque">
+        <p class="rdc-clave-etiqueta">En una frase</p>
+        <p class="rdc-clave-frase" set:html={mdEnLinea(frase)} />
+      </div>
+    )}
+    {imagina && (
+      <div class="rdc-clave-bloque">
+        <p class="rdc-clave-etiqueta">Imagínalo así</p>
+        <p class="rdc-clave-imagina" set:html={mdEnLinea(imagina)} />
+      </div>
+    )}
+  </aside>
+)}

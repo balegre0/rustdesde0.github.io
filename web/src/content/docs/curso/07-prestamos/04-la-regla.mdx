@@ -17,6 +17,8 @@ tarjetas:
     r: "Porque `push` puede necesitar más capacidad: pide un bloque nuevo, copia los elementos y libera el viejo. `p` apuntaría a memoria liberada (uso tras liberar)."
   - p: "¿Qué tienen que darse a la vez para que haya una carrera de datos?"
     r: "Dos accesos al mismo dato, al menos uno de escritura y sin sincronización. La regla de los préstamos impide que se den a la vez."
+frase: "En cada momento puedes tener **muchos lectores** (`&`) **o un solo escritor** (`&mut`), nunca las dos cosas a la vez."
+imagina: "Como una pizarra en clase: muchos pueden leerla a la vez, pero mientras alguien la borra y escribe, nadie debe copiar de ella, o copiará algo a medias."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Pregunta, BajoElCapo, Trampa, Historia } from '~/components';

@@ -17,6 +17,8 @@ tarjetas:
     r: "La tupla `(4, true)`: el resultado con vuelta y si hubo desbordamiento."
   - p: "¿Por qué `i8::MIN.checked_neg()` es `None`?"
     r: "Porque +128 no cabe en un `i8` (su máximo es 127): el rango con signo es asimétrico."
+frase: "Cuando una operación puede desbordar, eliges tú qué pasa: `checked` te da «nada» (`None`), `wrapping` da la vuelta y `saturating` se queda en el límite."
+imagina: "Como un vaso que se llena: `checked` te avisa de que no cabe y no echa nada, `wrapping` vacía y sigue llenando, `saturating` lo deja lleno hasta el borde."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';

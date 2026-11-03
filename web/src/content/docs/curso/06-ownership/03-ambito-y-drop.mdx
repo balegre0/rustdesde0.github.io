@@ -17,6 +17,8 @@ tarjetas:
     r: "No. La variable vieja queda oculta pero sigue siendo dueña hasta el final de su ámbito."
   - p: "¿Qué es RAII?"
     r: "Atar un recurso a la vida de un valor: se adquiere al crearlo y se libera en su drop, al salir del ámbito."
+frase: "Un valor se libera cuando su dueño sale de su ámbito (la `}` que lo cierra), en orden inverso al de creación, o antes si llamas a `drop`."
+imagina: "Como recoger después de una fiesta: lo último que sacaste es lo primero que guardas. Y al cerrar la puerta (la `}`), todo lo de esa habitación se recoge solo."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

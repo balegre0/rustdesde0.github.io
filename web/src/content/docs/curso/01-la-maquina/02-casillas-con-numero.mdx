@@ -15,6 +15,8 @@ tarjetas:
     r: "4 bytes en wasm32 y 8 bytes en un PC de 64 bits. Es lo mismo que mide un `usize`."
   - p: "¿Puedes contar con que un dato tenga la misma dirección cada vez que ejecutas el programa?"
     r: "No. Las direcciones dependen de la máquina, del sistema y de cada ejecución. Lo que sí se puede razonar es la distancia entre datos que van seguidos."
+frase: "La memoria es una fila enorme de casillas; cada casilla guarda un byte y tiene un número único, su **dirección**."
+imagina: "Como los buzones de un edificio gigante: cada uno tiene su número, y para dejar o recoger algo solo necesitas saber cuál es."
 ---
 
 import { Ejecutar, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

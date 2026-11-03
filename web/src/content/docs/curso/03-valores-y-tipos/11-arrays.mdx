@@ -15,6 +15,8 @@ tarjetas:
     r: "Pánico: «index out of bounds: the len is 3 but the index is 3». Nunca se lee memoria ajena."
   - p: "¿Y si el índice fuera de rango es una constante, como `notas[3]`?"
     r: "El compilador lo detecta y no compila: «this operation will panic at runtime»."
+frase: "Un array `[T; N]` guarda exactamente N valores del mismo tipo, uno detrás de otro, y Rust no te deja leer fuera de sus límites."
+imagina: "Como una huevera de 6: siempre tiene 6 huecos, todos para huevos. Si pides el hueco 7, Rust no te deja meter la mano en la nada."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';

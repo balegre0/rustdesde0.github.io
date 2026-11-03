@@ -15,6 +15,8 @@ tarjetas:
     r: "No: las lifetimes son regiones calculadas al compilar. No existen al ejecutar."
   - p: "Si tu código compila, ¿tus anotaciones de lifetime son correctas?"
     r: "Son seguras, pero no necesariamente las mejores: pueden ser más restrictivas de lo necesario y hacer que el código de quien llama no compile."
+frase: "Las lifetimes no alargan nada, `'static` no significa «para siempre en memoria» y un genérico `T` también puede ser una referencia."
+imagina: "Una lifetime es como la etiqueta de «consumir antes de»: no conserva el yogur ni lo hace durar más, solo te dice hasta cuándo es seguro comerlo."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo } from '~/components';

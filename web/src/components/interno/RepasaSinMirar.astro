@@ -1,0 +1,23 @@
+---
+// Al final de cada lección: sus tarjetas como preguntas para responder de memoria antes de ver la respuesta.
+// Recordar sin mirar (práctica de recuperación) fija mucho más que releer.
+import { mdEnLinea } from '../islas/md';
+interface Props { tarjetas: { p: string; r: string }[] }
+const { tarjetas } = Astro.props;
+---
+{tarjetas.length > 0 && (
+  <section class="rdc-repasa not-content" aria-labelledby="repasa-titulo">
+    <h2 id="repasa-titulo">Repasa sin mirar</h2>
+    <p class="rdc-repasa-instr">Antes de abrir cada respuesta, contéstala en voz alta o en un papel. Si te cuesta, mejor: ese esfuerzo es lo que hace que no se te olvide.</p>
+    <ol class="rdc-repasa-lista">
+      {tarjetas.map((t) => (
+        <li>
+          <details>
+            <summary><span set:html={mdEnLinea(t.p)} /><span class="rdc-repasa-ver" aria-hidden="true">Ver respuesta</span></summary>
+            <p set:html={mdEnLinea(t.r)} />
+          </details>
+        </li>
+      ))}
+    </ol>
+  </section>
+)}

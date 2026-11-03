@@ -15,6 +15,8 @@ tarjetas:
     r: "Entre `<>` después del nombre de la función (`fn f<'a>(…)`), igual que los tipos genéricos."
   - p: "¿Quién comprueba la anotación `'a` de una función?"
     r: "Dos sitios: el cuerpo de la función (que no devuelva algo que no cumpla `'a`) y cada llamada (que no use el resultado más allá de lo que duran sus argumentos)."
+frase: "Cuando una función devuelve una referencia que puede salir de varias entradas, `'a` dice cómo se relacionan: el resultado vale mientras valgan las entradas."
+imagina: "Como un vale que te da una tienda: dice «válido mientras las dos tiendas sigan abiertas». No las mantiene abiertas; solo avisa de cuándo deja de servir."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

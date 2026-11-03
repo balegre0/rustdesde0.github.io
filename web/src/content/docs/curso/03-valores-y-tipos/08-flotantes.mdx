@@ -17,6 +17,8 @@ tarjetas:
     r: "`false`: NaN no es igual a nada, ni a sí mismo. Se comprueba con `is_nan()`."
   - p: "¿Qué error da multiplicar un entero por un decimal, como `3 * 2.5`?"
     r: "E0277: «cannot multiply `{integer}` by `{float}`». Hay que convertir con `as f64`."
+frase: "Los decimales usan `f64` (o `f32`), casi nunca son exactos, y Rust no mezcla enteros con decimales sin que lo conviertas tú."
+imagina: "Como medir con una regla: siempre hay un poquito de error. Por eso nunca preguntes si dos medidas son exactamente iguales, sino si están muy cerca."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';

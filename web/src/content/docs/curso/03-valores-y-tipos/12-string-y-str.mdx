@@ -17,6 +17,8 @@ tarjetas:
     r: "Pánico: el byte 2 cae en mitad de la ñ («is not a char boundary»)."
   - p: "¿Cuánto ocupan `&str` y `String` en un PC de 64 bits?"
     r: "`&str`: 16 bytes (puntero + longitud). `String`: 24 bytes (puntero + capacidad + longitud). El texto en sí está en otro sitio."
+frase: "`&str` es texto fijo que solo miras; `String` es texto tuyo que puede crecer. Y como en UTF-8 las letras ocupan bytes distintos, no puedes pedir `texto[0]`."
+imagina: "`&str` es leer un cartel de la calle: lo ves, pero no lo cambias. `String` es tu libreta: puedes añadir, borrar y reescribir."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';

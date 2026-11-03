@@ -15,6 +15,8 @@ tarjetas:
     r: "`-C overflow-checks` (en Cargo, `overflow-checks` en el perfil). Debug la activa; release no."
   - p: "¿Qué hace el compilador con `let x: u8 = 255 + 1;`?"
     r: "No compila: «this arithmetic operation will overflow» (lint `arithmetic_overflow`, error por defecto)."
+frase: "Si un entero se sale de su rango, en modo debug el programa se detiene con un pánico y en release da la vuelta (255 + 1 = 0 en un `u8`)."
+imagina: "Como un cuentakilómetros que llega al máximo: en el taller (debug) salta una alarma; en la calle (release) vuelve a empezar desde cero."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';

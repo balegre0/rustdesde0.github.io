@@ -15,6 +15,8 @@ tarjetas:
     r: "Que intentas devolver una referencia a una variable local de la función (*cannot return reference to local variable*)."
   - p: "¿Cómo se arregla casi siempre E0515?"
     r: "Devolviendo el valor propio (por ejemplo `String` en vez de `&str`): la propiedad sale de la función y nada queda colgando."
+frase: "Una referencia colgante apunta a algo que ya se liberó; Rust lo impide al compilar con E0597 (dentro de una función) y E0515 (al devolverla)."
+imagina: "Como tener la dirección de un edificio que ya se ha derribado: la tarjeta sigue en tu bolsillo, pero ya no te lleva a ningún sitio."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

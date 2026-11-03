@@ -13,6 +13,8 @@ tarjetas:
     r: "Al terminar la función, cuando su parámetro sale de ámbito."
   - p: "¿Y si la función recibe un `i32`?"
     r: "Se copia (`i32` es `Copy`): la variable de quien llama sigue siendo válida y cambiar el parámetro no la afecta."
+frase: "Pasar un valor a una función es como asignarlo: un `String` se **mueve** dentro y se libera al acabar la función; un `i32` simplemente se copia."
+imagina: "Como dejar tu bicicleta en el taller sin pedir que te la devuelvan: ya no es cosa tuya, y cuando el taller cierra, se la quedan."
 ---
 
 import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

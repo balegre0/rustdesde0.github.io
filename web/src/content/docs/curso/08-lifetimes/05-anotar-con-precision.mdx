@@ -13,6 +13,8 @@ tarjetas:
     r: "El resultado mantiene vivo el préstamo EXCLUSIVO de `v` (por elisión, comparten lifetime). Mientras uses el resultado, no puedes ni leer `v`."
   - p: "Regla práctica para anotar lifetimes:"
     r: "Usa la misma lifetime solo en las referencias de las que de verdad puede salir el resultado. Las demás, déjalas sin anotar o con otra letra."
+frase: "Pon la misma lifetime solo a las referencias que de verdad van juntas; ponerle `'a` a todo ata cosas que no tienen nada que ver y te impide compilar."
+imagina: "Como atar con una cuerda a todos los excursionistas: si en vez de atar solo a los dos que van juntos atas a todo el grupo, nadie puede irse a casa."
 ---
 
 import { NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';

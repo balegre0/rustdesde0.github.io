@@ -15,6 +15,8 @@ tarjetas:
     r: "Encaja con cualquier valor sin ponerle nombre. Se usa como «todo lo demás», al final."
   - p: "¿Qué es una guarda en un `match`?"
     r: "Una condición extra tras el patrón: `x if x < 0 => ...`. El brazo solo se elige si el patrón encaja Y la condición es verdadera."
+frase: "`match` compara un valor con varios casos, de arriba abajo, y se queda con el primero que encaja; además te obliga a cubrir **todos** los casos posibles."
+imagina: "Como una clasificadora de correo: cada carta va a la primera bandeja que le corresponde, y tiene que haber bandeja para todas, aunque sea la de «otros» (`_`)."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

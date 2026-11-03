@@ -15,6 +15,8 @@ tarjetas:
     r: "Un puntero a los bytes en el heap, la longitud (bytes en uso) y la capacidad (bytes reservados)."
   - p: "¿Cuánto mide `size_of::<String>()`?"
     r: "Tres veces un `usize`: 12 bytes en el navegador (wasm32) y 24 en un PC de 64 bits. Mida lo que mida el texto."
+frase: "La **pila** guarda los datos de tamaño fijo, ordenados y rápidos; el **heap** guarda los que pueden crecer, y hay que pedir y devolver ese sitio."
+imagina: "La pila es una torre de platos: pones y quitas siempre arriba. El heap es un trastero: pides un hueco del tamaño que necesites y apuntas dónde está."
 ---
 
 import { Ejecutar, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';

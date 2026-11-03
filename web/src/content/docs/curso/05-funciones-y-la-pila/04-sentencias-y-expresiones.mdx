@@ -15,6 +15,8 @@ tarjetas:
     r: "`()`. Asigna, pero no «devuelve» el 10."
   - p: "¿Qué significa «implicitly returns `()`» en un error?"
     r: "Que el cuerpo de la función no tiene expresión final ni `return`, así que devuelve `()` sin que lo hayas escrito."
+frase: "Una **expresión** produce un valor (`x * x`); una **sentencia** solo hace algo (`let y = 5;`). Un `;` de más al final convierte el resultado en «nada» (E0308)."
+imagina: "Una expresión es una pregunta con respuesta («¿cuánto es 3 × 3?»); una sentencia es una orden («apunta esto»). Si a una función le pides respuesta y solo da órdenes, falla."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

@@ -13,6 +13,8 @@ tarjetas:
     r: "`fn f(xs: &[T])`. Acepta `&v`, `&v[a..b]` y arrays."
   - p: "¿Qué pregunta te haces ante cualquier error de préstamos?"
     r: "¿Qué podría mudarse, liberarse o cambiar mientras otra referencia lo mira? Y después: ¿dónde está el último uso que mantiene vivo el préstamo?"
+frase: "Para cambiar algo sin quedártelo, pide `&mut Vec<T>`; para solo leer varios elementos seguidos, pide `&[T]`. Así no necesitas clonar ni mover nada."
+imagina: "Como pedir las cosas justas: «déjame tu agenda para apuntar una cita» (`&mut`) o «enséñame la semana que viene» (`&[T]`). Nadie tiene que regalarte la agenda."
 ---
 
 import { Reto, Pregunta, Ordena } from '~/components';

@@ -17,6 +17,8 @@ tarjetas:
     r: "No es igual a nada, ni siquiera a sí mismo: `nan == nan` es `false`. Para detectarlo se usa `is_nan()`."
   - p: "¿Cuál es el sesgo del exponente de un `f32`?"
     r: "127: el exponente real es el número guardado menos 127. En un `f64` el sesgo es 1023."
+frase: "Un decimal (`f32`, `f64`) se guarda como signo, exponente y mantisa, y casi nunca de forma exacta: por eso `0.1 + 0.2` no da exactamente `0.3`."
+imagina: "Como escribir 1/3 en decimal: 0,333… nunca termina, así que te quedas con unas cuantas cifras. El ordenador hace lo mismo con 0,1 en binario."
 ---
 
 import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';

@@ -15,6 +15,8 @@ tarjetas:
     r: "-4: la llamada a método se aplica antes que el signo menos, así que es -(2.pow(2)). Para (-2)², escribe (-2i32).pow(2)."
   - p: "¿Por qué no compila `12 < edad < 18`?"
     r: "Porque en Rust los operadores de comparación no se pueden encadenar. Se escribe 12 < edad && edad < 18, o (13..18).contains(&edad)."
+frase: "Los operadores siguen un orden, como en matemáticas (`*` antes que `+`); `&&` y `||` dejan de evaluar en cuanto ya saben la respuesta; y la división entera quita los decimales."
+imagina: "Como en la calculadora del colegio: primero multiplicas y luego sumas. Y si para entrar hace falta «entrada Y DNI» y no tienes entrada, ni miran el DNI."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

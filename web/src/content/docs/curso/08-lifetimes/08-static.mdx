@@ -15,6 +15,8 @@ tarjetas:
     r: "Sí. Es dueño de su texto y no tiene préstamos cortos. Puede liberarse cuando quieras: `'static` habla de lo que el tipo tiene prestado, no de cuánto vive el valor."
   - p: "¿Qué dice E0310?"
     r: "Que un tipo genérico podría no vivir lo suficiente (*may not live long enough*): se necesita `T: 'static`, normalmente para guardarlo en un `Box<dyn Trait>`."
+frase: "`&'static T` vale durante todo el programa (como los literales `\"hola\"`); `T: 'static` significa otra cosa: que `T` no lleva préstamos cortos dentro, como un `String`."
+imagina: "`&'static` es como un cartel pintado en la pared del edificio: está ahí mientras exista el edificio. `T: 'static` es algo que es tuyo del todo y no depende de nadie."
 ---
 
 import { Ejecutar, NoCompila, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

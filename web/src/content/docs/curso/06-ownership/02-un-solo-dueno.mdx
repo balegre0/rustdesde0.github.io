@@ -13,6 +13,8 @@ tarjetas:
     r: "Una variable posee un valor, que puede poseer otros (un Vec posee sus elementos; un String, sus bytes). Al liberar la raíz se libera todo lo que cuelga de ella."
   - p: "Con E0596 «cannot borrow `x` as mutable», ¿qué permiso falta?"
     r: "W (escribir): la variable no se declaró con `mut`."
+frase: "La variable dueña de un valor decide sobre él: puede leerlo, cambiarlo (si es `mut`) y entregarlo. Y lo que posee, a su vez, posee sus partes."
+imagina: "Como tener una caja de herramientas: si es tuya, la abres, cambias herramientas o la regalas. Y si la tiras, se van con ella todas las herramientas de dentro."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';

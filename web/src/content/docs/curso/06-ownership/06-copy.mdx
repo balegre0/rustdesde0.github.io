@@ -15,6 +15,8 @@ tarjetas:
     r: "No (E0184): si se copiara bit a bit, cada copia ejecutaría su drop sobre el mismo recurso."
   - p: "¿`(i32, String)` es `Copy`?"
     r: "No: basta con que uno de sus componentes no lo sea."
+frase: "Los tipos pequeños y simples (enteros, `bool`, `char`, `f64`…) son `Copy`: al asignarlos se copian en vez de moverse, y el original sigue sirviendo."
+imagina: "Como decirle a alguien un número de teléfono: tú lo sigues sabiendo y ahora él también. No es como dar un objeto, que deja de ser tuyo."
 ---
 
 import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, BajoElCapo, Trampa } from '~/components';
