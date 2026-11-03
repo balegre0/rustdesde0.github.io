@@ -751,3 +751,36 @@ kbd {
 .rdc-pasos-nota { margin: 0.75rem 0 0 !important; padding: 0.55rem 0.75rem; border-left: 3px solid var(--sl-color-accent); background: color-mix(in srgb, var(--sl-color-accent) 8%, transparent); border-radius: 0 0.4rem 0.4rem 0; line-height: 1.55; color: var(--sl-color-white); }
 .rdc-pasos-botones { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.7rem 1rem; border-top: 1px solid var(--rdc-borde); }
 .rdc-pasos-estado .rdc-pasos-pila, .rdc-pasos-estado .rdc-pasos-nota, .rdc-pasos-estado .rdc-pasos-heap { max-width: none !important; }
+
+/* ── Página /chuleta/ ── */
+.rdc-chuleta { max-width: var(--rdc-medida); }
+.rdc-chuleta-barra { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin: 1.25rem 0 0.75rem; }
+.rdc-chuleta-opcion { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--sl-color-gray-2); cursor: pointer; }
+.rdc-chuleta-opcion input { width: 1.05rem; height: 1.05rem; accent-color: var(--sl-color-accent); }
+.rdc-chuleta-indice { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.5rem; }
+.rdc-chuleta-indice a { min-width: 2.2rem; padding: 0.25rem 0.5rem; text-align: center; border: 1px solid var(--rdc-borde); border-radius: 0.35rem; font-variant-numeric: tabular-nums; text-decoration: none; color: var(--sl-color-gray-2); }
+.rdc-chuleta-indice a:hover { border-color: var(--sl-color-accent); color: var(--sl-color-white); }
+.rdc-chuleta-mundo { scroll-margin-top: 5rem; }
+.rdc-chuleta-mundo h2 { margin: 2rem 0 0.6rem; font-size: 1.3rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--rdc-borde); }
+.rdc-chuleta-num { display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sl-color-accent-high); }
+.rdc-chuleta ol { margin: 0 !important; padding-left: 1.4rem !important; display: grid; gap: 0.7rem; }
+.rdc-chuleta li { margin: 0 !important; padding-left: 0.2rem; }
+.rdc-chuleta li::marker { color: var(--sl-color-gray-3); font-variant-numeric: tabular-nums; }
+.rdc-chuleta-titulo { font-weight: 600; text-decoration: none; color: var(--sl-color-white); }
+.rdc-chuleta-titulo:hover { text-decoration: underline; }
+.rdc-chuleta-frase { margin: 0.15rem 0 0 !important; line-height: 1.55; color: var(--sl-color-gray-2); }
+.rdc-chuleta-imagina { margin: 0.25rem 0 0 !important; padding-left: 0.7rem; border-left: 2px solid var(--rdc-borde-fuerte); line-height: 1.5; font-size: 0.9375rem; color: var(--sl-color-gray-3); }
+.rdc-chuleta-imagina[hidden] { display: none; }
+
+@media print {
+  header.header, .sidebar-pane, nav.sidebar, starlight-toc, mobile-starlight-toc, .right-sidebar-container, .pagination-links, footer,
+  .rdc-chuleta-barra, .rdc-chuleta-indice, site-search { display: none !important; }
+  .rdc-chuleta { max-width: none; font-size: 10.5pt; }
+  .rdc-chuleta-mundo { break-inside: auto; }
+  .rdc-chuleta-mundo h2 { break-after: avoid; margin-top: 1rem; }
+  .rdc-chuleta li { break-inside: avoid; }
+  .rdc-chuleta ol { columns: 2; column-gap: 2rem; display: block; }
+  .rdc-chuleta li + li { margin-top: 0.5rem !important; }
+  .rdc-chuleta-titulo, .rdc-chuleta-frase { color: #000 !important; }
+  .rdc-chuleta-imagina { color: #333 !important; }
+}

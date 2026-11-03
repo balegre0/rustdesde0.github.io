@@ -12,6 +12,8 @@ export type Leccion = {
   desde: string | null;
   requiere: string[];
   tarjetas: { p: string; r: string }[];
+  frase: string | null; // la idea en una frase (frontmatter «frase»)
+  imagina: string | null; // la comparación cotidiana (frontmatter «imagina»)
 };
 export type Mundo = { slug: string; numero: number | null; titulo: string; descripcion: string; href: string | null; lecciones: Leccion[] };
 
@@ -61,6 +63,8 @@ export function mundos(): Promise<Mundo[]> {
         desde: e.data.desde ?? null,
         requiere: e.data.requiere ?? [],
         tarjetas: e.data.tarjetas ?? [],
+        frase: e.data.frase ?? null,
+        imagina: e.data.imagina ?? null,
       });
     }
     const lista = [...porMundo.values()].sort((a, b) => a.slug.localeCompare(b.slug));

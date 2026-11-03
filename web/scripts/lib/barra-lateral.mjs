@@ -61,6 +61,7 @@ export function topics() {
     { label: 'Repaso de hoy', link: '/repaso/' },
     { label: 'Tu progreso', link: '/progreso/' },
     { label: 'Glosario', link: '/glosario/' },
+    { label: 'Chuleta del curso', link: '/chuleta/' },
     ...mundos().map((m) => grupoAuto(m.label, `curso/${m.slug}`)),
   ];
 

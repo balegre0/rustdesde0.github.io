@@ -1,7 +1,8 @@
 ---
-// Lista de lecciones de un mundo, con duración y estado (completada) leído del progreso local.
+// Lista de lecciones de un mundo: título, su idea en una frase, duración y estado (completada) del progreso local.
 import { Icon } from '@astrojs/starlight/components';
 import { mundos } from '../../lib/lecciones';
+import { mdEnLinea } from '../islas/md';
 interface Props { mundo: string }
 const m = (await mundos()).find((x) => x.slug === Astro.props.mundo);
 const ls = m?.lecciones ?? [];
@@ -18,7 +19,7 @@ const total = ls.reduce((s, l) => s + (l.duracion ?? 0), 0);
             <span class="rdc-ll-num" aria-hidden="true">{i + 1}</span>
             <span class="rdc-ll-texto">
               <span class="rdc-ll-titulo">{l.titulo}</span>
-              {l.descripcion && <span class="rdc-ll-desc">{l.descripcion}</span>}
+              {l.frase ? <span class="rdc-ll-desc" set:html={mdEnLinea(l.frase)} /> : l.descripcion && <span class="rdc-ll-desc">{l.descripcion}</span>}
             </span>
             <span class="rdc-ll-meta">
               {l.duracion && <span>{l.duracion} min</span>}

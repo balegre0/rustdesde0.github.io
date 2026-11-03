@@ -1,0 +1,37 @@
+---
+// /chuleta/ — la idea clave de cada lección, mundo por mundo: para repasar de un vistazo o imprimir.
+import { mundos } from '../../lib/lecciones';
+import { mdEnLinea } from '../islas/md';
+const lista = (await mundos()).filter((m) => m.lecciones.some((l) => l.frase));
+---
+<div class="rdc-chuleta not-content">
+  <div class="rdc-chuleta-barra">
+    <label class="rdc-chuleta-opcion"><input type="checkbox" data-chuleta-imagina /> Mostrar también «Imagínalo así»</label>
+    <button type="button" class="rdc-boton secundario" data-chuleta-imprimir>Imprimir o guardar en PDF</button>
+  </div>
+  <nav class="rdc-chuleta-indice" aria-label="Mundos">
+    {lista.map((m) => <a href={`#chuleta-${m.slug}`}>{m.numero ?? ''}</a>)}
+  </nav>
+  {lista.map((m) => (
+    <section class="rdc-chuleta-mundo" id={`chuleta-${m.slug}`} aria-labelledby={`chuleta-t-${m.slug}`}>
+      <h2 id={`chuleta-t-${m.slug}`}>{m.numero !== null && <span class="rdc-chuleta-num">Mundo {m.numero}</span>} {m.titulo}</h2>
+      <ol>
+        {m.lecciones.filter((l) => l.frase).map((l) => (
+          <li>
+            <a href={l.href} class="rdc-chuleta-titulo">{l.titulo}</a>
+            <p class="rdc-chuleta-frase" set:html={mdEnLinea(l.frase)} />
+            {l.imagina && <p class="rdc-chuleta-imagina" hidden set:html={mdEnLinea(l.imagina)} />}
+          </li>
+        ))}
+      </ol>
+    </section>
+  ))}
+</div>
+<script>
+  const casilla = document.querySelector<HTMLInputElement>('[data-chuleta-imagina]')!;
+  const aplicar = () => { for (const p of document.querySelectorAll<HTMLElement>('.rdc-chuleta-imagina')) p.hidden = !casilla.checked; };
+  try { casilla.checked = localStorage.getItem('rdc.chuleta.imagina') === '1'; } catch { /* sin almacenamiento */ }
+  aplicar();
+  casilla.addEventListener('change', () => { aplicar(); try { localStorage.setItem('rdc.chuleta.imagina', casilla.checked ? '1' : '0'); } catch { /* sin almacenamiento */ } });
+  document.querySelector('[data-chuleta-imprimir]')!.addEventListener('click', () => print());
+</script>
