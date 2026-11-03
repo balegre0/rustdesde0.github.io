@@ -17,7 +17,7 @@ frase: "Casi todos los bucles son una de cuatro recetas: **contar**, **acumular*
 imagina: "Como en un supermercado: contar productos en la cesta, sumar el total, buscar el más barato y localizar el primero que caduca. Cuatro tareas, cuatro recetas."
 ---
 
-import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+import { Ejecutar, Pregunta, Reto, BajoElCapo, Trampa, PasoAPaso } from '~/components';
 
 Casi todos los problemas con bucles son variaciones de **cuatro recetas**. Si las reconoces, la mitad del trabajo está hecha.
 
@@ -29,6 +29,12 @@ Casi todos los problemas con bucles son variaciones de **cuatro recetas**. Si la
 | **Acumular** | `let mut total = 0;` (o `1` para multiplicar, o `String::new()`) | `total += x;` |
 | **El mejor hasta ahora** | `let mut mejor = primero;` | `if x > mejor { mejor = x; }` |
 | **Buscar y parar** | ninguna | `if encontrado { break …; }` |
+
+## Paso a paso
+
+La receta «quedarse con el mejor», vuelta a vuelta. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m04/pasos-mejor" />
 
 ## Pruébalo
 

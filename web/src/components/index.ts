@@ -12,3 +12,4 @@ export { default as BajoElCapo } from './BajoElCapo.astro';
 export { default as Trampa } from './Trampa.astro';
 export { default as Historia } from './Historia.astro';
 export { default as Bits } from './Bits.astro';
+export { default as PasoAPaso } from './PasoAPaso.astro';

@@ -1,0 +1,202 @@
+# Pasos de <PasoAPaso ej="…" /> (src/components/PasoAPaso.astro). Clave: id del ejemplo (ejemplos/<id>.rs).
+# Cada paso: «linea» (la que se acaba de ejecutar), «marcos» (la pila: de la primera llamada a la última, cada una
+# con sus variables [nombre, valor]), «heap» opcional, «salida» (la salida ACUMULADA; si se omite, se mantiene la
+# anterior) y «nota». La salida del último paso tiene que coincidir con la real del ejemplo, o la build falla.
+# Un valor entre paréntesis, como "(movido)", se muestra tachado: la variable ya no se puede usar.
+
+m03/pasos-mut:
+  - linea: 1
+    marcos: [{ fn: main }]
+    nota: "El programa empieza en `main`. Todavía no existe ninguna variable."
+  - linea: 2
+    marcos: [{ fn: main, vars: [[puntos, "0"]] }]
+    nota: "`let mut` crea la variable `puntos` con el valor 0. Gracias a `mut`, podrá cambiar más adelante."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[puntos, "10"]] }]
+    nota: "Primero se calcula la parte derecha (`puntos + 10`, es decir, 0 + 10) y después el resultado se guarda en `puntos`."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[puntos, "15"]] }]
+    nota: "`+=` es un atajo: `puntos += 5` hace lo mismo que `puntos = puntos + 5`."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[puntos, "15"]] }]
+    salida: "Puntos: 15"
+    nota: "`println!` cambia `{puntos}` por el valor que tiene la variable **en este momento**: 15."
+  - linea: 6
+    marcos: [{ fn: main, vars: [[puntos, "15"]] }]
+    nota: "Llegamos a la `}` de `main`: el programa termina y la variable `puntos` desaparece."
+
+m04/pasos-for:
+  - linea: 2
+    marcos: [{ fn: main, vars: [[total, "0"]] }]
+    nota: "`total` empieza en 0. Es el acumulador: aquí iremos sumando."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[total, "0"], [n, "1"]] }]
+    nota: "El `for` toma el primer número del rango `1..=3`: `n` vale 1. La variable `n` solo existe dentro del bucle."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[total, "1"], [n, "1"]] }]
+    nota: "`total += n`: 0 + 1 = 1."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[total, "1"], [n, "1"]] }]
+    salida: "n = 1, total = 1"
+    nota: "Se imprime cómo van las cosas en esta vuelta."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[total, "1"], [n, "2"]] }]
+    nota: "Al llegar a la `}` del bucle se vuelve arriba: `n` pasa a valer 2."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[total, "3"], [n, "2"]] }]
+    nota: "`total += n`: 1 + 2 = 3."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[total, "3"], [n, "2"]] }]
+    salida: "n = 1, total = 1\nn = 2, total = 3"
+    nota: "Segunda línea de salida."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[total, "3"], [n, "3"]] }]
+    nota: "Otra vuelta: `n` vale 3, el último número del rango (con `..=`, el 3 se incluye)."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[total, "6"], [n, "3"]] }]
+    nota: "`total += n`: 3 + 3 = 6."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[total, "6"], [n, "3"]] }]
+    salida: "n = 1, total = 1\nn = 2, total = 3\nn = 3, total = 6"
+    nota: "Tercera línea de salida."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[total, "6"]] }]
+    nota: "No quedan números en el rango: el bucle termina y `n` deja de existir. `total` sigue ahí, porque se creó fuera del bucle."
+  - linea: 7
+    marcos: [{ fn: main, vars: [[total, "6"]] }]
+    salida: "n = 1, total = 1\nn = 2, total = 3\nn = 3, total = 6\nSuma final: 6"
+    nota: "Después del bucle se imprime el resultado: 1 + 2 + 3 = 6."
+
+m04/pasos-mejor:
+  - linea: 2
+    marcos: [{ fn: main, vars: [[notas, "[6, 9, 4]"]] }]
+    nota: "Un array con tres notas. Queremos encontrar la más alta."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[notas, "[6, 9, 4]"], [mejor, "6"]] }]
+    nota: "Empezamos con la **primera nota** como «la mejor hasta ahora». (Empezar con 0 fallaría si todas las notas fueran negativas.)"
+  - linea: 4
+    marcos: [{ fn: main, vars: [[notas, "[6, 9, 4]"], [mejor, "6"], [nota, "6"]] }]
+    nota: "Primera vuelta: `nota` vale 6."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[notas, "[6, 9, 4]"], [mejor, "6"], [nota, "6"]] }]
+    nota: "¿6 > 6? **No**: `mejor` se queda como está."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[notas, "[6, 9, 4]"], [mejor, "6"], [nota, "9"]] }]
+    nota: "Segunda vuelta: `nota` vale 9."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[notas, "[6, 9, 4]"], [mejor, "6"], [nota, "9"]] }]
+    nota: "¿9 > 6? **Sí**: entramos en el `if`."
+  - linea: 6
+    marcos: [{ fn: main, vars: [[notas, "[6, 9, 4]"], [mejor, "9"], [nota, "9"]] }]
+    nota: "Tenemos una nueva mejor nota: `mejor` pasa a valer 9."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[notas, "[6, 9, 4]"], [mejor, "9"], [nota, "4"]] }]
+    nota: "Tercera vuelta: `nota` vale 4."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[notas, "[6, 9, 4]"], [mejor, "9"], [nota, "4"]] }]
+    nota: "¿4 > 9? **No**: `mejor` sigue siendo 9."
+  - linea: 9
+    marcos: [{ fn: main, vars: [[notas, "[6, 9, 4]"], [mejor, "9"]] }]
+    salida: "La mejor nota es 9"
+    nota: "Se acabaron las notas. Después de mirarlas todas, `mejor` tiene la más alta."
+
+m05/pasos-funcion:
+  - linea: 6
+    marcos: [{ fn: main }]
+    nota: "Aunque `doble` está escrita antes, el programa **empieza siempre en `main`**."
+  - linea: 7
+    marcos: [{ fn: main, vars: [[a, "4"]] }]
+    nota: "`a` vale 4."
+  - linea: 1
+    marcos: [{ fn: main, vars: [[a, "4"]] }, { fn: doble, vars: [[n, "4"]] }]
+    nota: "`doble(a)` es una **llamada**: `main` se queda en pausa y se pone un marco nuevo encima de la pila para `doble`. Su parámetro `n` recibe una copia del 4."
+  - linea: 2
+    marcos: [{ fn: main, vars: [[a, "4"]] }, { fn: doble, vars: [[n, "4"], [resultado, "8"]] }]
+    nota: "Dentro de `doble`: `resultado` = 4 × 2 = 8. Esta variable vive en el marco de `doble`, no en el de `main`."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[a, "4"]] }, { fn: doble, vars: [[n, "4"], [resultado, "8"]] }]
+    nota: "La última línea, **sin punto y coma**, es el valor que devuelve la función: 8."
+  - linea: 8
+    marcos: [{ fn: main, vars: [[a, "4"], [b, "8"]] }]
+    nota: "`doble` termina: su marco desaparece de la pila (con `n` y `resultado` dentro) y el 8 que devolvió se guarda en `b`. `main` sigue justo donde se quedó."
+  - linea: 9
+    marcos: [{ fn: main, vars: [[a, "4"], [b, "8"]] }]
+    salida: "4 por dos es 8"
+    nota: "Se imprimen las dos variables de `main`."
+
+m05/pasos-factorial:
+  - linea: 9
+    marcos: [{ fn: main }]
+    nota: "`main` llama a `factorial(3)` y se queda esperando el resultado."
+  - linea: 2
+    marcos: [{ fn: main }, { fn: factorial, vars: [[n, "3"]] }]
+    nota: "Primer marco de `factorial`, con `n` = 3. ¿`n == 0`? No."
+  - linea: 2
+    marcos: [{ fn: main }, { fn: factorial, vars: [[n, "3"]] }, { fn: factorial, vars: [[n, "2"]] }]
+    nota: "Para calcular `3 * factorial(2)` antes hay que saber cuánto vale `factorial(2)`: **otra llamada, otro marco**. Cada llamada tiene su propia `n`."
+  - linea: 2
+    marcos: [{ fn: main }, { fn: factorial, vars: [[n, "3"]] }, { fn: factorial, vars: [[n, "2"]] }, { fn: factorial, vars: [[n, "1"]] }]
+    nota: "Lo mismo con `factorial(1)`: un marco más encima."
+  - linea: 2
+    marcos: [{ fn: main }, { fn: factorial, vars: [[n, "3"]] }, { fn: factorial, vars: [[n, "2"]] }, { fn: factorial, vars: [[n, "1"]] }, { fn: factorial, vars: [[n, "0"]] }]
+    nota: "Y `factorial(0)`. Ahora hay cinco marcos apilados, cada uno esperando al de encima."
+  - linea: 3
+    marcos: [{ fn: main }, { fn: factorial, vars: [[n, "3"]] }, { fn: factorial, vars: [[n, "2"]] }, { fn: factorial, vars: [[n, "1"]] }, { fn: factorial, vars: [[n, "0"]] }]
+    nota: "`n` es 0: es el **caso base**. Devuelve 1 sin volver a llamarse. Sin este caso, la pila crecería hasta desbordarse."
+  - linea: 5
+    marcos: [{ fn: main }, { fn: factorial, vars: [[n, "3"]] }, { fn: factorial, vars: [[n, "2"]] }, { fn: factorial, vars: [[n, "1"]] }]
+    nota: "El marco de `n` = 0 desaparece. `factorial(1)` ya puede terminar su cuenta: 1 × 1 = 1, y lo devuelve."
+  - linea: 5
+    marcos: [{ fn: main }, { fn: factorial, vars: [[n, "3"]] }, { fn: factorial, vars: [[n, "2"]] }]
+    nota: "`factorial(2)` recibe el 1 y calcula 2 × 1 = 2."
+  - linea: 5
+    marcos: [{ fn: main }, { fn: factorial, vars: [[n, "3"]] }]
+    nota: "`factorial(3)` recibe el 2 y calcula 3 × 2 = 6."
+  - linea: 9
+    marcos: [{ fn: main, vars: [[r, "6"]] }]
+    nota: "La pila vuelve a tener solo `main`, y `r` recibe el 6. Los marcos se quitaron en orden inverso a como se pusieron."
+  - linea: 10
+    marcos: [{ fn: main, vars: [[r, "6"]] }]
+    salida: "3! = 6"
+    nota: "3! = 3 × 2 × 1 = 6."
+
+m06/pasos-mover:
+  - linea: 2
+    marcos: [{ fn: main, vars: [[s1, "ficha: dirección → heap, longitud 4, capacidad 4"]] }]
+    heap: [["bytes de s1", "`h` `o` `l` `a`"]]
+    nota: "`String::from` pide sitio en el heap para los 4 bytes de «hola». En la pila, `s1` guarda solo la **ficha**: dónde están los bytes, cuántos hay y cuánto sitio hay reservado. `s1` es la **dueña**."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[s1, "(movido)"], [s2, "ficha: dirección → heap, longitud 4, capacidad 4"]] }]
+    heap: [["bytes de s2", "`h` `o` `l` `a`"]]
+    nota: "Se copia solo la ficha. Los bytes del heap **no se tocan**, y ahora su dueña es `s2`. `s1` queda movido: si intentas usarlo, el compilador da el error E0382."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[s1, "(movido)"], [s2, "ficha: dirección → heap, longitud 4, capacidad 4"]] }]
+    heap: [["bytes de s2", "`h` `o` `l` `a`"]]
+    salida: "hola"
+    nota: "`s2` sigue la dirección de su ficha y encuentra el texto."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[s1, "(movido)"], [s2, "(liberado)"]] }]
+    nota: "Fin de `main`: `s2` sale de su ámbito y **libera** los bytes del heap. `s1` no libera nada porque ya no es dueña: por eso nunca hay doble liberación."
+
+m07/pasos-prestar:
+  - linea: 6
+    marcos: [{ fn: main, vars: [[nombre, "ficha: dirección → heap, longitud 4"]] }]
+    heap: [["bytes de nombre", "`L` `í` `a` (4 bytes: la `í` ocupa 2)"]]
+    nota: "`nombre` es la dueña del texto «Lía»."
+  - linea: 1
+    marcos: [{ fn: main, vars: [[nombre, "ficha: dirección → heap, longitud 4"]] }, { fn: longitud, vars: [[texto, "&nombre (prestado)"]] }]
+    heap: [["bytes de nombre", "`L` `í` `a`"]]
+    nota: "Se llama a `longitud(&nombre)`: un **préstamo**. `texto` guarda solo la dirección de `nombre`. No se copia el texto ni cambia la dueña."
+  - linea: 2
+    marcos: [{ fn: main, vars: [[nombre, "ficha: dirección → heap, longitud 4"]] }, { fn: longitud, vars: [[texto, "&nombre (prestado)"]] }]
+    heap: [["bytes de nombre", "`L` `í` `a`"]]
+    nota: "`texto.len()` sigue la referencia hasta el `String` y cuenta sus **bytes**: 4."
+  - linea: 7
+    marcos: [{ fn: main, vars: [[nombre, "ficha: dirección → heap, longitud 4"], [n, "4"]] }]
+    heap: [["bytes de nombre", "`L` `í` `a`"]]
+    nota: "`longitud` termina: su marco desaparece y con él la referencia. El texto **no** se libera, porque `texto` solo lo tenía prestado."
+  - linea: 8
+    marcos: [{ fn: main, vars: [[nombre, "ficha: dirección → heap, longitud 4"], [n, "4"]] }]
+    heap: [["bytes de nombre", "`L` `í` `a`"]]
+    salida: "Lía tiene 4 bytes"
+    nota: "Como `nombre` nunca dejó de ser la dueña, se puede seguir usando después del préstamo."

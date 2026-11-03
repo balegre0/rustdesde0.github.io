@@ -19,7 +19,7 @@ frase: "En Rust las variables no cambian salvo que lo pidas con `mut`; si intent
 imagina: "Por defecto las cajas vienen cerradas con precinto. Si quieres poder cambiar lo de dentro, tienes que pedir una caja con tapa: `let mut`."
 ---
 
-import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits, PasoAPaso } from '~/components';
 
 Hoy vas a aprender que en Rust una variable, por defecto, **no cambia**. Y vas a leer tu primer error del compilador de verdad, que te dice exactamente cómo arreglarlo.
 
@@ -41,6 +41,12 @@ puntos = 20; // ahora sí
 ¿Por qué este diseño? Porque la mayoría de los valores de un programa **no** necesitan cambiar. Si todo pudiera cambiar, para entender una línea tendrías que revisar todo el código anterior por si alguien la tocó. Con `mut` a la vista, sabes de un vistazo qué variables pueden moverse y cuáles no. Y el compilador lo garantiza.
 
 Para cambiar una variable a partir de su propio valor hay atajos: `x += 1` es `x = x + 1`, y existen también `-=`, `*=`, `/=` y `%=`.
+
+## Paso a paso
+
+Mira cómo cambia una variable `mut` línea a línea. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m03/pasos-mut" />
 
 ## Pruébalo
 

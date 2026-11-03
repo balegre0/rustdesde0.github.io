@@ -1,0 +1,122 @@
+---
+// <PasoAPaso ej="m05/paso-funcion" /> — ejecuta un ejemplo paso a paso: línea actual, la pila (un marco por
+// llamada, con sus variables), el heap si hace falta, la salida acumulada y una explicación de cada paso.
+// Los pasos están en contenido/pasos.yaml. La salida del último paso tiene que coincidir con la REAL del
+// ejemplo (compilado y ejecutado por scripts/compilar-ejemplos.ts): si no, la build falla.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parse } from 'yaml';
+import { ejemplo } from '../lib/ejemplos';
+import { mdEnLinea } from './islas/md';
+
+interface Props { ej: string; titulo?: string }
+type Var = [string, string];
+type Marco = { fn: string; vars?: Var[] };
+type Paso = { linea: number; marcos: Marco[]; heap?: Var[]; salida?: string; nota: string };
+
+const { ej, titulo } = Astro.props;
+const e = ejemplo(ej, 'PasoAPaso');
+const todos = parse(readFileSync(join(process.cwd(), 'contenido', 'pasos.yaml'), 'utf8')) as Record<string, Paso[]>;
+const pasos = todos[ej];
+if (!pasos?.length) throw new Error(`<PasoAPaso ej="${ej}">: no hay pasos para «${ej}» en contenido/pasos.yaml`);
+const lineas = e.codigo.replace(/\n+$/, '').split('\n');
+// La salida se acumula: un paso sin «salida» conserva la del anterior.
+let acumulada = '';
+const vista = pasos.map((p, i) => {
+  if (p.linea < 1 || p.linea > lineas.length) throw new Error(`<PasoAPaso ej="${ej}">: el paso ${i + 1} apunta a la línea ${p.linea}, y el código tiene ${lineas.length}`);
+  if (p.salida !== undefined) acumulada = p.salida;
+  return { ...p, salida: acumulada };
+});
+const real = (e.salida ?? '').replace(/\n$/, '');
+if (acumulada.replace(/\n$/, '') !== real) {
+  throw new Error(`<PasoAPaso ej="${ej}">: la salida del último paso no coincide con la real.\n  pasos: ${JSON.stringify(acumulada)}\n  real:  ${JSON.stringify(real)}`);
+}
+// Variables que cambian respecto al paso anterior (se resaltan).
+const clave = (m: string, v: string) => `${m}\u0000${v}`;
+const valores = (p: Paso) => new Map(p.marcos.flatMap((m, k) => (m.vars ?? []).map(([n, v]) => [clave(`${k}:${m.fn}`, n), v] as const)));
+const id = 'pp-' + ej.replace(/[^a-z0-9]+/gi, '-');
+---
+<section class="rdc-pasos not-content" data-pasos id={id} aria-label={titulo ?? 'Paso a paso'}>
+  <div class="rdc-pasos-cab">
+    <p class="rdc-pasos-titulo">{titulo ?? 'Paso a paso'}</p>
+    <p class="rdc-pasos-contador" aria-live="polite"><span data-pasos-n>1</span> de {vista.length}</p>
+  </div>
+  <div class="rdc-pasos-cuerpo">
+    <pre class="rdc-pasos-codigo" aria-label="Código"><code>{lineas.map((l, k) => <span class="rdc-pasos-linea" data-linea={k + 1}><span class="rdc-pasos-num" aria-hidden="true">{k + 1}</span>{l || ' '}{'\n'}</span>)}</code></pre>
+    <div class="rdc-pasos-estado">
+      {vista.map((p, i) => {
+        const antes = i > 0 ? valores(vista[i - 1]) : new Map();
+        return (
+          <div class="rdc-pasos-paso" data-paso={i} data-linea-actual={p.linea} hidden={i !== 0}>
+            <p class="rdc-pasos-etiqueta">Pila <span>(la llamada de arriba es la que se está ejecutando)</span></p>
+            <ol class="rdc-pasos-pila" reversed>
+              {[...p.marcos].map((m, k) => ({ m, k })).reverse().map(({ m, k }) => (
+                <li class="rdc-pasos-marco" data-activo={k === p.marcos.length - 1 ? '' : undefined}>
+                  <p class="rdc-pasos-fn"><code>{m.fn}</code></p>
+                  {m.vars?.length ? (
+                    <dl>{m.vars.map(([n, v]) => {
+                      const cambio = i > 0 && antes.get(clave(`${k}:${m.fn}`, n)) !== v;
+                      return <div data-cambio={cambio ? '' : undefined} data-movido={/^\(.*\)$/.test(v) ? '' : undefined}><dt><code>{n}</code></dt><dd set:html={mdEnLinea(v)} /></div>;
+                    })}</dl>
+                  ) : <p class="rdc-pasos-vacio">sin variables todavía</p>}
+                </li>
+              ))}
+            </ol>
+            {p.heap?.length ? (
+              <>
+                <p class="rdc-pasos-etiqueta">Heap</p>
+                <dl class="rdc-pasos-heap">{p.heap.map(([n, v]) => <div><dt>{n}</dt><dd set:html={mdEnLinea(v)} /></div>)}</dl>
+              </>
+            ) : null}
+            <p class="rdc-pasos-etiqueta">Salida</p>
+            <pre class="rdc-pasos-salida">{p.salida || ' '}</pre>
+            <p class="rdc-pasos-nota" set:html={mdEnLinea(p.nota)} />
+          </div>
+        );
+      })}
+    </div>
+  </div>
+  <div class="rdc-pasos-botones">
+    <button type="button" class="rdc-boton secundario" data-pasos-ir="-1" disabled>← Anterior</button>
+    <button type="button" class="rdc-boton" data-pasos-ir="1">Siguiente →</button>
+    <button type="button" class="rdc-boton sutil" data-pasos-reiniciar hidden>Volver a empezar</button>
+  </div>
+</section>
+<script>
+  for (const s of document.querySelectorAll<HTMLElement>('[data-pasos]')) {
+    const pasos = [...s.querySelectorAll<HTMLElement>('[data-paso]')];
+    const lineas = [...s.querySelectorAll<HTMLElement>('[data-linea]')];
+    const pre = s.querySelector<HTMLElement>('.rdc-pasos-codigo')!;
+    const n = s.querySelector<HTMLElement>('[data-pasos-n]')!;
+    const ant = s.querySelector<HTMLButtonElement>('[data-pasos-ir="-1"]')!;
+    const sig = s.querySelector<HTMLButtonElement>('[data-pasos-ir="1"]')!;
+    const reiniciar = s.querySelector<HTMLButtonElement>('[data-pasos-reiniciar]')!;
+    let i = 0;
+    const mostrar = (k: number) => {
+      i = Math.max(0, Math.min(pasos.length - 1, k));
+      pasos.forEach((p, j) => (p.hidden = j !== i));
+      const actual = pasos[i].dataset.lineaActual;
+      for (const l of lineas) l.toggleAttribute('data-actual', l.dataset.linea === actual);
+      // Desplaza solo el recuadro del código (no la página) para que se vea la línea actual.
+      const l = lineas.find((x) => x.dataset.linea === actual);
+      if (l) {
+        const arriba = l.offsetTop, abajo = arriba + l.offsetHeight;
+        if (arriba < pre.scrollTop) pre.scrollTop = arriba - 8;
+        else if (abajo > pre.scrollTop + pre.clientHeight) pre.scrollTop = abajo - pre.clientHeight + 8;
+      }
+      n.textContent = String(i + 1);
+      ant.disabled = i === 0;
+      sig.disabled = i === pasos.length - 1;
+      reiniciar.hidden = i !== pasos.length - 1;
+    };
+    ant.addEventListener('click', () => mostrar(i - 1));
+    sig.addEventListener('click', () => mostrar(i + 1));
+    reiniciar.addEventListener('click', () => { mostrar(0); sig.focus(); });
+    s.addEventListener('keydown', (e) => {
+      if ((e.target as HTMLElement).closest('textarea, input')) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); mostrar(i + 1); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); mostrar(i - 1); }
+    });
+    mostrar(0);
+  }
+</script>

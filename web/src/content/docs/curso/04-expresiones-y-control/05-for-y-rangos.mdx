@@ -19,7 +19,7 @@ frase: "`for` recorre cada elemento de algo (un rango como `0..5`, un array, un 
 imagina: "Como repartir una baraja: das una carta a cada jugador de la lista, en orden, sin saltarte ninguno y sin pasarte del último."
 ---
 
-import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa, PasoAPaso } from '~/components';
 
 Vas a repetir algo **un número conocido de veces** o **una vez por cada elemento** de una colección, con la herramienta que más usarás en Rust: `for`.
 
@@ -50,6 +50,12 @@ Vas a repetir algo **un número conocido de veces** o **una vez por cada element
 Un **rango** (*range*) se escribe `inicio..fin` y contiene los números desde `inicio` hasta `fin` **sin incluirlo**. Si quieres incluir el final, usa `inicio..=fin`. ¿Por qué excluir el final por defecto? Porque así `0..n` da **exactamente n números**, y `0..array.len()` recorre justo las posiciones válidas de un array.
 
 Los rangos tienen trucos: `.rev()` los recorre al revés y `.step_by(k)` salta de k en k. Son **métodos** (funciones que se llaman con un punto); los verás con detalle en el mundo 14.
+
+## Paso a paso
+
+Sigue cada vuelta del `for`: qué vale `n` en cada momento y cómo crece `total`. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m04/pasos-for" />
 
 ## Pruébalo
 

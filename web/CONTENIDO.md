@@ -76,6 +76,7 @@ import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, R
 | `<Reto ej="m03/suma" enunciado="…" />` | requiere `suma.inicio.rs` + `suma.rs` | Editor (CodeMirror, Rust). Se ejecuta en el **Rust Playground** (aviso: el código se envía a play.rust-lang.org); superado si la salida coincide con la de la solución. «Ver solución» tras 3 intentos. |
 | `<BajoElCapo>`, `<Trampa titulo>`, `<Historia titulo>` | | Bloques plegable / aviso / historia. |
 | `<Bits objetivo={200} />` | | 8 interruptores. |
+| `<PasoAPaso ej="m05/pasos-funcion" />` | `titulo` | Ejecución paso a paso: línea actual, pila (marcos y variables), heap, salida y una nota por paso. Los pasos van en `contenido/pasos.yaml`; la salida del último paso debe coincidir con la real del ejemplo o la build falla. |
 
 ### Metadatos `ejemplos/<mundo>/<id>.json` (opcionales)
 

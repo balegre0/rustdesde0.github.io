@@ -19,7 +19,7 @@ frase: "Una función recursiva se llama a sí misma con un problema más pequeñ
 imagina: "Como las muñecas rusas: abres una y dentro hay otra más pequeña, y así hasta la última, que ya no se abre. Sin esa última, no acabarías nunca."
 ---
 
-import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+import { Ejecutar, Predice, Pregunta, Reto, BajoElCapo, Trampa, PasoAPaso } from '~/components';
 
 Vas a escribir funciones que **se llaman a sí mismas** para resolver un problema a base de resolver versiones más pequeñas de él.
 
@@ -51,6 +51,12 @@ Una función es **recursiva** cuando se llama a sí misma. Suena a trampa, pero 
 Toda recursión necesita dos piezas. El **caso base**: una entrada tan sencilla que se responde directamente (0! = 1). Y el **caso recursivo**: la función se llama con un problema **más pequeño**, que la acerca al caso base (n! = n × (n − 1)!). Si falta el caso base, o el caso recursivo no se acerca a él, la función se llamaría para siempre.
 
 Cada llamada es una llamada de verdad, con su propio espacio en la pila (lo verás en la siguiente lección). Las llamadas que esperan se van **apilando**, y se resuelven en orden inverso: la última en empezar es la primera en terminar.
+
+## Paso a paso
+
+Mira cómo se apilan las llamadas de `factorial(3)` hasta el caso base y cómo se resuelven de vuelta. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m05/pasos-factorial" />
 
 ## Pruébalo
 

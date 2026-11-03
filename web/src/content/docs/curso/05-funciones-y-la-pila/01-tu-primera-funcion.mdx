@@ -19,7 +19,7 @@ frase: "Una función es un trozo de código con nombre que defines con `fn` una 
 imagina: "Como una receta guardada en el recetario: cuando la necesitas, vas a esa página, la sigues y vuelves a lo que estabas haciendo en la cocina."
 ---
 
-import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo } from '~/components';
+import { Ejecutar, NoCompila, Predice, Pregunta, Ordena, BajoElCapo, PasoAPaso } from '~/components';
 
 Vas a crear tus propias funciones y a seguir con el dedo el camino que recorre el programa cuando las llama.
 
@@ -50,6 +50,12 @@ Desde el mundo 02 llevas escribiendo una función: `main`. Ahora vas a escribir 
 Para usarla la **llamas** (*call*): escribes su nombre seguido de paréntesis, `saludar();`. En ese momento el programa deja `main`, salta al cuerpo de `saludar`, lo ejecuta entero y **vuelve** al punto exacto de donde salió, para seguir con la siguiente línea.
 
 ¿Para qué sirve? Para **no repetirte** (escribes algo una vez y lo usas muchas) y, sobre todo, para **poner nombre a las ideas**: `dibujar_tablero();` se entiende mucho mejor que veinte líneas de `print!`. Los nombres de funciones en Rust se escriben en minúsculas y con guiones bajos (*snake_case*): `dibujar_tablero`, no `DibujarTablero`.
+
+## Paso a paso
+
+Mira el viaje de ida y vuelta de una llamada: cómo aparece el marco de la función en la pila y cómo desaparece al volver. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m05/pasos-funcion" />
 
 ## Pruébalo
 

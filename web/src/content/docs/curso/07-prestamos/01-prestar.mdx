@@ -19,7 +19,7 @@ frase: "Con `&x` le **prestas** un valor a una función: ella lo usa, pero la du
 imagina: "Como prestar un libro a un amigo: lo lee, pero sigue siendo tuyo. Cuando termina, el libro sigue existiendo y vuelve a ti."
 ---
 
-import { Ejecutar, NoCompila, Predice, Prestamos, Pregunta, BajoElCapo, Trampa } from '~/components';
+import { Ejecutar, NoCompila, Predice, Prestamos, Pregunta, BajoElCapo, Trampa, PasoAPaso } from '~/components';
 
 Vas a resolver el problema que dejó abierto el mundo 06: usar un valor en una función **sin perderlo**. La herramienta es el préstamo, y se escribe con un solo carácter: `&`.
 
@@ -44,6 +44,12 @@ let n = longitud(&nombre);                      // presta nombre
 - Cuando `longitud` termina, desaparece la referencia, no el texto. Nadie libera nada, porque la dueña sigue viva.
 
 Como en la vida real: si prestas un libro, sigue siendo tuyo. Quien lo lee no puede regalarlo ni tirarlo, y te lo devuelve cuando termina.
+
+## Paso a paso
+
+Mira cómo una función usa un `String` prestado sin quedárselo. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m07/pasos-prestar" />
 
 ## Pruébalo
 
