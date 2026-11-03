@@ -1,0 +1,21 @@
+---
+// Arriba de cada lección: la idea clave de las lecciones que necesita (frontmatter «requiere»),
+// para refrescar lo previo antes de añadir algo nuevo encima.
+import { getEntry } from 'astro:content';
+import { mdEnLinea } from '../islas/md';
+interface Props { requiere: string[] }
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const previas = (await Promise.all(Astro.props.requiere.map((id) => getEntry('docs', `curso/${id}`))))
+  .filter((e) => e && (e.data as { frase?: string }).frase)
+  .map((e) => ({ titulo: e!.data.title, frase: (e!.data as { frase: string }).frase, href: `${base}/${e!.id}/` }));
+---
+{previas.length > 0 && (
+  <aside class="rdc-antes not-content" aria-label="Antes de empezar">
+    <p class="rdc-antes-titulo">Antes de empezar, recuerda</p>
+    <ul>
+      {previas.map((p) => (
+        <li><span set:html={mdEnLinea(p.frase)} /> <a href={p.href}>({p.titulo})</a></li>
+      ))}
+    </ul>
+  </aside>
+)}

@@ -1,0 +1,43 @@
+---
+// Al final de cada lección: escribe la idea con tus palabras y compárala con «En una frase».
+// Explicar con palabras propias (elaboración) fija mucho más que releer. Se guarda solo en este navegador.
+import { mdEnLinea } from '../islas/md';
+interface Props { id: string; frase: string }
+const { id, frase } = Astro.props;
+---
+<section class="rdc-explica not-content" data-explica={id} aria-labelledby="explica-titulo">
+  <h2 id="explica-titulo">Explícalo con tus palabras</h2>
+  <p class="rdc-explica-instr">Imagina que se lo cuentas a un amigo que no sabe nada de programación. Escribe en dos o tres frases la idea de esta lección, sin mirar arriba. Después compárala.</p>
+  <textarea rows="4" aria-labelledby="explica-titulo" placeholder="Con mis palabras: …" data-explica-texto></textarea>
+  <div class="rdc-explica-barra">
+    <button type="button" class="rdc-boton secundario" data-explica-comparar>Comparar con la idea clave</button>
+    <span class="rdc-explica-guardado" data-explica-estado aria-live="polite"></span>
+  </div>
+  <div class="rdc-explica-comparar" data-explica-solucion hidden>
+    <p class="rdc-explica-etiqueta">La idea clave</p>
+    <p set:html={mdEnLinea(frase)} />
+    <p class="rdc-explica-pista">¿Has dicho lo mismo, aunque sea con otras palabras? Si te falta algo, añádelo a tu explicación: ese es justo el trozo que se te iba a olvidar.</p>
+  </div>
+</section>
+<script>
+  for (const s of document.querySelectorAll<HTMLElement>('[data-explica]')) {
+    const clave = `rdc.explica.${s.dataset.explica}`;
+    const texto = s.querySelector<HTMLTextAreaElement>('[data-explica-texto]')!;
+    const estado = s.querySelector<HTMLElement>('[data-explica-estado]')!;
+    const solucion = s.querySelector<HTMLElement>('[data-explica-solucion]')!;
+    const boton = s.querySelector<HTMLButtonElement>('[data-explica-comparar]')!;
+    try { texto.value = localStorage.getItem(clave) ?? ''; } catch { /* sin almacenamiento */ }
+    let t = 0;
+    texto.addEventListener('input', () => {
+      clearTimeout(t);
+      t = window.setTimeout(() => {
+        try { localStorage.setItem(clave, texto.value); estado.textContent = texto.value.trim() ? 'Guardado en este navegador' : ''; } catch { estado.textContent = ''; }
+      }, 400);
+    });
+    boton.addEventListener('click', () => {
+      solucion.hidden = false;
+      boton.hidden = true;
+      solucion.querySelector('p:nth-of-type(2)')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+  }
+</script>
