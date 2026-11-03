@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'preact/hooks';
-import { hashTexto, mdEnLinea } from './md';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { hashTexto, mdEnLinea, ordenAleatorio } from './md';
 import { claveActividad, registrarActividad, registrarPregunta } from '../../runtime/progreso';
 
 type Props = {
@@ -23,6 +23,11 @@ export default function Pregunta({ pregunta, opciones, correcta, explicacion, po
   const raiz = useRef<HTMLDivElement>(null);
   const idEnunciado = 'p-' + hashTexto((pregunta ?? '') + opciones.join('|'));
   const clave = useMemo(() => (typeof location === 'undefined' ? '' : claveActividad(modo, (pregunta ?? '') + opciones.join('|'))), []);
+  // Las opciones se barajan en cada carga, ya en el navegador (el HTML del servidor no puede ser aleatorio
+  // sin descuadrar la hidratación): hasta entonces la lista está oculta.
+  const [orden, setOrden] = useState<number[] | null>(null);
+  useEffect(() => setOrden(ordenAleatorio(opciones.length)), []);
+  const posiciones = orden ?? opciones.map((_, k) => k);
   const predice = modo === 'predice';
   const cerrada = acertada || (predice && elegida !== null);
 
@@ -47,20 +52,22 @@ export default function Pregunta({ pregunta, opciones, correcta, explicacion, po
     <div class="rdc-quiz not-content" ref={raiz} data-estado={acertada ? 'ok' : falladas.length ? 'mal' : ''}>
       <p class="rdc-quiz-tipo">{predice ? 'Predice antes de ejecutar' : 'Pregunta'}</p>
       <p class="rdc-quiz-enunciado" id={idEnunciado} dangerouslySetInnerHTML={{ __html: mdEnLinea(pregunta ?? '¿Qué imprime este programa?') }} />
-      <ul class="rdc-opciones" role="list" aria-labelledby={idEnunciado}>
-        {opciones.map((o, i) => {
+      <ul class="rdc-opciones" role="list" aria-labelledby={idEnunciado} data-barajando={orden ? undefined : ''}>
+        {posiciones.map((i, pos) => {
+          const o = opciones[i];
           const est = estadoDe(i);
           return (
             <li key={i}>
               <button
                 type="button"
                 class="rdc-opcion"
+                data-opcion={i}
                 data-resultado={est || undefined}
                 aria-pressed={elegida === i || est === 'mal'}
                 aria-disabled={cerrada || est === 'mal' ? 'true' : undefined}
                 onClick={() => elegir(i)}
               >
-                <span class="rdc-opcion-letra" aria-hidden="true">{LETRAS[i]}</span>
+                <span class="rdc-opcion-letra" aria-hidden="true">{LETRAS[pos]}</span>
                 <span class="rdc-opcion-texto" dangerouslySetInnerHTML={{ __html: mdEnLinea(o) }} />
                 {est === 'ok' && <span class="rdc-opcion-marca"><Marca ok /> Correcta</span>}
                 {est === 'mal' && <span class="rdc-opcion-marca"><Marca /> No</span>}
@@ -79,7 +86,7 @@ export default function Pregunta({ pregunta, opciones, correcta, explicacion, po
             <p class="rdc-feedback-titulo">
               {acertada
                 ? falladas.length === 0 ? 'Correcto a la primera.' : 'Correcto.'
-                : `La respuesta correcta es la ${LETRAS[correcta]}.`}
+                : `La respuesta correcta es la ${LETRAS[posiciones.indexOf(correcta)]}.`}
               {predice && ' Ahora ejecútalo y compruébalo.'}
             </p>
             {explicacion && <p dangerouslySetInnerHTML={{ __html: mdEnLinea(explicacion) }} />}

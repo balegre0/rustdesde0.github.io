@@ -1,4 +1,5 @@
 ---
+import { mdEnLinea } from '../../components/islas/md';
 // /preguntas/<id>/ — una pregunta de la biblioteca: respuesta interactiva, solución detallada tras responder,
 // relacionadas (mismo tema) y anterior/siguiente.
 import Practica from '../../components/paginas/Practica.astro';
@@ -59,7 +60,7 @@ const esPredice = p.tipo === 'predice' && e && !e.debeFallar && e.plataforma ===
     <section class="rdc-solucion-pregunta" data-solucion-pregunta hidden aria-labelledby="sol-titulo" tabindex="-1">
       <h2 id="sol-titulo">Solución</h2>
       {p.tipo === 'respuesta' && <p class="rdc-sol-correcta">Respuesta: <code>{p.respuestas[0]}</code></p>}
-      {p.tipo !== 'respuesta' && <p class="rdc-sol-correcta">Correcta: <strong>{String.fromCharCode(65 + p.correcta)}</strong></p>}
+      {p.tipo !== 'respuesta' && <p class="rdc-sol-correcta">Correcta: <strong set:html={mdEnLinea(p.opciones[p.correcta])} /></p>}
       <div class="sl-markdown-content" set:html={solucion} />
       {e?.debeFallar && e.diagnosticos && <Diagnostico diagnosticos={e.diagnosticos} />}
       {e?.debeFallar && e.arreglo && (

@@ -21,3 +21,13 @@ export function hashTexto(s: string): string {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(36);
 }
+
+/** Copia barajada (Fisher-Yates). */
+export const barajar = <T,>(a: T[]): T[] => {
+  const b = [...a];
+  for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; }
+  return b;
+};
+
+/** Orden aleatorio de n opciones: orden[posición en pantalla] = índice original. Cambia en cada carga. */
+export const ordenAleatorio = (n: number) => barajar(Array.from({ length: n }, (_, k) => k));

@@ -1,11 +1,11 @@
 // Minijuegos de 60 s (/juegos/compila/, /juegos/predice/): ráfaga de preguntas con tiempo, puntuación y mejor marca.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { leer, registrarMarca } from '../../runtime/progreso';
+import { barajar } from './md';
 
 export type ItemJuego = { codigo: string; opciones: string[]; correcta: number; explicacion: string; href?: string | null };
 type Props = { juego: 'compila' | 'predice'; items: ItemJuego[]; duracion?: number };
 
-const barajar = <T,>(a: T[]) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
 
 export default function Juego({ juego, items, duracion = 60 }: Props) {
   const clave = `juego:${juego}`;

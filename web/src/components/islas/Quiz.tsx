@@ -1,6 +1,6 @@
 // Quiz cronometrado (/quizzes/<id>/): una pregunta cada vez, corrección inmediata, puntuación y mejor marca.
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { mdEnLinea } from './md';
+import { mdEnLinea, ordenAleatorio } from './md';
 import { Marca } from './Pregunta';
 import { leer, registrarMarca, registrarPregunta } from '../../runtime/progreso';
 
@@ -24,6 +24,8 @@ export default function Quiz({ id, titulo, tiempo, items }: Props) {
   const [texto, setTexto] = useState('');
   const [nueva, setNueva] = useState(false);
   const [mejor, setMejor] = useState<number | null>(null);
+  // Orden de las opciones de cada pregunta: nuevo en cada partida (la correcta no está siempre en el mismo sitio).
+  const [ordenes, setOrdenes] = useState<number[][]>([]);
   const fin = useRef(0);
   const foco = useRef<HTMLElement | null>(null);
 
@@ -41,6 +43,7 @@ export default function Quiz({ id, titulo, tiempo, items }: Props) {
 
   function empezar() {
     setResps(items.map(() => null));
+    setOrdenes(items.map((x) => ordenAleatorio(x.opciones.length)));
     setI(0);
     setTexto('');
     fin.current = Date.now() + tiempo * 1000;
@@ -101,6 +104,7 @@ export default function Quiz({ id, titulo, tiempo, items }: Props) {
 
   const it = items[i];
   const r = resps[i];
+  const orden = ordenes[i] ?? it.opciones.map((_, k) => k);
   const fraccion = restante / tiempo;
   return (
     <div class="rdc-juego not-content" data-quiz={id} data-jugando>
@@ -118,12 +122,13 @@ export default function Quiz({ id, titulo, tiempo, items }: Props) {
         </form>
       ) : (
         <ul class="rdc-opciones" role="list">
-          {it.opciones.map((o, k) => {
+          {orden.map((k, pos) => {
+            const o = it.opciones[k];
             const est = r ? (k === it.correcta ? 'ok' : r.valor === String(k) ? 'mal' : '') : '';
             return (
               <li key={k}>
-                <button type="button" class="rdc-opcion" data-resultado={est || undefined} aria-disabled={r ? 'true' : undefined} onClick={() => responder(String(k), k === it.correcta)} ref={(e) => { if (k === 0 && !r) foco.current = e; }}>
-                  <span class="rdc-opcion-letra" aria-hidden="true">{LETRAS[k]}</span>
+                <button type="button" class="rdc-opcion" data-opcion={k} data-resultado={est || undefined} aria-disabled={r ? 'true' : undefined} onClick={() => responder(String(k), k === it.correcta)} ref={(e) => { if (pos === 0 && !r) foco.current = e; }}>
+                  <span class="rdc-opcion-letra" aria-hidden="true">{LETRAS[pos]}</span>
                   <span class="rdc-opcion-texto" dangerouslySetInnerHTML={{ __html: mdEnLinea(o) }} />
                   {est === 'ok' && <span class="rdc-opcion-marca"><Marca ok /> Correcta</span>}
                   {est === 'mal' && <span class="rdc-opcion-marca"><Marca /> No</span>}
@@ -136,7 +141,7 @@ export default function Quiz({ id, titulo, tiempo, items }: Props) {
       <div class="rdc-feedback" aria-live="polite">
         {r && (
           <div class={r.ok ? 'rdc-feedback-ok' : 'rdc-feedback-mal'}>
-            <p class="rdc-feedback-titulo"><Marca ok={r.ok} /> {r.ok ? 'Correcto.' : it.tipo === 'respuesta' ? `No: era «${it.respuestas[0]}».` : `No: era la ${LETRAS[it.correcta]}.`} <a href={it.href} target="_blank" rel="noopener">Ver la solución ↗</a></p>
+            <p class="rdc-feedback-titulo"><Marca ok={r.ok} /> {r.ok ? 'Correcto.' : it.tipo === 'respuesta' ? `No: era «${it.respuestas[0]}».` : `No: era la ${LETRAS[orden.indexOf(it.correcta)]}.`} <a href={it.href} target="_blank" rel="noopener">Ver la solución ↗</a></p>
           </div>
         )}
       </div>

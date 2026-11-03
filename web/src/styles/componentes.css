@@ -178,6 +178,7 @@
   color: var(--sl-color-white);
 }
 .rdc-opciones { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 0.5rem; }
+.rdc-opciones[data-barajando] { visibility: hidden; }
 .rdc-opciones li { margin: 0 !important; }
 .rdc-opcion {
   display: flex;

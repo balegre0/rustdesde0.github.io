@@ -121,7 +121,7 @@ await paso('Predice: bloqueado hasta responder, luego ejecuta', async () => {
   const btn = b.locator('[data-accion="ejecutar"]');
   if (!(await btn.isDisabled())) throw new Error('Ejecutar debería estar bloqueado');
   await hidratada(b.locator('.rdc-quiz'));
-  await b.locator('.rdc-opcion').nth(1).click();
+  await b.locator('.rdc-opcion[data-opcion=\"1\"]').click();
   await b.locator('.rdc-feedback-ok').waitFor({ timeout: 5000 });
   await btn.click();
   await b.locator('[data-texto]').filter({ hasText: '3' }).waitFor({ timeout: 10000 });
@@ -130,9 +130,9 @@ await paso('Predice: bloqueado hasta responder, luego ejecuta', async () => {
 await paso('Pregunta: fallo con porqué y acierto con teclado', async () => {
   const q = page.locator('.rdc-quiz', { hasText: 'si los dos son' }).first();
   await hidratada(q);
-  await q.locator('.rdc-opcion').nth(0).click();
+  await q.locator('.rdc-opcion[data-opcion=\"0\"]').click();
   await q.locator('.rdc-porque').waitFor({ timeout: 3000 });
-  await q.locator('.rdc-opcion').nth(1).focus();
+  await q.locator('.rdc-opcion[data-opcion=\"1\"]').focus();
   await page.keyboard.press('Enter');
   await q.locator('.rdc-feedback-ok').waitFor({ timeout: 3000 });
   await q.screenshot({ path: cap('pregunta-1440.png') });
@@ -198,11 +198,11 @@ await paso('Pregunta de la biblioteca: responder, solución y estadística', asy
   await page.goto(`${BASE}/preguntas/demo-dos-mut/`);
   const q = page.locator('.rdc-quiz').first();
   await hidratada(q);
-  await q.locator('.rdc-opcion').nth(0).click();
+  await q.locator('.rdc-opcion[data-opcion=\"0\"]').click();
   const sol = page.locator('[data-solucion-pregunta]:not([hidden])');
   await sol.waitFor({ timeout: 3000 });
   if (!(await sol.locator('[data-diagnostico]').innerText()).includes('error[E0499]')) throw new Error('la solución no muestra el error real');
-  await q.locator('.rdc-opcion').nth(1).click();
+  await q.locator('.rdc-opcion[data-opcion=\"1\"]').click();
   await q.locator('.rdc-feedback-ok').waitFor({ timeout: 3000 });
   await page.locator('[data-mi-estado]', { hasText: 'Fallada a la primera' }).waitFor({ timeout: 3000 });
   await page.screenshot({ path: cap('pregunta-biblioteca-1440.png'), fullPage: true });
