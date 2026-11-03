@@ -17,7 +17,7 @@ frase: "Pasar un valor a una función es como asignarlo: un `String` se **mueve*
 imagina: "Como dejar tu bicicleta en el taller sin pedir que te la devuelvan: ya no es cosa tuya, y cuando el taller cierra, se la quedan."
 ---
 
-import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa } from '~/components';
+import { Ejecutar, NoCompila, Pregunta, BajoElCapo, Trampa, PasoAPaso } from '~/components';
 
 Las funciones reciben valores. Vas a ver que pasar un argumento **es exactamente** una asignación, y por tanto sigue las mismas reglas que `let b = a;`.
 
@@ -36,6 +36,12 @@ Al llamar a `saludar(n)`, el valor de `n` se **asigna** al parámetro `nombre`. 
 Por eso `println!("Adiós, {n}")` no compila: el texto ya ni siquiera existe.
 
 Con un tipo `Copy` todo es distinto: el parámetro recibe una **copia** y la variable original sigue intacta.
+
+## Paso a paso
+
+Compara qué pasa al pasar un `String` a una función y al copiar un número. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m06/pasos-mover-funcion" />
 
 ## Pruébalo
 

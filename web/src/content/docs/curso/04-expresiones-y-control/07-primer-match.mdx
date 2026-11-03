@@ -19,7 +19,7 @@ frase: "`match` compara un valor con varios casos, de arriba abajo, y se queda c
 imagina: "Como una clasificadora de correo: cada carta va a la primera bandeja que le corresponde, y tiene que haber bandeja para todas, aunque sea la de «otros» (`_`)."
 ---
 
-import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa } from '~/components';
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, Trampa, PasoAPaso } from '~/components';
 
 Vas a conocer `match`, la forma de Rust de **elegir entre muchos casos**. Es una de las herramientas más poderosas del lenguaje, y hoy das el primer paso.
 
@@ -37,6 +37,12 @@ Vas a conocer `match`, la forma de Rust de **elegir entre muchos casos**. Es una
 Como `if`, `match` es una **expresión**: vale lo que valga el brazo elegido, y todos los brazos deben dar el mismo tipo.
 
 Y lo más importante: un `match` tiene que ser **exhaustivo** (*exhaustive*). Tiene que cubrir **todos** los valores que el tipo puede tener. Si te dejas uno, no compila. Parece una exigencia pesada, pero evita una clase entera de errores: el caso «que nunca iba a pasar» y que un día pasa. El compilador hace la cuenta por ti y te dice exactamente qué falta.
+
+## Paso a paso
+
+Mira cómo `match` prueba los brazos de arriba abajo y se queda con el primero que encaja. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m04/pasos-match" />
 
 ## Pruébalo
 

@@ -17,7 +17,7 @@ frase: "`while` repite **mientras** se cumpla una condición, que se comprueba a
 imagina: "Como «mientras quede sopa en la olla, sirve otro plato»: miras la olla antes de cada plato. Si ya estaba vacía, no sirves ninguno."
 ---
 
-import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo } from '~/components';
+import { Ejecutar, NoCompila, Predice, Pregunta, Reto, BajoElCapo, PasoAPaso } from '~/components';
 
 Vas a repetir algo **mientras** se cumpla una condición, que es la forma más natural de escribir muchas cuentas atrás, búsquedas y cálculos paso a paso.
 
@@ -48,6 +48,12 @@ Vas a repetir algo **mientras** se cumpla una condición, que es la forma más n
 Úsalo cuando sabes **la condición para seguir**, pero no cuántas vueltas harán falta: «mientras queden cifras», «mientras no llegue a 1». En `while` también puedes usar `break` y `continue`, igual que en `loop`.
 
 Lo que **no** puedes es salir con `break valor`. ¿Por qué? Un `while` puede terminar de dos maneras: por un `break` o porque la condición se volvió falsa. En el segundo caso no hay ningún valor que entregar. Por eso un `while` siempre vale `()`, y Rust te avisa si intentas otra cosa.
+
+## Paso a paso
+
+Fíjate en cuándo se comprueba la condición del `while`: antes de cada vuelta. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m04/pasos-while" />
 
 ## Pruébalo
 

@@ -17,7 +17,7 @@ frase: "`loop` repite para siempre hasta que haces `break`, y con `break valor` 
 imagina: "Como buscar las llaves por la casa: miras habitación tras habitación sin un número fijo de intentos y, cuando las encuentras, paras y te las llevas."
 ---
 
-import { Ejecutar, Predice, Pregunta, Ordena, BajoElCapo, Trampa } from '~/components';
+import { Ejecutar, Predice, Pregunta, Ordena, BajoElCapo, Trampa, PasoAPaso } from '~/components';
 
 Vas a construir bucles que repiten algo **hasta encontrar un resultado** y te lo **devuelven**, sin variables extra.
 
@@ -48,6 +48,12 @@ Vas a construir bucles que repiten algo **hasta encontrar un resultado** y te lo
 Lo especial de Rust es que `loop` también es una expresión. Si escribes `break valor;`, el bucle termina y **todo el `loop` vale `valor`**. Así puedes escribir `let resultado = loop { ... break x; };` y guardar directamente lo que encontraste.
 
 Este patrón aparece mucho: reintentar algo hasta que salga bien, buscar el primer número que cumple una condición, o leer datos hasta que se acaben.
+
+## Paso a paso
+
+Sigue al `loop` vuelta a vuelta hasta que `break` lo para y entrega un valor. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m04/pasos-loop" />
 
 ## Pruébalo
 

@@ -19,7 +19,7 @@ frase: "El sombreado crea una variable **nueva** con el mismo nombre que tapa a 
 imagina: "Es como pegar una etiqueta nueva encima de la vieja en otra caja: el nombre es el mismo, pero la caja (y lo que contiene) es otra."
 ---
 
-import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits } from '~/components';
+import { Ejecutar, NoCompila, Prestamos, Predice, Pregunta, Respuesta, Ordena, Reto, BajoElCapo, Trampa, Historia, Bits, PasoAPaso } from '~/components';
 
 Hoy vas a ver un truco muy de Rust: declarar **otra** variable con el mismo nombre. Parece lo mismo que `mut`, pero no lo es, y la diferencia te va a ahorrar muchos nombres raros como `edad_texto` y `edad_numero`.
 
@@ -43,6 +43,12 @@ Tiene dos diferencias importantes con `mut`:
 2. **La sombra respeta los bloques**. Una sombra creada dentro de `{ ... }` desaparece al cerrar la llave, y el nombre vuelve a referirse a la de fuera.
 
 El uso típico es transformar un valor paso a paso sin inventar nombres: leer un texto, convertirlo en número, ajustarlo… todo con el mismo nombre. Y, si no pones `mut`, cada paso sigue siendo inmutable.
+
+## Paso a paso
+
+Mira cómo cada `let` crea una variable nueva que tapa a la anterior, aunque se llame igual. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m03/pasos-sombreado" />
 
 ## Pruébalo
 

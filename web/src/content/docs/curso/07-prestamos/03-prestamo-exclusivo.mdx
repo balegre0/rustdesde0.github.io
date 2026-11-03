@@ -19,7 +19,7 @@ frase: "`&mut x` presta un valor **para modificarlo**: la dueña tiene que ser `
 imagina: "Como dejarle tu cuaderno a alguien para que escriba en él: solo puede tenerlo una persona a la vez, y tú no lo usas hasta que te lo devuelve."
 ---
 
-import { Ejecutar, NoCompila, Predice, Prestamos, Pregunta, BajoElCapo, Trampa } from '~/components';
+import { Ejecutar, NoCompila, Predice, Prestamos, Pregunta, BajoElCapo, Trampa, PasoAPaso } from '~/components';
 
 Leer prestado está bien, pero a veces una función tiene que **cambiar** tu valor: añadir texto, ordenar una lista, sumar puntos. Para eso existe el segundo tipo de préstamo, el **exclusivo**: `&mut`.
 
@@ -47,6 +47,12 @@ fn duplicar(n: &mut i32) { *n *= 2; }  // *n es el i32; n es la referencia
 ```
 
 Con métodos no hace falta, porque el punto desreferencia solo: `r.push(3)`.
+
+## Paso a paso
+
+Mira cómo una función modifica un `String` prestado con `&mut` sin quedárselo. Pulsa «Siguiente» (o usa las flechas del teclado) y fíjate en la línea resaltada, en la pila y en la explicación de cada paso.
+
+<PasoAPaso ej="m07/pasos-exclusivo" />
 
 ## Pruébalo
 

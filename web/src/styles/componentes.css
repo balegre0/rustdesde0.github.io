@@ -710,12 +710,13 @@ kbd {
 .rdc-explica-pista { color: var(--sl-color-gray-2); font-size: 0.9375rem; }
 
 /* ── <PasoAPaso>: ejecución paso a paso ── */
-.rdc-pasos { margin: 1.5rem 0; border: 1px solid var(--rdc-borde); border-radius: 0.6rem; background: var(--rdc-superficie); overflow: hidden; }
+.rdc-pasos { container-type: inline-size; margin: 1.5rem 0; border: 1px solid var(--rdc-borde); border-radius: 0.6rem; background: var(--rdc-superficie); overflow: hidden; }
 .rdc-pasos-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 0.6rem 1rem; border-bottom: 1px solid var(--rdc-borde); }
 .rdc-pasos-titulo { margin: 0 !important; font-weight: 600; color: var(--sl-color-white); }
 .rdc-pasos-contador { margin: 0 !important; font-size: 0.875rem; font-variant-numeric: tabular-nums; color: var(--sl-color-gray-3); }
 .rdc-pasos-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 56rem) { .rdc-pasos-cuerpo { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
+/* Lado a lado solo si el propio componente es muy ancho; si no, el código arriba y el estado debajo. */
+@container (min-width: 60rem) { .rdc-pasos-cuerpo { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
 .rdc-pasos-codigo {
   position: relative; margin: 0 !important; max-height: 24rem; overflow: auto; padding: 0.6rem 0 !important;
   background: var(--rdc-consola-bg) !important; color: var(--rdc-consola-fg); border: 0 !important; border-radius: 0 !important;
@@ -727,7 +728,8 @@ kbd {
 .rdc-pasos-linea[data-actual] { background: color-mix(in srgb, var(--sl-color-accent) 22%, transparent); border-left-color: var(--sl-color-accent); }
 .rdc-pasos-linea[data-actual] .rdc-pasos-num { color: var(--rdc-consola-fg); font-weight: 600; }
 .rdc-pasos-estado { padding: 0.75rem 1rem 0.9rem; min-width: 0; }
-@media (min-width: 56rem) { .rdc-pasos-estado { border-left: 1px solid var(--rdc-borde); } }
+.rdc-pasos-estado { border-top: 1px solid var(--rdc-borde); }
+@container (min-width: 60rem) { .rdc-pasos-estado { border-top: 0; border-left: 1px solid var(--rdc-borde); } }
 .rdc-pasos-paso[hidden] { display: none; }
 .rdc-pasos-etiqueta { margin: 0.6rem 0 0.3rem !important; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sl-color-gray-3); }
 .rdc-pasos-etiqueta:first-child { margin-top: 0 !important; }
@@ -748,3 +750,4 @@ kbd {
 .rdc-pasos-salida { margin: 0 !important; min-height: 2.2rem; padding: 0.45rem 0.7rem !important; font-size: 0.875rem; background: var(--rdc-consola-bg) !important; color: var(--rdc-consola-fg); border: 1px solid var(--rdc-borde) !important; border-radius: 0.4rem; white-space: pre-wrap; }
 .rdc-pasos-nota { margin: 0.75rem 0 0 !important; padding: 0.55rem 0.75rem; border-left: 3px solid var(--sl-color-accent); background: color-mix(in srgb, var(--sl-color-accent) 8%, transparent); border-radius: 0 0.4rem 0.4rem 0; line-height: 1.55; color: var(--sl-color-white); }
 .rdc-pasos-botones { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.7rem 1rem; border-top: 1px solid var(--rdc-borde); }
+.rdc-pasos-estado .rdc-pasos-pila, .rdc-pasos-estado .rdc-pasos-nota, .rdc-pasos-estado .rdc-pasos-heap { max-width: none !important; }

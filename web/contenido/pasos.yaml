@@ -200,3 +200,166 @@ m07/pasos-prestar:
     heap: [["bytes de nombre", "`L` `í` `a`"]]
     salida: "Lía tiene 4 bytes"
     nota: "Como `nombre` nunca dejó de ser la dueña, se puede seguir usando después del préstamo."
+
+m03/pasos-sombreado:
+  - linea: 2
+    marcos: [{ fn: main, vars: [[edad, "\"42\" (texto)"]] }]
+    nota: "`edad` es un **texto**: las comillas lo dicen. Todavía no se puede sumar."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[edad, "(tapada)"], [edad, "42 (número u32)"]] }]
+    nota: "Un `let` nuevo con el mismo nombre crea **otra variable**, ahora de tipo `u32`, que tapa a la anterior. `parse()` convierte el texto en número, y `unwrap()` lo saca (si el texto no fuera un número, el programa se detendría)."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[edad, "(tapada)"], [edad, "(tapada)"], [edad, "43"]] }]
+    nota: "Otra vez: una tercera `edad` con el valor de la anterior más 1. Ninguna variable ha cambiado: hay tres distintas, y el nombre `edad` se refiere a la última."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[edad, "(tapada)"], [edad, "(tapada)"], [edad, "43"]] }]
+    salida: "El año que viene tendrás 43"
+    nota: "`{edad}` usa la `edad` visible: la última. Así el sombreado deja cambiar hasta el **tipo**, algo que `mut` no permite."
+
+m04/pasos-loop:
+  - linea: 2
+    marcos: [{ fn: main, vars: [[intento, "1"]] }]
+    nota: "Empezamos probando con el 1."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[intento, "1"]] }]
+    nota: "Primera vuelta del `loop`. ¿1 × 1 = 1 > 10? No."
+  - linea: 7
+    marcos: [{ fn: main, vars: [[intento, "2"]] }]
+    nota: "Probamos el siguiente número. Al llegar a la `}` del `loop`, se vuelve arriba **siempre**: un `loop` no se para solo."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[intento, "2"]] }]
+    nota: "¿2 × 2 = 4 > 10? No."
+  - linea: 7
+    marcos: [{ fn: main, vars: [[intento, "3"]] }]
+    nota: "`intento` pasa a 3."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[intento, "3"]] }]
+    nota: "¿3 × 3 = 9 > 10? Todavía no."
+  - linea: 7
+    marcos: [{ fn: main, vars: [[intento, "4"]] }]
+    nota: "`intento` pasa a 4."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[intento, "4"]] }]
+    nota: "¿4 × 4 = 16 > 10? **Sí**."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[intento, "4"], [resultado, "4"]] }]
+    nota: "`break intento` hace dos cosas: **sale** del bucle y hace que todo el `loop { … }` **valga** 4. Ese valor se guarda en `resultado`."
+  - linea: 9
+    marcos: [{ fn: main, vars: [[intento, "4"], [resultado, "4"]] }]
+    salida: "El primer número cuyo cuadrado pasa de 10 es 4"
+    nota: "El `loop` es perfecto para «busca hasta encontrar y entrégame lo que encontraste»."
+
+m04/pasos-while:
+  - linea: 2
+    marcos: [{ fn: main, vars: [[cuenta, "3"]] }]
+    nota: "La cuenta atrás empieza en 3."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[cuenta, "3"]] }]
+    nota: "`while` mira la condición **antes** de cada vuelta: ¿3 > 0? Sí, entra."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[cuenta, "3"]] }]
+    salida: "3..."
+    nota: "Se imprime el número actual."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[cuenta, "2"]] }]
+    nota: "`cuenta -= 1`: baja a 2. Si olvidaras esta línea, la condición sería verdadera siempre y el bucle no acabaría nunca."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[cuenta, "2"]] }]
+    nota: "¿2 > 0? Sí."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[cuenta, "2"]] }]
+    salida: "3...\n2..."
+    nota: "Segunda línea."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[cuenta, "1"]] }]
+    nota: "Baja a 1."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[cuenta, "1"]] }]
+    nota: "¿1 > 0? Sí."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[cuenta, "1"]] }]
+    salida: "3...\n2...\n1..."
+    nota: "Tercera línea."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[cuenta, "0"]] }]
+    nota: "Baja a 0."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[cuenta, "0"]] }]
+    nota: "¿0 > 0? **No**: el `while` termina sin entrar y salta a lo que hay después de su `}`."
+  - linea: 7
+    marcos: [{ fn: main, vars: [[cuenta, "0"]] }]
+    salida: "3...\n2...\n1...\n¡Despegue!"
+    nota: "Fuera del bucle. Fíjate: el 0 nunca se imprimió, porque la condición se comprueba antes de entrar."
+
+m04/pasos-match:
+  - linea: 2
+    marcos: [{ fn: main, vars: [[nota, "7"]] }]
+    nota: "`nota` vale 7."
+  - linea: 4
+    marcos: [{ fn: main, vars: [[nota, "7"]] }]
+    nota: "`match` prueba los brazos **de arriba abajo**. ¿7 está en `0..=4`? No."
+  - linea: 5
+    marcos: [{ fn: main, vars: [[nota, "7"]] }]
+    nota: "¿7 está en `5..=6`? No."
+  - linea: 6
+    marcos: [{ fn: main, vars: [[nota, "7"]] }]
+    nota: "¿7 está en `7..=8`? **Sí**: gana este brazo. Los de abajo ya no se miran."
+  - linea: 3
+    marcos: [{ fn: main, vars: [[nota, "7"], [texto, "\"notable\""]] }]
+    nota: "Todo el `match` vale lo que da el brazo ganador, `\"notable\"`, y eso se guarda en `texto`. El último brazo, `_`, recoge cualquier otro valor: sin él no compilaría, porque `match` exige cubrir **todos** los casos."
+  - linea: 9
+    marcos: [{ fn: main, vars: [[nota, "7"], [texto, "\"notable\""]] }]
+    salida: "Un 7 es un notable"
+    nota: "Se imprimen las dos variables."
+
+m06/pasos-mover-funcion:
+  - linea: 6
+    marcos: [{ fn: main, vars: [[n, "ficha → heap (\"Ana\")"]] }]
+    heap: [["bytes de n", "`A` `n` `a`"]]
+    nota: "`n` es la dueña del texto «Ana»."
+  - linea: 1
+    marcos: [{ fn: main, vars: [[n, "(movido)"]] }, { fn: saludar, vars: [[nombre, "ficha → heap (\"Ana\")"]] }]
+    heap: [["bytes de nombre", "`A` `n` `a`"]]
+    nota: "Pasar `n` a la función es como escribir `let nombre = n;`: la propiedad **se mueve** al parámetro `nombre`. Desde aquí, `n` ya no se puede usar."
+  - linea: 2
+    marcos: [{ fn: main, vars: [[n, "(movido)"]] }, { fn: saludar, vars: [[nombre, "ficha → heap (\"Ana\")"]] }]
+    heap: [["bytes de nombre", "`A` `n` `a`"]]
+    salida: "Hola, Ana"
+    nota: "La función usa su `String`."
+  - linea: 7
+    marcos: [{ fn: main, vars: [[n, "(movido)"]] }]
+    nota: "`saludar` termina: `nombre` sale de su ámbito y **libera** el texto. Como la función no lo devolvió, el texto ya no existe en ningún sitio."
+  - linea: 8
+    marcos: [{ fn: main, vars: [[n, "(movido)"], [edad, "30"]] }]
+    nota: "Ahora un número: `edad` vale 30."
+  - linea: 9
+    marcos: [{ fn: main, vars: [[n, "(movido)"], [edad, "30"], [otra, "30"]] }]
+    nota: "Con un `i32` no hay movimiento: es un tipo `Copy` y se copia entero. `edad` sigue sirviendo."
+  - linea: 10
+    marcos: [{ fn: main, vars: [[n, "(movido)"], [edad, "30"], [otra, "30"]] }]
+    salida: "Hola, Ana\n30 y 30"
+    nota: "Las dos se pueden usar. La diferencia: un `String` posee memoria del heap (se mueve); un número no (se copia)."
+
+m07/pasos-exclusivo:
+  - linea: 6
+    marcos: [{ fn: main, vars: [[saludo, "\"Hola\""]] }]
+    nota: "`saludo` es `mut`: requisito para poder prestarlo para modificarlo."
+  - linea: 1
+    marcos: [{ fn: main, vars: [[saludo, "\"Hola\" (prestado en exclusiva)"]] }, { fn: exclamar, vars: [[texto, "&mut saludo"]] }]
+    nota: "`&mut saludo` es un **préstamo exclusivo**: `exclamar` puede cambiar el texto, y mientras dure el préstamo nadie más puede ni leerlo."
+  - linea: 2
+    marcos: [{ fn: main, vars: [[saludo, "\"Hola!\" (prestado en exclusiva)"]] }, { fn: exclamar, vars: [[texto, "&mut saludo"]] }]
+    nota: "`push('!')` modifica el `String` **original** a través de la referencia. No hay copia: el cambio se hace en `saludo`."
+  - linea: 7
+    marcos: [{ fn: main, vars: [[saludo, "\"Hola!\""]] }]
+    nota: "La función termina y el préstamo acaba. `saludo` vuelve a ser libre, ya con el cambio."
+  - linea: 2
+    marcos: [{ fn: main, vars: [[saludo, "\"Hola!!\" (prestado en exclusiva)"]] }, { fn: exclamar, vars: [[texto, "&mut saludo"]] }]
+    nota: "Segunda llamada: un préstamo exclusivo **nuevo**, que añade otro `!`."
+  - linea: 8
+    marcos: [{ fn: main, vars: [[saludo, "\"Hola!!\""]] }]
+    nota: "Termina el segundo préstamo. Dos préstamos exclusivos **seguidos** están permitidos; lo prohibido es tener dos **a la vez**."
+  - linea: 9
+    marcos: [{ fn: main, vars: [[saludo, "\"Hola!!\""]] }]
+    salida: "Hola!!"
+    nota: "`saludo` nunca dejó de ser la dueña: la función lo modificó sin quedárselo."
