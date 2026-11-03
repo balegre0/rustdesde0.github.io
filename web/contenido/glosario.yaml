@@ -1,0 +1,417 @@
+# Glosario del curso (CONTENIDO.md). Cada término: definición de una frase, sin jerga, y la lección donde se explica.
+# «formas»: cómo aparece en el texto (plurales, variantes). En las lecciones se marca la primera aparición de cada término.
+# «hasta»: último mundo en el que se marca (las palabras básicas dejan de marcarse cuando ya se dan por sabidas).
+- termino: compilador
+  formas: [compilador, compiladores]
+  hasta: 6
+  def: "El programa (`rustc`) que lee tu código, comprueba que es correcto y lo traduce a un programa que el ordenador puede ejecutar."
+  leccion: 02-tu-primer-programa/06-el-viaje-de-rustc
+- termino: compilar
+  formas: [compilar, compila, compilas, compilan, compilando, compilación]
+  hasta: 6
+  def: "Traducir tu código a un programa ejecutable. Si el código tiene errores, no se compila y no hay programa."
+  leccion: 00-el-taller/07-check-build-y-release
+- termino: Cargo
+  formas: [Cargo]
+  hasta: 6
+  def: "La herramienta que crea proyectos, descarga bibliotecas, compila y ejecuta tu código con órdenes como `cargo run`."
+  leccion: 00-el-taller/06-cargo-new-y-run
+- termino: crate
+  formas: [crate, crates]
+  hasta: 12
+  def: "La unidad que compila Rust de una vez: un programa o una biblioteca. También se llama así a las bibliotecas publicadas en crates.io."
+  leccion: 12-modulos-crates-y-cargo/05-binarios-y-bibliotecas
+- termino: terminal
+  formas: [terminal]
+  hasta: 4
+  def: "Ventana donde le das órdenes al ordenador escribiéndolas, como `cargo run`."
+  leccion: 00-el-taller/02-la-terminal
+- termino: ruta
+  formas: [ruta, rutas]
+  hasta: 4
+  def: "La dirección escrita de un archivo o carpeta, como `C:\\Users\\ana\\proyecto\\src\\main.rs`."
+  leccion: 00-el-taller/01-archivos-y-rutas
+- termino: enlazador
+  formas: [enlazador, linker]
+  def: "El último paso de la compilación: junta todas las piezas y crea el archivo ejecutable (`.exe`)."
+  leccion: 00-el-taller/04-la-trampa-de-link
+- termino: bit
+  formas: [bit, bits]
+  hasta: 8
+  def: "La unidad mínima de información: un 0 o un 1."
+  leccion: 01-la-maquina/03-bits-y-bytes
+- termino: byte
+  formas: [byte, bytes]
+  hasta: 8
+  def: "Un grupo de 8 bits. Puede tomar 256 valores distintos, de 0 a 255."
+  leccion: 01-la-maquina/03-bits-y-bytes
+- termino: binario
+  formas: [binario]
+  hasta: 6
+  def: "Forma de escribir números solo con 0 y 1, donde cada posición vale el doble que la de su derecha."
+  leccion: 01-la-maquina/04-contar-en-binario
+- termino: hexadecimal
+  formas: [hexadecimal]
+  hasta: 8
+  def: "Forma de escribir números con 16 cifras (0–9 y a–f). Cada cifra resume 4 bits, así que un byte son 2 cifras."
+  leccion: 01-la-maquina/05-hexadecimal-el-atajo
+- termino: CPU
+  formas: [CPU, procesador]
+  hasta: 8
+  def: "La pieza del ordenador que ejecuta las instrucciones, una detrás de otra, miles de millones de veces por segundo."
+  leccion: 01-la-maquina/01-el-procesador
+- termino: dirección de memoria
+  formas: [dirección de memoria, direcciones de memoria]
+  def: "El número de una casilla de la memoria. Cada byte tiene la suya."
+  leccion: 01-la-maquina/02-casillas-con-numero
+- termino: pila
+  formas: [pila, stack]
+  hasta: 12
+  def: "Zona de memoria rápida y ordenada donde van los datos de tamaño fijo de cada función. Se libera sola al volver de la función."
+  leccion: 01-la-maquina/11-pila-y-heap
+- termino: heap
+  formas: [heap, montículo]
+  hasta: 12
+  def: "Zona de memoria para datos que pueden crecer o cuyo tamaño no se sabe al compilar, como el texto de un `String`. Hay que pedir el sitio y devolverlo."
+  leccion: 01-la-maquina/11-pila-y-heap
+- termino: puntero
+  formas: [puntero, punteros]
+  hasta: 12
+  def: "Un valor que guarda una dirección de memoria: dice dónde está otro dato."
+  leccion: 07-prestamos/02-referencias-por-dentro
+- termino: UTF-8
+  formas: [UTF-8]
+  def: "La forma en que Rust guarda el texto en bytes. Cada carácter ocupa de 1 a 4 bytes: la «a», 1; la «ñ», 2."
+  leccion: 01-la-maquina/10-texto-en-bytes-utf8
+- termino: desbordamiento
+  formas: [desbordamiento, desborda, desbordar, overflow]
+  def: "Cuando el resultado de una operación no cabe en el tipo de número, como sumar 1 a 255 en un `u8`."
+  leccion: 03-valores-y-tipos/05-overflow
+- termino: complemento a dos
+  formas: [complemento a dos]
+  def: "La forma de guardar números negativos en binario: el bit de la izquierda vale en negativo."
+  leccion: 01-la-maquina/07-complemento-a-dos
+- termino: coma flotante
+  formas: [coma flotante, flotante, flotantes]
+  def: "La forma de guardar números con decimales (`f32`, `f64`). Casi nunca son exactos: `0.1 + 0.2` no da exactamente `0.3`."
+  leccion: 03-valores-y-tipos/08-flotantes
+- termino: función
+  formas: [función, funciones]
+  hasta: 8
+  def: "Un trozo de código con nombre que haces una vez y usas (llamas) cuando quieras. Puede recibir datos y devolver un resultado."
+  leccion: 05-funciones-y-la-pila/01-tu-primera-funcion
+- termino: parámetro
+  formas: [parámetro, parámetros]
+  hasta: 8
+  def: "Un dato que recibe una función, con su nombre y su tipo: `edad: u32`."
+  leccion: 05-funciones-y-la-pila/02-parametros
+- termino: argumento
+  formas: [argumento, argumentos]
+  hasta: 8
+  def: "El valor concreto que pasas a una función al llamarla: en `saludar(30)`, el argumento es `30`."
+  leccion: 05-funciones-y-la-pila/02-parametros
+- termino: variable
+  formas: [variable, variables]
+  hasta: 8
+  def: "Un nombre que le pones a un valor con `let` para usarlo después. Por defecto no se puede cambiar."
+  leccion: 03-valores-y-tipos/01-let-y-variables
+- termino: inmutable
+  formas: [inmutable, inmutables]
+  hasta: 8
+  def: "Que no se puede cambiar. En Rust las variables son inmutables salvo que las declares con `mut`."
+  leccion: 03-valores-y-tipos/02-mut
+- termino: sombreado
+  formas: [sombreado, shadowing]
+  def: "Declarar con `let` otra variable con el mismo nombre que una anterior. La nueva tapa a la vieja."
+  leccion: 03-valores-y-tipos/03-shadowing
+- termino: anotación de tipo
+  formas: [anotación de tipo, anotaciones de tipo]
+  def: "Escribir a mano el tipo de una variable: `let x: u8 = 5;`."
+  leccion: 03-valores-y-tipos/01-let-y-variables
+- termino: expresión
+  formas: [expresión, expresiones]
+  hasta: 8
+  def: "Algo que produce un valor, como `2 + 3` o un bloque `{ … }`."
+  leccion: 05-funciones-y-la-pila/04-sentencias-y-expresiones
+- termino: sentencia
+  formas: [sentencia, sentencias]
+  hasta: 8
+  def: "Una orden que hace algo pero no produce valor, como `let x = 5;`."
+  leccion: 05-funciones-y-la-pila/04-sentencias-y-expresiones
+- termino: macro
+  formas: [macro, macros]
+  hasta: 8
+  def: "Algo que escribe código por ti al compilar. Se reconoce por el `!`, como en `println!`."
+  leccion: 02-tu-primer-programa/02-println-y-las-macros
+- termino: aviso
+  formas: [aviso, avisos, warning, warnings]
+  hasta: 8
+  def: "Un mensaje del compilador que señala algo sospechoso pero no impide crear el programa. Un error sí lo impide."
+  leccion: 02-tu-primer-programa/08-avisos-no-son-errores
+- termino: edición
+  formas: [edición, ediciones]
+  def: "El conjunto de reglas del lenguaje que usa un proyecto (2015, 2018, 2021 o 2024). No es lo mismo que la versión del compilador."
+  leccion: 02-tu-primer-programa/09-ediciones
+- termino: tupla
+  formas: [tupla, tuplas]
+  hasta: 8
+  def: "Varios valores, de tipos que pueden ser distintos, juntos en uno: `(1, 'a', true)`."
+  leccion: 03-valores-y-tipos/10-tuplas
+- termino: array
+  formas: [array, arrays]
+  hasta: 8
+  def: "Un número fijo de valores del mismo tipo, uno detrás de otro: `[i32; 4]` son exactamente 4 enteros."
+  leccion: 03-valores-y-tipos/11-arrays
+- termino: bucle
+  formas: [bucle, bucles]
+  hasta: 8
+  def: "Código que se repite: `loop` (sin fin), `while` (mientras se cumpla algo) o `for` (por cada elemento)."
+  leccion: 04-expresiones-y-control/03-loop-y-break-con-valor
+- termino: rango
+  formas: [rango, rangos]
+  hasta: 8
+  def: "Una secuencia de números: `0..5` va del 0 al 4, y `0..=5` incluye el 5."
+  leccion: 04-expresiones-y-control/05-for-y-rangos
+- termino: patrón
+  formas: [patrón, patrones]
+  def: "Una forma con la que se compara un valor para ver si encaja y, a la vez, sacar sus partes: `Some(x)`, `(a, b)`, `1..=9`."
+  leccion: 09-structs-enums-y-patrones/08-patrones-a-fondo
+- termino: exhaustivo
+  formas: [exhaustivo, exhaustiva]
+  def: "Que cubre todos los casos posibles. Un `match` tiene que serlo, o no compila (E0004)."
+  leccion: 09-structs-enums-y-patrones/07-match-exhaustivo
+- termino: recursión
+  formas: [recursión, recursiva, recursivas, recursivo]
+  def: "Que una función se llame a sí misma con un problema más pequeño, hasta llegar a un caso que se resuelve directamente."
+  leccion: 05-funciones-y-la-pila/05-recursion
+- termino: marco de pila
+  formas: [marco de pila, marcos de pila]
+  def: "El trozo de la pila que reserva cada llamada a una función para sus datos. Se libera al volver."
+  leccion: 05-funciones-y-la-pila/06-marcos-de-pila
+- termino: ownership
+  formas: [ownership, propiedad]
+  def: "La regla central de Rust: cada valor tiene un único dueño, y cuando el dueño desaparece, el valor se libera."
+  leccion: 06-ownership/01-quien-limpia
+- termino: dueño
+  formas: [dueño, dueña, dueños, dueñas]
+  hasta: 12
+  def: "La variable responsable de un valor. Cuando sale de su ámbito, el valor se libera."
+  leccion: 06-ownership/02-un-solo-dueno
+- termino: ámbito
+  formas: [ámbito, ámbitos, scope]
+  hasta: 12
+  def: "La zona del código donde existe una variable: desde que se declara hasta la `}` que cierra su bloque."
+  leccion: 06-ownership/03-ambito-y-drop
+- termino: mover
+  formas: [mover, mueve, se mueve, movido, movida, movimiento]
+  hasta: 12
+  def: "Pasar la propiedad de un valor a otra variable o función. La variable original ya no se puede usar."
+  leccion: 06-ownership/04-mover
+- termino: liberar
+  formas: [liberar, libera, se libera, liberación]
+  hasta: 12
+  def: "Devolver la memoria que ocupaba un valor cuando ya no hace falta. En Rust ocurre sola cuando el dueño desaparece."
+  leccion: 06-ownership/03-ambito-y-drop
+- termino: doble liberación
+  formas: [doble liberación, double free]
+  def: "Error grave: devolver dos veces la misma memoria del heap. Rust lo hace imposible con el ownership."
+  leccion: 06-ownership/05-por-que-no-copiar
+- termino: fuga de memoria
+  formas: [fuga de memoria, fugas de memoria, fuga, fugas]
+  def: "Memoria que nadie devuelve. El programa sigue funcionando, pero gasta cada vez más."
+  leccion: 15-punteros-inteligentes/07-fugas-seguras
+- termino: préstamo
+  formas: [préstamo, préstamos, prestar, presta, prestado, prestada, borrow]
+  hasta: 12
+  def: "Usar un valor sin quedártelo, con una referencia (`&x` o `&mut x`). El dueño sigue siendo el mismo."
+  leccion: 07-prestamos/01-prestar
+- termino: referencia
+  formas: [referencia, referencias]
+  hasta: 12
+  def: "Un préstamo de un valor: una dirección que el compilador garantiza que es válida. Se escribe `&x` (para leer) o `&mut x` (para cambiar)."
+  leccion: 07-prestamos/02-referencias-por-dentro
+- termino: préstamo exclusivo
+  formas: [préstamo exclusivo, préstamos exclusivos]
+  def: "Un préstamo con `&mut` que permite cambiar el valor. Mientras dura, nadie más puede usarlo."
+  leccion: 07-prestamos/03-prestamo-exclusivo
+- termino: comprobador de préstamos
+  formas: [comprobador de préstamos, borrow checker]
+  def: "La parte del compilador que vigila que ningún préstamo rompa las reglas: muchos lectores o un solo escritor, y nada que apunte a memoria liberada."
+  leccion: 07-prestamos/04-la-regla
+- termino: desreferenciar
+  formas: [desreferenciar, desreferencia]
+  def: "Seguir una referencia o un puntero hasta el valor al que apunta, con `*`."
+  leccion: 07-prestamos/02-referencias-por-dentro
+- termino: slice
+  formas: [slice, slices]
+  def: "Un préstamo de un trozo seguido de una lista o de un texto: `&v[1..3]`, `&str`. Guarda dónde empieza y cuánto mide."
+  leccion: 07-prestamos/09-slices
+- termino: referencia colgante
+  formas: [referencia colgante, referencias colgantes]
+  def: "Una referencia a algo que ya se liberó. Rust las impide al compilar."
+  leccion: 08-lifetimes/01-referencias-colgantes
+- termino: lifetime
+  formas: [lifetime, lifetimes]
+  def: "El trozo del programa en el que una referencia tiene que seguir siendo válida. Lo calcula el compilador y se escribe `'a` cuando hace falta."
+  leccion: 08-lifetimes/02-que-es-una-lifetime
+- termino: elisión
+  formas: [elisión]
+  def: "Las reglas que dejan omitir las lifetimes en casi todas las funciones, porque el compilador las deduce."
+  leccion: 08-lifetimes/04-elision
+- termino: temporal
+  formas: [temporal, temporales]
+  def: "Un valor creado en mitad de una expresión sin guardarlo en ninguna variable. Vive hasta el final de la sentencia."
+  leccion: 08-lifetimes/09-temporales
+- termino: struct
+  formas: [struct, structs]
+  def: "Un tipo propio que junta varios datos con nombre, como una ficha con casillas."
+  leccion: 09-structs-enums-y-patrones/01-structs
+- termino: enum
+  formas: [enum, enums]
+  def: "Un tipo que es una de varias opciones, cada una con sus propios datos si los necesita."
+  leccion: 09-structs-enums-y-patrones/05-enums-con-datos
+- termino: método
+  formas: [método, métodos]
+  hasta: 12
+  def: "Una función que pertenece a un tipo y se llama con punto: `texto.len()`."
+  leccion: 09-structs-enums-y-patrones/03-metodos-e-impl
+- termino: newtype
+  formas: [newtype, newtypes]
+  def: "Envolver un tipo en otro propio (`struct Metros(f64)`) para que el compilador no deje mezclarlo con valores que significan otra cosa."
+  leccion: 09-structs-enums-y-patrones/02-tuple-structs-y-newtypes
+- termino: nicho
+  formas: [nicho, nichos]
+  def: "Un valor que un tipo no puede tener nunca (como el 0 en una referencia). Rust lo aprovecha para guardar gratis la marca de `None`."
+  leccion: 09-structs-enums-y-patrones/10-layout-y-nichos
+- termino: pánico
+  formas: [pánico, pánicos, panic]
+  def: "Parada del programa cuando ocurre algo que no debería pasar nunca, como leer fuera de una lista."
+  leccion: 10-errores/01-panic
+- termino: propagar
+  formas: [propagar, propaga]
+  def: "Devolver un error a la función que te llamó en vez de tratarlo tú. En Rust se hace con `?`."
+  leccion: 10-errores/04-el-operador-interrogacion
+- termino: capacidad
+  formas: [capacidad]
+  def: "Cuántos elementos caben en un `Vec` o un `String` sin pedir más memoria. La longitud es cuántos hay de verdad."
+  leccion: 11-colecciones-y-texto/02-vec-por-dentro
+- termino: colección
+  formas: [colección, colecciones]
+  def: "Un tipo que guarda muchos valores: `Vec`, `HashMap`, `HashSet`, `VecDeque`…"
+  leccion: 11-colecciones-y-texto/10-vecdeque-y-elegir
+- termino: módulo
+  formas: [módulo, módulos]
+  def: "Un espacio con nombre que agrupa código relacionado y decide qué se ve desde fuera."
+  leccion: 12-modulos-crates-y-cargo/01-modulos
+- termino: dependencia
+  formas: [dependencia, dependencias]
+  def: "Una biblioteca de otra persona que tu proyecto usa. Se añade en `Cargo.toml`."
+  leccion: 12-modulos-crates-y-cargo/06-dependencias-y-semver
+- termino: trait
+  formas: [trait, traits]
+  def: "Una capacidad con nombre (por ejemplo, «sabe mostrarse en pantalla») que distintos tipos pueden tener implementando sus métodos."
+  leccion: 13-traits-y-genericos/01-traits
+- termino: genérico
+  formas: [genérico, genérica, genéricos, genéricas]
+  def: "Código que sirve para muchos tipos a la vez, escrito con un parámetro de tipo como `T`."
+  leccion: 13-traits-y-genericos/02-genericos-y-bounds
+- termino: monomorfización
+  formas: [monomorfización]
+  def: "Lo que hace el compilador con el código genérico: crea una copia especializada para cada tipo con el que lo usas."
+  leccion: 13-traits-y-genericos/03-monomorfizacion
+- termino: vtable
+  formas: [vtable, vtables]
+  def: "La tabla con las direcciones de los métodos de un tipo. La usa `dyn Trait` para saber qué método llamar al ejecutar."
+  leccion: 13-traits-y-genericos/05-dyn-y-vtables
+- termino: closure
+  formas: [closure, closures]
+  def: "Una función pequeña sin nombre, escrita `|x| x + 1`, que puede usar las variables de su alrededor."
+  leccion: 14-closures-e-iteradores/01-closures
+- termino: iterador
+  formas: [iterador, iteradores]
+  def: "Algo que va dando elementos de uno en uno con `next()`. No hace nada hasta que alguien lo consume."
+  leccion: 14-closures-e-iteradores/05-el-trait-iterator
+- termino: adaptador
+  formas: [adaptador, adaptadores]
+  def: "Un método que transforma un iterador en otro, como `map` o `filter`. Se encadenan como piezas de una tubería."
+  leccion: 14-closures-e-iteradores/07-adaptadores
+- termino: coste cero
+  formas: [coste cero]
+  def: "Que una comodidad del lenguaje no hace el programa más lento: se compila igual que si lo escribieras a mano."
+  leccion: 14-closures-e-iteradores/09-coste-cero
+- termino: puntero inteligente
+  formas: [puntero inteligente, punteros inteligentes]
+  def: "Un tipo que se comporta como una referencia pero además gestiona algo: `Box` (un valor en el heap), `Rc` (varios dueños)…"
+  leccion: 15-punteros-inteligentes/01-box
+- termino: mutabilidad interior
+  formas: [mutabilidad interior]
+  def: "Poder cambiar un valor a través de un préstamo compartido, con tipos como `Cell` o `RefCell`, que vigilan las reglas a su manera."
+  leccion: 15-punteros-inteligentes/08-cell-y-refcell
+- termino: contador de referencias
+  formas: [contador de referencias]
+  def: "Un número que cuenta cuántos dueños tiene un valor compartido (`Rc`, `Arc`). Cuando llega a cero, se libera."
+  leccion: 15-punteros-inteligentes/05-rc
+- termino: prueba
+  formas: [prueba unitaria, pruebas unitarias, test]
+  def: "Una función marcada con `#[test]` que comprueba automáticamente que tu código hace lo que debe."
+  leccion: 16-pruebas-y-herramientas/01-tu-primer-test
+- termino: hilo
+  formas: [hilo, hilos, thread]
+  def: "Una línea de ejecución que corre a la vez que otras dentro del mismo programa."
+  leccion: 17-concurrencia/01-hilos-y-join
+- termino: carrera de datos
+  formas: [carrera de datos, carreras de datos]
+  def: "Dos hilos que tocan el mismo dato a la vez, y al menos uno lo cambia. En Rust seguro es imposible."
+  leccion: 17-concurrencia/05-carreras-de-datos
+- termino: candado
+  formas: [candado, candados, mutex]
+  def: "Un `Mutex`: protege un dato para que solo un hilo pueda usarlo a la vez."
+  leccion: 17-concurrencia/06-mutex
+- termino: interbloqueo
+  formas: [interbloqueo, interbloqueos, deadlock]
+  def: "Dos hilos esperando cada uno algo que tiene el otro: se quedan parados para siempre."
+  leccion: 17-concurrencia/10-interbloqueos
+- termino: atómico
+  formas: [atómico, atómicos, atómica, atómicas]
+  def: "Una operación que se hace de una sola vez, sin que otro hilo pueda verla a medias."
+  leccion: 17-concurrencia/09-atomicos-y-ordering
+- termino: future
+  formas: [future, futures]
+  def: "Un trabajo asíncrono que todavía no ha terminado. Se espera con `.await`."
+  leccion: 18-async/02-future-y-poll
+- termino: ejecutor
+  formas: [ejecutor, ejecutores, runtime]
+  def: "El programa que hace avanzar los futures, despertándolos cuando tienen algo que hacer."
+  leccion: 18-async/04-ejecutor
+- termino: comportamiento indefinido
+  formas: [comportamiento indefinido, UB]
+  def: "Lo que pasa si rompes una regla que el compilador da por hecha (por ejemplo, leer memoria liberada): ya no hay ninguna garantía sobre lo que hará el programa."
+  leccion: 20-unsafe-y-ub/03-la-lista-de-ub
+- termino: unsafe
+  formas: [unsafe]
+  def: "Una palabra clave que desbloquea unas pocas operaciones que el compilador no puede comprobar. A partir de ahí, la responsabilidad es tuya."
+  leccion: 20-unsafe-y-ub/01-que-es-unsafe
+- termino: sound
+  formas: [sound, solidez]
+  def: "Una API es *sound* (sólida) si ningún uso desde código seguro puede causar comportamiento indefinido."
+  leccion: 20-unsafe-y-ub/04-abstracciones-seguras
+- termino: invariante
+  formas: [invariante, invariantes]
+  def: "Una condición que tu tipo promete que se cumple siempre, como «la longitud nunca supera la capacidad»."
+  leccion: 20-unsafe-y-ub/04-abstracciones-seguras
+- termino: asignador
+  formas: [asignador, asignadores, allocator]
+  def: "El encargado de repartir y recoger la memoria del heap."
+  leccion: 22-sistemas-y-ffi/11-tu-propio-asignador
+- termino: FFI
+  formas: [FFI]
+  def: "La frontera para llamar a funciones compiladas fuera de Rust, o para que te llamen a ti."
+  leccion: 22-sistemas-y-ffi/08-llamar-a-una-biblioteca-externa
+- termino: MIR
+  formas: [MIR]
+  def: "Una versión simplificada de tu programa que usa el compilador por dentro, sobre la que trabaja el comprobador de préstamos."
+  leccion: 21-el-compilador-por-dentro/04-leer-mir
+- termino: ensamblador
+  formas: [ensamblador]
+  def: "Las instrucciones de la CPU escritas con nombres legibles. Es lo más cerca de la máquina que se puede leer."
+  leccion: 13-traits-y-genericos/03-monomorfizacion

@@ -1,0 +1,45 @@
+---
+// /glosario/ — todos los términos de contenido/glosario.yaml, en orden alfabético y con buscador.
+import { cargarGlosario } from '../../../scripts/lib/glosario.mjs';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const terminos = cargarGlosario().sort((a, b) => a.termino.localeCompare(b.termino, 'es', { sensitivity: 'base' }));
+const inicial = (t: string) => t.normalize('NFD')[0].toUpperCase();
+const letras = [...new Set(terminos.map((t) => inicial(t.termino)))];
+---
+<div class="rdc-glosario not-content">
+  <label class="rdc-glosario-buscar">
+    <span>Buscar una palabra</span>
+    <input type="search" data-glosario-buscar placeholder="Por ejemplo: heap, préstamo, trait…" autocomplete="off" />
+  </label>
+  <p class="rdc-glosario-vacio" data-glosario-vacio hidden>Ninguna palabra coincide. Prueba con otra o con parte de ella.</p>
+  {letras.map((l) => (
+    <section class="rdc-glosario-letra" data-letra={l}>
+      <h2>{l}</h2>
+      <dl>
+        {terminos.filter((t) => inicial(t.termino) === l).map((t) => (
+          <div class="rdc-glosario-item" data-texto={[t.termino, ...t.formas, t.def].join(' ').toLowerCase()} id={'g-' + t.termino.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-')}>
+            <dt>{t.termino}</dt>
+            <dd>
+              <span set:html={t.html} />
+              {' '}<a href={`${base}${t.href}`}>Ver la lección</a>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  ))}
+</div>
+<script>
+  const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const input = document.querySelector<HTMLInputElement>('[data-glosario-buscar]')!;
+  const items = [...document.querySelectorAll<HTMLElement>('.rdc-glosario-item')].map((el) => ({ el, texto: sinTildes(el.dataset.texto ?? '') }));
+  const secciones = [...document.querySelectorAll<HTMLElement>('.rdc-glosario-letra')];
+  const vacio = document.querySelector<HTMLElement>('[data-glosario-vacio]')!;
+  input.addEventListener('input', () => {
+    const q = sinTildes(input.value.trim());
+    let visibles = 0;
+    for (const { el, texto } of items) { const ok = !q || texto.includes(q); el.hidden = !ok; if (ok) visibles++; }
+    for (const s of secciones) s.hidden = ![...s.querySelectorAll<HTMLElement>('.rdc-glosario-item')].some((x) => !x.hidden);
+    vacio.hidden = visibles > 0;
+  });
+</script>

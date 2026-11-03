@@ -6,7 +6,7 @@
   "scripts": {
     "ejemplos": "bun run scripts/compilar-ejemplos.ts && bun run scripts/generar-practica.ts",
     "dev": "bun run ejemplos && bun --bun astro dev --port 4331",
-    "build": "bun run scripts/revisar-contenido.ts && bun run ejemplos && bun --bun astro build && bun run scripts/aplicar-base.ts && bun run scripts/generar-sw.ts",
+    "build": "bun run scripts/revisar-contenido.ts && bun run ejemplos && bun --bun astro build && bun run scripts/aplicar-glosario.ts && bun run scripts/aplicar-base.ts && bun run scripts/generar-sw.ts",
     "preview": "bun run scripts/servir.ts 4332",
     "test": "bun run tests/e2e.ts"
   },

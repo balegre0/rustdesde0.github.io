@@ -87,7 +87,7 @@ export default defineConfig({
         starlightSidebarTopics(topics(), {
           exclude: ['/', '/**'],
           topics: {
-            curso: ['/repaso', '/progreso', '/demo', '/demo/**', '/curso/**'],
+            curso: ['/repaso', '/progreso', '/glosario', '/demo', '/demo/**', '/curso/**'],
             ref: ['/ref/**'],
             recetas: ['/recetas', '/recetas/**'],
             errores: ['/errores', '/errores/**'],

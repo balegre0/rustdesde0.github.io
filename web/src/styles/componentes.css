@@ -625,3 +625,60 @@ kbd {
   .rdc-repasa details > p { padding-left: 1rem; }
 }
 @media (hover: hover) { .rdc-repasa summary:hover { background: var(--rdc-superficie-2); } }
+
+/* ── Glosario: término con definición (src/runtime/glosario.ts) ── */
+.rdc-term {
+  all: unset;
+  display: inline;
+  cursor: help;
+  color: inherit;
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in srgb, var(--sl-color-accent) 70%, transparent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.2em;
+  border-radius: 0.2rem;
+  -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) { .rdc-term:hover { text-decoration-style: solid; } }
+.rdc-term:focus-visible { outline: 2px solid var(--rdc-foco); outline-offset: 2px; }
+.rdc-term[aria-expanded='true'] { text-decoration-style: solid; background: color-mix(in srgb, var(--sl-color-accent) 12%, transparent); }
+.rdc-term-globo {
+  position: fixed;
+  z-index: 60;
+  width: max-content;
+  max-width: min(22rem, calc(100vw - 24px));
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--rdc-borde-fuerte);
+  border-radius: 0.55rem;
+  background: var(--sl-color-bg-nav, var(--rdc-superficie));
+  box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.35);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--sl-color-gray-2);
+  animation: rdc-term-entra 120ms ease-out;
+}
+.rdc-term-globo[hidden] { display: none; }
+.rdc-term-globo p { margin: 0; }
+.rdc-term-globo-titulo { font-weight: 600; color: var(--sl-color-white); margin-bottom: 0.2rem !important; }
+.rdc-term-globo-titulo::first-letter { text-transform: uppercase; }
+.rdc-term-globo code { font-size: 0.875em; }
+.rdc-term-globo-enlace { display: inline-block; margin-top: 0.45rem; font-size: 0.875rem; font-weight: 500; color: var(--sl-color-accent-high); }
+@keyframes rdc-term-entra { from { opacity: 0; transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .rdc-term-globo { animation: none; } }
+
+/* ── Página /glosario/ ── */
+.rdc-glosario { max-width: var(--rdc-medida); }
+.rdc-glosario-buscar { display: grid; gap: 0.35rem; margin: 1.25rem 0 0.5rem; font-weight: 600; color: var(--sl-color-white); }
+.rdc-glosario-buscar input {
+  font: inherit; font-weight: 400; padding: 0.6rem 0.8rem; border-radius: 0.45rem;
+  border: 1px solid var(--rdc-borde-fuerte); background: var(--rdc-superficie); color: var(--sl-color-white);
+}
+.rdc-glosario-buscar input:focus-visible { outline: 2px solid var(--rdc-foco); outline-offset: 1px; }
+.rdc-glosario-vacio { color: var(--sl-color-gray-2); }
+.rdc-glosario-letra[hidden], .rdc-glosario-item[hidden] { display: none; }
+.rdc-glosario-letra h2 { margin: 1.75rem 0 0.5rem; font-size: 1.25rem; color: var(--sl-color-accent-high); border-bottom: 1px solid var(--rdc-borde); padding-bottom: 0.25rem; }
+.rdc-glosario dl { margin: 0; display: grid; gap: 0.85rem; }
+.rdc-glosario dt { font-weight: 600; color: var(--sl-color-white); }
+.rdc-glosario dt::first-letter { text-transform: uppercase; }
+.rdc-glosario dd { margin: 0.15rem 0 0; line-height: 1.6; color: var(--sl-color-gray-2); }
+.rdc-glosario dd a { font-size: 0.9rem; white-space: nowrap; }

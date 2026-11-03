@@ -60,6 +60,7 @@ export function topics() {
     { label: 'Árbol de progreso', link: '/arbol/' },
     { label: 'Repaso de hoy', link: '/repaso/' },
     { label: 'Tu progreso', link: '/progreso/' },
+    { label: 'Glosario', link: '/glosario/' },
     ...mundos().map((m) => grupoAuto(m.label, `curso/${m.slug}`)),
   ];
 

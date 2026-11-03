@@ -1,6 +1,7 @@
 ---
 // En la portada de cada mundo (curso/<mundo>/index.mdx) la plataforma añade la lista de lecciones.
-// En cada lección: arriba, la idea en una frase; abajo, sus tarjetas para repasar de memoria.
+// En cada lección: arriba, la idea en una frase; abajo, sus tarjetas para repasar de memoria;
+// y los términos del glosario muestran su definición (src/runtime/glosario.ts).
 import Default from '@astrojs/starlight/components/MarkdownContent.astro';
 import ListaLecciones from '../components/interno/ListaLecciones.astro';
 import LaClave from '../components/interno/LaClave.astro';
@@ -17,3 +18,4 @@ const d = entry.data as { frase?: string; imagina?: string; tarjetas?: { p: stri
   {leccion && <RepasaSinMirar tarjetas={d.tarjetas ?? []} />}
   {mundo && <ListaLecciones mundo={mundo} />}
 </Default>
+{leccion && <script>import '../runtime/glosario';</script>}
