@@ -23,7 +23,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Configurar Pages
         id: pages
@@ -61,7 +61,7 @@ jobs:
         run: bun run build
 
       - name: Subir la web
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: web/dist
 
