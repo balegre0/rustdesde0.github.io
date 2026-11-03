@@ -817,3 +817,17 @@ kbd {
 .rdc-traductor-lugar { color: var(--sl-color-gray-2); }
 .rdc-traductor-enlace a { font-weight: 500; }
 .rdc-traductor-titulo { display: inline-block; } .rdc-traductor-titulo::first-letter { text-transform: uppercase; }
+
+/* ── Repaso: vuelve a intentar lo que fallaste ── */
+.rdc-fallos { max-width: var(--rdc-medida); margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--rdc-borde); }
+.rdc-fallos[hidden] { display: none; }
+.rdc-fallos h2 { margin: 0 0 0.4rem; font-size: 1.375rem; }
+.rdc-fallos-instr { margin: 0 0 1rem !important; color: var(--sl-color-gray-2); line-height: 1.55; }
+.rdc-fallos-lista { list-style: none; margin: 0 !important; padding: 0 !important; display: grid; gap: 0.5rem; }
+.rdc-fallos-lista li { margin: 0 !important; }
+.rdc-fallos-enlace { display: grid; gap: 0.15rem; padding: 0.7rem 0.9rem; border: 1px solid var(--rdc-borde); border-left: 3px solid var(--rdc-aviso); border-radius: 0.5rem; background: var(--rdc-superficie); text-decoration: none; }
+@media (hover: hover) { .rdc-fallos-enlace:hover { border-color: var(--sl-color-accent); border-left-color: var(--rdc-aviso); } }
+.rdc-fallos-enlace:focus-visible { outline: 2px solid var(--rdc-foco); outline-offset: 2px; }
+.rdc-fallos-titulo { font-weight: 600; color: var(--sl-color-white); }
+.rdc-fallos-meta { font-size: 0.8125rem; color: var(--sl-color-gray-3); }
+.rdc-fallos-mas { margin: 0.75rem 0 0 !important; color: var(--sl-color-gray-2); font-size: 0.9375rem; }

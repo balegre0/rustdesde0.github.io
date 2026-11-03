@@ -1,0 +1,52 @@
+---
+// En /repaso/: las preguntas y problemas que fallaste y todavía no has acertado, de los más antiguos a los
+// más recientes. Volver a intentarlo pasado un tiempo es justo lo que fija lo aprendido.
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<section class="rdc-fallos not-content" data-fallos data-base={base} aria-labelledby="fallos-titulo" hidden>
+  <h2 id="fallos-titulo">Vuelve a intentar lo que fallaste</h2>
+  <p class="rdc-fallos-instr">Estas preguntas y problemas se te resistieron y todavía no los has resuelto. Inténtalo otra vez: equivocarse y volver al cabo de unos días es de lo que más ayuda a aprender. Cuando los aciertes, desaparecen de aquí.</p>
+  <ul class="rdc-fallos-lista" data-fallos-lista></ul>
+  <p class="rdc-fallos-mas" data-fallos-mas hidden></p>
+</section>
+<script>
+  import { leer } from '../../runtime/progreso';
+  const MAX = 6;
+  const s = document.querySelector<HTMLElement>('[data-fallos]');
+  if (s) {
+    const base = s.dataset.base ?? '';
+    const p = leer();
+    const pendientes = [
+      ...Object.entries(p.preguntas).filter(([, x]) => !x.ok).map(([id, x]) => ({ tipo: 'pregunta' as const, id, fecha: x.fecha, intentos: x.intentos })),
+      ...Object.entries(p.problemas).filter(([, x]) => !x.ok && x.intentos > 0).map(([id, x]) => ({ tipo: 'problema' as const, id, fecha: x.fecha, intentos: x.intentos })),
+    ].sort((a, b) => a.fecha.localeCompare(b.fecha));
+    if (pendientes.length) {
+      fetch(`${base}/datos/practica.json`).then((r) => r.json()).then((d: { preguntas: Record<string, [string, string]>; problemas: Record<string, [string, string]> }) => {
+        const validos = pendientes.filter((x) => (x.tipo === 'pregunta' ? d.preguntas[x.id] : d.problemas[x.id]));
+        if (!validos.length) return;
+        const lista = s.querySelector<HTMLElement>('[data-fallos-lista]')!;
+        const hace = (f: string) => {
+          const dias = Math.floor((Date.now() - new Date(f).getTime()) / 86400000);
+          return dias <= 0 ? 'hoy' : dias === 1 ? 'ayer' : `hace ${dias} días`;
+        };
+        for (const x of validos.slice(0, MAX)) {
+          const [titulo, dificultad] = x.tipo === 'pregunta' ? d.preguntas[x.id] : d.problemas[x.id];
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = `${base}/${x.tipo === 'pregunta' ? 'preguntas' : 'problemas'}/${x.id}/`;
+          a.className = 'rdc-fallos-enlace';
+          const t = document.createElement('span'); t.className = 'rdc-fallos-titulo'; t.textContent = titulo;
+          const m = document.createElement('span'); m.className = 'rdc-fallos-meta';
+          m.textContent = `${x.tipo === 'pregunta' ? 'Pregunta' : 'Problema'} · ${dificultad} · ${x.intentos} ${x.intentos === 1 ? 'intento' : 'intentos'} · último ${hace(x.fecha)}`;
+          a.append(t, m); li.append(a); lista.append(li);
+        }
+        if (validos.length > MAX) {
+          const mas = s.querySelector<HTMLElement>('[data-fallos-mas]')!;
+          mas.innerHTML = `Y ${validos.length - MAX} más. Las preguntas están todas en <a href="${base}/preguntas/?estado=mal">Preguntas → falladas a la primera</a>.`;
+          mas.hidden = false;
+        }
+        s.hidden = false;
+      }).catch(() => {});
+    }
+  }
+</script>
