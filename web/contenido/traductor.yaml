@@ -1,0 +1,132 @@
+# Traductor de errores (/errores/traductor/): explicaciones de lo que NO tiene código E (avisos y pánicos)
+# y de mensajes sueltos frecuentes. Los errores con código (E0382…) salen de las fichas de src/content/docs/errores/.
+# «avisos»: por nombre del lint, tal como aparece en `#[warn(nombre)]`.
+# «mensajes»: «patron» es un trozo del texto en inglés (sin distinguir mayúsculas).
+
+avisos:
+  unused_variables:
+    titulo: "Variable sin usar"
+    explica: "Creaste una variable y nunca la lees. No impide compilar. Si es a propósito, empieza su nombre por guion bajo: `_total`."
+    leccion: 02-tu-primer-programa/08-avisos-no-son-errores
+  unused_mut:
+    titulo: "mut que sobra"
+    explica: "Declaraste la variable con `mut`, pero nunca la cambias. Quita el `mut`."
+    leccion: 03-valores-y-tipos/02-mut
+  unused_assignments:
+    titulo: "Valor que nadie lee"
+    explica: "Guardas un valor en una variable, pero antes de leerlo lo sustituyes por otro. La primera asignación no sirve para nada."
+    leccion: 02-tu-primer-programa/08-avisos-no-son-errores
+  dead_code:
+    titulo: "Código que nunca se usa"
+    explica: "Hay una función, un tipo o un campo que ningún sitio del programa usa. Bórralo o úsalo; si es a propósito, pon `#[allow(dead_code)]` encima."
+    leccion: 02-tu-primer-programa/08-avisos-no-son-errores
+  unused_imports:
+    titulo: "use que sobra"
+    explica: "Importas algo con `use` que luego no utilizas. Quita esa línea `use`."
+    leccion: 12-modulos-crates-y-cargo/03-use
+  non_snake_case:
+    titulo: "Nombre con el estilo equivocado"
+    explica: "Las variables y funciones se escriben en minúsculas con guiones bajos: `mi_variable`, no `miVariable`."
+    leccion: 02-tu-primer-programa/08-avisos-no-son-errores
+  non_camel_case_types:
+    titulo: "Nombre de tipo con el estilo equivocado"
+    explica: "Los tipos (structs, enums, traits) se escriben con cada palabra en mayúscula: `MiTipo`, no `mi_tipo`."
+    leccion: 09-structs-enums-y-patrones/01-structs
+  non_upper_case_globals:
+    titulo: "Constante con el estilo equivocado"
+    explica: "Las `const` y los `static` se escriben en mayúsculas con guiones bajos: `MAX_VIDAS`."
+    leccion: 03-valores-y-tipos/13-constantes-y-static
+  unreachable_code:
+    titulo: "Código que nunca se ejecuta"
+    explica: "Hay líneas después de un `return`, un `break`, un `panic!` o un bucle infinito: el programa nunca llegará a ellas."
+    leccion: 04-expresiones-y-control/03-loop-y-break-con-valor
+  unused_must_use:
+    titulo: "Resultado ignorado"
+    explica: "Llamas a algo que devuelve un `Result` (puede haber fallado) y no miras el resultado. Trátalo con `?`, `match` o, si de verdad te da igual, `let _ = …`."
+    leccion: 10-errores/02-result
+  unused_parens:
+    titulo: "Paréntesis que sobran"
+    explica: "En Rust la condición de un `if` o un `while` no lleva paréntesis: `if x > 0 {`, no `if (x > 0) {`."
+    leccion: 04-expresiones-y-control/02-if-es-una-expresion
+  while_true:
+    titulo: "while true"
+    explica: "Para repetir sin fin se usa `loop { … }`, no `while true { … }`."
+    leccion: 04-expresiones-y-control/03-loop-y-break-con-valor
+  overflowing_literals:
+    titulo: "Número que no cabe en su tipo"
+    explica: "Escribiste un número que se sale del rango de su tipo, como `300` en un `u8` (que llega hasta 255)."
+    leccion: 03-valores-y-tipos/04-enteros
+  arithmetic_overflow:
+    titulo: "Cuenta que desborda"
+    explica: "El compilador ve que una operación se saldrá del rango del tipo. Usa un tipo más grande o `checked_add`, `wrapping_add`, `saturating_add`."
+    leccion: 03-valores-y-tipos/06-checked-wrapping-saturating
+  unconditional_recursion:
+    titulo: "Recursión sin salida"
+    explica: "Una función se llama a sí misma siempre, sin ningún caso base: se llamaría sin fin hasta desbordar la pila."
+    leccion: 05-funciones-y-la-pila/05-recursion
+  irrefutable_let_patterns:
+    titulo: "if let que siempre encaja"
+    explica: "El patrón de tu `if let` encaja siempre, así que el `if` no sirve: usa un `let` normal."
+    leccion: 09-structs-enums-y-patrones/09-if-let-while-let-let-else
+  unused_comparisons:
+    titulo: "Comparación inútil"
+    explica: "Comparas algo que siempre da lo mismo, como `x >= 0` con un número sin signo (que nunca es negativo)."
+    leccion: 01-la-maquina/06-enteros-sin-signo
+
+mensajes:
+  - patron: "linker `link.exe` not found"
+    titulo: "Falta el enlazador de Microsoft"
+    explica: "Tu código está bien: lo que falta es el programa que crea el `.exe`. Instala las Build Tools de Visual Studio con «Desarrollo para el escritorio con C++»."
+    leccion: 00-el-taller/04-la-trampa-de-link
+  - patron: "index out of bounds"
+    titulo: "Pánico: índice fuera de la lista"
+    explica: "Pediste la posición `i` de una lista que no tiene tantos elementos (recuerda que se cuenta desde 0). Usa `.get(i)`, que devuelve `None` en vez de detener el programa."
+    leccion: 11-colecciones-y-texto/01-vec
+  - patron: "attempt to add with overflow"
+    titulo: "Pánico: la suma no cabe"
+    explica: "El resultado de una suma se salió del rango de su tipo (por ejemplo, 255 + 1 en un `u8`). Usa un tipo más grande o `checked_add`."
+    leccion: 03-valores-y-tipos/05-overflow
+  - patron: "attempt to subtract with overflow"
+    titulo: "Pánico: la resta no cabe"
+    explica: "Una resta dio un número fuera del rango del tipo; lo típico es restar a un número sin signo (`u32`, `usize`) y quedar por debajo de 0. Usa `checked_sub` o `saturating_sub`."
+    leccion: 03-valores-y-tipos/05-overflow
+  - patron: "attempt to multiply with overflow"
+    titulo: "Pánico: la multiplicación no cabe"
+    explica: "El resultado se salió del rango del tipo. Usa un tipo más grande (`u64`, `i64`…) o `checked_mul`."
+    leccion: 03-valores-y-tipos/05-overflow
+  - patron: "attempt to divide by zero"
+    titulo: "Pánico: división entre cero"
+    explica: "Dividiste un entero entre 0. Comprueba antes que el divisor no sea 0, o usa `checked_div`."
+    leccion: 04-expresiones-y-control/08-operadores-y-precedencia
+  - patron: "called `Option::unwrap()` on a `None` value"
+    titulo: "Pánico: unwrap sobre None"
+    explica: "Usaste `unwrap()` en un `Option` que estaba vacío. Trata el caso `None` con `match`, `if let` o `unwrap_or`."
+    leccion: 10-errores/03-unwrap-y-expect
+  - patron: "called `Result::unwrap()` on an `Err` value"
+    titulo: "Pánico: unwrap sobre un error"
+    explica: "Usaste `unwrap()` en un `Result` que traía un error. Lee el error que aparece detrás y trátalo con `match` o propágalo con `?`."
+    leccion: 10-errores/03-unwrap-y-expect
+  - patron: "not yet implemented"
+    titulo: "Pánico: todo!()"
+    explica: "Se ejecutó un `todo!()`: una marca de «aquí falta código». Sustitúyelo por tu código."
+    leccion: 10-errores/01-panic
+  - patron: "byte index"
+    titulo: "Pánico: corte de texto en mitad de una letra"
+    explica: "Cortaste un texto por una posición de byte que cae en mitad de un carácter (por ejemplo, dentro de una ñ, que ocupa 2 bytes). Corta con `char_indices` o busca la posición con `find`."
+    leccion: 11-colecciones-y-texto/06-cortar-texto
+  - patron: "already mutably borrowed"
+    titulo: "Pánico: RefCell ya prestado para modificar"
+    explica: "Pediste leer un `RefCell` (`borrow`) mientras alguien lo tenía prestado para modificarlo (`borrow_mut`). Acorta ese préstamo antes."
+    leccion: 15-punteros-inteligentes/08-cell-y-refcell
+  - patron: "already borrowed"
+    titulo: "Pánico: RefCell ya prestado"
+    explica: "Pediste un préstamo de un `RefCell` mientras había otro incompatible activo (por ejemplo, dos `borrow_mut` a la vez). Acorta el primer préstamo antes de pedir el segundo."
+    leccion: 15-punteros-inteligentes/08-cell-y-refcell
+  - patron: "has overflowed its stack"
+    titulo: "Desbordamiento de pila"
+    explica: "Demasiadas llamadas anidadas: casi siempre, una recursión sin caso base o demasiado profunda. Revisa el caso base o conviértela en un bucle."
+    leccion: 05-funciones-y-la-pila/09-cuanta-pila-cabe
+  - patron: "could not find `Cargo.toml`"
+    titulo: "No estás en la carpeta del proyecto"
+    explica: "Ejecutaste `cargo` en una carpeta que no tiene `Cargo.toml`. Entra en la carpeta del proyecto con `cd` (la que creó `cargo new`)."
+    leccion: 00-el-taller/06-cargo-new-y-run

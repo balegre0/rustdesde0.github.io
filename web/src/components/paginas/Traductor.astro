@@ -1,0 +1,182 @@
+---
+// /errores/traductor/ — pega la salida de rustc o cargo y explica cada error, aviso y pánico en español:
+// qué significa, dónde mirar y dónde aprenderlo. Todo ocurre en el navegador: no se envía nada.
+// Datos: las fichas de errores (src/content/docs/errores/eXXXX.mdx) y contenido/traductor.yaml.
+import { getCollection } from 'astro:content';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parse } from 'yaml';
+import { mdEnLinea } from '../islas/md';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const fichas = Object.fromEntries(
+  (await getCollection('docs', (e) => /^errores\/e\d{4}$/.test(e.id))).map((e) => [
+    e.id.slice(-5).toUpperCase(),
+    { titulo: e.data.title.replace(/^E\d{4}:\s*/, ''), explica: mdEnLinea(e.data.description ?? ''), href: `${base}/${e.id}/` },
+  ]),
+);
+type Entrada = { titulo: string; explica: string; leccion: string };
+const t = parse(readFileSync(join(process.cwd(), 'contenido', 'traductor.yaml'), 'utf8')) as {
+  avisos: Record<string, Entrada>;
+  mensajes: (Entrada & { patron: string })[];
+};
+const conLeccion = (x: Entrada) => ({ titulo: x.titulo, explica: mdEnLinea(x.explica), href: `${base}/curso/${x.leccion}/` });
+const datos = {
+  fichas,
+  avisos: Object.fromEntries(Object.entries(t.avisos).map(([k, v]) => [k, conLeccion(v)])),
+  mensajes: t.mensajes.map((m) => ({ patron: m.patron.toLowerCase(), ...conLeccion(m) })),
+};
+---
+<div class="rdc-traductor not-content" data-traductor>
+  <label class="rdc-traductor-label" for="traductor-entrada">Pega aquí lo que te ha dicho el compilador (o el programa al detenerse)</label>
+  <textarea id="traductor-entrada" rows="9" spellcheck="false" autocomplete="off" data-traductor-entrada
+    placeholder={'error[E0382]: borrow of moved value: `s1`\n --> src/main.rs:4:20\n  |\n2 |     let s1 = String::from("hola");\n…'}></textarea>
+  <div class="rdc-traductor-barra">
+    <button type="button" class="rdc-boton" data-traductor-explicar>Explicar</button>
+    <button type="button" class="rdc-boton secundario" data-traductor-ejemplo>Probar con un ejemplo</button>
+    <span class="rdc-traductor-privado">Se analiza en tu navegador: no se envía a ningún sitio.</span>
+  </div>
+  <div class="rdc-traductor-resultado" data-traductor-resultado aria-live="polite"></div>
+  <script type="application/json" data-traductor-datos set:html={JSON.stringify(datos).replace(/</g, '\\u003c')} />
+</div>
+<script>
+  type Info = { titulo: string; explica: string; href: string };
+  type Datos = { fichas: Record<string, Info>; avisos: Record<string, Info>; mensajes: (Info & { patron: string })[] };
+  type Diag = { tipo: 'error' | 'aviso' | 'panico'; cabecera: string; codigo?: string; lint?: string; lugar?: string; ayudas: string[] };
+
+  const raiz = document.querySelector<HTMLElement>('[data-traductor]')!;
+  const datos: Datos = JSON.parse(raiz.querySelector('[data-traductor-datos]')!.textContent!);
+  const entrada = raiz.querySelector<HTMLTextAreaElement>('[data-traductor-entrada]')!;
+  const resultado = raiz.querySelector<HTMLElement>('[data-traductor-resultado]')!;
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const EJEMPLO = `warning: unused variable: \`x\`
+ --> src/main.rs:2:9
+  |
+2 |     let x = 5;
+  |         ^ help: if this is intentional, prefix it with an underscore: \`_x\`
+  |
+  = note: \`#[warn(unused_variables)]\` on by default
+
+error[E0382]: borrow of moved value: \`s1\`
+ --> src/main.rs:5:20
+  |
+3 |     let s1 = String::from("hola");
+  |         -- move occurs because \`s1\` has type \`String\`, which does not implement the \`Copy\` trait
+4 |     let s2 = s1;
+  |              -- value moved here
+5 |     println!("{}", s1);
+  |                    ^^ value borrowed here after move
+  |
+help: consider cloning the value if the performance cost is acceptable
+  |
+4 |     let s2 = s1.clone();
+  |                ++++++++
+
+error: could not compile \`hola\` (bin "hola") due to 1 previous error; 1 warning emitted`;
+
+  // Líneas de resumen de cargo/rustc que no son diagnósticos en sí.
+  const RESUMEN = /^(error: (could not compile|aborting due to)|warning: `[^`]+` \(.*\) generated|warning: \d+ warnings? emitted|error: Some errors have)/i;
+
+  function analizar(texto: string): Diag[] {
+    const diags: Diag[] = [];
+    let actual: Diag | null = null;
+    const lineas = texto.replace(/\r\n?/g, '\n').split('\n');
+    for (let k = 0; k < lineas.length; k++) {
+      const l = lineas[k];
+      const cab = /^(error|warning)(?:\[(E\d{4})\])?: (.*)$/.exec(l);
+      if (cab && !RESUMEN.test(l)) {
+        actual = { tipo: cab[1] === 'error' ? 'error' : 'aviso', cabecera: cab[3], codigo: cab[2], ayudas: [] };
+        diags.push(actual);
+        continue;
+      }
+      if (cab) { actual = null; continue; }
+      const panico = /panicked at ([^\s:]+):(\d+):(\d+):?\s*(.*)$/.exec(l);
+      if (panico) {
+        // Formato actual: el mensaje va en la línea siguiente. Formato antiguo: 'mensaje', en la misma línea.
+        const enLinea = panico[4].replace(/^'|',?$/g, '').trim();
+        const msg = enLinea || (lineas[k + 1] ?? '').trim();
+        actual = { tipo: 'panico', cabecera: msg, lugar: `${panico[1]}:${panico[2]}:${panico[3]}`, ayudas: [] };
+        diags.push(actual);
+        continue;
+      }
+      if (!actual) continue;
+      const lugar = /^\s*-->\s*(.+?:\d+:\d+)/.exec(l);
+      if (lugar && !actual.lugar) actual.lugar = lugar[1];
+      const lint = /#\[(?:warn|deny|forbid)\(([\w:]+)\)\]/.exec(l);
+      if (lint && !actual.lint) actual.lint = lint[1];
+      const ayuda = /^\s*(?:=\s*)?help: (.*)$/.exec(l);
+      if (ayuda && actual.ayudas.length < 3) actual.ayudas.push(ayuda[1]);
+    }
+    return diags;
+  }
+
+  const textoLugar = (lugar?: string) => {
+    if (!lugar) return '';
+    const m = /^(.*):(\d+):(\d+)$/.exec(lugar);
+    return m ? `Mira el archivo <code>${esc(m[1])}</code>, <strong>línea ${m[2]}</strong>, columna ${m[3]}.` : '';
+  };
+  const codigoEnLinea = (s: string) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+  const mensaje = (s: string) => datos.mensajes.find((m) => s.toLowerCase().includes(m.patron));
+
+  function tarjeta(d: Diag) {
+    const etiqueta = d.tipo === 'error' ? 'Error' : d.tipo === 'aviso' ? 'Aviso' : 'Pánico al ejecutar';
+    let info: Info | undefined;
+    let enlace = '';
+    let nota = '';
+    if (d.codigo) {
+      info = datos.fichas[d.codigo];
+      if (info) enlace = `<a href="${info.href}">Ficha completa de ${d.codigo}: ejemplo, causas típicas y cómo arreglarlo →</a>`;
+      else enlace = `<a href="https://doc.rust-lang.org/error_codes/${d.codigo}.html" rel="noopener">Explicación oficial de ${d.codigo} (en inglés) →</a>`;
+      if (!info) nota = `Todavía no hay ficha en español de ${d.codigo}. También puedes leer su explicación con <code>rustc --explain ${d.codigo}</code>.`;
+    } else if (d.lint && datos.avisos[d.lint]) {
+      info = datos.avisos[d.lint];
+      enlace = `<a href="${info.href}">Aprende esto en su lección →</a>`;
+    } else {
+      info = mensaje(d.cabecera);
+      if (info) enlace = `<a href="${info.href}">Aprende esto en su lección →</a>`;
+    }
+    if (!info && d.tipo === 'aviso') nota = 'Es un aviso: el programa se crea igualmente, pero conviene hacerle caso.' + (d.lint ? ` Su nombre es <code>${esc(d.lint)}</code>.` : '');
+    if (!info && d.tipo === 'panico') nota = 'El programa compiló, pero se detuvo al ejecutarse en esa línea. Lee el mensaje: suele decir exactamente qué pasó.';
+    if (!info && d.tipo === 'error' && !d.codigo) nota = 'Este error no tiene código. Lee el mensaje y fíjate en la línea que señala.';
+    const ayudas = d.ayudas.length
+      ? `<p class="rdc-traductor-ayuda"><strong>El compilador sugiere:</strong> ${d.ayudas.map(codigoEnLinea).join(' · ')}</p>` : '';
+    return `<article class="rdc-traductor-tarjeta" data-tipo="${d.tipo}">
+      <p class="rdc-traductor-cab"><span class="rdc-traductor-tipo">${etiqueta}</span>${d.codigo ? `<code>${d.codigo}</code>` : ''}${info ? `<span class="rdc-traductor-titulo">${esc(info.titulo)}</span>` : ''}</p>
+      <p class="rdc-traductor-original"><span>Mensaje original:</span> <code>${esc(d.cabecera)}</code></p>
+      ${info ? `<p class="rdc-traductor-explica">${info.explica}</p>` : ''}
+      ${nota ? `<p class="rdc-traductor-nota">${nota}</p>` : ''}
+      ${d.lugar ? `<p class="rdc-traductor-lugar">${textoLugar(d.lugar)}</p>` : ''}
+      ${ayudas}
+      ${enlace ? `<p class="rdc-traductor-enlace">${enlace}</p>` : ''}
+    </article>`;
+  }
+
+  function explicar() {
+    const texto = entrada.value;
+    if (!texto.trim()) { resultado.innerHTML = ''; return; }
+    const diags = analizar(texto);
+    // Mensajes sueltos que no son un diagnóstico con cabecera (p. ej. el enlazador o Cargo.toml).
+    if (!diags.length) {
+      const m = mensaje(texto);
+      if (m) diags.push({ tipo: 'error', cabecera: texto.trim().split('\n').find((l) => l.toLowerCase().includes(m.patron)) ?? m.patron, ayudas: [] });
+    }
+    if (!diags.length) {
+      resultado.innerHTML = '<p class="rdc-traductor-vacio">No he encontrado ningún error, aviso ni pánico. Copia el texto completo tal y como sale en la terminal, desde la línea que empieza por <code>error</code>, <code>warning</code> o <code>thread \'main\' panicked</code>.</p>';
+      return;
+    }
+    // Primero lo que impide compilar, luego los pánicos y al final los avisos.
+    const orden = { error: 0, panico: 1, aviso: 2 };
+    diags.sort((a, b) => orden[a.tipo] - orden[b.tipo]);
+    const n = { error: 0, aviso: 0, panico: 0 };
+    for (const d of diags) n[d.tipo]++;
+    const partes = [n.error && `${n.error} ${n.error === 1 ? 'error' : 'errores'}`, n.aviso && `${n.aviso} ${n.aviso === 1 ? 'aviso' : 'avisos'}`, n.panico && `${n.panico} ${n.panico === 1 ? 'pánico' : 'pánicos'}`].filter(Boolean);
+    const consejo = n.error > 1 ? ' Arregla primero el <strong>primer error</strong>: a veces los siguientes son consecuencia de él.' : '';
+    resultado.innerHTML = `<p class="rdc-traductor-resumen">He encontrado ${partes.join(', ')}.${consejo}</p>` + diags.map(tarjeta).join('');
+  }
+
+  raiz.querySelector('[data-traductor-explicar]')!.addEventListener('click', explicar);
+  raiz.querySelector('[data-traductor-ejemplo]')!.addEventListener('click', () => { entrada.value = EJEMPLO; explicar(); });
+  entrada.addEventListener('paste', () => setTimeout(explicar, 0));
+  entrada.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); explicar(); } });
+</script>

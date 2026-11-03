@@ -784,3 +784,36 @@ kbd {
   .rdc-chuleta-titulo, .rdc-chuleta-frase { color: #000 !important; }
   .rdc-chuleta-imagina { color: #333 !important; }
 }
+
+/* ── Traductor de errores (/errores/traductor/) ── */
+.rdc-traductor { max-width: var(--rdc-medida); }
+.rdc-traductor-label { display: block; margin: 1.25rem 0 0.4rem; font-weight: 600; color: var(--sl-color-white); }
+.rdc-traductor textarea {
+  box-sizing: border-box; width: 100%; resize: vertical; min-height: 10rem;
+  font-family: var(--sl-font-mono); font-size: 0.8125rem; line-height: 1.5; padding: 0.7rem 0.85rem;
+  border-radius: 0.5rem; border: 1px solid var(--rdc-borde-fuerte); background: var(--rdc-consola-bg); color: var(--rdc-consola-fg);
+}
+.rdc-traductor textarea:focus-visible { outline: 2px solid var(--rdc-foco); outline-offset: 1px; }
+.rdc-traductor-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin: 0.6rem 0 1.25rem; }
+.rdc-traductor-privado { font-size: 0.8125rem; color: var(--sl-color-gray-3); }
+.rdc-traductor-resultado { display: grid; gap: 0.75rem; }
+.rdc-traductor-resumen, .rdc-traductor-vacio { margin: 0 !important; color: var(--sl-color-gray-2); line-height: 1.55; }
+.rdc-traductor-tarjeta { padding: 0.85rem 1rem; border: 1px solid var(--rdc-borde); border-left-width: 3px; border-radius: 0.5rem; background: var(--rdc-superficie); }
+.rdc-traductor-tarjeta[data-tipo='error'] { border-left-color: var(--rdc-error); }
+.rdc-traductor-tarjeta[data-tipo='aviso'] { border-left-color: var(--rdc-aviso); }
+.rdc-traductor-tarjeta[data-tipo='panico'] { border-left-color: var(--rdc-info); }
+.rdc-traductor-tarjeta p { margin: 0 !important; line-height: 1.55; }
+.rdc-traductor-tarjeta p + p { margin-top: 0.45rem !important; }
+.rdc-traductor-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
+.rdc-traductor-tipo { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+[data-tipo='error'] .rdc-traductor-tipo { color: var(--rdc-error); }
+[data-tipo='aviso'] .rdc-traductor-tipo { color: var(--rdc-aviso); }
+[data-tipo='panico'] .rdc-traductor-tipo { color: var(--rdc-info); }
+.rdc-traductor-titulo { font-weight: 600; font-size: 1.0625rem; color: var(--sl-color-white); }
+.rdc-traductor-original { font-size: 0.875rem; color: var(--sl-color-gray-3); overflow-wrap: anywhere; }
+.rdc-traductor-original span { font-weight: 600; }
+.rdc-traductor-explica { color: var(--sl-color-white); }
+.rdc-traductor-nota, .rdc-traductor-ayuda { color: var(--sl-color-gray-2); font-size: 0.9375rem; overflow-wrap: anywhere; }
+.rdc-traductor-lugar { color: var(--sl-color-gray-2); }
+.rdc-traductor-enlace a { font-weight: 500; }
+.rdc-traductor-titulo { display: inline-block; } .rdc-traductor-titulo::first-letter { text-transform: uppercase; }
