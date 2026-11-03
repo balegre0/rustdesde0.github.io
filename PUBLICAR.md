@@ -6,6 +6,10 @@ GitHub instala Rust 1.99.1 y Bun, compila los ejemplos, construye la web y la pu
 
 La dirección final será `https://TU-USUARIO.github.io/rust-desde-cero/`.
 
+**Ya publicado:** el repositorio es <https://github.com/balegre0/rustdesde0.github.io> y la web queda en
+<https://balegre0.github.io/rustdesde0.github.io/>. Para que estuviera en la raíz (`https://balegre0.github.io/`),
+el repositorio tendría que llamarse exactamente `balegre0.github.io`.
+
 ## 1. Crea el repositorio en GitHub (una sola vez)
 
 1. Entra en <https://github.com/new>.
