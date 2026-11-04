@@ -9,6 +9,7 @@ import LaClave from '../components/interno/LaClave.astro';
 import RepasaSinMirar from '../components/interno/RepasaSinMirar.astro';
 import AntesDeEmpezar from '../components/interno/AntesDeEmpezar.astro';
 import ExplicaloTu from '../components/interno/ExplicaloTu.astro';
+import Escuchar from '../components/interno/Escuchar.astro';
 import { esLeccionId, esMundoId } from '../lib/lecciones';
 const { id, entry } = Astro.locals.starlightRoute;
 const mundo = esMundoId(id) ? id.replace(/^curso\//, '') : null;
@@ -16,6 +17,7 @@ const leccion = esLeccionId(id);
 const d = entry.data as { frase?: string; imagina?: string; requiere?: string[]; tarjetas?: { p: string; r: string }[] };
 ---
 <Default>
+  {leccion && <Escuchar />}
   {leccion && <AntesDeEmpezar requiere={d.requiere ?? []} />}
   {leccion && <LaClave frase={d.frase} imagina={d.imagina} />}
   <slot />

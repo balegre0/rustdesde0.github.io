@@ -1,0 +1,21 @@
+---
+// Barra «Escuchar»: lee en voz alta el contenido de la página (src/runtime/escuchar.ts).
+// objetivo: selector del contenido a leer; etiqueta: texto del botón.
+interface Props { objetivo?: string; etiqueta?: string }
+const { objetivo = '.sl-markdown-content', etiqueta = 'Escuchar esta lección' } = Astro.props;
+---
+<div class="rdc-escuchar not-content" data-escuchar-barra data-escuchar={objetivo} data-etiqueta={etiqueta} role="group" aria-label="Escuchar en voz alta">
+  <div class="rdc-escuchar-controles" data-esc-controles>
+    <button type="button" class="rdc-boton" data-esc-play aria-pressed="false">▶ {etiqueta}</button>
+    <span class="rdc-escuchar-extra">
+      <button type="button" class="rdc-boton secundario pequeno" data-esc-ant aria-label="Bloque anterior">⏮</button>
+      <button type="button" class="rdc-boton secundario pequeno" data-esc-sig aria-label="Bloque siguiente">⏭</button>
+      <button type="button" class="rdc-boton secundario pequeno" data-esc-vel aria-label="Velocidad">1×</button>
+      <button type="button" class="rdc-boton sutil pequeno" data-esc-parar>Parar</button>
+    </span>
+  </div>
+  <label class="rdc-escuchar-voz"><span class="sr-only">Voz</span><select data-esc-voz hidden aria-label="Voz"></select></label>
+  <span class="rdc-escuchar-estado" data-esc-estado aria-live="polite"></span>
+  <p class="rdc-escuchar-aviso" data-esc-aviso hidden></p>
+</div>
+<script>import '../../runtime/escuchar';</script>

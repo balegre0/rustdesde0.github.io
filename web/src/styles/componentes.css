@@ -831,3 +831,19 @@ kbd {
 .rdc-fallos-titulo { font-weight: 600; color: var(--sl-color-white); }
 .rdc-fallos-meta { font-size: 0.8125rem; color: var(--sl-color-gray-3); }
 .rdc-fallos-mas { margin: 0.75rem 0 0 !important; color: var(--sl-color-gray-2); font-size: 0.9375rem; }
+
+/* ── Escuchar en voz alta (src/runtime/escuchar.ts) ── */
+.rdc-escuchar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; max-width: var(--rdc-medida); margin: 0 0 1rem; }
+.rdc-escuchar-controles { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.rdc-escuchar-extra { display: none; gap: 0.35rem; }
+.rdc-escuchar[data-sonando] .rdc-escuchar-extra { display: inline-flex; }
+.rdc-escuchar [data-esc-play] { min-width: 9.5rem; }
+.rdc-escuchar [data-esc-vel] { font-variant-numeric: tabular-nums; min-width: 3.4rem; }
+.rdc-escuchar-estado { font-size: 0.8125rem; color: var(--sl-color-gray-3); font-variant-numeric: tabular-nums; }
+/* Lo que se está leyendo ahora mismo */
+.rdc-leyendo { background: color-mix(in srgb, var(--sl-color-accent) 14%, transparent) !important; box-shadow: 0 0 0 4px color-mix(in srgb, var(--sl-color-accent) 14%, transparent); border-radius: 0.25rem; transition: background 0.2s ease; }
+@media (prefers-reduced-motion: reduce) { .rdc-leyendo { transition: none; } }
+.rdc-escuchar-voz select { font: inherit; font-size: 0.875rem; max-width: 15rem; min-height: 2.125rem; padding: 0.2rem 0.5rem; border-radius: 0.4rem; border: 1px solid var(--rdc-borde-fuerte); background: var(--rdc-superficie); color: var(--sl-color-white); }
+.rdc-escuchar-voz select[hidden] { display: none; }
+.rdc-escuchar-aviso { flex-basis: 100%; margin: 0 !important; padding: 0.5rem 0.75rem; font-size: 0.875rem; line-height: 1.5; border-radius: 0.4rem; background: var(--rdc-aviso-bg); color: var(--sl-color-gray-2); border: 1px solid color-mix(in srgb, var(--rdc-aviso) 35%, transparent); }
+.rdc-escuchar-aviso[hidden] { display: none; }

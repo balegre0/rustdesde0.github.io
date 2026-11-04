@@ -2,8 +2,10 @@
 // /chuleta/ — la idea clave de cada lección, mundo por mundo: para repasar de un vistazo o imprimir.
 import { mundos } from '../../lib/lecciones';
 import { mdEnLinea } from '../islas/md';
+import Escuchar from '../interno/Escuchar.astro';
 const lista = (await mundos()).filter((m) => m.lecciones.some((l) => l.frase));
 ---
+<Escuchar objetivo=".rdc-chuleta" etiqueta="Escuchar toda la chuleta" />
 <div class="rdc-chuleta not-content">
   <div class="rdc-chuleta-barra">
     <label class="rdc-chuleta-opcion"><input type="checkbox" data-chuleta-imagina /> Mostrar también «Imagínalo así»</label>
