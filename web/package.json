@@ -8,7 +8,8 @@
     "dev": "bun run ejemplos && bun --bun astro dev --port 4331",
     "build": "bun run scripts/revisar-contenido.ts && bun run ejemplos && bun --bun astro build && bun run scripts/aplicar-glosario.ts && bun run scripts/aplicar-base.ts && bun run scripts/generar-sw.ts",
     "preview": "bun run scripts/servir.ts 4332",
-    "test": "bun run tests/e2e.ts"
+    "test": "bun run tests/e2e.ts",
+    "test:emacs": "bun run scripts/revisar-emacs.ts && bun run tests/emacs-e2e.ts"
   },
   "dependencies": {
     "@astrojs/preact": "6.1.1",

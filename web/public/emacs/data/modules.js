@@ -1,0 +1,16 @@
+export const modules = [
+  { id: 'm00', num: 0, title: 'El modelo Emacs', subtitle: 'Qué es realmente Emacs, cómo se organiza y cómo pedirle ayuda. El mapa mental que hace que todo lo demás encaje.', lessons: ['m00-l01', 'm00-l02', 'm00-l03', 'm00-l04', 'm00-l05'] },
+  { id: 'm01', num: 1, title: 'Supervivencia', subtitle: 'Abrir, guardar, cambiar de buffer, deshacer y cancelar. Lo mínimo para no perderte ni perder trabajo.', lessons: ['m01-l01', 'm01-l02', 'm01-l03', 'm01-l04', 'm01-l05'] },
+  { id: 'm02', num: 2, title: 'Movimiento y edición', subtitle: 'Punto, mark, región, kill ring, rectángulos y macros de teclado. Editar rápido sin mouse.', lessons: ['m02-l01', 'm02-l02', 'm02-l03', 'm02-l04', 'm02-l05'] },
+  { id: 'm03', num: 3, title: 'Búsqueda y navegación', subtitle: 'isearch, reemplazo, occur, grep, imenu, xref y marcadores. Encontrar cualquier cosa en cualquier proyecto.', lessons: ['m03-l01', 'm03-l02', 'm03-l03', 'm03-l04', 'm03-l05'] },
+  { id: 'm04', num: 4, title: 'Ventanas, frames y workspace', subtitle: 'Organizar el espacio de trabajo: splits, winner, tab-bar, frames y perspectivas.', lessons: ['m04-l01', 'm04-l02', 'm04-l03', 'm04-l04', 'm04-l05'] },
+  { id: 'm05', num: 5, title: 'Dired, Tramp y shell', subtitle: 'Gestionar archivos, editar en remoto y ejecutar procesos sin salir de Emacs.', lessons: ['m05-l01', 'm05-l02', 'm05-l03', 'm05-l04', 'm05-l05'] },
+  { id: 'm06', num: 6, title: 'Org-mode', subtitle: 'El sistema de notas, tareas, agenda, tablas, código y publicación que vive dentro de Emacs.', lessons: ['m06-l01', 'm06-l02', 'm06-l03', 'm06-l04', 'm06-l05'] },
+  { id: 'm07', num: 7, title: 'Git con Magit', subtitle: 'Versionar, revisar, ramificar y resolver conflictos con una interfaz que muestra el estado real del repo.', lessons: ['m07-l01', 'm07-l02', 'm07-l03', 'm07-l04', 'm07-l05'] },
+  { id: 'm08', num: 8, title: 'Completion y ecosistema', subtitle: 'Cómo completa Emacs, Vertico/Consult/Embark/Corfu y las herramientas que hacen que todo se sienta rápido.', lessons: ['m08-l01', 'm08-l02', 'm08-l03', 'm08-l04', 'm08-l05'] },
+  { id: 'm09', num: 9, title: 'Desarrollo', subtitle: 'Proyectos, LSP con Eglot, treesit, flymake, formateo, tests y debugging dentro del editor.', lessons: ['m09-l01', 'm09-l02', 'm09-l03', 'm09-l04', 'm09-l05'] },
+  { id: 'm10', num: 10, title: 'Emacs Lisp I', subtitle: 'Formas, listas, símbolos, funciones, variables y scope. El lenguaje que hay debajo de cada tecla.', lessons: ['m10-l01', 'm10-l02', 'm10-l03', 'm10-l04', 'm10-l05'] },
+  { id: 'm11', num: 11, title: 'Emacs Lisp II', subtitle: 'Buffers, text properties, overlays, keymaps, modos, hooks, advice y procesos. El nivel para extender Emacs.', lessons: ['m11-l01', 'm11-l02', 'm11-l03', 'm11-l04', 'm11-l05'] },
+  { id: 'm12', num: 12, title: 'Paquetes y configuración', subtitle: 'package.el, use-package, straight/elpaca, early-init, byte-compile, native-comp y publicación.', lessons: ['m12-l01', 'm12-l02', 'm12-l03', 'm12-l04', 'm12-l05'] },
+  { id: 'm13', num: 13, title: 'Rendimiento, testing e internals', subtitle: 'Arranque, profiler, GC, ERT, edebug, bytecode y cómo contribuir a Emacs sin miedo.', lessons: ['m13-l01', 'm13-l02', 'm13-l03', 'm13-l04', 'm13-l05'] },
+];
