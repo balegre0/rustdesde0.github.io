@@ -145,6 +145,7 @@ export function montarEscuchar(barra: HTMLElement) {
   const parar = barra.querySelector<HTMLButtonElement>('[data-esc-parar]')!;
   const vel = barra.querySelector<HTMLButtonElement>('[data-esc-vel]')!;
   const estado = barra.querySelector<HTMLElement>('[data-esc-estado]')!;
+  const probar = barra.querySelector<HTMLButtonElement>('[data-esc-probar]')!;
   if (!objetivo) return;
   if (!('speechSynthesis' in window)) {
     barra.querySelector<HTMLElement>('[data-esc-controles]')!.hidden = true;
@@ -156,13 +157,15 @@ export function montarEscuchar(barra: HTMLElement) {
   const aviso = barra.querySelector<HTMLElement>('[data-esc-aviso]')!;
   let voces: SpeechSynthesisVoice[] = [];
   let voz: SpeechSynthesisVoice | null = null;
+  let listas = false;
   const prepararVoces = vocesEspanol().then((vs) => {
     voces = vs;
+    listas = true;
     let guardada = '';
     try { guardada = localStorage.getItem(CLAVE_VOZ) ?? ''; } catch { /* sin almacenamiento */ }
     voz = vs.find((v) => v.name === guardada) ?? vs[0] ?? null;
     selector.replaceChildren(...vs.map((v) => new Option(nombreVoz(v), v.name, false, v === voz)));
-    selector.hidden = vs.length < 2;
+    selector.hidden = vs.length === 0;
     const edge = /Edg\//.test(navigator.userAgent);
     if (!vs.length) {
       aviso.innerHTML = 'Tu dispositivo no tiene ninguna voz en español, por eso suena mal. <strong>En Windows:</strong> Configuración → Hora e idioma → Voz → Agregar voces → Español. O abre la web en <strong>Microsoft Edge</strong>, que trae voces naturales.';
@@ -179,6 +182,7 @@ export function montarEscuchar(barra: HTMLElement) {
   });
   selector.addEventListener('change', () => {
     voz = voces.find((v) => v.name === selector.value) ?? voz;
+    if (voz) fallidas.delete(voz.name);
     try { localStorage.setItem(CLAVE_VOZ, selector.value); } catch { /* sin almacenamiento */ }
     if (voz && calidad(voz) >= 60) aviso.hidden = true;
     if (sonando && !enPausa) decir(i);
@@ -210,34 +214,92 @@ export function montarEscuchar(barra: HTMLElement) {
     barra.toggleAttribute('data-sonando', reproduciendo || enPausa || i > 0);
   };
 
-  const decir = (k: number) => {
+  // Generación: cada vez que se corta la lectura sube, y los avisos de frases viejas se ignoran.
+  let generacion = 0;
+  let vigia = 0;
+  // Referencias a las frases en cola: si no se guardan, el navegador puede tirarlas y no avisar al terminar.
+  const vivas: SpeechSynthesisUtterance[] = [];
+  const fallidas = new Set<string>();
+  const ocupado = () => speechSynthesis.speaking || speechSynthesis.pending;
+  const callar = () => {
+    generacion++;
     clearTimeout(temporizador);
-    speechSynthesis.cancel();
+    clearTimeout(vigia);
+    vivas.length = 0;
+    if (ocupado()) speechSynthesis.cancel();
+  };
+
+  /** La voz actual no habla: se prueba la siguiente; si no queda ninguna, se explica qué revisar. */
+  const otraVoz = (k: number, motivo: string) => {
+    if (voz) fallidas.add(voz.name);
+    const siguiente = voces.find((v) => !fallidas.has(v.name));
+    const antes = voz ? nombreVoz(voz) : 'La voz del sistema';
+    if (siguiente) {
+      voz = siguiente;
+      selector.value = siguiente.name;
+      estado.textContent = `${antes} no responde (${motivo}). Probando con ${nombreVoz(siguiente)}…`;
+      decir(k);
+    } else if (voz) {
+      voz = null; // último intento: la voz por defecto del navegador, pidiendo español
+      estado.textContent = `Ninguna voz respondió (${motivo}). Probando con la voz por defecto…`;
+      decir(k);
+    } else {
+      terminar(false);
+      estado.textContent = '';
+      aviso.innerHTML = `Tu navegador no consigue hablar (${motivo}). Revisa: <strong>1)</strong> el volumen de Windows y que esté elegido el altavoz correcto; <strong>2)</strong> que la pestaña no esté silenciada (clic derecho en la pestaña → «Activar sonido del sitio»); <strong>3)</strong> que tengas conexión a internet si usas una voz «natural». Después pulsa «Probar voz».`;
+      aviso.hidden = false;
+    }
+  };
+
+  const decir = (k: number) => {
+    const habiaSonido = ocupado();
+    callar();
     if (k >= trozos.length) { terminar(true); return; }
     i = Math.max(0, k);
+    const gen = generacion;
     const t = trozos[i];
     marcar(t.el);
     estado.textContent = `${i + 1} de ${trozos.length}`;
     const partes = frases(paraVoz(t.texto));
+    if (!partes.length) { setTimeout(() => { if (gen === generacion) decir(k + 1); }, 0); return; }
     const lanzar = () => {
+      if (gen !== generacion) return;
+      speechSynthesis.resume(); // por si el navegador dejó la síntesis en pausa (pestaña en segundo plano)
+      let empezo = false;
+      const t0 = performance.now();
       partes.forEach((p, j) => {
         const u = new SpeechSynthesisUtterance(p);
         u.lang = voz?.lang ?? 'es-ES';
         if (voz) u.voice = voz;
-        u.pitch = 1;
         u.rate = velocidad;
-        if (j === partes.length - 1) u.onend = () => { if (sonando && !enPausa && i === k) decir(k + 1); };
+        u.onstart = () => { empezo = true; };
+        u.onerror = (e) => {
+          if (gen !== generacion || e.error === 'interrupted' || e.error === 'canceled') return;
+          if (e.error === 'not-allowed') { terminar(false); estado.textContent = 'El navegador pide que pulses ▶ otra vez.'; return; }
+          otraVoz(k, e.error);
+        };
+        if (j === partes.length - 1) {
+          u.onend = () => {
+            if (gen !== generacion || !sonando || enPausa) return;
+            // Terminar «al instante» sin haber empezado a hablar: es una voz rota que no da error.
+            if (!empezo && performance.now() - t0 < 250 && p.length > 20) { otraVoz(k, 'sin sonido'); return; }
+            setTimeout(() => { if (gen === generacion) decir(k + 1); }, 0);
+          };
+        }
+        vivas.push(u);
         speechSynthesis.speak(u);
       });
-      if (!partes.length) decir(k + 1);
+      // Si en 5 s no ha empezado a hablar (p. ej. una voz natural sin conexión), se prueba otra.
+      vigia = window.setTimeout(() => { if (gen === generacion && !empezo && sonando && !enPausa && ocupado()) otraVoz(k, 'no empieza'); }, 5000);
     };
-    if (t.pausaAntes) temporizador = window.setTimeout(lanzar, t.pausaAntes / velocidad);
+    // Tras cortar una lectura, se espera un poco: hablar justo después de cancel() puede no sonar en Edge.
+    const espera = (t.pausaAntes ? t.pausaAntes / velocidad : 0) + (habiaSonido ? 180 : 0);
+    if (espera) temporizador = window.setTimeout(lanzar, espera);
     else lanzar();
   };
 
   const terminar = (alFinal: boolean) => {
-    clearTimeout(temporizador);
-    speechSynthesis.cancel();
+    callar();
     sonando = false; enPausa = false;
     if (alFinal) { i = 0; estado.textContent = 'Fin. ¡Bien hecho!'; }
     marcar(null);
@@ -245,18 +307,41 @@ export function montarEscuchar(barra: HTMLElement) {
     if (alFinal) barra.removeAttribute('data-sonando');
   };
 
-  play.addEventListener('click', () => {
+  const empezar = (k: number) => {
     if (!trozos.length) trozos = recoger(objetivo);
+    if (/no consigue hablar/.test(aviso.textContent ?? '')) aviso.hidden = true;
+    sonando = true; enPausa = false; ponerPlay(true);
+    // Si las voces ya están, se habla dentro del mismo clic (algunos navegadores lo exigen).
+    if (listas) decir(k);
+    else prepararVoces.then(() => { if (sonando && !enPausa) decir(k); });
+  };
+  play.addEventListener('click', () => {
     if (sonando && !enPausa) {
       // Pausa: se corta y, al seguir, se vuelve a leer el bloque actual desde el principio (más fiable que pause()).
-      enPausa = true; clearTimeout(temporizador); speechSynthesis.cancel(); ponerPlay(false); return;
+      enPausa = true; callar(); ponerPlay(false); return;
     }
-    sonando = true; enPausa = false; ponerPlay(true);
-    prepararVoces.then(() => { if (sonando && !enPausa) decir(i); });
+    empezar(i);
   });
-  sig.addEventListener('click', () => { if (!trozos.length) trozos = recoger(objetivo); sonando = true; enPausa = false; ponerPlay(true); decir(i + 1); });
-  ant.addEventListener('click', () => { if (!trozos.length) trozos = recoger(objetivo); sonando = true; enPausa = false; ponerPlay(true); decir(i - 1); });
+  sig.addEventListener('click', () => empezar(i + 1));
+  ant.addEventListener('click', () => empezar(i - 1));
   parar.addEventListener('click', () => { i = 0; estado.textContent = ''; terminar(false); barra.removeAttribute('data-sonando'); ponerPlay(false); });
+  probar.addEventListener('click', () => {
+    callar();
+    const gen = generacion;
+    const u = new SpeechSynthesisUtterance('Hola. Así suena esta voz.');
+    u.lang = voz?.lang ?? 'es-ES';
+    if (voz) u.voice = voz;
+    u.rate = velocidad;
+    let empezo = false;
+    estado.textContent = 'Probando…';
+    u.onstart = () => { empezo = true; if (gen === generacion) estado.textContent = '✓ La voz está hablando. Si no oyes nada, sube el volumen o revisa que la pestaña no esté silenciada.'; };
+    u.onerror = (e) => { if (gen === generacion) estado.textContent = `✗ La voz falló (${e.error}). Elige otra voz en la lista y vuelve a probar.`; };
+    u.onend = () => { if (gen === generacion && !empezo) estado.textContent = '✗ La voz terminó sin hablar. Elige otra voz en la lista y vuelve a probar.'; };
+    vivas.push(u);
+    speechSynthesis.resume();
+    speechSynthesis.speak(u);
+    window.setTimeout(() => { if (gen === generacion && !empezo && estado.textContent === 'Probando…') estado.textContent = '✗ La voz no responde. Elige otra voz en la lista (o comprueba tu conexión si es «natural»).'; }, 5000);
+  });
   vel.addEventListener('click', () => {
     velocidad = VELOCIDADES[(VELOCIDADES.indexOf(velocidad) + 1) % VELOCIDADES.length] ?? 1;
     try { localStorage.setItem(CLAVE_VEL, String(velocidad)); } catch { /* sin almacenamiento */ }
